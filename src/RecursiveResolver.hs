@@ -6,6 +6,8 @@ import qualified Data.List as L
 import qualified Data.Set as S
 import Control.Applicative ((<|>))
 import Control.Monad (guard)
+import Control.Monad.Trans.Maybe
+import Control.Monad.IO.Class (MonadIO(liftIO))
 
 type Name = [String]
 -- TODO: Integrate DNAME | MX | PTR | SOA | TXT
@@ -33,13 +35,14 @@ choose :: Foldable t => t a -> Maybe a
 choose = foldr ((<|>) . Just) Nothing
 
 -- TODO: Model non-deterministic
-query :: Name -> [Record]
+query :: Name -> IO [Record]
 query = error ""
 
-resolve :: S.Set Name -> Name -> Type -> Maybe Record
+resolve :: S.Set Name -> Name -> Type -> MaybeT IO Record
 resolve slist qname qtype = do
-  ns <- choose slist
-  r <- choose (query ns)
+  ns <- hoistMaybe $ choose slist
+  rs <- liftIO $ query ns
+  r <- hoistMaybe $ choose rs
   guard (rname r `L.isSuffixOf` qname)
   case rtype r of
     t | rname r == qname && t == qtype -> return r
@@ -50,4 +53,4 @@ resolve slist qname qtype = do
     DNAME -> do
       let rewritten = take (length qname - length (rname r)) qname ++ nameInData r
       resolve slist rewritten qtype
-    _ -> Nothing
+    _ -> hoistMaybe Nothing
