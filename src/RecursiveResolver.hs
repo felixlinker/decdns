@@ -2,51 +2,52 @@ module RecursiveResolver
   ( Record
   , resolve ) where
 
+import qualified Data.List as L
 import qualified Data.Set as S
-import Control.Applicative ((<|>),asum)
-import Data.Functor (($>))
+import Control.Applicative ((<|>))
 import Control.Monad (guard)
 
-type NAME = String
+type Name = [String]
 -- TODO: Integrate DNAME | MX | PTR | SOA | TXT
-data TYPE = CNAME | NS | A
+data Type = CNAME | DNAME | NS | A
   deriving (Eq, Ord)
 
 data Record = Record
-  { name :: NAME
-  , rtype :: TYPE
+  { rname :: Name
+  , rtype :: Type
   , rdata :: String }
   deriving (Eq, Ord)
 
-data NameServer = NameServer NAME (Maybe [Record])
-  deriving (Eq, Ord)
+nameInData :: Record -> Name
+nameInData (Record _ A _) = []
+nameInData (Record _ _ d) = parse d
+  where
+    parse :: String -> Name
+    parse val = case span (/= '.') val of
+      (label, "") -> [label]
+      (label, '.':t) -> label : parse t
+      (_, _) -> error "unreachable"
 
 -- Returns some element for a non-empty foldable and Nothing otherwise.
 choose :: Foldable t => t a -> Maybe a
 choose = foldr ((<|>) . Just) Nothing
 
-query :: NAME -> NameServer
+-- TODO: Model non-deterministic
+query :: Name -> [Record]
 query = error ""
 
--- TODO: This model assumes that name servers are static, i.e., they return all
--- responses at once. This is not realistic.
-resolve :: S.Set NameServer -> NAME -> TYPE -> Maybe [Record]
+resolve :: S.Set Name -> Name -> Type -> Maybe Record
 resolve slist qname qtype = do
-  s@(NameServer _ mrs) <- choose slist
-  rs <- mrs <|> resolve (S.delete s slist) qname qtype
-  let ars = [ r | r@(Record rn rt _) <- rs, rn == qname, rt == qtype ]
-  asum  [ guard (not (null ars)) $> ars
-        , followNS rs
-        , rewriteCNAME rs ]
-  where
-    followNS :: [Record] -> Maybe [Record]
-    followNS rs = do
-      Record _ _ ns  <- choose [ r | r@(Record rname NS _) <- rs, rname == qname ]
-      -- model that we can only query a nameserver if we know its address
-      _ <- resolve slist ns A
-      resolve (S.insert (query ns) slist) qname qtype
-
-    rewriteCNAME :: [Record] -> Maybe [Record]
-    rewriteCNAME rs = do
-      Record _ _ newQ <- choose [ r | r@(Record rname CNAME _) <- rs, rname == qname ]
-      resolve slist newQ qtype
+  ns <- choose slist
+  r <- choose (query ns)
+  guard (rname r `L.isSuffixOf` qname)
+  case rtype r of
+    t | rname r == qname && t == qtype -> return r
+    NS -> do
+      _ <- resolve slist (nameInData r) A
+      resolve (S.insert (nameInData r) slist) qname qtype
+    CNAME -> resolve slist (nameInData r) qtype
+    DNAME -> do
+      let rewritten = take (length qname - length (rname r)) qname ++ nameInData r
+      resolve slist rewritten qtype
+    _ -> Nothing
