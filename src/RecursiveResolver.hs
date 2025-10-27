@@ -6,8 +6,7 @@ import qualified Data.List as L
 import qualified Data.Set as S
 import Control.Applicative ((<|>))
 import Control.Monad (guard)
-import Control.Monad.Trans.Maybe
-import Control.Monad.IO.Class (MonadIO(liftIO))
+import GHC.Base (failIO)
 
 type Name = [String]
 -- TODO: Integrate DNAME | MX | PTR | SOA | TXT
@@ -28,27 +27,30 @@ nameInData (Record _ _ d) = parse d
     parse val = case span (/= '.') val of
       (label, "") -> [label]
       (label, '.':t) -> label : parse t
-      (_, _) -> error "unreachable"
+      (_, _) -> undefined
 
 -- Returns some element for a non-empty foldable and Nothing otherwise.
-choose :: Foldable t => t a -> Maybe a
-choose = foldr ((<|>) . Just) Nothing
+choose :: Foldable t => t a -> IO a
+choose = foldr ((<|>) . return) (failIO "empty sequence")
 
 query :: Name -> IO Record
-query = error ""
+query = undefined
 
-resolve :: S.Set Name -> Name -> Type -> MaybeT IO Record
-resolve slist qname qtype = do
-  ns <- hoistMaybe $ choose slist
-  r <- liftIO $ query ns
+resolve :: S.Set Name -> Name -> Type -> IO [Record]
+resolve = rresolve []
+
+rresolve :: [Record] -> S.Set Name -> Name -> Type -> IO [Record]
+rresolve trace slist qname qtype = do
+  ns <- choose slist
+  r <- query ns
   guard (rname r `L.isSuffixOf` qname)
   case rtype r of
-    t | rname r == qname && t == qtype -> return r
+    t | rname r == qname && t == qtype -> return (r:trace)
     NS -> do
-      _ <- resolve slist (nameInData r) A
-      resolve (S.insert (nameInData r) slist) qname qtype
-    CNAME -> resolve slist (nameInData r) qtype
+      trace' <- rresolve trace slist (nameInData r) A
+      rresolve trace' (S.insert (nameInData r) slist) qname qtype
+    CNAME -> rresolve trace slist (nameInData r) qtype
     DNAME -> do
       let rewritten = take (length qname - length (rname r)) qname ++ nameInData r
-      resolve slist rewritten qtype
-    _ -> hoistMaybe Nothing
+      rresolve trace slist rewritten qtype
+    _ -> return []
