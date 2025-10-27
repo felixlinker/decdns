@@ -34,15 +34,13 @@ nameInData (Record _ _ d) = parse d
 choose :: Foldable t => t a -> Maybe a
 choose = foldr ((<|>) . Just) Nothing
 
--- TODO: Model non-deterministic
-query :: Name -> IO [Record]
+query :: Name -> IO Record
 query = error ""
 
 resolve :: S.Set Name -> Name -> Type -> MaybeT IO Record
 resolve slist qname qtype = do
   ns <- hoistMaybe $ choose slist
-  rs <- liftIO $ query ns
-  r <- hoistMaybe $ choose rs
+  r <- liftIO $ query ns
   guard (rname r `L.isSuffixOf` qname)
   case rtype r of
     t | rname r == qname && t == qtype -> return r
