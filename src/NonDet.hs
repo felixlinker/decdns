@@ -2,8 +2,8 @@ module NonDet
   ( NonDet
   , some
   , NonDet.all
+  , chooseFoldable
   , choose
-  , chooseFromList
   , NonDet.fail ) where
 
 import qualified Data.List as L
@@ -31,11 +31,11 @@ some (NonDet la) = fst <$> L.uncons la
 all :: NonDet a -> [a]
 all (NonDet la) = la
 
-choose :: Foldable t => t a -> NonDet a
-choose = NonDet . foldr (:) []
+chooseFoldable :: Foldable t => t a -> NonDet a
+chooseFoldable = NonDet . foldr (:) []
 
-chooseFromList :: [a] -> NonDet a
-chooseFromList = NonDet
+choose :: [a] -> NonDet a
+choose = NonDet
 
 fail :: NonDet a
 fail = NonDet []
