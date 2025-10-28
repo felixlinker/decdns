@@ -2,55 +2,35 @@ module RecursiveResolver
   ( Record
   , resolve ) where
 
-import qualified Data.List as L
 import qualified Data.Set as S
-import Control.Applicative ((<|>))
 import Control.Monad (guard)
-import GHC.Base (failIO)
 
-type Name = [String]
--- TODO: Integrate DNAME | MX | PTR | SOA | TXT
-data Type = CNAME | DNAME | NS | A
-  deriving (Eq, Ord)
-
-data Record = Record
-  { rname :: Name
-  , rtype :: Type
-  , rdata :: String }
-  deriving (Eq, Ord)
+import NonDet
+import ZoneFile
+import Data.Maybe (fromMaybe)
 
 nameInData :: Record -> Name
-nameInData (Record _ A _) = []
-nameInData (Record _ _ d) = parse d
-  where
-    parse :: String -> Name
-    parse val = case span (/= '.') val of
-      (label, "") -> [label]
-      (label, '.':t) -> label : parse t
-      (_, _) -> undefined
+nameInData (Record _ A _) = Name []
+nameInData (Record _ _ d) = fromMaybe undefined (parseNameM d)
 
--- Returns some element for a non-empty foldable and Nothing otherwise.
-choose :: Foldable t => t a -> IO a
-choose = foldr ((<|>) . return) (failIO "empty sequence")
+type Zones = Name -> NonDet Record
 
-query :: Name -> IO Record
-query = undefined
-
-resolve :: S.Set Name -> Name -> Type -> IO [Record]
+resolve :: Zones -> S.Set Name -> Name -> Type -> NonDet [(Name, Record)]
 resolve = rresolve []
 
-rresolve :: [Record] -> S.Set Name -> Name -> Type -> IO [Record]
-rresolve trace slist qname qtype = do
+rresolve :: [(Name, Record)] -> Zones -> S.Set Name -> Name -> Type -> NonDet [(Name, Record)]
+rresolve trace zones slist qname qtype = do
   ns <- choose slist
-  r <- query ns
-  guard (rname r `L.isSuffixOf` qname)
+  r <- zones ns
+  guard (isSubDomain qname (rname r))
+  let trace' = (ns, r):trace
   case rtype r of
-    t | rname r == qname && t == qtype -> return (r:trace)
+    t | rname r == qname && t == qtype -> return trace'
     NS -> do
-      trace' <- rresolve trace slist (nameInData r) A
-      rresolve trace' (S.insert (nameInData r) slist) qname qtype
-    CNAME -> rresolve trace slist (nameInData r) qtype
+      trace'' <- rresolve trace' zones slist (nameInData r) A
+      rresolve trace'' zones (S.insert (nameInData r) slist) qname qtype
+    CNAME -> rresolve trace' zones slist (nameInData r) qtype
     DNAME -> do
-      let rewritten = take (length qname - length (rname r)) qname ++ nameInData r
-      rresolve trace slist rewritten qtype
-    _ -> return []
+      let rewritten = dnameRewrite qname (rname r) (nameInData r)
+      rresolve trace' zones slist rewritten qtype
+    _ -> NonDet.fail
