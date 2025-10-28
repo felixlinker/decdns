@@ -2,21 +2,21 @@ module RecursiveResolver
   ( Record
   , resolve ) where
 
-import qualified Data.Set as S
 import Control.Monad (guard)
 
 import NonDet
 import ZoneFile
 import Data.Maybe (fromMaybe)
+import Data.List (nub)
 
 nameInData :: Record -> Name
 nameInData (Record _ A _) = Name []
 nameInData (Record _ _ d) = fromMaybe undefined (parseNameM d)
 
-resolve :: (Name -> [Record]) -> S.Set Name -> Name -> Type -> NonDet [(Name, Record)]
+resolve :: (Name -> [Record]) -> [Name] -> Name -> Type -> NonDet [(Name, Record)]
 resolve query = rresolve []
   where
-    rresolve :: [(Name, Record)] -> S.Set Name -> Name -> Type -> NonDet [(Name, Record)]
+    rresolve :: [(Name, Record)] -> [Name] -> Name -> Type -> NonDet [(Name, Record)]
     rresolve trace slist qname qtype = do
       ns <- choose slist
       r <- choose $ query ns
@@ -27,7 +27,7 @@ resolve query = rresolve []
         t | rname r == qname && t == qtype -> return trace'
         NS -> do
           trace'' <- rresolve trace' slist (nameInData r) A
-          rresolve trace'' (S.insert (nameInData r) slist) qname qtype
+          rresolve trace'' (nub $ nameInData r:slist) qname qtype
         CNAME -> rresolve trace' slist (nameInData r) qtype
         DNAME -> do
           let rewritten = dnameRewrite qname (rname r) (nameInData r)

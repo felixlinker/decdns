@@ -26,7 +26,7 @@ main = do
   files <- getArgs
   zoneFiles <- M.fromList <$> mapM parseZoneFileFile files
   putStrLn "Resolve query with :?"
-  query (uncurry $ resolve (zoneFiles M.!) (M.keysSet zoneFiles))
+  query (uncurry $ resolve (zoneFiles M.!) (M.keys zoneFiles))
   where
     printHelp :: IO ()
     printHelp = putStrLn "could not parse; write :q to exit"
