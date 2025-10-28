@@ -13,10 +13,14 @@ nameInData :: Record -> Name
 nameInData (Record _ A _) = Name []
 nameInData (Record _ _ d) = fromMaybe undefined (parseNameM d)
 
-resolve :: (Name -> [Record]) -> [Name] -> Name -> Type -> NonDet [(Name, Record)]
+type SList = [Name]
+type QName = Name
+type QType = Type
+
+resolve :: (Name -> [Record]) -> SList -> QName -> QType -> NonDet [(Name, Record)]
 resolve query = rresolve []
   where
-    rresolve :: [(Name, Record)] -> [Name] -> Name -> Type -> NonDet [(Name, Record)]
+    rresolve :: [(Name, Record)] -> SList -> QName -> QType -> NonDet [(Name, Record)]
     rresolve trace slist qname qtype = do
       ns <- choose slist
       r <- choose $ query ns
