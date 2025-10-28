@@ -24,7 +24,7 @@ parseZoneFileFile path = do
 main :: IO ()
 main = do
   files <- getArgs
-  zoneFiles <- fmap chooseFromList . M.fromList <$> mapM parseZoneFileFile files
+  zoneFiles <- M.fromList <$> mapM parseZoneFileFile files
   putStrLn "Resolve query with :?"
   query (uncurry $ resolve (zoneFiles M.!) (M.keysSet zoneFiles))
   where

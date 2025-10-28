@@ -13,25 +13,25 @@ nameInData :: Record -> Name
 nameInData (Record _ A _) = Name []
 nameInData (Record _ _ d) = fromMaybe undefined (parseNameM d)
 
-type Zones = Name -> NonDet Record
+type Channel = Name -> [Record]
 
-resolve :: Zones -> S.Set Name -> Name -> Type -> NonDet [(Name, Record)]
+resolve :: Channel -> S.Set Name -> Name -> Type -> NonDet [(Name, Record)]
 resolve = rresolve []
 
-rresolve :: [(Name, Record)] -> Zones -> S.Set Name -> Name -> Type -> NonDet [(Name, Record)]
-rresolve trace zones slist qname qtype = do
+rresolve :: [(Name, Record)] -> Channel -> S.Set Name -> Name -> Type -> NonDet [(Name, Record)]
+rresolve trace query slist qname qtype = do
   ns <- choose slist
-  r <- zones ns
+  r <- choose $ query ns
   guard ((ns, r) `notElem` trace)
   guard (isSubDomain qname (rname r))
   let trace' = (ns, r):trace
   case rtype r of
     t | rname r == qname && t == qtype -> return trace'
     NS -> do
-      trace'' <- rresolve trace' zones slist (nameInData r) A
-      rresolve trace'' zones (S.insert (nameInData r) slist) qname qtype
-    CNAME -> rresolve trace' zones slist (nameInData r) qtype
+      trace'' <- rresolve trace' query slist (nameInData r) A
+      rresolve trace'' query (S.insert (nameInData r) slist) qname qtype
+    CNAME -> rresolve trace' query slist (nameInData r) qtype
     DNAME -> do
       let rewritten = dnameRewrite qname (rname r) (nameInData r)
-      rresolve trace' zones slist rewritten qtype
+      rresolve trace' query slist rewritten qtype
     _ -> NonDet.fail
