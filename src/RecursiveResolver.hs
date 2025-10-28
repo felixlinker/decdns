@@ -13,9 +13,7 @@ nameInData :: Record -> Name
 nameInData (Record _ A _) = Name []
 nameInData (Record _ _ d) = fromMaybe undefined (parseNameM d)
 
-type Channel = Name -> [Record]
-
-resolve :: Channel -> S.Set Name -> Name -> Type -> NonDet [(Name, Record)]
+resolve :: (Name -> [Record]) -> S.Set Name -> Name -> Type -> NonDet [(Name, Record)]
 resolve query = rresolve []
   where
     rresolve :: [(Name, Record)] -> S.Set Name -> Name -> Type -> NonDet [(Name, Record)]
