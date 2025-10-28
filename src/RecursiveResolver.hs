@@ -22,6 +22,7 @@ rresolve :: [(Name, Record)] -> Zones -> S.Set Name -> Name -> Type -> NonDet [(
 rresolve trace zones slist qname qtype = do
   ns <- choose slist
   r <- zones ns
+  guard ((ns, r) `notElem` trace)
   guard (isSubDomain qname (rname r))
   let trace' = (ns, r):trace
   case rtype r of
