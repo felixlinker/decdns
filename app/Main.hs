@@ -42,8 +42,7 @@ query = do
 nslist :: Stream s m Char => Parser s m Command
 nslist = do
   _ <- string ":slist"
-  list <- many name
-  return $ SList list
+  SList <$> many (spaces >> name)
 
 exit :: Stream s m Char => Parser s m Command
 exit = string ":q" $> Exit

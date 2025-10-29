@@ -64,7 +64,7 @@ dot = Char.char '.'
 
 name :: Stream s m Char => Parser s m Name
 name = do
-  n <- manyTill (letter <|> digit <|> Char.char '-' <|> Char.char '@' <|> dot) (space $> () <|> eof)
+  n <- many1 (letter <|> digit <|> Char.char '-' <|> Char.char '@' <|> dot)
   maybe (fail "could not split name") (return . Name) (splitName n)
   where
     splitName :: String -> Maybe [String]
