@@ -3,7 +3,9 @@
 module Main (main) where
 
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.Functor (($>))
+import Control.Applicative (asum)
 import System.Environment (getArgs)
 import GHC.Base (failIO, when)
 import Text.Parsec
@@ -25,7 +27,7 @@ parseZoneFileFile path = do
 
 type Query = (Name, Type)
 
-data Command = Exit | Query Query
+data Command = Exit | Query Query | SList SList
   deriving Show
 
 query :: Stream s m Char => Parser s m Command
@@ -37,32 +39,45 @@ query = do
   t <- recordType
   return $ Query (n, t)
 
+nslist :: Stream s m Char => Parser s m Command
+nslist = do
+  _ <- string ":slist"
+  list <- many name
+  return $ SList list
+
 exit :: Stream s m Char => Parser s m Command
 exit = string ":q" $> Exit
 
+commands :: Stream s m Char => Parser s m Command
+commands = asum $ map try [ query, nslist, exit ]
+
 parseCommand :: Monad m => String -> m (Either ParseError Command)
-parseCommand = runParserT (try exit <|> try query) (Name []) "parseCommand function"
+parseCommand = runParserT commands (Name []) "parseCommand function"
+
+runCommands :: M.Map Name [Record] -> IO ()
+runCommands nses = go (M.keys nses)
+  where
+    printHelp :: IO ()
+    printHelp = putStrLn "could not parse; write :q to exit"
+
+    go :: SList -> IO ()
+    go slist = do
+      l <- getLine
+      ecmd <- parseCommand l
+      either
+        (\_ -> printHelp >> go slist)
+        (\case  Exit -> return ()
+                SList slist' -> go (filter (`S.member` M.keysSet nses) slist')
+                Query (qname, qtype) -> do
+                  let traces = NonDet.all (resolve (nses M.!) slist qname qtype)
+                  when (null traces) (putStrLn "query cannot be resolved")
+                  mapM_ print traces
+                  go slist)
+        ecmd
 
 main :: IO ()
 main = do
   files <- getArgs
   zoneFiles <- M.fromList <$> mapM parseZoneFileFile files
   putStrLn "Resolve query with :?"
-  query (uncurry $ resolve (zoneFiles M.!) (M.keys zoneFiles))
-  where
-    printHelp :: IO ()
-    printHelp = putStrLn "could not parse; write :q to exit"
-
-    query :: ((Name, Type) -> NonDet [(Name, Record)]) ->  IO ()
-    query r = do
-      l <- getLine
-      ecmd <- parseCommand l
-      either
-        (\_ -> printHelp >> query r)
-        (\case  Exit -> return ()
-                Query q -> do
-                  let traces = NonDet.all (r q)
-                  when (null traces) (putStrLn "query cannot be resolved")
-                  mapM_ print traces
-                  query r)
-        ecmd
+  runCommands zoneFiles

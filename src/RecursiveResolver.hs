@@ -1,5 +1,6 @@
 module RecursiveResolver
   ( Record
+  , SList
   , resolve ) where
 
 import Control.Monad (guard)
