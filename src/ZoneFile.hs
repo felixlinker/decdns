@@ -99,7 +99,7 @@ relName = do
   return $ if ls == ["@"] then orig else Name (ls ++ origLs)
 
 ttl :: Stream s m Char => Parser s m String
-ttl = manyTill digit space
+ttl = many1 digit
 
 record :: Stream s m Char => Parser s m Record
 record = do
