@@ -3,14 +3,14 @@ module ZoneFile
   ( Name(..)
   , isSubDomain
   , dnameRewrite
+  , name
+  , recordType
   , Type(..)
   , Record(..)
+  , Parser
   , parseName
   , parseNameM
-  , parseZoneFile
-  , Command(..)
-  , Query
-  , parseCommand ) where
+  , parseZoneFile ) where
 
 import Text.Parsec
 import Text.Parsec.Char as Char
@@ -129,23 +129,3 @@ parseNameM s = parseName s >>= either (const mzero) return
 
 parseZoneFile :: Stream s m Char => SourceName -> s -> m (Either ParseError [Record])
 parseZoneFile = runParserT zoneFile (Name [])
-
-data Command = Exit | Query Query
-  deriving Show
-
-type Query = (Name, Type)
-
-query :: Stream s m Char => Parser s m Command
-query = do
-  _ <- string ":?"
-  spaces
-  n <- name
-  spaces
-  t <- recordType
-  return $ Query (n, t)
-
-exit :: Stream s m Char => Parser s m Command
-exit = string ":q" $> Exit
-
-parseCommand :: Monad m => String -> m (Either ParseError Command)
-parseCommand = runParserT (try exit <|> try query) (Name []) "parseCommand function"

@@ -1,10 +1,12 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 module Main (main) where
 
 import qualified Data.Map as M
+import Data.Functor (($>))
 import System.Environment (getArgs)
 import GHC.Base (failIO, when)
-import Text.Parsec (ParseError)
+import Text.Parsec
 
 import NonDet
 import RecursiveResolver
@@ -20,6 +22,26 @@ parseZoneFileFile path = do
     handleParser :: Either ParseError a -> IO a
     handleParser (Left err) = failIO (show err)
     handleParser (Right a) = return a
+
+type Query = (Name, Type)
+
+data Command = Exit | Query Query
+  deriving Show
+
+query :: Stream s m Char => Parser s m Command
+query = do
+  _ <- string ":?"
+  spaces
+  n <- name
+  spaces
+  t <- recordType
+  return $ Query (n, t)
+
+exit :: Stream s m Char => Parser s m Command
+exit = string ":q" $> Exit
+
+parseCommand :: Monad m => String -> m (Either ParseError Command)
+parseCommand = runParserT (try exit <|> try query) (Name []) "parseCommand function"
 
 main :: IO ()
 main = do
