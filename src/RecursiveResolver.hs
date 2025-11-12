@@ -33,7 +33,7 @@ resolve query = rresolve []
         NS -> do
           trace'' <- rresolve trace' slist (nameInData r) A
           rresolve trace'' (nub $ nameInData r:slist) qname qtype
-        CNAME -> rresolve trace' slist (nameInData r) qtype
+        CNAME | rname r == qname -> rresolve trace' slist (nameInData r) qtype
         DNAME -> do
           let rewritten = dnameRewrite qname (rname r) (nameInData r)
           rresolve trace' slist rewritten qtype
