@@ -14,11 +14,12 @@ module ZoneFile
 
 import Text.Parsec
 import Text.Parsec.Char as Char
-import Control.Monad (guard, MonadPlus (mzero))
+import Control.Monad (guard, MonadPlus (mzero), when)
 import Control.Applicative (asum)
 import Data.Functor (($>))
 import qualified Data.List as L
 import Data.List (intercalate)
+import Data.Maybe (isJust)
 
 newtype Name = Name { labels :: [String] }
   deriving (Eq, Ord)
@@ -121,8 +122,13 @@ zone = do
 zoneFile :: Stream s m Char => Parser s m [Record]
 zoneFile = concat <$> many zone
 
+skipPath :: Stream s m Char => Parser s m ()
+skipPath = do
+  m <- optionMaybe (try $ manyTill (Char.noneOf ['/']) (Char.char '/'))
+  when (isJust m) skipPath
+
 parseName :: Monad m => String -> m (Either ParseError Name)
-parseName = runParserT name (Name []) "parseName function"
+parseName = runParserT (skipPath >> name) (Name []) "parseName function"
 
 parseNameM :: MonadPlus m => String -> m Name
 parseNameM s = parseName s >>= either (const mzero) return
