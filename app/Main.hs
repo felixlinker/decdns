@@ -69,8 +69,9 @@ runCommands nses = go (M.keys nses)
                 SList slist' -> go (filter (`S.member` M.keysSet nses) slist')
                 Query (qname, qtype) -> do
                   let traces = NonDet.all (resolve (nses M.!) slist qname qtype)
-                  when (null traces) (putStrLn "query cannot be resolved")
-                  mapM_ print traces
+                  putStrLn (if null traces then "query cannot be resolved" else "query resolved to:")
+                  let minimal t = not $ any (`subtrace` t) traces
+                  mapM_ print $ filter minimal traces
                   go slist)
         ecmd
 

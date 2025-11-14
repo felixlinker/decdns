@@ -1,6 +1,10 @@
 module RecursiveResolver
   ( Record
   , SList
+  , QName
+  , QType
+  , Trace
+  , subtrace
   , resolve ) where
 
 import Control.Monad (guard)
@@ -17,11 +21,20 @@ nameInData (Record _ _ d) = fromMaybe undefined (parseNameM d)
 type SList = [Name]
 type QName = Name
 type QType = Type
+type Trace = [(Name, Record)]
 
-resolve :: (Name -> [Record]) -> SList -> QName -> QType -> NonDet [(Name, Record)]
+subtrace :: Trace -> Trace -> Bool
+subtrace [] [] = False
+subtrace [] _ = True
+subtrace _ [] = False
+subtrace (h1:t1) (h2:t2)
+  | h1 == h2 = subtrace t1 t2
+  | otherwise = False
+
+resolve :: (Name -> [Record]) -> SList -> QName -> QType -> NonDet Trace
 resolve query = rresolve []
   where
-    rresolve :: [(Name, Record)] -> SList -> QName -> QType -> NonDet [(Name, Record)]
+    rresolve :: Trace -> SList -> QName -> QType -> NonDet Trace
     rresolve trace slist qname qtype = do
       ns <- choose slist
       r <- choose $ query ns
