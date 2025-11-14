@@ -7,7 +7,7 @@ import qualified Data.Set as S
 import Data.Functor (($>))
 import Control.Applicative (asum)
 import System.Environment (getArgs)
-import GHC.Base (failIO, when)
+import GHC.Base (failIO)
 import Text.Parsec
 
 import NonDet
