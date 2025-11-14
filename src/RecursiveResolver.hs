@@ -23,13 +23,18 @@ type QName = Name
 type QType = Type
 type Trace = [(Name, Record)]
 
-subtrace :: Trace -> Trace -> Bool
-subtrace [] [] = False
-subtrace [] _ = True
-subtrace _ [] = False
-subtrace (h1:t1) (h2:t2)
-  | h1 == h2 = subtrace t1 t2
-  | otherwise = False
+subtrace :: Eq a => [a] -> [a] -> Bool
+subtrace = go False
+  where
+    go :: Eq a => Bool -> [a] -> [a] -> Bool
+    go acc  []      []    = acc
+    go _    []      (_:_) = True
+    go _    (_:_)   []    = False
+    go acc  (h1:t1) (h2:t2)
+      -- Accumulator stores whether second list is known to be smaller than
+      -- first list
+      | h1 == h2 = go acc t1 t2
+      | otherwise = go True (h1:t1) t2
 
 resolve :: (Name -> [Record]) -> SList -> QName -> QType -> NonDet Trace
 resolve query = rresolve []
