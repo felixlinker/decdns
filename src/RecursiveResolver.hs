@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 module RecursiveResolver
   ( Record
   , SList
@@ -13,6 +14,7 @@ import NonDet
 import ZoneFile
 import Data.Maybe (fromMaybe)
 import Data.List (nub)
+import qualified Data.Set as S
 
 nameInData :: Record -> Name
 nameInData (Record _ A _) = Name []
@@ -23,18 +25,8 @@ type QName = Name
 type QType = Type
 type Trace = [(Name, Record)]
 
-subtrace :: Eq a => [a] -> [a] -> Bool
-subtrace = go False
-  where
-    go :: Eq a => Bool -> [a] -> [a] -> Bool
-    go acc  []      []    = acc
-    go _    []      (_:_) = True
-    go _    (_:_)   []    = False
-    go acc  (h1:t1) (h2:t2)
-      -- Accumulator stores whether second list is known to be smaller than
-      -- first list
-      | h1 == h2 = go acc t1 t2
-      | otherwise = go True (h1:t1) t2
+subtrace :: Ord a => [a] -> [a] -> Bool
+subtrace (S.fromList -> s1) (S.fromList -> s2) = s1 `S.isProperSubsetOf` s2
 
 resolve :: (Name -> [Record]) -> SList -> QName -> QType -> NonDet Trace
 resolve query = rresolve []
