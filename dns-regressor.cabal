@@ -34,6 +34,7 @@ library
   build-depends:
       base >=4.7 && <5
     , containers
+    , lens
     , parsec
     , transformers
   default-language: Haskell2010
@@ -51,6 +52,7 @@ executable dns-regressor-exe
       base >=4.7 && <5
     , containers
     , dns-regressor
+    , lens
     , parsec
     , transformers
   default-language: Haskell2010
@@ -69,6 +71,7 @@ test-suite dns-regressor-test
       base >=4.7 && <5
     , containers
     , dns-regressor
+    , lens
     , parsec
     , transformers
   default-language: Haskell2010
