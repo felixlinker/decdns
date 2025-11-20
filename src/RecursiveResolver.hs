@@ -17,8 +17,11 @@ import Data.List (nub)
 import qualified Data.Set as S
 
 nameInData :: Record -> Name
-nameInData (Record _ A _) = Name []
-nameInData (Record _ _ d) = fromMaybe undefined (parseNameM d)
+nameInData (Record _ _ _ NS [d]) = fromMaybe undefined (parseNameM d)
+nameInData (Record _ _ _ CNAME [d]) = fromMaybe undefined (parseNameM d)
+nameInData (Record _ _ _ DNAME [d]) = fromMaybe undefined (parseNameM d)
+nameInData (Record _ _ _ MX [_, d]) = fromMaybe undefined (parseNameM d)
+nameInData Record {} = Name []
 
 type SList = [Name]
 type QName = Name

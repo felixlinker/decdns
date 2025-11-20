@@ -19,7 +19,7 @@ parseZoneFileFile path = do
   c <- readFile path
   zf <- parseZoneFile path c >>= handleParser
   ns <- parseName path >>= handleParser
-  return (ns, zf)
+  return (ns, concatMap records zf)
   where
     handleParser :: Either ParseError a -> IO a
     handleParser (Left err) = failIO (show err)
@@ -51,7 +51,7 @@ commands :: Stream s m Char => Parser s m Command
 commands = asum $ map try [ query, nslist, exit ]
 
 parseCommand :: Monad m => String -> m (Either ParseError Command)
-parseCommand = runParserT commands (Name []) "parseCommand function"
+parseCommand = runParserT commands emptyState "parseCommand function"
 
 runCommands :: M.Map Name [Record] -> IO ()
 runCommands nses = go (M.keys nses)
