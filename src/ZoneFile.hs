@@ -57,13 +57,13 @@ data Zone = Zone
   , children :: M.Map String Zone }
 
 insert :: Zone -> Record String -> Zone
-insert z_@(Zone org _ _) r_ = go (ZoneFile.labels org) r_ z_
+insert z_@(Zone org _ _) r_ = go (labels org) r_ z_
   where
     go :: [String] -> Record String -> Zone -> Zone
-    go acc r z@(Zone _ rs ch) = case L.unsnoc (ZoneFile.labels (rname r)) of
+    go acc r z@(Zone _ rs ch) = case L.unsnoc (labels (rname r)) of
       Nothing -> Zone org (r { rname = Name acc }:rs) ch
       Just (ls, l) ->
-        let rec = go ls (r { rname = Name ls })
+        let rec = go (l:acc) (r { rname = Name ls })
             ch' = if M.member l ch
               then M.update (Just . rec) l ch
               else M.insert l (rec (Zone (Name [l]) [] M.empty)) ch
