@@ -8,6 +8,7 @@ import Text.Read (readMaybe)
 import Control.Applicative (asum)
 import Data.Functor (($>))
 import Data.Maybe (catMaybes)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 
 import Parsing.State
@@ -27,7 +28,9 @@ origin = do
   spaces
   _ <- string "$ORIGIN"
   spaces1
-  name
+  org <- name
+  writeState parsedZone org
+  return org
 
 ttl :: Stream s m Char => Parser s m Int
 ttl = do
@@ -40,6 +43,12 @@ setTTL = do
   spaces1
   t <- ttl
   writeState lastTTL t
+
+relName :: Stream s m Char => Parser s m (Name String)
+relName = do
+  Name ls <- name
+  Name org <- readState parsedZone
+  return $ Name $ if ls == NE.singleton "@" then org else ls <> org
 
 record :: Stream s m Char => Parser s m (Record String)
 record = do
@@ -78,14 +87,14 @@ line = spaces >> asum (map try
   , setTTL $> Nothing
   , Just <$> record ])
 
-zone :: Stream s m Char => Parser s m Zone
+zone :: Stream s m Char => Parser s m (Zone String)
 zone = do
   org <- origin
   rs <- catMaybes <$> many line
   return $ foldl insert (Zone org [] M.empty) rs
 
-zoneFile :: Stream s m Char => Parser s m [Zone]
+zoneFile :: Stream s m Char => Parser s m [Zone String]
 zoneFile = many zone
 
-parseZoneFile :: Stream s m Char => SourceName -> s -> m (Either ParseError [Zone])
+parseZoneFile :: Stream s m Char => SourceName -> s -> m (Either ParseError [Zone String])
 parseZoneFile = runParserT zoneFile emptyState

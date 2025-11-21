@@ -2,6 +2,7 @@
 module Parsing.State
   ( Parser
   , ParserState
+  , parsedZone
   , lastName
   , lastTTL
   , lastCat
@@ -18,14 +19,15 @@ import ZoneFile
 type Parser s m = ParsecT s ParserState m
 
 data ParserState = ParserState
-  { _lastName :: Maybe (Name String)
+  { _parsedZone :: Maybe (Name String)
+  , _lastName :: Maybe (Name String)
   , _lastTTL :: Maybe Int
   , _lastCat :: Maybe Cat }
 
 L.makeLenses ''ParserState
 
 emptyState :: ParserState
-emptyState = ParserState Nothing Nothing Nothing
+emptyState = ParserState Nothing Nothing Nothing Nothing
 
 writeState :: Monad m => L.Lens' ParserState (Maybe a) -> a -> Parser s m ()
 writeState l a = modifyState (L.set l (return a))
