@@ -22,6 +22,12 @@ source-repository head
 library
   exposed-modules:
       NonDet
+      Parsing
+      Parsing.Command
+      Parsing.Name
+      Parsing.State
+      Parsing.Tokens
+      Parsing.ZoneFile
       RecursiveResolver
       ZoneFile
   other-modules:

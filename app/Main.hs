@@ -4,8 +4,6 @@ module Main (main) where
 
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Functor (($>))
-import Control.Applicative (asum)
 import System.Environment (getArgs)
 import GHC.Base (failIO)
 import Text.Parsec
@@ -13,6 +11,7 @@ import Text.Parsec
 import NonDet
 import RecursiveResolver
 import ZoneFile
+import Parsing
 
 parseZoneFileFile :: FilePath -> IO (Name String, [Record String])
 parseZoneFileFile path = do
@@ -24,34 +23,6 @@ parseZoneFileFile path = do
     handleParser :: Either ParseError a -> IO a
     handleParser (Left err) = failIO (show err)
     handleParser (Right a) = return a
-
-type Query = (Name String, Type)
-
-data Command = Exit | Query Query | SList SList
-  deriving Show
-
-query :: Stream s m Char => Parser s m Command
-query = do
-  _ <- string ":?"
-  spaces
-  n <- name
-  spaces
-  t <- recordType
-  return $ Query (n, t)
-
-nslist :: Stream s m Char => Parser s m Command
-nslist = do
-  _ <- string ":slist"
-  SList <$> many (spaces >> name)
-
-exit :: Stream s m Char => Parser s m Command
-exit = string ":q" $> Exit
-
-commands :: Stream s m Char => Parser s m Command
-commands = asum $ map try [ query, nslist, exit ]
-
-parseCommand :: Monad m => String -> m (Either ParseError Command)
-parseCommand = runParserT commands emptyState "parseCommand function"
 
 runCommands :: M.Map (Name String) [Record String] -> IO ()
 runCommands nses = go (M.keys nses)

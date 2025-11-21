@@ -15,6 +15,7 @@ import ZoneFile
 import Data.Maybe (fromMaybe)
 import Data.List (nub)
 import qualified Data.Set as S
+import Parsing.Name (parseNameM)
 
 nameInData :: Record String -> Name String
 nameInData (Record _ _ _ NS [d]) = fromMaybe undefined (parseNameM d)
