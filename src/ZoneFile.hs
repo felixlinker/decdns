@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 module ZoneFile
   ( Name(..)
   , Cat(..)
@@ -20,8 +21,8 @@ newtype Name a = Name { labels :: [a] }
 instance Functor Name where
   fmap f (Name ls) = Name (fmap f ls)
 
-instance Show a => Show (Name a) where
-  show (Name ls) = intercalate "." (map show ls)
+instance Show (Name String) where
+  show (Name ls) = intercalate "." ls
 
 isSubDomain :: Eq a => Name a -> Name a -> Bool
 isSubDomain (Name l1) (Name l2) = l2 `isSuffixOf` l1
@@ -47,7 +48,7 @@ data Record a = Record
   , rdata :: [String] }
   deriving (Eq, Ord)
 
-instance Show a => Show (Record a) where
+instance Show (Record String) where
   show (Record n c ttl t d) = show n ++ " " ++ show ttl ++ " " ++ show c ++ " " ++ show t ++ " " ++ unwords d
 
 data Zone = Zone
