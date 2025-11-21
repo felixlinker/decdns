@@ -14,18 +14,18 @@ import NonDet
 import RecursiveResolver
 import ZoneFile
 
-parseZoneFileFile :: FilePath -> IO (Name, [Record])
+parseZoneFileFile :: FilePath -> IO (Name String, [Record String])
 parseZoneFileFile path = do
   c <- readFile path
   zf <- parseZoneFile path c >>= handleParser
   ns <- parseName path >>= handleParser
-  return (ns, concatMap records zf)
+  return (ns, concatMap allRecords zf)
   where
     handleParser :: Either ParseError a -> IO a
     handleParser (Left err) = failIO (show err)
     handleParser (Right a) = return a
 
-type Query = (Name, Type)
+type Query = (Name String, Type)
 
 data Command = Exit | Query Query | SList SList
   deriving Show
@@ -53,7 +53,7 @@ commands = asum $ map try [ query, nslist, exit ]
 parseCommand :: Monad m => String -> m (Either ParseError Command)
 parseCommand = runParserT commands emptyState "parseCommand function"
 
-runCommands :: M.Map Name [Record] -> IO ()
+runCommands :: M.Map (Name String) [Record String] -> IO ()
 runCommands nses = go (M.keys nses)
   where
     printHelp :: IO ()

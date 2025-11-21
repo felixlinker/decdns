@@ -16,22 +16,22 @@ import Data.Maybe (fromMaybe)
 import Data.List (nub)
 import qualified Data.Set as S
 
-nameInData :: Record -> Name
+nameInData :: Record String -> Name String
 nameInData (Record _ _ _ NS [d]) = fromMaybe undefined (parseNameM d)
 nameInData (Record _ _ _ CNAME [d]) = fromMaybe undefined (parseNameM d)
 nameInData (Record _ _ _ DNAME [d]) = fromMaybe undefined (parseNameM d)
 nameInData (Record _ _ _ MX [_, d]) = fromMaybe undefined (parseNameM d)
 nameInData Record {} = Name []
 
-type SList = [Name]
-type QName = Name
+type SList = [Name String]
+type QName = Name String
 type QType = Type
-type Trace = [(Name, Record)]
+type Trace = [(Name String, Record String)]
 
 subtrace :: Ord a => [a] -> [a] -> Bool
 subtrace (S.fromList -> s1) (S.fromList -> s2) = s1 `S.isProperSubsetOf` s2
 
-resolve :: (Name -> [Record]) -> SList -> QName -> QType -> NonDet Trace
+resolve :: (Name String -> [Record String]) -> SList -> QName -> QType -> NonDet Trace
 resolve query = rresolve []
   where
     rresolve :: Trace -> SList -> QName -> QType -> NonDet Trace

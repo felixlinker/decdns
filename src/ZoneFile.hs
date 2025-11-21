@@ -7,8 +7,9 @@ module ZoneFile
   , name
   , recordType
   , Type(..)
-  , Zone(..)
   , Record(..)
+  , Zone(..)
+  , allRecords
   , Parser
   , emptyState
   , parseName
@@ -18,43 +19,32 @@ module ZoneFile
 import Text.Parsec
 import Text.Parsec.Char as Char
 import Text.Read (readMaybe)
-import Control.Monad (guard, MonadPlus (mzero), when)
+import Control.Monad (MonadPlus (mzero), when)
 import Control.Applicative (asum)
 import qualified Control.Lens as L
 import Data.Functor (($>))
 import Data.List (intercalate, isSuffixOf)
 import Data.Maybe (isJust, catMaybes)
+import qualified Data.Map as M
 
-newtype Name = Name { labels :: [String] }
+newtype Name a = Name { labels :: [a] }
   deriving (Eq, Ord)
 
-instance Show Name where
-  show (Name ls) = intercalate "." ls
+instance Functor Name where
+  fmap f (Name ls) = Name (fmap f ls)
 
-isSubDomain :: Name -> Name -> Bool
+instance Show a => Show (Name a) where
+  show (Name ls) = intercalate "." (map show ls)
+
+isSubDomain :: Eq a => Name a -> Name a -> Bool
 isSubDomain (Name l1) (Name l2) = l2 `isSuffixOf` l1
 
-dnameRewrite :: Name -> Name -> Name -> Name
+dnameRewrite :: Eq a => Name a -> Name a -> Name a -> Name a
 dnameRewrite qn@(Name qname) fn@(Name from) (Name to) =
   let prefixLen = length qname - length from
   in if not (isSubDomain qn fn)
     then undefined
     else Name (take prefixLen qname ++ to)
-
-data Record = Record
-  { rname :: Name
-  , rcat  :: Cat
-  , rttl  :: Int
-  , rtype :: Type
-  , rdata :: [String] }
-  deriving (Eq, Ord)
-
-instance Show Record where
-  show (Record n c ttl t d) = show n ++ " " ++ show ttl ++ " " ++ show c ++ " " ++ show t ++ " " ++ unwords d
-
-data Zone = Zone
-  { root :: Name
-  , records :: [Record] }
 
 data Type = CNAME | DNAME | NS | A | TXT | MX | SOA
   deriving (Eq, Ord, Show)
@@ -62,16 +52,47 @@ data Type = CNAME | DNAME | NS | A | TXT | MX | SOA
 data Cat = IN
   deriving (Eq, Ord, Show)
 
+data Record a = Record
+  { rname :: Name a
+  , rcat  :: Cat
+  , rttl  :: Int
+  , rtype :: Type
+  , rdata :: [String] }
+  deriving (Eq, Ord)
+
+instance Show a => Show (Record a) where
+  show (Record n c ttl t d) = show n ++ " " ++ show ttl ++ " " ++ show c ++ " " ++ show t ++ " " ++ unwords d
+
+data Zone = Zone
+  { root :: Name String
+  , records :: [Record String]
+  , children :: M.Map String Zone }
+
+insert :: Zone -> Record String -> Zone
+insert z_@(Zone org _ _) r_ = go (ZoneFile.labels org) r_ z_
+  where
+    go :: [String] -> Record String -> Zone -> Zone
+    go acc r z@(Zone _ rs ch) = case L.unsnoc (ZoneFile.labels (rname r)) of
+      Nothing -> Zone org (r { rname = Name acc }:rs) ch
+      Just (ls, l) ->
+        let rec = go ls (r { rname = Name ls })
+            ch' = if M.member l ch
+              then M.update (Just . rec) l ch
+              else M.insert l (rec (Zone (Name [l]) [] M.empty)) ch
+        in z { children = ch' }
+
+allRecords :: Zone -> [Record String]
+allRecords (Zone _ rs ch) = rs ++ concatMap allRecords (M.elems ch)
+
 data ParserState = ParserState
-  { _zoneOrigin :: Maybe Name
-  , _lastName :: Maybe Name
+  { _lastName :: Maybe (Name String)
   , _lastTTL :: Maybe Int
   , _lastCat :: Maybe Cat }
 
 L.makeLenses ''ParserState
 
 emptyState :: ParserState
-emptyState = ParserState Nothing Nothing Nothing Nothing
+emptyState = ParserState Nothing Nothing Nothing
 
 type Parser s m = ParsecT s ParserState m
 
@@ -106,7 +127,7 @@ comment = do
   _ <- manyTill anyChar (endOfLine $> () <|> eof)
   return ()
 
-name :: Stream s m Char => Parser s m Name
+name :: Stream s m Char => Parser s m (Name String)
 name = do
   n <- many1 (lower <|> digit <|> Char.char '-' <|> Char.char '@' <|> dot)
   maybe (fail "could not split name") (return . Name) (splitName n)
@@ -117,21 +138,17 @@ name = do
       (lbl, '.':t) -> (lbl :) <$> splitName t
       (_, _) -> Nothing
 
-origin :: Stream s m Char => Parser s m Name
+origin :: Stream s m Char => Parser s m (Name String)
 origin = do
   spaces
   _ <- string "$ORIGIN"
   spaces1
-  org <- name
-  writeState zoneOrigin org
-  return org
+  name
 
-relName :: Stream s m Char => Parser s m Name
+relName :: Stream s m Char => Parser s m (Name String)
 relName = do
   Name ls <- name
-  orig@(Name origLs) <- readState zoneOrigin
-  guard (not (null origLs))
-  return $ if ls == ["@"] then orig else Name (ls ++ origLs)
+  return $ Name $ if ls == ["@"] then [] else ls
 
 ttl :: Stream s m Char => Parser s m Int
 ttl = do
@@ -156,7 +173,7 @@ setTTL = do
   t <- ttl
   writeState lastTTL t
 
-record :: Stream s m Char => Parser s m Record
+record :: Stream s m Char => Parser s m (Record String)
 record = do
   spaces
   n <- tryOrState relName lastName
@@ -187,7 +204,7 @@ ttlCatType = do
   ty <- recordType
   return (c, t, ty)
 
-line :: Stream s m Char => Parser s m (Maybe Record)
+line :: Stream s m Char => Parser s m (Maybe (Record String))
 line = spaces >> asum (map try
   [ comment $> Nothing
   , setTTL $> Nothing
@@ -197,7 +214,7 @@ zone :: Stream s m Char => Parser s m Zone
 zone = do
   org <- origin
   rs <- catMaybes <$> many line
-  return $ Zone org rs
+  return $ foldl insert (Zone org [] M.empty) rs
 
 zoneFile :: Stream s m Char => Parser s m [Zone]
 zoneFile = many zone
@@ -207,10 +224,10 @@ skipPath = do
   m <- optionMaybe (try $ manyTill (Char.noneOf ['/']) (Char.char '/'))
   when (isJust m) skipPath
 
-parseName :: Monad m => String -> m (Either ParseError Name)
+parseName :: Monad m => String -> m (Either ParseError (Name String))
 parseName = runParserT (skipPath >> name) emptyState "parseName function"
 
-parseNameM :: MonadPlus m => String -> m Name
+parseNameM :: MonadPlus m => String -> m (Name String)
 parseNameM s = parseName s >>= either (const mzero) return
 
 parseZoneFile :: Stream s m Char => SourceName -> s -> m (Either ParseError [Zone])
