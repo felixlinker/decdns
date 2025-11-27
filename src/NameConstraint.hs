@@ -2,15 +2,23 @@
 module NameConstraint
   ( NameConstraint(..)
   , compileWildcards
-  , match ) where
+  , synthesize ) where
 
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 
 import ZoneFile
+import Data.Maybe (fromMaybe)
 
 data NameConstraint a = Wildcard [a] | Exactly a
   deriving (Eq, Ord)
+
+toLabel :: NameConstraint String -> String
+toLabel (Wildcard _) = "*"
+toLabel (Exactly l) = l
+
+toName :: Name (NameConstraint String) -> Name String
+toName (Name cs) = Name (NE.map toLabel cs)
 
 existIn :: Node String -> [String]
 existIn = filter (/= "*") . M.keys . children
@@ -46,3 +54,6 @@ match (Name (NE.reverse -> ls)) (Name (NE.reverse -> cs)) = do
     rec [] _ = Nothing
     rec (a:as) (c:ncs) =
       match' (a NE.:| as) (c NE.:| ncs)
+
+synthesize :: Name String -> Record (NameConstraint String) -> Record String
+synthesize qname (Record cs d) = Record (fromMaybe (toName cs) (match qname cs)) d

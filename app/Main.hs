@@ -12,7 +12,7 @@ import NonDet
 import RecursiveResolver
 import ZoneFile
 import Parsing
-import NameConstraint (NameConstraint, compileWildcards)
+import NameConstraint (NameConstraint, compileWildcards, synthesize)
 
 parseZoneFileFile :: FilePath -> IO (Name String, [Record (NameConstraint String)])
 parseZoneFileFile path = do
@@ -40,7 +40,8 @@ runCommands nses = go (M.keys nses)
         (\case  Exit -> return ()
                 SList slist' -> go (filter (`S.member` M.keysSet nses) slist')
                 Query (qname, qtype) -> do
-                  let traces = S.fromList $ NonDet.all (resolve (nses M.!) slist qname qtype)
+                  let queryF ns qn = map (synthesize qn) (nses M.! ns)
+                  let traces = S.fromList $ NonDet.all (resolve queryF slist qname qtype)
                   let minimal t = not $ any (`subtrace` t) traces
                   let traces' =  S.filter minimal traces
                   putStrLn (if S.null traces' then "query cannot be resolved" else show (S.size traces') ++ " results")
