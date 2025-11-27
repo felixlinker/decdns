@@ -6,12 +6,13 @@ module ZoneFile
   , isSubDomain
   , dnameRewrite
   , Type(..)
+  , RData(..)
   , Record(..)
+  , Node(..)
   , Zone(..)
   , insert
   , allRecords ) where
 
-import qualified Control.Lens as L
 import Data.List (intercalate, isSuffixOf)
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
@@ -41,34 +42,57 @@ data Type = CNAME | DNAME | NS | A | TXT | MX | SOA
 data Cat = IN
   deriving (Eq, Ord, Show)
 
-data Record a = Record
-  { rname :: Name a
-  , rcat  :: Cat
+data RData = RData
+  { rcat  :: Cat
   , rttl  :: Int
   , rtype :: Type
   , rdata :: [String] }
   deriving (Eq, Ord)
 
+data Record a = Record
+  { rname :: Name a
+  , rrdata :: RData }
+  deriving (Eq, Ord)
+
 instance Show (Record String) where
-  show (Record n c ttl t d) = show n ++ " " ++ show ttl ++ " " ++ show c ++ " " ++ show t ++ " " ++ unwords d
+  show (Record n (RData c ttl t d)) = show n ++ " " ++ show ttl ++ " " ++ show c ++ " " ++ show t ++ " " ++ unwords d
+
+data Node a = Node
+  { label :: a
+  , records :: [RData]
+  , children :: M.Map a (Node a) }
 
 data Zone a = Zone
-  { root :: Name a
-  , records :: [Record a]
-  , children :: M.Map a (Zone a) }
+  { zoneName :: Name a
+  , root :: Node a }
 
-insert :: Ord a => Zone a -> Record a -> Zone a
-insert z@(Zone org _ _) r@(Record { rname = rn }) =
-  let path = drop (length (labels org)) (NE.toList (NE.reverse (labels rn)))
-  in go path z
+insert :: Ord a => Zone a -> Record a -> Maybe (Zone a)
+insert (Zone norg@(Name org) zroot) (Record (Name n) d) =
+  let rPath = pathInZone (reverse $ NE.toList org) (reverse $ NE.toList n)
+  in do
+    p <- rPath
+    return $ Zone norg (go p zroot)
   where
-    go [] zr@(Zone _ rs _) = zr { records = r:rs  }
-    go (l:path) zr@(Zone (Name zroot) _ ch) =
-      let emptyZone = Zone (Name (l NE.<| zroot)) [] M.empty
-          chf = if M.member l ch
-            then M.update (Just . go path) l
-            else M.insert l (go path emptyZone)
-      in zr { children = chf ch }
+    pathInZone :: Eq a => [a] -> [a] -> Maybe [a]
+    pathInZone [] bs = Just bs
+    pathInZone _ [] = Nothing
+    pathInZone (a:as) (b:bs)
+      | a == b = if null as then Just bs else pathInZone as bs
+      | otherwise = Nothing
+
+    go :: Ord a => [a] -> Node a -> Node a
+    go [] node@(Node _ rs _) = node { records = d:rs }
+    go (lr:t) node@(Node _ _ ch) =
+      let emptyNode = Node lr [] M.empty
+          chf = if M.member lr ch
+            then M.update (Just . go t) lr
+            else M.insert lr (go t emptyNode)
+      in node { children = chf ch }
 
 allRecords :: Zone a -> [Record a]
-allRecords (Zone _ rs ch) = rs ++ concatMap allRecords (M.elems ch)
+allRecords (Zone (Name orig) ns) = go orig ns
+  where
+    go :: NE.NonEmpty a -> Node a -> [Record a]
+    go path (Node l rs ch) =
+      let path' = l NE.<| path
+      in map (Record (Name path')) rs ++ concatMap (go path') (M.elems ch)

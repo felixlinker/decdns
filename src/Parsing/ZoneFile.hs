@@ -58,7 +58,7 @@ record = do
   (c, t, ty) <- try catTtlType <|> try ttlCatType
   spaces1
   d <- manyTill anyChar end
-  return (Record n c t ty (words d))
+  return (Record n (RData c t ty (words d)))
   where
     end :: Stream s m Char => Parser s m ()
     end = endOfLine $> () <|> eof
@@ -89,9 +89,15 @@ line = spaces >> asum (map try
 
 zone :: Stream s m Char => Parser s m (Zone String)
 zone = do
-  org <- origin
+  n@(Name org) <- origin
   rs <- catMaybes <$> many line
-  return $ foldl insert (Zone org [] M.empty) rs
+  let z = Zone n (Node (NE.head org) [] M.empty)
+  foldl safeInsert (return z) rs
+  where
+    safeInsert :: MonadFail m => m (Zone String) -> Record String -> m (Zone String)
+    safeInsert zm r = do
+      z <- zm
+      maybe (fail "cannot insert record - illformed zone") return (insert z r)
 
 zoneFile :: Stream s m Char => Parser s m [Zone String]
 zoneFile = many zone
