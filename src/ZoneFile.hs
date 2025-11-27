@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ViewPatterns #-}
 module ZoneFile
   ( Name(..)
   , Cat(..)
@@ -9,6 +10,7 @@ module ZoneFile
   , RData(..)
   , Record(..)
   , Node(..)
+  , emptyZone
   , Zone(..)
   , insert
   , allRecords ) where
@@ -58,33 +60,38 @@ instance Show (Record String) where
   show (Record n (RData c ttl t d)) = show n ++ " " ++ show ttl ++ " " ++ show c ++ " " ++ show t ++ " " ++ unwords d
 
 data Node a = Node
-  { label :: a
-  , records :: [RData]
+  { records :: [RData]
   , children :: M.Map a (Node a) }
+
+emptyNode :: Node a
+emptyNode = Node [] M.empty
 
 data Zone a = Zone
   { zoneName :: Name a
   , root :: Node a }
 
-insert :: Ord a => Zone a -> Record a -> Maybe (Zone a)
-insert (Zone norg@(Name org) zroot) (Record (Name n) d) =
-  let rPath = pathInZone (reverse $ NE.toList org) (reverse $ NE.toList n)
-  in do
-    p <- rPath
-    return $ Zone norg (go p zroot)
+emptyZone :: Name a -> Zone a
+emptyZone org = Zone org emptyNode
+
+pathInZone :: Eq a => Name a -> Name a -> Maybe [a]
+pathInZone (Name (reverse . NE.toList -> org)) (Name (reverse . NE.toList -> n)) = pathInZone' org n
   where
-    pathInZone :: Eq a => [a] -> [a] -> Maybe [a]
-    pathInZone [] bs = Just bs
-    pathInZone _ [] = Nothing
-    pathInZone (a:as) (b:bs)
-      | a == b = if null as then Just bs else pathInZone as bs
+    pathInZone' :: Eq a => [a] -> [a] -> Maybe [a]
+    pathInZone' [] bs = Just bs
+    pathInZone' _ [] = Just []
+    pathInZone' (a:as) (b:bs)
+      | a == b = pathInZone' as bs
       | otherwise = Nothing
 
+insert :: Ord a => Zone a -> Record a -> Maybe (Zone a)
+insert (Zone norg zroot) (Record n d) = do
+  p <- pathInZone norg n
+  return $ Zone norg (go p zroot)
+  where
     go :: Ord a => [a] -> Node a -> Node a
-    go [] node@(Node _ rs _) = node { records = d:rs }
-    go (lr:t) node@(Node _ _ ch) =
-      let emptyNode = Node lr [] M.empty
-          chf = if M.member lr ch
+    go [] node@(Node rs _) = node { records = d:rs }
+    go (lr:t) node@(Node _ ch) =
+      let chf = if M.member lr ch
             then M.update (Just . go t) lr
             else M.insert lr (go t emptyNode)
       in node { children = chf ch }
@@ -93,6 +100,5 @@ allRecords :: Zone a -> [Record a]
 allRecords (Zone (Name orig) ns) = go orig ns
   where
     go :: NE.NonEmpty a -> Node a -> [Record a]
-    go path (Node l rs ch) =
-      let path' = l NE.<| path
-      in map (Record (Name path')) rs ++ concatMap (go path') (M.elems ch)
+    go path (Node rs ch) =
+      map (Record (Name path)) rs ++ concat (M.mapWithKey (\l -> go (l NE.<| path)) ch)

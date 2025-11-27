@@ -9,7 +9,6 @@ import Control.Applicative (asum)
 import Data.Functor (($>))
 import Data.Maybe (catMaybes)
 import qualified Data.List.NonEmpty as NE
-import qualified Data.Map as M
 
 import Parsing.State
 import Parsing.Tokens
@@ -89,10 +88,9 @@ line = spaces >> asum (map try
 
 zone :: Stream s m Char => Parser s m (Zone String)
 zone = do
-  n@(Name org) <- origin
+  org <- origin
   rs <- catMaybes <$> many line
-  let z = Zone n (Node (NE.head org) [] M.empty)
-  foldl safeInsert (return z) rs
+  foldl safeInsert (return (emptyZone org)) rs
   where
     safeInsert :: MonadFail m => m (Zone String) -> Record String -> m (Zone String)
     safeInsert zm r = do

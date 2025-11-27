@@ -12,19 +12,20 @@ import NonDet
 import RecursiveResolver
 import ZoneFile
 import Parsing
+import NameConstraint (NameConstraint, compileWildcards)
 
-parseZoneFileFile :: FilePath -> IO (Name String, [Record String])
+parseZoneFileFile :: FilePath -> IO (Name String, [Record (NameConstraint String)])
 parseZoneFileFile path = do
   c <- readFile path
   zf <- parseZoneFile path c >>= handleParser
   ns <- parseName path >>= handleParser
-  return (ns, concatMap allRecords zf)
+  return (ns, concatMap (allRecords . compileWildcards) zf)
   where
     handleParser :: Either ParseError a -> IO a
     handleParser (Left err) = failIO (show err)
     handleParser (Right a) = return a
 
-runCommands :: M.Map (Name String) [Record String] -> IO ()
+runCommands :: M.Map (Name String) [Record (NameConstraint String)] -> IO ()
 runCommands nses = go (M.keys nses)
   where
     printHelp :: IO ()

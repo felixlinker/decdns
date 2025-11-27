@@ -4,10 +4,12 @@ module NonDet
   , NonDet.all
   , chooseFoldable
   , choose
+  , liftFoldable
   , NonDet.fail ) where
 
 import qualified Data.List as L
 import Control.Applicative (Alternative(empty,(<|>)))
+import Data.Foldable (Foldable(toList))
 
 newtype NonDet a = NonDet { source :: [a] }
 
@@ -36,6 +38,9 @@ chooseFoldable = NonDet . foldr (:) []
 
 choose :: [a] -> NonDet a
 choose = NonDet
+
+liftFoldable :: Foldable f => f a -> NonDet a
+liftFoldable = NonDet . toList
 
 fail :: NonDet a
 fail = NonDet []
