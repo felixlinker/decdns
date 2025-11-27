@@ -35,7 +35,7 @@ writeState l a = modifyState (L.set l (return a))
 readState :: Monad m => L.Lens' ParserState (Maybe a) -> Parser s m a
 readState l = do
   st <- getState
-  maybe (fail "required state missig") return (L.view l st)
+  maybe (fail "required state missing") return (L.view l st)
 
 tryOrState :: Monad m => Parser s m a -> L.Lens' ParserState (Maybe a) -> Parser s m a
 tryOrState p l = tryP <|> readState l
