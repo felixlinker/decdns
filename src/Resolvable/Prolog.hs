@@ -1,6 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Prolog
-  ( fromZoneFile ) where
+  ( Rule(..)
+  , fromZoneFile ) where
 
 import NameConstraint
 import ZoneFile

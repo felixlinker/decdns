@@ -1,29 +1,21 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
-module Main (main) where
+module Interactive (main) where
 
 import qualified Data.Map as M
 import qualified Data.Set as S
 import System.Environment (getArgs)
-import GHC.Base (failIO)
-import Text.Parsec
 
 import NonDet
 import RecursiveResolver
 import ZoneFile
 import Parsing
-import NameConstraint (NameConstraint, compileWildcards, synthesize)
+import NameConstraint (NameConstraint, synthesize)
+import Util (parseZoneFileZones)
 
 parseZoneFileFile :: FilePath -> IO (Name String, [Record (NameConstraint String)])
 parseZoneFileFile path = do
-  c <- readFile path
-  zf <- parseZoneFile path c >>= handleParser
-  ns <- parseName path >>= handleParser
-  return (ns, concatMap (allRecords . compileWildcards) zf)
-  where
-    handleParser :: Either ParseError a -> IO a
-    handleParser (Left err) = failIO (show err)
-    handleParser (Right a) = return a
+  (ns, zfs) <- parseZoneFileZones path
+  return (ns, concatMap allRecords zfs)
 
 runCommands :: M.Map (Name String) [Record (NameConstraint String)] -> IO ()
 runCommands nses = go (M.keys nses)
