@@ -30,6 +30,8 @@ library
       Parsing.Tokens
       Parsing.ZoneFile
       RecursiveResolver
+      Resolvable.Prolog
+      Util.Fresh
       ZoneFile
   other-modules:
       Paths_dns_regressor
