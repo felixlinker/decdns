@@ -56,10 +56,11 @@ partialNameRule (Name (l NE.:| ls)) = case l of
     exactlyNatoms :: [NameConstraint String] -> [Term]
     exactlyNatoms [] = []
     exactlyNatoms (Wildcard _ : t) = dnsWildcard : exactlyNatoms t
+    exactlyNatoms (Exactly "" : t) = exactlyNatoms t
     exactlyNatoms (Exactly c : t) = TAtom c : exactlyNatoms t
 
 nameTerm :: Name String -> Term
-nameTerm (Name (NE.toList -> ls)) = TList (reverse $ map TAtom ls) Nothing
+nameTerm (Name (NE.toList -> ls)) = TList (reverse $ map TAtom $ filter (not . null) ls) Nothing
 
 data Rule = Rule
   { rhead :: Predicate
