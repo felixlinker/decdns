@@ -22,8 +22,8 @@ runFreshT = runStateT
 evalFreshT :: Monad m => FreshT m a -> Int -> m a
 evalFreshT = evalStateT
 
-runFresh :: Fresh a -> (a, Int)
-runFresh m = runIdentity (runFreshT m 0)
+runFresh :: Fresh a -> a
+runFresh m = fst $ runIdentity (runFreshT m 0)
 
 evalFresh :: Fresh a -> a
 evalFresh m = runIdentity (evalFreshT m 0)

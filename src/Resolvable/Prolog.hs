@@ -11,7 +11,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Char (toLower, toUpper)
 import RecursiveResolver (nameInData)
 import Data.Maybe (fromMaybe)
-import Util.Fresh (Fresh, fresh)
+import Util.Fresh (Fresh, fresh, runFresh)
 
 data Term = TVar String | TAtom String | TList [Term] (Maybe Term)
 
@@ -70,13 +70,13 @@ instance Show Rule where
   show (Rule h []) = show h ++ "."
   show (Rule h b) = show h ++ " :- " ++ intercalate ", " (map show b) ++ "."
 
-resolvableBase :: Name String -> Record (NameConstraint String) -> Fresh Rule
-resolvableBase ns (Record n (RData _ _ ty _)) = do
+resolvableBase :: Name String -> Record (NameConstraint String) -> Rule
+resolvableBase ns (Record n (RData _ _ ty _)) = runFresh $ do
   (n', difs) <- partialNameRule n
   return (Rule (resolvable (nameTerm ns) (typeAtom ty) n') difs)
 
-resolvableStep :: Name String -> Record (NameConstraint String) -> Fresh [Rule]
-resolvableStep (nameTerm -> ns) r@(Record n d) = do
+resolvableStep :: Name String -> Record (NameConstraint String) -> [Rule]
+resolvableStep (nameTerm -> ns) r@(Record n d) = runFresh $ do
   (n', difs) <- partialNameRule n
   q <- TVar <$> fresh "Q"
   let rules = case rtype d of
@@ -98,14 +98,8 @@ resolvableStep (nameTerm -> ns) r@(Record n d) = do
     addDifs :: [Predicate] -> Rule -> Rule
     addDifs ps rule@(Rule _ b) = rule { rbody = ps ++ b }
 
-fromZoneFile :: Name String -> Zone (NameConstraint String) -> Fresh [Rule]
-fromZoneFile ns z = concat <$> mapM recordToRules rs
+fromZoneFile :: Name String -> Zone (NameConstraint String) -> [Rule]
+fromZoneFile ns (allRecords -> rs) = concatMap recordToRules rs
   where
-    rs :: [Record (NameConstraint String)]
-    rs = allRecords z
-
-    recordToRules :: Record (NameConstraint String) -> Fresh [Rule]
-    recordToRules r = do
-      base <- resolvableBase ns r
-      steps <- resolvableStep ns r
-      return (base:steps)
+    recordToRules :: Record (NameConstraint String) -> [Rule]
+    recordToRules r = resolvableBase ns r : resolvableStep ns r

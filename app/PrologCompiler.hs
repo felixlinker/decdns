@@ -5,13 +5,13 @@ import System.Environment (getArgs)
 
 import NameConstraint (NameConstraint)
 import Util (parseZoneFileZones)
-import Util.Fresh (evalFresh)
 import ZoneFile (Name, Zone)
 
 compileZones :: [(Name String, [Zone (NameConstraint String)])] -> [Rule]
-compileZones parsed = evalFresh $ concat <$> mapM compileOne parsed
+compileZones = concatMap (uncurry compileOne)
   where
-    compileOne (ns, zs) = concat <$> mapM (fromZoneFile ns) zs
+    compileOne :: Name String -> [Zone (NameConstraint String)] -> [Rule]
+    compileOne ns = concatMap (fromZoneFile ns)
 
 main :: IO ()
 main = do
