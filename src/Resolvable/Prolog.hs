@@ -78,6 +78,7 @@ resolvableBase ns (Record n (RData _ _ ty _)) = do
 resolvableStep :: Name String -> Record (NameConstraint String) -> Fresh [Rule]
 resolvableStep (nameTerm -> ns) r@(Record n d) = do
   (n', difs) <- partialNameRule n
+  q <- TVar <$> fresh "Q"
   let rules = case rtype d of
         NS -> let delegatedNs = nameTerm (fromMaybe undefined $ nameInData r)
               in [ Rule { rhead = resolvable ns q n'
@@ -94,9 +95,6 @@ resolvableStep (nameTerm -> ns) r@(Record n d) = do
         _ -> undefined
   return (map (addDifs difs) rules)
   where
-    q :: Term
-    q = TVar "Q"
-
     addDifs :: [Predicate] -> Rule -> Rule
     addDifs ps rule@(Rule _ b) = rule { rbody = ps ++ b }
 
