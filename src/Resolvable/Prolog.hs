@@ -34,7 +34,7 @@ typeAtom = TAtom . show
 data Predicate = Predicate String [Term]
 
 instance Show Predicate where
-  show (Predicate (show -> h) (map show -> args)) = h ++ "(" ++ intercalate ", " args ++ ")"
+  show (Predicate h (map show -> args)) = h ++ "(" ++ intercalate ", " args ++ ")"
 
 resolvable :: Term -> Term -> Term -> Predicate
 resolvable ns t n = Predicate "resolvable" [ ns, t, n ]
