@@ -34,9 +34,9 @@ subtrace :: Ord a => [a] -> [a] -> Bool
 subtrace (S.fromList -> s1) (S.fromList -> s2) = s1 `S.isProperSubsetOf` s2
 
 resolve :: (Name String -> Name String -> [Record String]) -> SList -> QName -> QType -> NonDet Trace
-resolve query = rresolve []
+resolve query ses qn qt = snd <$> rresolve [] ses qn qt
   where
-    rresolve :: Trace -> SList -> QName -> QType -> NonDet Trace
+    rresolve :: Trace -> SList -> QName -> QType -> NonDet (SList, Trace)
     rresolve trace slist qname qtype = do
       ns <- choose slist
       r@(Record n d) <- choose $ query ns qname
@@ -46,10 +46,10 @@ resolve query = rresolve []
       let ref = fromMaybe undefined (nameInData r)
       let trace' = traceEl:trace
       case rtype d of
-        t | n == qname && t == qtype -> return trace'
+        t | n == qname && t == qtype -> return (slist, trace')
         NS -> do
-          trace'' <- rresolve trace' slist ref A
-          rresolve trace'' (nub $ ref:slist) qname qtype
+          (slist', trace'') <- rresolve trace' slist ref A
+          rresolve trace'' (nub $ ref:slist') qname qtype
         CNAME | rname r == qname -> rresolve trace' slist ref qtype
         DNAME -> do
           let rewritten = dnameRewrite qname (rname r) ref
