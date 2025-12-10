@@ -76,8 +76,8 @@ resolvableBase ns (Record n (RData _ _ ty _)) = runFresh $ do
   (n', difs) <- nameWithSynthesis n
   return (Rule (resolvable (nameTerm ns) (typeAtom ty) n') difs)
 
-resolvableStep :: Name String -> Record (NameConstraint String) -> [Rule]
-resolvableStep (nameTerm -> ns) r@(Record n d) = runFresh $ do
+resolvableStep :: Name String -> Name String -> Record (NameConstraint String) -> [Rule]
+resolvableStep (nameTerm -> rootServer) (nameTerm -> ns) r@(Record n d) = runFresh $ do
   (n', difs) <- nameWithSynthesis n
   t <- TVar <$> fresh "T"
   q <- TVar <$> fresh "Q"
@@ -86,13 +86,13 @@ resolvableStep (nameTerm -> ns) r@(Record n d) = runFresh $ do
                   n'' = mapListTail n' (Just t)
               in [ Rule { rhead = resolvable ns q n''
                         , rbody = [ dif q (typeAtom NS)
-                                  , resolvable plWildcard (typeAtom A) delegatedNs
+                                  , resolvable rootServer (typeAtom A) delegatedNs
                                   , resolvable delegatedNs q n'' ] } ]
         CNAME ->
           let cname = nameTerm (fromMaybe undefined $ nameInData r)
           in [ Rule { rhead = resolvable ns q n'
                     , rbody = [ dif q (typeAtom CNAME)
-                              , resolvable plWildcard q cname ] } ]
+                              , resolvable rootServer q cname ] } ]
         A -> []
         TXT -> []
         _ -> undefined
@@ -105,8 +105,8 @@ resolvableStep (nameTerm -> ns) r@(Record n d) = runFresh $ do
     mapListTail (TList pref listTail) defaultTail = TList pref (listTail <|> defaultTail)
     mapListTail _ _ = undefined
 
-fromZoneFile :: Name String -> Zone (NameConstraint String) -> [Rule]
-fromZoneFile ns (allRecords -> rs) = concatMap recordToRules rs
+fromZoneFile :: Name String -> Name String -> Zone (NameConstraint String) -> [Rule]
+fromZoneFile rootServer ns (allRecords -> rs) = concatMap recordToRules rs
   where
     recordToRules :: Record (NameConstraint String) -> [Rule]
-    recordToRules r = resolvableBase ns r : resolvableStep ns r
+    recordToRules r = resolvableBase ns r : resolvableStep rootServer ns r
