@@ -35,24 +35,25 @@ typeAtom = TAtom . show
 data Predicate = Predicate String [Term]
 
 instance Show Predicate where
+  show (Predicate "\\=" (map show -> [ a, b ])) = a ++ " \\= " ++ b
   show (Predicate h (map show -> args)) = h ++ "(" ++ intercalate ", " args ++ ")"
 
 resolvable :: Term -> Term -> Term -> Predicate
 resolvable ns t n = Predicate "resolvable" [ ns, t, n ]
 
-dif :: Term -> Term -> Predicate
-dif a b = Predicate "dif" [ a, b ]
+neq :: Term -> Term -> Predicate
+neq a b = Predicate "\\=" [ a, b ]
 
 nameWithSynthesis :: Name (NameConstraint String) -> Fresh (Term, [Predicate])
 nameWithSynthesis (Name (l NE.:| ls)) = case l of
-  Wildcard neqs -> do
+  Wildcard cs -> do
     h <- TVar <$> fresh "H"
     t <- TVar <$> fresh "T"
-    return (TList (reverse (h : exactlyNatoms ls)) (Just t), difs h neqs)
+    return (TList (reverse (h : exactlyNatoms ls)) (Just t), neqs h cs)
   _ -> return (TList (reverse (exactlyNatoms (l:ls))) Nothing, [])
   where
-    difs :: Term -> [String] -> [Predicate]
-    difs var = map (dif var . TAtom)
+    neqs :: Term -> [String] -> [Predicate]
+    neqs var = map (neq var . TAtom)
 
     exactlyNatoms :: [NameConstraint String] -> [Term]
     exactlyNatoms [] = []
@@ -73,12 +74,12 @@ instance Show Rule where
 
 resolvableBase :: Name String -> Record (NameConstraint String) -> Rule
 resolvableBase ns (Record n (RData _ _ ty _)) = runFresh $ do
-  (n', difs) <- nameWithSynthesis n
-  return (Rule (resolvable (nameTerm ns) (typeAtom ty) n') difs)
+  (n', neqs) <- nameWithSynthesis n
+  return (Rule (resolvable (nameTerm ns) (typeAtom ty) n') neqs)
 
 resolvableStep :: Name String -> Name String -> Record (NameConstraint String) -> [Rule]
 resolvableStep (nameTerm -> rootServer) (nameTerm -> ns) r@(Record n d) = runFresh $ do
-  (n', difs) <- nameWithSynthesis n
+  (n', neqs) <- nameWithSynthesis n
   t <- TVar <$> fresh "T"
   q <- TVar <$> fresh "Q"
   let rules = case rtype d of
@@ -91,15 +92,15 @@ resolvableStep (nameTerm -> rootServer) (nameTerm -> ns) r@(Record n d) = runFre
         CNAME ->
           let cname = nameTerm (fromMaybe undefined $ nameInData r)
           in [ Rule { rhead = resolvable ns q n'
-                    , rbody = [ dif q (typeAtom CNAME)
+                    , rbody = [ neq q (typeAtom CNAME)
                               , resolvable rootServer q cname ] } ]
         A -> []
         TXT -> []
         _ -> undefined
-  return (map (addDifs difs) rules)
+  return (map (addNeqs neqs) rules)
   where
-    addDifs :: [Predicate] -> Rule -> Rule
-    addDifs ps rule@(Rule _ b) = rule { rbody = ps ++ b }
+    addNeqs :: [Predicate] -> Rule -> Rule
+    addNeqs ps rule@(Rule _ b) = rule { rbody = ps ++ b }
 
     mapListTail :: Term -> Maybe Term -> Term
     mapListTail (TList pref listTail) defaultTail = TList pref (listTail <|> defaultTail)
