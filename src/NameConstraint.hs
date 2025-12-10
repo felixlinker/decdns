@@ -1,6 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module NameConstraint
   ( NameConstraint(..)
+  , toName
   , compileWildcards
   , synthesize ) where
 

@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ViewPatterns #-}
 module Interactive (main) where
 
 import qualified Data.Map as M
@@ -9,13 +10,24 @@ import NonDet
 import RecursiveResolver
 import ZoneFile
 import Parsing
-import NameConstraint (NameConstraint, synthesize)
+import NameConstraint (NameConstraint, synthesize, toName)
 import Util (parseZoneFileZones)
+import Control.Monad (forM_)
 
 parseZoneFileFile :: FilePath -> IO (Name String, [Record (NameConstraint String)])
 parseZoneFileFile path = do
   (ns, zfs) <- parseZoneFileZones path
   return (ns, concatMap allRecords zfs)
+
+rToName :: Record (NameConstraint String) -> Record String
+rToName (Record n d) = Record (toName n) d
+
+printNameServer :: Name String -> [Record (NameConstraint String)] -> IO ()
+printNameServer n (map rToName -> rs) = do
+  putStrLn $ "name server " ++ show n ++ " serves..."
+  forM_ rs (\r -> do
+    putStr "  "
+    print r)
 
 runCommands :: M.Map (Name String) [Record (NameConstraint String)] -> IO ()
 runCommands nses = go (M.keys nses)
@@ -38,6 +50,9 @@ runCommands nses = go (M.keys nses)
                   let traces' =  S.filter minimal traces
                   putStrLn (if S.null traces' then "query cannot be resolved" else show (S.size traces') ++ " results")
                   mapM_ print traces'
+                  go slist
+                Print -> do
+                  forM_ (M.toList nses) (uncurry printNameServer)
                   go slist)
         ecmd
 
