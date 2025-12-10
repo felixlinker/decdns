@@ -20,7 +20,7 @@ instance Show Term where
   show (TAtom a) = map toLower a
   show (TList [] _) = "[]"
   show (TList hs t) =
-    "[" ++ intercalate ", " (map show hs ++ maybe [] (\x -> [" | " ++ show x]) t) ++ "]"
+    "[" ++ intercalate ", " (map show hs) ++ maybe "" (\x -> " | " ++ show x) t ++ "]"
 
 plWildcard :: Term
 plWildcard = TVar "_"
