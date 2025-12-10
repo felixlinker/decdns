@@ -28,7 +28,7 @@ nameInData Record {} = Nothing
 type SList = [Name String]
 type QName = Name String
 type QType = Type
-type Trace = [(Name String, Record String)]
+type Trace = [(Name String, Type)]
 
 subtrace :: Ord a => [a] -> [a] -> Bool
 subtrace (S.fromList -> s1) (S.fromList -> s2) = s1 `S.isProperSubsetOf` s2
@@ -40,10 +40,11 @@ resolve query = rresolve []
     rresolve trace slist qname qtype = do
       ns <- choose slist
       r@(Record n d) <- choose $ query ns qname
-      guard ((ns, r) `notElem` trace)
+      let traceEl = (n, rtype d)
+      guard (traceEl `notElem` trace)
       guard (qname `isSubDomain` n)
       let ref = fromMaybe undefined (nameInData r)
-      let trace' = (ns, r):trace
+      let trace' = traceEl:trace
       case rtype d of
         t | n == qname && t == qtype -> return trace'
         NS -> do
