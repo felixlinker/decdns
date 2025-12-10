@@ -85,8 +85,7 @@ resolvableStep (nameTerm -> rootServer) (nameTerm -> ns) r@(Record n d) = runFre
         NS -> let delegatedNs = nameTerm (fromMaybe undefined $ nameInData r)
                   n'' = mapListTail n' (Just t)
               in [ Rule { rhead = resolvable ns q n''
-                        , rbody = [ dif q (typeAtom NS)
-                                  , resolvable rootServer (typeAtom A) delegatedNs
+                        , rbody = [ resolvable rootServer (typeAtom A) delegatedNs
                                   , resolvable delegatedNs q n'' ] } ]
         CNAME ->
           let cname = nameTerm (fromMaybe undefined $ nameInData r)
