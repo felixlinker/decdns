@@ -6,6 +6,7 @@ module Resolvable.Prolog
 import NameConstraint
 import ZoneFile
 
+import Control.Applicative ((<|>))
 import Data.List (intercalate)
 import qualified Data.List.NonEmpty as NE
 import Data.Char (toLower, toUpper)
@@ -42,8 +43,8 @@ resolvable ns t n = Predicate "resolvable" [ ns, t, n ]
 dif :: Term -> Term -> Predicate
 dif a b = Predicate "dif" [ a, b ]
 
-partialNameRule :: Name (NameConstraint String) -> Fresh (Term, [Predicate])
-partialNameRule (Name (l NE.:| ls)) = case l of
+nameWithSynthesis :: Name (NameConstraint String) -> Fresh (Term, [Predicate])
+nameWithSynthesis (Name (l NE.:| ls)) = case l of
   Wildcard neqs -> do
     h <- TVar <$> fresh "H"
     t <- TVar <$> fresh "T"
@@ -72,19 +73,21 @@ instance Show Rule where
 
 resolvableBase :: Name String -> Record (NameConstraint String) -> Rule
 resolvableBase ns (Record n (RData _ _ ty _)) = runFresh $ do
-  (n', difs) <- partialNameRule n
+  (n', difs) <- nameWithSynthesis n
   return (Rule (resolvable (nameTerm ns) (typeAtom ty) n') difs)
 
 resolvableStep :: Name String -> Record (NameConstraint String) -> [Rule]
 resolvableStep (nameTerm -> ns) r@(Record n d) = runFresh $ do
-  (n', difs) <- partialNameRule n
+  (n', difs) <- nameWithSynthesis n
+  t <- TVar <$> fresh "T"
   q <- TVar <$> fresh "Q"
   let rules = case rtype d of
         NS -> let delegatedNs = nameTerm (fromMaybe undefined $ nameInData r)
-              in [ Rule { rhead = resolvable ns q n'
+                  n'' = mapListTail n' (Just t)
+              in [ Rule { rhead = resolvable ns q n''
                         , rbody = [ dif q (typeAtom NS)
                                   , resolvable plWildcard (typeAtom A) delegatedNs
-                                  , resolvable delegatedNs q n' ] } ]
+                                  , resolvable delegatedNs q n'' ] } ]
         CNAME ->
           let cname = nameTerm (fromMaybe undefined $ nameInData r)
           in [ Rule { rhead = resolvable ns q n'
@@ -97,6 +100,10 @@ resolvableStep (nameTerm -> ns) r@(Record n d) = runFresh $ do
   where
     addDifs :: [Predicate] -> Rule -> Rule
     addDifs ps rule@(Rule _ b) = rule { rbody = ps ++ b }
+
+    mapListTail :: Term -> Maybe Term -> Term
+    mapListTail (TList pref listTail) defaultTail = TList pref (listTail <|> defaultTail)
+    mapListTail _ _ = undefined
 
 fromZoneFile :: Name String -> Zone (NameConstraint String) -> [Rule]
 fromZoneFile ns (allRecords -> rs) = concatMap recordToRules rs
