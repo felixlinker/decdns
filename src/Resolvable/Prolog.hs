@@ -2,11 +2,11 @@
 module Resolvable.Prolog
   ( Term(..)
   , Rule(..)
+  , (Resolvable.Prolog.^)
   , plWildcard
   , dnsWildcard
   , typeAtom
-  , resolvable
-  , neq
+  , (Resolvable.Prolog.\=)
   , nameWithSynthesis
   , nameTerm ) where
 
@@ -18,11 +18,15 @@ import qualified Data.List.NonEmpty as NE
 import Data.Char (toLower, toUpper)
 import Util.Fresh (Fresh, fresh)
 
-data Term = TVar String | TAtomQuoted String | TAtom String | TList [Term] (Maybe Term) | TString String | TPred String [Term]
+data Term = TOp String [Term] | TVar String | TAtomQuoted String | TAtom String | TList [Term] (Maybe Term) | TString String | TPred String [Term]
 
 instance Show Term where
-  show (TVar v) = map toUpper v
-  show (TAtom a) = map toLower a
+  show (TOp "^" [ a, b ]) = show a ++ "^" ++ show b
+  show (TOp op (map show -> args)) = op ++ "(" ++ intercalate ", " args ++ ")"
+  show (TVar "") = undefined
+  show (TVar (h:t)) = toUpper h : t
+  show (TAtom "") = undefined
+  show (TAtom (h:t)) = toLower h : t
   show (TAtomQuoted a) =  "'" ++ a ++ "'"
   show (TList [] _) = "[]"
   show (TList hs t) =
@@ -31,6 +35,9 @@ instance Show Term where
   show (TPred "\\=" (map show -> [ a, b ])) = a ++ " \\= " ++ b
   show (TPred h (map show -> args)) = h ++ "(" ++ intercalate ", " args ++ ")"
 
+(^) :: Term -> Term -> Term
+(^) a b = TOp "^" [ a, b ]
+
 plWildcard :: Term
 plWildcard = TVar "_"
 
@@ -38,13 +45,10 @@ dnsWildcard :: Term
 dnsWildcard = TAtom "'*'"
 
 typeAtom :: Type -> Term
-typeAtom = TAtom . show
+typeAtom = TAtom . map toLower . show
 
-resolvable :: Term -> Term -> Term -> Term
-resolvable ns t n = TPred "resolvable" [ ns, t, n ]
-
-neq :: Term -> Term -> Term
-neq a b = TPred "\\=" [ a, b ]
+(\=) :: Term -> Term -> Term
+(\=) a b = TPred "\\=" [ a, b ]
 
 nameWithSynthesis :: ConstrainedName -> Fresh (Term, [Term])
 nameWithSynthesis (Name (l NE.:| ls)) = case l of
@@ -55,7 +59,7 @@ nameWithSynthesis (Name (l NE.:| ls)) = case l of
   _ -> return (TList (reverse (exactlyNatoms (l:ls))) Nothing, [])
   where
     neqs :: Term -> [String] -> [Term]
-    neqs var = map (neq var . TAtom)
+    neqs var = map ((var \=) . TAtom)
 
     exactlyNatoms :: [NameConstraint String] -> [Term]
     exactlyNatoms [] = []

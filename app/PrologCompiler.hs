@@ -1,7 +1,7 @@
 module PrologCompiler (main) where
 
 import Resolvable.Prolog (Rule (rbody))
-import Resolvable.Resolvability (fromZoneFile)
+import Resolvable.Resolvability (resolvable, fromZoneFile)
 import System.Environment (getArgs)
 
 import NameConstraint (NameConstraint)
@@ -25,5 +25,6 @@ main = do
   rootName <- parseNameM root
   parsed <- mapM parseZoneFileZones files
   let (facts, rules) = spanAll (null . rbody) (compileZones rootName parsed)
+  print (resolvable rootName)
   mapM_ print facts
   mapM_ print rules
