@@ -1,4 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE FlexibleInstances #-}
 module NameConstraint
   ( NameConstraint(..)
   , ConstrainedName
@@ -15,14 +16,17 @@ import Data.Maybe (fromMaybe)
 data NameConstraint a = Wildcard [a] | Exactly a
   deriving (Eq, Ord)
 
+instance Show (NameConstraint String) where
+  show (Wildcard _) = "*"
+  show (Exactly l) = l
+
 type ConstrainedName = Name (NameConstraint String)
 
-toLabel :: NameConstraint String -> String
-toLabel (Wildcard _) = "*"
-toLabel (Exactly l) = l
+instance Show ConstrainedName where
+  show = show . toName
 
 toName :: ConstrainedName -> Name String
-toName (Name cs) = Name (NE.map toLabel cs)
+toName (Name cs) = Name (NE.map show cs)
 
 existIn :: Node String -> [String]
 existIn = filter (/= "*") . M.keys . children
