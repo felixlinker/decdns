@@ -1,6 +1,7 @@
 module PrologCompiler (main) where
 
-import Resolvable.Prolog (Rule (rbody), fromZoneFile)
+import Resolvable.Prolog (Rule (rbody))
+import Resolvable.Resolvability (fromZoneFile)
 import System.Environment (getArgs)
 
 import NameConstraint (NameConstraint)
@@ -13,7 +14,7 @@ compileZones :: Name String -> [(Name String, [Zone (NameConstraint String)])] -
 compileZones root = concatMap (uncurry compileOne)
   where
     compileOne :: Name String -> [Zone (NameConstraint String)] -> [Rule]
-    compileOne ns = concatMap (fromZoneFile root ns)
+    compileOne ns = concatMap (concatMap snd . fromZoneFile root ns)
 
 spanAll :: (a -> Bool) -> [a] -> ([a], [a])
 spanAll p l = ([ x | x <- l, p x ], [ x | x <- l, not (p x) ])
