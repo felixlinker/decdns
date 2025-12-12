@@ -31,8 +31,7 @@ resolvableStep (nameTerm -> rootServer) (nameTerm -> ns) r@(Record n d) = runFre
         CNAME ->
           let cname = nameTerm (fromMaybe undefined $ nameInData r)
           in [ Rule { rhead = resolvable ns q n'
-                    , rbody = [ neq q (typeAtom CNAME)
-                              , resolvable rootServer q cname ] } ]
+                    , rbody = [ resolvable rootServer q cname ] } ]
         A -> []
         TXT -> []
         _ -> undefined
