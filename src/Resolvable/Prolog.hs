@@ -18,14 +18,16 @@ import qualified Data.List.NonEmpty as NE
 import Data.Char (toLower, toUpper)
 import Util.Fresh (Fresh, fresh)
 
-data Term = TVar String | TAtom String | TList [Term] (Maybe Term) | TPred String [Term]
+data Term = TVar String | TAtomQuoted String | TAtom String | TList [Term] (Maybe Term) | TString String | TPred String [Term]
 
 instance Show Term where
   show (TVar v) = map toUpper v
   show (TAtom a) = map toLower a
+  show (TAtomQuoted a) =  "'" ++ a ++ "'"
   show (TList [] _) = "[]"
   show (TList hs t) =
     "[" ++ intercalate ", " (map show hs) ++ maybe "" (\x -> " | " ++ show x) t ++ "]"
+  show (TString s) = show s
   show (TPred "\\=" (map show -> [ a, b ])) = a ++ " \\= " ++ b
   show (TPred h (map show -> args)) = h ++ "(" ++ intercalate ", " args ++ ")"
 
