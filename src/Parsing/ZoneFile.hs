@@ -49,7 +49,7 @@ relName = do
   Name org <- readState parsedZone
   return $ Name $ if ls == NE.singleton "@" then org else ls <> org
 
-record :: Stream s m Char => Parser s m (Record String)
+record :: Stream s m Char => Parser s m (Record (Name String))
 record = do
   spaces
   n <- tryOrState relName lastName
@@ -80,7 +80,7 @@ ttlCatType = do
   ty <- recordType
   return (c, t, ty)
 
-line :: Stream s m Char => Parser s m (Maybe (Record String))
+line :: Stream s m Char => Parser s m (Maybe (Record (Name String)))
 line = spaces >> asum (map try
   [ comment $> Nothing
   , setTTL $> Nothing
@@ -92,7 +92,7 @@ zone = do
   rs <- catMaybes <$> many line
   foldl safeInsert (return (emptyZone org)) rs
   where
-    safeInsert :: MonadFail m => m (Zone String) -> Record String -> m (Zone String)
+    safeInsert :: MonadFail m => m (Zone String) -> Record (Name String) -> m (Zone String)
     safeInsert zm r = do
       z <- zm
       maybe (fail "cannot insert record - illformed zone") return (insert z r)

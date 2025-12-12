@@ -52,11 +52,11 @@ data RData = RData
   deriving (Eq, Ord)
 
 data Record a = Record
-  { rname :: Name a
+  { rname :: a
   , rrdata :: RData }
   deriving (Eq, Ord)
 
-instance Show (Record String) where
+instance Show a => Show (Record a) where
   show (Record n (RData c ttl t d)) = show n ++ " " ++ show ttl ++ " " ++ show c ++ " " ++ show t ++ " " ++ unwords d
 
 data Node a = Node
@@ -83,7 +83,7 @@ pathInZone (Name (reverse . NE.toList -> org)) (Name (reverse . NE.toList -> n))
       | a == b = pathInZone' as bs
       | otherwise = Nothing
 
-insert :: Ord a => Zone a -> Record a -> Maybe (Zone a)
+insert :: Ord a => Zone a -> Record (Name a) -> Maybe (Zone a)
 insert (Zone norg zroot) (Record n d) = do
   p <- pathInZone norg n
   return $ Zone norg (go p zroot)
@@ -96,9 +96,9 @@ insert (Zone norg zroot) (Record n d) = do
             else M.insert lr (go t emptyNode)
       in node { children = chf ch }
 
-allRecords :: Zone a -> [Record a]
+allRecords :: Zone a -> [Record (Name a)]
 allRecords (Zone (Name orig) ns) = go orig ns
   where
-    go :: NE.NonEmpty a -> Node a -> [Record a]
+    go :: NE.NonEmpty a -> Node a -> [Record (Name a)]
     go path (Node rs ch) =
       map (Record (Name path)) rs ++ concat (M.mapWithKey (\l -> go (l NE.<| path)) ch)

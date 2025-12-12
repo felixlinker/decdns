@@ -11,12 +11,12 @@ import RecursiveResolver (nameInData)
 import Data.Maybe (fromMaybe)
 import Util.Fresh (fresh, runFresh)
 
-resolvableBase :: Name String -> Record (NameConstraint String) -> Rule
+resolvableBase :: Name String -> Record ConstrainedName -> Rule
 resolvableBase ns (Record n (RData _ _ ty _)) = runFresh $ do
   (n', neqs) <- nameWithSynthesis n
   return (Rule (resolvable (nameTerm ns) (typeAtom ty) n') neqs)
 
-resolvableStep :: Name String -> Name String -> Record (NameConstraint String) -> [Rule]
+resolvableStep :: Name String -> Name String -> Record ConstrainedName -> [Rule]
 resolvableStep (nameTerm -> rootServer) (nameTerm -> ns) r@(Record n d) = runFresh $ do
   (n', neqs) <- nameWithSynthesis n
   t <- TVar <$> fresh "T"
@@ -45,8 +45,8 @@ resolvableStep (nameTerm -> rootServer) (nameTerm -> ns) r@(Record n d) = runFre
     mapListTail (TList pref listTail) defaultTail = TList pref (listTail <|> defaultTail)
     mapListTail _ _ = undefined
 
-fromZoneFile :: Name String -> Name String -> Zone (NameConstraint String) -> [(Record (NameConstraint String), [Rule])]
+fromZoneFile :: Name String -> Name String -> Zone (NameConstraint String) -> [(Record ConstrainedName, [Rule])]
 fromZoneFile rootServer ns (allRecords -> rs) = map (\r -> (r, recordToRules r)) rs
   where
-    recordToRules :: Record (NameConstraint String) -> [Rule]
+    recordToRules :: Record ConstrainedName -> [Rule]
     recordToRules r = resolvableBase ns r : resolvableStep rootServer ns r

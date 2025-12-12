@@ -44,7 +44,7 @@ resolvable ns t n = TPred "resolvable" [ ns, t, n ]
 neq :: Term -> Term -> Term
 neq a b = TPred "\\=" [ a, b ]
 
-nameWithSynthesis :: Name (NameConstraint String) -> Fresh (Term, [Term])
+nameWithSynthesis :: ConstrainedName -> Fresh (Term, [Term])
 nameWithSynthesis (Name (l NE.:| ls)) = case l of
   Wildcard cs -> do
     h <- TVar <$> fresh "H"

@@ -33,7 +33,7 @@ type Trace = [(Name String, Type)]
 subtrace :: Ord a => [a] -> [a] -> Bool
 subtrace (S.fromList -> s1) (S.fromList -> s2) = s1 `S.isProperSubsetOf` s2
 
-resolve :: (Name String -> Name String -> [Record String]) -> SList -> QName -> QType -> NonDet Trace
+resolve :: (Name String -> Name String -> [Record (Name String)]) -> SList -> QName -> QType -> NonDet Trace
 resolve query ses qn qt = snd <$> rresolve [] ses qn qt
   where
     rresolve :: Trace -> SList -> QName -> QType -> NonDet (SList, Trace)

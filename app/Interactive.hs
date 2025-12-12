@@ -10,26 +10,26 @@ import NonDet
 import RecursiveResolver
 import ZoneFile
 import Parsing
-import NameConstraint (NameConstraint, synthesize, toName)
+import NameConstraint
 import Util (parseZoneFileZones)
 import Control.Monad (forM_)
 
-parseZoneFileFile :: FilePath -> IO (Name String, [Record (NameConstraint String)])
+parseZoneFileFile :: FilePath -> IO (Name String, [Record ConstrainedName])
 parseZoneFileFile path = do
   (ns, zfs) <- parseZoneFileZones path
   return (ns, concatMap allRecords zfs)
 
-rToName :: Record (NameConstraint String) -> Record String
+rToName :: Record ConstrainedName -> Record (Name String)
 rToName (Record n d) = Record (toName n) d
 
-printNameServer :: Name String -> [Record (NameConstraint String)] -> IO ()
+printNameServer :: Name String -> [Record ConstrainedName] -> IO ()
 printNameServer n (map rToName -> rs) = do
   putStrLn $ "name server " ++ show n ++ " serves..."
   forM_ rs (\r -> do
     putStr "  "
     print r)
 
-runCommands :: M.Map (Name String) [Record (NameConstraint String)] -> IO ()
+runCommands :: M.Map (Name String) [Record ConstrainedName] -> IO ()
 runCommands nses = go (M.keys nses)
   where
     printHelp :: IO ()

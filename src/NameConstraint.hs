@@ -1,6 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module NameConstraint
   ( NameConstraint(..)
+  , ConstrainedName
   , toName
   , compileWildcards
   , synthesize ) where
@@ -14,11 +15,13 @@ import Data.Maybe (fromMaybe)
 data NameConstraint a = Wildcard [a] | Exactly a
   deriving (Eq, Ord)
 
+type ConstrainedName = Name (NameConstraint String)
+
 toLabel :: NameConstraint String -> String
 toLabel (Wildcard _) = "*"
 toLabel (Exactly l) = l
 
-toName :: Name (NameConstraint String) -> Name String
+toName :: ConstrainedName -> Name String
 toName (Name cs) = Name (NE.map toLabel cs)
 
 existIn :: Node String -> [String]
@@ -34,7 +37,7 @@ compileWildcards (Zone (Name n) r) = Zone (Name (NE.map Exactly n)) (go r)
     go :: Node String -> Node (NameConstraint String)
     go n_@(Node _ ch) = n_ { children = M.map go $ M.mapKeys (mapLabel (existIn n_)) ch }
 
-match :: Name String -> Name (NameConstraint String) -> Maybe (Name String)
+match :: Name String -> ConstrainedName -> Maybe (Name String)
 match (Name (NE.reverse -> ls)) (Name (NE.reverse -> cs)) = do
   matched <- match' ls cs
   n <- NE.nonEmpty (reverse matched)
@@ -56,5 +59,5 @@ match (Name (NE.reverse -> ls)) (Name (NE.reverse -> cs)) = do
     rec (a:as) (c:ncs) =
       match' (a NE.:| as) (c NE.:| ncs)
 
-synthesize :: Name String -> Record (NameConstraint String) -> Record String
+synthesize :: Name String -> Record ConstrainedName -> Record (Name String)
 synthesize qname (Record cs d) = Record (fromMaybe (toName cs) (match qname cs)) d
