@@ -1,7 +1,6 @@
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Prolog
   ( Term(..)
-  , Predicate(..)
   , Rule(..)
   , plWildcard
   , dnsWildcard
@@ -19,7 +18,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Char (toLower, toUpper)
 import Util.Fresh (Fresh, fresh)
 
-data Term = TVar String | TAtom String | TList [Term] (Maybe Term)
+data Term = TVar String | TAtom String | TList [Term] (Maybe Term) | TPred String [Term]
 
 instance Show Term where
   show (TVar v) = map toUpper v
@@ -27,6 +26,8 @@ instance Show Term where
   show (TList [] _) = "[]"
   show (TList hs t) =
     "[" ++ intercalate ", " (map show hs) ++ maybe "" (\x -> " | " ++ show x) t ++ "]"
+  show (TPred "\\=" (map show -> [ a, b ])) = a ++ " \\= " ++ b
+  show (TPred h (map show -> args)) = h ++ "(" ++ intercalate ", " args ++ ")"
 
 plWildcard :: Term
 plWildcard = TVar "_"
@@ -37,19 +38,13 @@ dnsWildcard = TAtom "'*'"
 typeAtom :: Type -> Term
 typeAtom = TAtom . show
 
-data Predicate = Predicate String [Term]
+resolvable :: Term -> Term -> Term -> Term
+resolvable ns t n = TPred "resolvable" [ ns, t, n ]
 
-instance Show Predicate where
-  show (Predicate "\\=" (map show -> [ a, b ])) = a ++ " \\= " ++ b
-  show (Predicate h (map show -> args)) = h ++ "(" ++ intercalate ", " args ++ ")"
+neq :: Term -> Term -> Term
+neq a b = TPred "\\=" [ a, b ]
 
-resolvable :: Term -> Term -> Term -> Predicate
-resolvable ns t n = Predicate "resolvable" [ ns, t, n ]
-
-neq :: Term -> Term -> Predicate
-neq a b = Predicate "\\=" [ a, b ]
-
-nameWithSynthesis :: Name (NameConstraint String) -> Fresh (Term, [Predicate])
+nameWithSynthesis :: Name (NameConstraint String) -> Fresh (Term, [Term])
 nameWithSynthesis (Name (l NE.:| ls)) = case l of
   Wildcard cs -> do
     h <- TVar <$> fresh "H"
@@ -57,7 +52,7 @@ nameWithSynthesis (Name (l NE.:| ls)) = case l of
     return (TList (reverse (h : exactlyNatoms ls)) (Just t), neqs h cs)
   _ -> return (TList (reverse (exactlyNatoms (l:ls))) Nothing, [])
   where
-    neqs :: Term -> [String] -> [Predicate]
+    neqs :: Term -> [String] -> [Term]
     neqs var = map (neq var . TAtom)
 
     exactlyNatoms :: [NameConstraint String] -> [Term]
@@ -70,8 +65,8 @@ nameTerm :: Name String -> Term
 nameTerm (Name (NE.toList -> ls)) = TList (reverse $ map TAtom $ filter (not . null) ls) Nothing
 
 data Rule = Rule
-  { rhead :: Predicate
-  , rbody :: [Predicate] }
+  { rhead :: Term
+  , rbody :: [Term] }
 
 instance Show Rule where
   show (Rule h []) = show h ++ "."

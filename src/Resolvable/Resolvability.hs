@@ -38,7 +38,7 @@ resolvableStep (nameTerm -> rootServer) (nameTerm -> ns) r@(Record n d) = runFre
         _ -> undefined
   return (map (addNeqs neqs) rules)
   where
-    addNeqs :: [Predicate] -> Rule -> Rule
+    addNeqs :: [Term] -> Rule -> Rule
     addNeqs ps rule@(Rule _ b) = rule { rbody = ps ++ b }
 
     mapListTail :: Term -> Maybe Term -> Term
