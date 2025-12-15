@@ -1,27 +1,38 @@
 module PrologCompiler (main) where
 
-import Resolvable.Prolog (Rule (rbody))
-import Resolvable.Resolvability (resolvable, fromZoneFile)
-import System.Environment (getArgs)
-
-import NameConstraint (NameConstraint)
-import Util (parseZoneFileZones)
-import ZoneFile (Name, Zone)
-import Data.List (uncons, partition)
+import Resolvable.Prolog
+import Resolvable.Resolvability
+import Resolvable.Dependencies
+import NameConstraint
+import ZoneFile
 import Parsing (parseNameM)
 
-compileZones :: Name String -> [(Name String, [Zone (NameConstraint String)])] -> [Rule a]
+import System.Environment (getArgs)
+import Util (parseZoneFileZones)
+import Control.Monad (void)
+import Data.List (uncons, partition)
+
+compileZones :: Name String -> [(Name String, [Zone (NameConstraint String)])] -> [Rule RComp]
 compileZones root = concatMap (uncurry compileOne)
   where
-    compileOne :: Name String -> [Zone (NameConstraint String)] -> [Rule a]
+    compileOne :: Name String -> [Zone (NameConstraint String)] -> [Rule RComp]
     compileOne ns = concatMap (concatMap snd . fromZoneFile root ns)
 
 main :: IO ()
 main = do
-  (root, files) <- maybe (fail "too few arguments") return . uncons =<< getArgs
+  (root, remaining) <- popArg =<< getArgs
+  (cmd, files) <- popArg remaining
   rootName <- parseNameM root
   parsed <- mapM parseZoneFileZones files
-  let (facts, rules) = partition (null . rbody) (compileZones rootName parsed)
-  print (resolvable rootName)
-  mapM_ print facts
-  mapM_ print rules
+  let compiled = compileZones rootName parsed
+  case cmd of
+    "prolog" -> do
+      let (facts, rules) = partition (null . rbody) compiled
+      print (resolvable rootName)
+      mapM_ print facts
+      mapM_ print rules
+    "deps" -> print (fromRules compiled)
+    _ -> fail "unknown command"
+  where
+    popArg :: [String] -> IO (String, [String])
+    popArg = maybe (fail "too few arguments") return . uncons
