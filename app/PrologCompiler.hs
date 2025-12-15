@@ -10,10 +10,10 @@ import ZoneFile (Name, Zone)
 import Data.List (uncons)
 import Parsing (parseNameM)
 
-compileZones :: Name String -> [(Name String, [Zone (NameConstraint String)])] -> [Rule]
+compileZones :: Name String -> [(Name String, [Zone (NameConstraint String)])] -> [Rule ()]
 compileZones root = concatMap (uncurry compileOne)
   where
-    compileOne :: Name String -> [Zone (NameConstraint String)] -> [Rule]
+    compileOne :: Name String -> [Zone (NameConstraint String)] -> [Rule ()]
     compileOne ns = concatMap (concatMap snd . fromZoneFile root ns)
 
 spanAll :: (a -> Bool) -> [a] -> ([a], [a])

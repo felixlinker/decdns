@@ -70,10 +70,14 @@ nameWithSynthesis (Name (l NE.:| ls)) = case l of
 nameTerm :: Name String -> Term
 nameTerm (Name (NE.toList -> ls)) = TList (reverse $ map TAtom $ filter (not . null) ls) Nothing
 
-data Rule = Rule
-  { rhead :: Term
+data Rule a = Rule
+  { rannotation :: a
+  , rhead :: Term
   , rbody :: [Term] }
 
-instance Show Rule where
-  show (Rule h []) = show h ++ "."
-  show (Rule h b) = show h ++ " :- " ++ intercalate ", " (map show b) ++ "."
+instance Functor Rule where
+  fmap f (Rule a h b) = Rule (f a) h b
+
+instance Show (Rule a) where
+  show (Rule _ h []) = show h ++ "."
+  show (Rule _ h b) = show h ++ " :- " ++ intercalate ", " (map show b) ++ "."
