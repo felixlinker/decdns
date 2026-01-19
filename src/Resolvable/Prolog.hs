@@ -6,7 +6,6 @@ module Resolvable.Prolog
   , subterm
   , Rule(..)
   , (Resolvable.Prolog.^)
-  , plWildcard
   , dnsWildcard
   , typeAtom
   , (Resolvable.Prolog.\=)
@@ -22,7 +21,7 @@ import Data.Char (toLower, toUpper)
 import Data.Semigroup (Semigroup(..), sconcat)
 import Util.Fresh (Fresh, fresh)
 
-data Term = TOp String [Term] | TVar String | TAtomQuoted String | TAtom String | TList [Term] (Maybe String) | TString String | TPred String [Term]
+data Term = TOp String [Term] | TVar String | TWildcard | TAtomQuoted String | TAtom String | TList [Term] (Maybe String) | TString String | TPred String [Term]
   deriving (Eq, Ord)
 
 instance Show Term where
@@ -30,6 +29,7 @@ instance Show Term where
   show (TOp op (map show -> args)) = op ++ "(" ++ intercalate ", " args ++ ")"
   show (TVar "") = undefined
   show (TVar (h:t)) = toUpper h : t
+  show TWildcard = "_"
   show (TAtom "") = undefined
   show (TAtom (h:t)) = toLower h : t
   show (TAtomQuoted a) =  "'" ++ a ++ "'"
@@ -43,6 +43,7 @@ instance Show Term where
 walk :: Semigroup a => (Term -> a) -> Term -> a
 walk f t@(TOp _ args) = sconcat (f t NE.:| map (walk f) args)
 walk f t@(TVar _) = f t
+walk f TWildcard = f TWildcard
 walk f t@(TAtomQuoted _) = f t
 walk f t@(TAtom _) = f t
 walk f t@(TList hs tl) = sconcat (f t NE.:| map (walk f) (hs ++ maybe [] ((:[]) . TVar) tl))
@@ -67,9 +68,6 @@ subterm t1 t2 = toBool $ walk (\t -> Or (t == t1)) t2
 
 (^) :: Term -> Term -> Term
 (^) a b = TOp "^" [ a, b ]
-
-plWildcard :: Term
-plWildcard = TVar "_"
 
 dnsWildcard :: Term
 dnsWildcard = TAtom "'*'"

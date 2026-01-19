@@ -55,6 +55,7 @@ unifyList u t1 t2 = maybe NoUnifier mconcat (zipWithStrict (extendUnifier u) t1 
 
 extendUnifier :: Unifier -> Term -> Term -> Unifier
 extendUnifier NoUnifier _ _ = NoUnifier
+extendUnifier u TWildcard _ = u
 extendUnifier u v@(TVar _) t
   | t == v = u
   | otherwise   = Unifier (M.singleton v t)

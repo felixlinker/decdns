@@ -41,7 +41,7 @@ resolvableStep (nameTerm -> rootServer) ns r@(Record n d) = runFresh $ do
               in [ Rule { rannotation = cannot
                         , rhead = resolves nsTerm q n'' res
                         , rbody = [ resolves delegatedNs q n'' res
-                                  , resolves rootServer (typeAtom A) delegatedNs plWildcard
+                                  , resolves rootServer (typeAtom A) delegatedNs TWildcard
                                   ] } ]
         CNAME ->
           let cname = nameTerm (fromMaybe undefined $ nameInData r)
