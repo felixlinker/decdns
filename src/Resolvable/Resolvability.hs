@@ -2,6 +2,7 @@
 module Resolvable.Resolvability
   ( RComp(..)
   , resolvable
+  , regression
   , fromZoneFile ) where
 
 import NameConstraint
@@ -72,6 +73,19 @@ resolvable =
 
     bagof :: Term -> Term -> Term -> Term
     bagof a b c = TPred "bagof" [ a, b, c ]
+
+(\+) :: Term -> Term
+(\+) t1 = TPred "\\+" [t1]
+
+regression :: Rule ()
+regression = Rule () (TPred "regression" [ ns, q, n ]) [ resolves_old, (\+) resolves_new ]
+  where
+    ns = TVar "NS"
+    q = TVar "Q"
+    n = TVar "N"
+
+    resolves_old = renamePred "resolves" "resolves_old" $ resolves ns q n TWildcard
+    resolves_new = renamePred "resolves" "resolves_new" $ resolves ns q n TWildcard
 
 fromZoneFile :: Name String -> Zone (NameConstraint String) -> [(Record ConstrainedName, [Rule RComp])]
 fromZoneFile ns (allRecords -> rs) = map (\r -> (r, recordToRules r)) rs

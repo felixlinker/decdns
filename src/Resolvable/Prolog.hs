@@ -3,8 +3,10 @@
 module Resolvable.Prolog
   ( Term(..)
   , walk
+  , renamePred
   , subterm
   , Rule(..)
+  , mapRule
   , (Resolvable.Prolog.^)
   , dnsWildcard
   , typeAtom
@@ -49,6 +51,12 @@ walk f t@(TAtom _) = f t
 walk f t@(TList hs tl) = sconcat (f t NE.:| map (walk f) (hs ++ maybe [] ((:[]) . TVar) tl))
 walk f t@(TString _) = f t
 walk f t@(TPred _ args) = sconcat (f t NE.:| map (walk f) args)
+
+renamePred :: String -> String -> Term -> Term
+renamePred from to p@(TPred n args)
+  | n == from = TPred to args
+  | otherwise = p
+renamePred _ _ p = p
 
 newtype Or = Or Bool
 
@@ -109,3 +117,6 @@ instance Functor Rule where
 instance Show (Rule a) where
   show (Rule _ h []) = show h ++ "."
   show (Rule _ h b) = show h ++ " :- " ++ intercalate ", " (map show b) ++ "."
+
+mapRule :: (Term -> Term) -> Rule a -> Rule a
+mapRule f (Rule a h b) = Rule a (f h) (map f b)
