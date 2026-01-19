@@ -2,7 +2,6 @@ module PrologCompiler (main) where
 
 import Resolvable.Prolog
 import Resolvable.Resolvability
-import Resolvable.Dependencies
 import NameConstraint
 import ZoneFile
 
@@ -28,7 +27,6 @@ main = do
       print resolvable
       mapM_ print facts
       mapM_ print rules
-    "deps" -> print (fromRules compiled)
     _ -> fail "unknown command"
   where
     popArg :: [String] -> IO (String, [String])
