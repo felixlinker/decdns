@@ -27,8 +27,8 @@ resolvableBase ns r@(Record n (RData _ _ ty (TString . unwords -> d))) = runFres
   let cannot = RComp ns r d
   return (Rule cannot (resolves (nameTerm ns) (typeAtom ty) n' d) neqs)
 
-resolvableStep :: Name String -> Name String -> Record ConstrainedName -> [Rule RComp]
-resolvableStep (nameTerm -> rootServer) ns r@(Record n d) = runFresh $ do
+resolvableStep :: Name String -> Record ConstrainedName -> [Rule RComp]
+resolvableStep ns r@(Record n d) = runFresh $ do
   (n', neqs) <- nameWithSynthesis n
   t <- fresh "T"
   q <- TVar <$> fresh "Q"
@@ -41,13 +41,13 @@ resolvableStep (nameTerm -> rootServer) ns r@(Record n d) = runFresh $ do
               in [ Rule { rannotation = cannot
                         , rhead = resolves nsTerm q n'' res
                         , rbody = [ resolves delegatedNs q n'' res
-                                  , resolves rootServer (typeAtom A) delegatedNs TWildcard
+                                  , resolves TWildcard (typeAtom A) delegatedNs TWildcard
                                   ] } ]
         CNAME ->
           let cname = nameTerm (fromMaybe undefined $ nameInData r)
           in [ Rule { rannotation = cannot
                     , rhead = resolves nsTerm q n' res
-                    , rbody = [ resolves rootServer q cname res ] } ]
+                    , rbody = [ resolves TWildcard q cname res ] } ]
         A -> []
         TXT -> []
         _ -> undefined
@@ -60,11 +60,12 @@ resolvableStep (nameTerm -> rootServer) ns r@(Record n d) = runFresh $ do
     mapListTail (TList pref listTail) defaultTail = TList pref (listTail <|> defaultTail)
     mapListTail _ _ = undefined
 
-resolvable :: Name String -> Rule ()
-resolvable (nameTerm -> rootServer) =
-  Rule () (TPred "resolvable" [ q, ns ]) [ bagof n (r Pl.^ resolves rootServer q n r) ns ]
+resolvable :: Rule ()
+resolvable =
+  Rule () (TPred "resolvable" [ q, rns, ns ]) [ bagof n (r Pl.^ resolves rns q n r) ns ]
   where
     q = TVar "Q"
+    rns = TVar "RS"
     ns = TVar "Names"
     n = TVar "Name"
     r = TVar "R"
@@ -72,8 +73,8 @@ resolvable (nameTerm -> rootServer) =
     bagof :: Term -> Term -> Term -> Term
     bagof a b c = TPred "bagof" [ a, b, c ]
 
-fromZoneFile :: Name String -> Name String -> Zone (NameConstraint String) -> [(Record ConstrainedName, [Rule RComp])]
-fromZoneFile rootServer ns (allRecords -> rs) = map (\r -> (r, recordToRules r)) rs
+fromZoneFile :: Name String -> Zone (NameConstraint String) -> [(Record ConstrainedName, [Rule RComp])]
+fromZoneFile ns (allRecords -> rs) = map (\r -> (r, recordToRules r)) rs
   where
     recordToRules :: Record ConstrainedName -> [Rule RComp]
-    recordToRules r = resolvableBase ns r : resolvableStep rootServer ns r
+    recordToRules r = resolvableBase ns r : resolvableStep ns r

@@ -5,30 +5,27 @@ import Resolvable.Resolvability
 import Resolvable.Dependencies
 import NameConstraint
 import ZoneFile
-import Parsing (parseNameM)
 
 import System.Environment (getArgs)
 import Util (parseZoneFileZones)
 import Control.Monad (void)
 import Data.List (uncons, partition)
 
-compileZones :: Name String -> [(Name String, [Zone (NameConstraint String)])] -> [Rule RComp]
-compileZones root = concatMap (uncurry compileOne)
+compileZones :: [(Name String, [Zone (NameConstraint String)])] -> [Rule RComp]
+compileZones = concatMap (uncurry compileOne)
   where
     compileOne :: Name String -> [Zone (NameConstraint String)] -> [Rule RComp]
-    compileOne ns = concatMap (concatMap snd . fromZoneFile root ns)
+    compileOne ns = concatMap (concatMap snd . fromZoneFile ns)
 
 main :: IO ()
 main = do
-  (root, remaining) <- popArg =<< getArgs
-  (cmd, files) <- popArg remaining
-  rootName <- parseNameM root
+  (cmd, files) <- popArg =<< getArgs
   parsed <- mapM parseZoneFileZones files
-  let compiled = compileZones rootName parsed
+  let compiled = compileZones parsed
   case cmd of
     "prolog" -> do
       let (facts, rules) = partition (null . rbody) compiled
-      print (resolvable rootName)
+      print resolvable
       mapM_ print facts
       mapM_ print rules
     "deps" -> print (fromRules compiled)
