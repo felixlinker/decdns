@@ -7,7 +7,6 @@ import ZoneFile
 
 import System.Environment (getArgs)
 import Util (parseZoneFileZones)
-import Control.Monad (void)
 import Data.List (uncons, partition)
 
 compileZones :: [(Name String, [Zone (NameConstraint String)])] -> [Rule RComp]
