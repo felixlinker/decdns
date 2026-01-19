@@ -87,8 +87,8 @@ regression = Rule () (TPred "regression" [ ns, q, n ]) [ resolves_old, (\+) reso
     resolves_old = renamePred "resolves" "resolves_old" $ resolves ns q n TWildcard
     resolves_new = renamePred "resolves" "resolves_new" $ resolves ns q n TWildcard
 
-fromZoneFile :: Name String -> Zone (NameConstraint String) -> [(Record ConstrainedName, [Rule RComp])]
-fromZoneFile ns (allRecords -> rs) = map (\r -> (r, recordToRules r)) rs
+fromZoneFile :: Name String -> Zone (NameConstraint String) -> [Rule RComp]
+fromZoneFile ns (allRecords -> rs) = concatMap recordToRules rs
   where
     recordToRules :: Record ConstrainedName -> [Rule RComp]
     recordToRules r = resolvableBase ns r : resolvableStep ns r

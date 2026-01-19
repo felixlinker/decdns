@@ -15,7 +15,7 @@ compileZones :: [(Name String, [Zone (NameConstraint String)])] -> [Rule RComp]
 compileZones = concatMap (uncurry compileOne)
   where
     compileOne :: Name String -> [Zone (NameConstraint String)] -> [Rule RComp]
-    compileOne ns = concatMap (concatMap snd . fromZoneFile ns)
+    compileOne ns = concatMap (fromZoneFile ns)
 
 main :: IO ()
 main = do
