@@ -56,8 +56,11 @@ record = do
   n <- tryOrState relName lastName
   spaces
   (c, t, ty) <- try catTtlType <|> try ttlCatType
-  -- Reject wildcard domains must not have DNAME records (https://datatracker.ietf.org/doc/html/rfc4592#section-4.4)
-  guard (ty /= DNAME || NE.last (ZoneFile.labels n) /= "*")
+  -- Wildcard domains must not have DNAME records (https://datatracker.ietf.org/doc/html/rfc4592#section-4.4)
+  let isWildCardName = NE.last (ZoneFile.labels n) == "*"
+  guard (ty /= DNAME || not isWildCardName)
+  -- Wildcard domains must not have NS records (https://datatracker.ietf.org/doc/html/rfc4592#section-4.2)
+  guard (ty /= NS || not isWildCardName)
   spaces1
   d <- manyTill anyChar end
   return (Record n (RData c t ty (words d)))
