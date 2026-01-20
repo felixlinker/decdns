@@ -53,10 +53,7 @@ resolvableStep ns r@(Record n d) = runFresh $ do
           in [ Rule { rannotation = ann
                     , rhead = resolves nsTerm q n' res
                     , rbody = [ resolves TWildcard q cname res ] } ]
-        A -> []
-        AAAA -> []
-        TXT -> []
-        _ -> undefined
+        _ -> []
   return (map (addNeqs neqs) rules)
   where
     addNeqs :: [Term] -> Rule RComp -> Rule RComp
