@@ -14,6 +14,7 @@ import Parsing.State
 import Parsing.Tokens
 import Parsing.Name
 import ZoneFile
+import Control.Monad (guard)
 
 comment :: Stream s m Char => Parser s m ()
 comment = do
@@ -55,6 +56,8 @@ record = do
   n <- tryOrState relName lastName
   spaces
   (c, t, ty) <- try catTtlType <|> try ttlCatType
+  -- Reject wildcard domains must not have DNAME records (https://datatracker.ietf.org/doc/html/rfc4592#section-4.4)
+  guard (ty /= DNAME || NE.last (ZoneFile.labels n) /= "*")
   spaces1
   d <- manyTill anyChar end
   return (Record n (RData c t ty (words d)))
