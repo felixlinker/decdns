@@ -48,7 +48,9 @@ resolve query ses qn qt = snd <$> rresolve [] ses qn qt
       case rtype d of
         t | n == qname && t == qtype -> return (slist, trace')
         NS -> do
-          (slist', trace'') <- rresolve trace' slist ref A
+          -- Non-deterministically choose to resolve the name server's A or AAAA record
+          typ <- choose [ A, AAAA ]
+          (slist', trace'') <- rresolve trace' slist ref typ
           rresolve trace'' (nub $ ref:slist') qname qtype
         CNAME | rname r == qname -> rresolve trace' slist ref qtype
         DNAME -> do

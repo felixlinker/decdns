@@ -38,7 +38,7 @@ dnameRewrite qn@(Name qname) fn@(Name from) (Name to) =
     then undefined
     else Name (NE.prependList (NE.take prefixLen qname) to)
 
-data Type = CNAME | DNAME | NS | A | TXT | MX | SOA
+data Type = CNAME | DNAME | NS | A | AAAA | TXT | MX | SOA
   deriving (Eq, Ord, Show)
 
 data Cat = IN

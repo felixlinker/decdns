@@ -24,6 +24,7 @@ recordType = asum $ map try
   , string "DNAME" $> DNAME
   , string "NS" $> NS
   , string "A" $> A
+  , string "AAAA" $> AAAA
   , string "TXT" $> TXT
   , string "MX" $> MX
   , string "SOA" $> SOA ]

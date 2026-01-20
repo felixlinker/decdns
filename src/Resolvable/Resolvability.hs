@@ -35,21 +35,26 @@ resolvableStep ns r@(Record n d) = runFresh $ do
   q <- TVar <$> fresh "Q"
   res <- TVar <$> fresh "R"
   let nsTerm = nameTerm ns
-  let cannot = RComp ns r res
+  let ann = RComp ns r res
   let rules = case rtype d of
         NS -> let delegatedNs = nameTerm (fromMaybe undefined $ nameInData r)
                   n'' = mapListTail n' (Just t)
-              in [ Rule { rannotation = cannot
-                        , rhead = resolves nsTerm q n'' res
-                        , rbody = [ resolves delegatedNs q n'' res
-                                  , resolves TWildcard (typeAtom A) delegatedNs TWildcard
-                                  ] } ]
+                  resolvesHead = resolves nsTerm q n'' res
+                  resolvesDeleg = resolves delegatedNs q n'' res
+                  resolvesNSAddr typ = resolves TWildcard (typeAtom typ) delegatedNs TWildcard
+              in  [ Rule  { rannotation = ann
+                          , rhead = resolvesHead
+                          , rbody = [ resolvesDeleg, resolvesNSAddr A ] }
+                  , Rule  { rannotation = ann
+                          , rhead = resolvesHead
+                          , rbody = [ resolvesDeleg, resolvesNSAddr AAAA ] }]
         CNAME ->
           let cname = nameTerm (fromMaybe undefined $ nameInData r)
-          in [ Rule { rannotation = cannot
+          in [ Rule { rannotation = ann
                     , rhead = resolves nsTerm q n' res
                     , rbody = [ resolves TWildcard q cname res ] } ]
         A -> []
+        AAAA -> []
         TXT -> []
         _ -> undefined
   return (map (addNeqs neqs) rules)
