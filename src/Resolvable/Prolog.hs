@@ -23,7 +23,14 @@ import Data.Char (toLower, toUpper)
 import Data.Semigroup (Semigroup(..), sconcat)
 import Util.Fresh (Fresh, fresh)
 
-data Term = TOp String [Term] | TVar String | TWildcard | TAtomQuoted String | TAtom String | TList [Term] (Maybe String) | TString String | TPred String [Term]
+data Term = TOp String [Term]
+          | TVar String
+          | TWildcard
+          | TAtomQuoted String
+          | TAtom String
+          | TList [Term] (Maybe String)
+          | TString String
+          | TPred String [Term]
   deriving (Eq, Ord)
 
 instance Show Term where
