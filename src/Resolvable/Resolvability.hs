@@ -9,7 +9,6 @@ import NameConstraint
 import Resolvable.Prolog as Pl
 import ZoneFile
 
-import Control.Applicative ((<|>))
 import RecursiveResolver (nameInData)
 import Data.Maybe (fromMaybe)
 import Util.Fresh (fresh, runFresh)
@@ -31,14 +30,14 @@ resolvableBase ns r@(Record n (RData _ _ ty (TString . unwords -> d))) = runFres
 resolvableStep :: Name String -> Record ConstrainedName -> [Rule RComp]
 resolvableStep ns r@(Record n d) = runFresh $ do
   (n', neqs) <- nameWithSynthesis n
-  t <- fresh "T"
+  t <- TVar <$> fresh "T"
   q <- TVar <$> fresh "Q"
   res <- TVar <$> fresh "R"
   let nsTerm = nameTerm ns
   let ann = RComp ns r res
   let rules = case rtype d of
         NS -> let delegatedNs = nameTerm (fromMaybe undefined $ nameInData r)
-                  n'' = mapListTail n' (Just t)
+                  n'' = setListTail n' t
                   resolvesHead = resolves nsTerm q n'' res
                   resolvesDeleg = resolves delegatedNs q n'' res
                   resolvesNSAddr typ = resolves TWildcard (typeAtom typ) delegatedNs TWildcard
@@ -59,9 +58,10 @@ resolvableStep ns r@(Record n d) = runFresh $ do
     addNeqs :: [Term] -> Rule RComp -> Rule RComp
     addNeqs ps rule@(Rule _ _ b) = rule { rbody = ps ++ b }
 
-    mapListTail :: Term -> Maybe String -> Term
-    mapListTail (TList pref listTail) defaultTail = TList pref (listTail <|> defaultTail)
-    mapListTail _ _ = undefined
+    setListTail :: Term -> Term -> Term
+    setListTail (TList pref Nothing) t = TList pref (Just t)
+    setListTail (TList _ (Just _)) _ = undefined
+    setListTail _ _ = undefined
 
 resolvable :: Rule ()
 resolvable =

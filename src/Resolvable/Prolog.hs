@@ -22,13 +22,14 @@ import qualified Data.List.NonEmpty as NE
 import Data.Char (toLower, toUpper)
 import Data.Semigroup (Semigroup(..), sconcat)
 import Util.Fresh (Fresh, fresh)
+import Data.Maybe (maybeToList)
 
 data Term = TOp String [Term]
           | TVar String
           | TWildcard
           | TAtomQuoted String
           | TAtom String
-          | TList [Term] (Maybe String)
+          | TList [Term] (Maybe Term)
           | TString String
           | TPred String [Term]
   deriving (Eq, Ord)
@@ -44,7 +45,7 @@ instance Show Term where
   show (TAtomQuoted a) =  "'" ++ a ++ "'"
   show (TList [] _) = "[]"
   show (TList hs t) =
-    "[" ++ intercalate ", " (map show hs) ++ maybe "" (\x -> " | " ++ show (TVar x)) t ++ "]"
+    "[" ++ intercalate ", " (map show hs) ++ maybe "" (\x -> " | " ++ show x) t ++ "]"
   show (TString s) = show s
   show (TPred "\\=" (map show -> [ a, b ])) = a ++ " \\= " ++ b
   show (TPred h (map show -> args)) = h ++ "(" ++ intercalate ", " args ++ ")"
@@ -55,7 +56,7 @@ walk f t@(TVar _) = f t
 walk f TWildcard = f TWildcard
 walk f t@(TAtomQuoted _) = f t
 walk f t@(TAtom _) = f t
-walk f t@(TList hs tl) = sconcat (f t NE.:| map (walk f) (hs ++ maybe [] ((:[]) . TVar) tl))
+walk f t@(TList hs tl) = sconcat (f t NE.:| map (walk f) (hs ++ maybeToList tl))
 walk f t@(TString _) = f t
 walk f t@(TPred _ args) = sconcat (f t NE.:| map (walk f) args)
 
@@ -97,7 +98,7 @@ nameWithSynthesis :: ConstrainedName -> Fresh (Term, [Term])
 nameWithSynthesis (Name (l NE.:| ls)) = case l of
   Wildcard cs -> do
     h <- TVar <$> fresh "H"
-    t <- fresh "T"
+    t <- TVar <$> fresh "T"
     return (TList (reverse (h : exactlyNatoms ls)) (Just t), neqs h cs)
   _ -> return (TList (reverse (exactlyNatoms (l:ls))) Nothing, [])
   where

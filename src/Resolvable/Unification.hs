@@ -45,13 +45,13 @@ apply u (TList ts mt) = do
   (tailApplied, tailVarApplied) <- applyTailVar mt
   return $ TList (listApplied ++ tailApplied) tailVarApplied
   where
-    applyTailVar :: Maybe String -> Maybe ([Term], Maybe String)
+    applyTailVar :: Maybe Term -> Maybe ([Term], Maybe Term)
     applyTailVar Nothing = Just ([], Nothing)
-    applyTailVar (Just tailName) = do
-      tailApplied <- apply u (TVar tailName)
+    applyTailVar (Just tailTerm) = do
+      tailApplied <- apply u tailTerm
       case tailApplied of
         TList ts' t -> return (ts', t)
-        TVar t -> return ([], Just t)
+        t@(TVar _) -> return ([], Just t)
         _ -> Nothing
 apply _ t@(TString _) = Just t
 apply u (TPred n ts) = TPred n <$> mapM (apply u) ts
@@ -104,12 +104,12 @@ extendUnifier u@(Unifier m) from to =
     unif (TAtom _) _ = NoUnifier
     unif (TList hs1 t1) (TList hs2 t2) = go' u hs1 hs2 t1 t2
       where
-        go' :: Unifier -> [Term] -> [Term] -> Maybe String -> Maybe String -> Unifier
+        go' :: Unifier -> [Term] -> [Term] -> Maybe Term -> Maybe Term -> Unifier
         go' u' []        hs2'      Nothing t2'
           | null hs2' && isNothing t2' = u'
           | otherwise = NoUnifier
         go' u' []        hs2'      (Just v) t2' =
-          extendUnifier u' (TVar v) (TList hs2' t2')
+          extendUnifier u' v (TList hs2' t2')
         go' _  _         []        _ _ = NoUnifier
         go' u' (h1:hs1') (h2:hs2') t1' t2' =
           go' (extendUnifier u' h1 h2) hs1' hs2' t1' t2'
