@@ -60,11 +60,26 @@ walk f t@(TList hs tl) = sconcat (f t NE.:| map (walk f) (hs ++ maybeToList tl))
 walk f t@(TString _) = f t
 walk f t@(TPred _ args) = sconcat (f t NE.:| map (walk f) args)
 
+replace :: (Term -> Term) -> Term -> Term
+replace f t = rec (f t)
+  where
+    rec (TOp op ts) = TOp op (map (replace f) ts)
+    rec u@(TVar _) = u
+    rec u@TWildcard = u
+    rec u@(TAtomQuoted _) = u
+    rec u@(TAtom _) = u
+    rec (TList ts tl) = TList (map (replace f) ts) tl
+    rec u@(TString _) = u
+    rec (TPred p ts) = TPred p (map (replace f) ts)
+
 renamePred :: String -> String -> Term -> Term
-renamePred from to p@(TPred n args)
-  | n == from = TPred to args
-  | otherwise = p
-renamePred _ _ p = p
+renamePred from to = replace go
+  where
+    go :: Term -> Term
+    go t@(TPred n args)
+      | n == from = TPred to args
+      | otherwise = t
+    go t = t
 
 newtype Or = Or Bool
 
