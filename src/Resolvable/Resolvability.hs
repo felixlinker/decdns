@@ -52,6 +52,14 @@ resolvableStep ns r@(Record n d) = runFresh $ do
           in [ Rule { rannotation = ann
                     , rhead = resolves nsTerm q n' res
                     , rbody = [ resolves TWildcard q cname res ] } ]
+        DNAME ->
+          let n'' = setListTail n' t
+              dname = nameTerm (fromMaybe undefined $ nameInData r)
+              dname' = setListTail dname t
+          in [ Rule { rannotation = ann
+                    , rhead = resolves nsTerm q n'' res
+                    , rbody = [ t \= TList [] Nothing
+                              , resolves TWildcard q dname' res ] }]
         _ -> []
   return (map (addNeqs neqs) rules)
   where
