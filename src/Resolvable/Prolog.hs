@@ -111,10 +111,11 @@ typeAtom = TAtom . map toLower . show
 
 nameWithSynthesis :: ConstrainedName -> Fresh (Term, [Term])
 nameWithSynthesis (Name (l NE.:| ls)) = case l of
+  Wildcard [] -> do
+    return (TList (reverse (TWildcard : exactlyNatoms ls)) (Just TWildcard), [])
   Wildcard cs -> do
     h <- TVar <$> fresh "H"
-    t <- TVar <$> fresh "T"
-    return (TList (reverse (h : exactlyNatoms ls)) (Just t), neqs h cs)
+    return (TList (reverse (h : exactlyNatoms ls)) (Just TWildcard), neqs h cs)
   _ -> return (TList (reverse (exactlyNatoms (l:ls))) Nothing, [])
   where
     neqs :: Term -> [String] -> [Term]
