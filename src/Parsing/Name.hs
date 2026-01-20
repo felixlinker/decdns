@@ -24,7 +24,7 @@ splitName val = case span (/= '.') val of
 
 name :: Stream s m Char => ParsecT s u m (Name String)
 name = do
-  n <- many1 (lower <|> digit <|> Char.char '-' <|> Char.char '@' <|> dot)
+  n <- many1 (lower <|> digit <|> Char.char '-' <|> Char.char '@' <|> Char.char '*' <|> dot)
   maybe (fail "could not split name") (return . Name) (splitName n)
 
 skipPath :: Stream s m Char => ParsecT s u m ()
