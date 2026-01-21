@@ -20,6 +20,7 @@ zipWithStrict _ [] [] = Just []
 zipWithStrict _ _ _ = Nothing
 
 newtype Unifier = Unifier (M.Map Term Term)
+  deriving Eq
 
 instance Show Unifier where
   show (Unifier m) = "{" ++ intercalate ", " (map (\(k, v) -> show k ++ " -> " ++ show v) (M.toList m)) ++ "}"
