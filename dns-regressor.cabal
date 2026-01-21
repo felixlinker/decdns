@@ -28,6 +28,7 @@ library
       Parsing.Name
       Parsing.State
       Parsing.Tokens
+      Parsing.Wellformedness
       Parsing.ZoneFile
       RecursiveResolver
       Resolvable.ConstrainedUnification

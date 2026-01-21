@@ -14,7 +14,7 @@ import Parsing.State
 import Parsing.Tokens
 import Parsing.Name
 import ZoneFile
-import Control.Monad (guard)
+import Parsing.Wellformedness (wellformed)
 
 comment :: Stream s m Char => Parser s m ()
 comment = do
@@ -56,11 +56,6 @@ record = do
   n <- tryOrState relName lastName
   spaces
   (c, t, ty) <- try catTtlType <|> try ttlCatType
-  -- Wildcard domains must not have DNAME records (https://datatracker.ietf.org/doc/html/rfc4592#section-4.4)
-  let isWildCardName = NE.last (ZoneFile.labels n) == "*"
-  guard (ty /= DNAME || not isWildCardName)
-  -- Wildcard domains must not have NS records (https://datatracker.ietf.org/doc/html/rfc4592#section-4.2)
-  guard (ty /= NS || not isWildCardName)
   spaces1
   d <- manyTill anyChar end
   return (Record n (RData c t ty (words d)))
@@ -96,7 +91,8 @@ zone :: Stream s m Char => Parser s m (Zone String)
 zone = do
   org <- origin
   rs <- catMaybes <$> many line
-  foldl safeInsert (return (emptyZone org)) rs
+  z <- foldl safeInsert (return (emptyZone org)) rs
+  maybe (return z) (\msg -> fail ("zone ill-formed: " ++ msg)) (wellformed z)
   where
     safeInsert :: MonadFail m => m (Zone String) -> Record (Name String) -> m (Zone String)
     safeInsert zm r = do
