@@ -1,2 +1,12 @@
+module Main (main) where
+
+import Test.Tasty (defaultMain, testGroup)
+
+import qualified Resolvable.UnificationSpec as UnificationSpec
+
 main :: IO ()
-main = putStrLn "Test suite not yet implemented"
+main =
+  defaultMain $
+    testGroup
+      "dns-regressor"
+      [UnificationSpec.tests]
