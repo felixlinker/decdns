@@ -3,6 +3,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module ZoneFile
   ( Name(..)
+  , (<|)
   , Cat(..)
   , isSubDomain
   , dnameRewrite
@@ -21,6 +22,9 @@ import qualified Data.List.NonEmpty as NE
 
 newtype Name a = Name { labels :: NE.NonEmpty a }
   deriving (Eq, Ord)
+
+(<|) :: a -> Name a -> Name a
+(<|) l (Name ls) = Name (l NE.<| ls)
 
 instance Functor Name where
   fmap f (Name ls) = Name (fmap f ls)
@@ -97,8 +101,8 @@ insert (Zone norg zroot) (Record n d) = do
       in node { children = chf ch }
 
 allRecords :: Zone a -> [Record (Name a)]
-allRecords (Zone (Name orig) ns) = go orig ns
+allRecords (Zone orig ns) = go orig ns
   where
-    go :: NE.NonEmpty a -> Node a -> [Record (Name a)]
-    go path (Node rs ch) =
-      map (Record (Name path)) rs ++ concat (M.mapWithKey (\l -> go (l NE.<| path)) ch)
+    go :: Name a -> Node a -> [Record (Name a)]
+    go n (Node rs ch) =
+      map (Record n) rs ++ concat (M.mapWithKey (\l -> go (l <| n)) ch)
