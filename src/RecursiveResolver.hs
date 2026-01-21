@@ -5,6 +5,7 @@ module RecursiveResolver
   , QName
   , QType
   , Trace
+  , nameInRData
   , nameInData
   , subtrace
   , resolve ) where
@@ -18,12 +19,15 @@ import Data.List (nub)
 import qualified Data.Set as S
 import Parsing.Name (parseNameM)
 
+nameInRData :: RData -> Maybe (Name String)
+nameInRData (RData _ _ NS [d]) = parseNameM d
+nameInRData (RData _ _ CNAME [d]) = parseNameM d
+nameInRData (RData _ _ DNAME [d]) = parseNameM d
+nameInRData (RData _ _ MX [_, d]) = parseNameM d
+nameInRData _ = Nothing
+
 nameInData :: Record a -> Maybe (Name String)
-nameInData (Record _ (RData _ _ NS [d])) = parseNameM d
-nameInData (Record _ (RData _ _ CNAME [d])) = parseNameM d
-nameInData (Record _ (RData _ _ DNAME [d])) = parseNameM d
-nameInData (Record _ (RData _ _ MX [_, d])) = parseNameM d
-nameInData Record {} = Nothing
+nameInData (Record _ d) = nameInRData d
 
 type SList = [Name String]
 type QName = Name String
