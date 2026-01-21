@@ -61,6 +61,7 @@ extendUnifier from to u@(Unifier m) = unif from (apply u to)
     unif TWildcard _ = Just u
     unif v@(TVar _) t
       | t == v = Just u
+      | subterm v t = Nothing
       | otherwise   =
         let base = Unifier $ M.insert v t $ M.map (apply (singleton v t)) m
         in  maybe (Just base) (\t' -> extendUnifier t' t u) (M.lookup v m)
