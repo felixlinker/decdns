@@ -2,6 +2,7 @@ module PrologCompiler (main) where
 
 import Resolvable.Prolog
 import Resolvable.Resolvability
+import Resolvable.Dependencies
 import NameConstraint
 import ZoneFile
 
@@ -37,6 +38,10 @@ main = do
       print regression
       mapM_ print rold
       mapM_ print rnew
+    "deps" -> do
+      parsed <- mapM parseZoneFileZones rest
+      let compiled = compileZones parsed
+      print (fromRules compiled)
     _ -> fail "unknown command"
   where
     popArg :: [String] -> IO (String, [String])

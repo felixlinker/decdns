@@ -1,6 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Unification
   ( Unifier(..)
+  , identity
   , apply
   , unify
   , unifies

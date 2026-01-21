@@ -134,6 +134,7 @@ data Rule a = Rule
   { rannotation :: a
   , rhead :: Term
   , rbody :: [Term] }
+  deriving (Eq, Ord)
 
 instance Functor Rule where
   fmap f (Rule a h b) = Rule (f a) h b

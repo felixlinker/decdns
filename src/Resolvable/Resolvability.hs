@@ -17,6 +17,7 @@ data RComp = RComp
   { fromNS :: Name String
   , fromRecord :: Record ConstrainedName
   , resultTerm :: Term }
+  deriving (Eq, Ord)
 
 resolves :: Term -> Term -> Term -> Term -> Term
 resolves ns t n r = TPred "resolves" [ ns, t, n, r ]

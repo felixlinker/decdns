@@ -30,6 +30,8 @@ library
       Parsing.Tokens
       Parsing.ZoneFile
       RecursiveResolver
+      Resolvable.ConstrainedUnification
+      Resolvable.Dependencies
       Resolvable.Prolog
       Resolvable.Resolvability
       Resolvable.Unification
