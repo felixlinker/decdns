@@ -3,9 +3,11 @@ module Resolvable.ConstrainedUnification
   , identity
   , apply
   , addConstraint
-  , extendUnifier ) where
+  , extendUnifier
+  , mergeUnifiers ) where
 
 import qualified Data.Set as S
+import qualified Data.Map as M
 
 import qualified Resolvable.Unification as U
 import Resolvable.Prolog
@@ -38,3 +40,8 @@ extendUnifier a b (CUnifier u neqs) = do
   let neqs' = S.map (bimap (U.apply u') (U.apply u')) neqs
   guard (all (uncurry (/=)) (S.toList neqs'))
   return $ CUnifier u' neqs'
+
+mergeUnifiers :: ConstrainedUnifier -> ConstrainedUnifier -> Maybe ConstrainedUnifier
+mergeUnifiers keep (CUnifier (U.Unifier m) neqs) =
+  let withNeqs = foldr (\(a, b) -> (>>= addConstraint a b)) (Just keep) neqs
+  in foldr (\(a, b) -> (>>= extendUnifier a b)) withNeqs (M.toList m)
