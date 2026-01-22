@@ -1,12 +1,20 @@
 module Util
-  ( parseZoneFileZones ) where
+  ( sepBy
+  , parseZoneFileZones ) where
 
+import Data.List (uncons)
 import GHC.Base (failIO)
 import Text.Parsec (ParseError)
 
 import NameConstraint (NameConstraint, compileWildcards)
 import Parsing (parseName, parseZoneFile)
 import ZoneFile (Name, Zone)
+
+sepBy :: String -> [String] -> IO ([String], [String])
+sepBy sep args = do
+  let (first, withSep) = span (/= sep) args
+  (_, second) <- maybe (failIO "missing separator") return (uncons withSep)
+  return (first, second)
 
 handleParser :: Either ParseError a -> IO a
 handleParser = either (failIO . show) return

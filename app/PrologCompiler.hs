@@ -7,10 +7,8 @@ import NameConstraint
 import ZoneFile
 
 import System.Environment (getArgs)
-import Util (parseZoneFileZones)
+import Util
 import Data.List (uncons, partition)
-import GHC.Base (failIO)
-import Control.Monad (guard)
 
 compileZones :: [(Name String, [Zone (NameConstraint String)])] -> [Rule RComp]
 compileZones = concatMap (uncurry compileOne)
@@ -20,7 +18,7 @@ compileZones = concatMap (uncurry compileOne)
 
 main :: IO ()
 main = do
-  (cmd, rest) <- popArg =<< getArgs
+  (cmd, args) <- popArg =<< getArgs
   case cmd of
     "prolog" -> do
       parsed <- mapM parseZoneFileZones rest
@@ -30,11 +28,9 @@ main = do
       mapM_ print facts
       mapM_ print rules
     "delta" -> do
-      let (old, tmp) = span (/= "--") rest
-      (sep, new) <- maybe (failIO "missing separator") return $ uncons tmp
-      guard (sep == "--")
-      rold <- renameResolves "resolves_old" . compileZones <$> mapM parseZoneFileZones old
-      rnew <- renameResolves "resolves_new" . compileZones <$> mapM parseZoneFileZones new
+      (old, new) <- sepBy "--" args
+      rold <- renameResolves "resolves_old" . compileZones rootServers <$> mapM parseZoneFileZones old
+      rnew <- renameResolves "resolves_new" . compileZones rootServers <$> mapM parseZoneFileZones new
       print regression
       mapM_ print rold
       mapM_ print rnew
