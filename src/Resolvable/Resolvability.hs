@@ -13,7 +13,7 @@ import ZoneFile
 
 import RecursiveResolver (nameInData)
 import Data.Maybe (fromMaybe)
-import Util.Fresh (fresh, runFresh)
+import Util.Fresh (Fresh, fresh, runFresh)
 import Control.Monad (void)
 
 data RComp = RComp
@@ -25,14 +25,14 @@ data RComp = RComp
 resolves :: Term -> Term -> Term -> Term -> Term
 resolves ns t n r = TPred "resolves" [ ns, t, n, r ]
 
-resolvableBase :: Name String -> Record ConstrainedName -> Rule RComp
-resolvableBase ns r@(Record n (RData _ _ ty (TString . unwords -> d))) = runFresh $ do
+resolvableBase :: Name String -> Record ConstrainedName -> Fresh (Rule RComp)
+resolvableBase ns r@(Record n (RData _ _ ty (TString . unwords -> d))) = do
   (n', neqs) <- nameWithSynthesis n
   let cannot = RComp ns r d
   return (Rule cannot (resolves (nameTerm ns) (typeAtom ty) n' d) neqs)
 
-resolvableStep :: [Name String] -> Name String -> Record ConstrainedName -> [Rule RComp]
-resolvableStep (map nameTerm -> rootServers) ns r@(Record n d) = runFresh $ do
+resolvableStep :: [Name String] -> Name String -> Record ConstrainedName -> Fresh [Rule RComp]
+resolvableStep (map nameTerm -> rootServers) ns r@(Record n d) = do
   (n', neqs) <- nameWithSynthesis n
   t <- TVar <$> fresh "T"
   q <- TVar <$> fresh "Q"
@@ -88,19 +88,19 @@ resolvable =
     bagof :: Term -> Term -> Term -> Term
     bagof a b c = TPred "bagof" [ a, b, c ]
 
-fromZoneFile :: [Name String] -> Name String -> Zone (NameConstraint String) -> [Rule RComp]
-fromZoneFile rootServers ns (allRecords -> rs) = concatMap recordToRules rs
+fromZoneFile :: [Name String] -> Name String -> Zone (NameConstraint String) -> Fresh [Rule RComp]
+fromZoneFile rootServers ns (allRecords -> rs) = concat <$> mapM recordToRules rs
   where
-    recordToRules :: Record ConstrainedName -> [Rule RComp]
-    recordToRules r = resolvableBase ns r : resolvableStep rootServers ns r
+    recordToRules :: Record ConstrainedName -> Fresh [Rule RComp]
+    recordToRules r = (:) <$> resolvableBase ns r <*> resolvableStep rootServers ns r
 
 type NameServersConfig = [(Name String, [Zone (NameConstraint String)])]
 
-compileConfig :: [Name String] -> NameServersConfig -> [Rule RComp]
-compileConfig rootServers = concatMap (uncurry compileOne)
+compileConfig :: [Name String] -> NameServersConfig -> Fresh [Rule RComp]
+compileConfig rootServers = (concat <$>) . mapM (uncurry compileOne)
   where
-    compileOne :: Name String -> [Zone (NameConstraint String)] -> [Rule RComp]
-    compileOne ns = concatMap (fromZoneFile rootServers ns)
+    compileOne :: Name String -> [Zone (NameConstraint String)] -> Fresh [Rule RComp]
+    compileOne ns = (concat <$>) . mapM (fromZoneFile rootServers ns)
 
 plResolvable :: [Name String] -> NameServersConfig -> [Rule ()]
-plResolvable rootServers = (resolvable :) . map void . compileConfig rootServers
+plResolvable rootServers = (resolvable :) . map void . runFresh . compileConfig rootServers

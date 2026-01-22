@@ -4,6 +4,7 @@ import Resolvable.Prolog
 import Resolvable.Resolvability
 import Resolvable.Update.Resolvability
 import Resolvable.Dependencies
+import Util.Fresh (runFresh)
 
 import System.Environment (getArgs)
 import Util
@@ -29,7 +30,7 @@ main = do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
       parsed <- mapM parseZoneFileZones zones
-      let compiled = compileConfig rootServers parsed
+      let compiled = runFresh $ compileConfig rootServers parsed
       print (fromRules compiled)
     _ -> fail "unknown command"
   where
