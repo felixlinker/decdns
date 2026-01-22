@@ -28,8 +28,8 @@ resolvableBase ns r@(Record n (RData _ _ ty (TString . unwords -> d))) = runFres
   let cannot = RComp ns r d
   return (Rule cannot (resolves (nameTerm ns) (typeAtom ty) n' d) neqs)
 
-resolvableStep :: Name String -> Record ConstrainedName -> [Rule RComp]
-resolvableStep ns r@(Record n d) = runFresh $ do
+resolvableStep :: [Name String] -> Name String -> Record ConstrainedName -> [Rule RComp]
+resolvableStep (map nameTerm -> rootServers) ns r@(Record n d) = runFresh $ do
   (n', neqs) <- nameWithSynthesis n
   t <- TVar <$> fresh "T"
   q <- TVar <$> fresh "Q"
@@ -37,30 +37,30 @@ resolvableStep ns r@(Record n d) = runFresh $ do
   let nsTerm = nameTerm ns
   let ann = RComp ns r res
   let rules = case rtype d of
-        NS -> let delegatedNs = nameTerm (fromMaybe undefined $ nameInData r)
-                  n'' = setListTail n' t
-                  resolvesHead = resolves nsTerm q n'' res
-                  resolvesDeleg = resolves delegatedNs q n'' res
-                  resolvesNSAddr typ = resolves TWildcard (typeAtom typ) delegatedNs TWildcard
-              in  [ Rule  { rannotation = ann
-                          , rhead = resolvesHead
-                          , rbody = [ resolvesDeleg, resolvesNSAddr A ] }
-                  , Rule  { rannotation = ann
-                          , rhead = resolvesHead
-                          , rbody = [ resolvesDeleg, resolvesNSAddr AAAA ] }]
-        CNAME ->
-          let cname = nameTerm (fromMaybe undefined $ nameInData r)
-          in [ Rule { rannotation = ann
-                    , rhead = resolves nsTerm q n' res
-                    , rbody = [ resolves TWildcard q cname res ] } ]
-        DNAME ->
+        NS -> do
+          rootServer <- rootServers
+          glueType <- typeAtom <$> [A, AAAA]
+          let delegatedNs = nameTerm (fromMaybe undefined $ nameInData r)
           let n'' = setListTail n' t
-              dname = nameTerm (fromMaybe undefined $ nameInData r)
-              dname' = setListTail dname t
-          in [ Rule { rannotation = ann
-                    , rhead = resolves nsTerm q n'' res
-                    , rbody = [ t \= TList [] Nothing
-                              , resolves TWildcard q dname' res ] }]
+          return $ Rule { rannotation = ann
+                        , rhead = resolves nsTerm q n'' res
+                        , rbody = [ resolves delegatedNs q n'' res
+                                  , resolves rootServer glueType delegatedNs TWildcard ] }
+        CNAME -> do
+          rootServer <- rootServers
+          let cname = nameTerm (fromMaybe undefined $ nameInData r)
+          return $ Rule { rannotation = ann
+                        , rhead = resolves nsTerm q n' res
+                        , rbody = [ resolves rootServer q cname res ] }
+        DNAME -> do
+          rootServer <- rootServers
+          let n'' = setListTail n' t
+          let dname = nameTerm (fromMaybe undefined $ nameInData r)
+          let rewritten = setListTail dname t
+          return $ Rule { rannotation = ann
+                        , rhead = resolves nsTerm q n'' res
+                        , rbody = [ t \= TList [] Nothing
+                                  , resolves rootServer q rewritten res ] }
         _ -> []
   return (map (addNeqs neqs) rules)
   where
@@ -98,8 +98,8 @@ regression = Rule () (TPred "regression" [ ns, q, n ]) [ resolves_old, (\+) reso
     resolves_old = renamePred "resolves" "resolves_old" $ resolves ns q n TWildcard
     resolves_new = renamePred "resolves" "resolves_new" $ resolves ns q n TWildcard
 
-fromZoneFile :: Name String -> Zone (NameConstraint String) -> [Rule RComp]
-fromZoneFile ns (allRecords -> rs) = concatMap recordToRules rs
+fromZoneFile :: [Name String] -> Name String -> Zone (NameConstraint String) -> [Rule RComp]
+fromZoneFile rootServers ns (allRecords -> rs) = concatMap recordToRules rs
   where
     recordToRules :: Record ConstrainedName -> [Rule RComp]
-    recordToRules r = resolvableBase ns r : resolvableStep ns r
+    recordToRules r = resolvableBase ns r : resolvableStep rootServers ns r

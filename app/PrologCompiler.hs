@@ -10,33 +10,39 @@ import System.Environment (getArgs)
 import Util
 import Data.List (uncons, partition)
 
-compileZones :: [(Name String, [Zone (NameConstraint String)])] -> [Rule RComp]
-compileZones = concatMap (uncurry compileOne)
+compileZones :: [Name String] -> [(Name String, [Zone (NameConstraint String)])] -> [Rule RComp]
+compileZones rootServers = concatMap (uncurry compileOne)
   where
     compileOne :: Name String -> [Zone (NameConstraint String)] -> [Rule RComp]
-    compileOne ns = concatMap (fromZoneFile ns)
+    compileOne ns = concatMap (fromZoneFile rootServers ns)
 
 main :: IO ()
 main = do
   (cmd, args) <- popArg =<< getArgs
   case cmd of
     "prolog" -> do
-      parsed <- mapM parseZoneFileZones rest
-      let compiled = compileZones parsed
+      (roots, zones) <- sepBy "--" args
+      rootServers <- parseNames roots
+      parsed <- mapM parseZoneFileZones zones
+      let compiled = compileZones rootServers parsed
       let (facts, rules) = partition (null . rbody) compiled
       print resolvable
       mapM_ print facts
       mapM_ print rules
     "delta" -> do
-      (old, new) <- sepBy "--" args
+      (roots, args') <- sepBy "--" args
+      (old, new) <- sepBy "--" args'
+      rootServers <- parseNames roots
       rold <- renameResolves "resolves_old" . compileZones rootServers <$> mapM parseZoneFileZones old
       rnew <- renameResolves "resolves_new" . compileZones rootServers <$> mapM parseZoneFileZones new
       print regression
       mapM_ print rold
       mapM_ print rnew
     "deps" -> do
-      parsed <- mapM parseZoneFileZones rest
-      let compiled = compileZones parsed
+      (roots, zones) <- sepBy "--" args
+      rootServers <- parseNames roots
+      parsed <- mapM parseZoneFileZones zones
+      let compiled = compileZones rootServers parsed
       print (fromRules compiled)
     _ -> fail "unknown command"
   where

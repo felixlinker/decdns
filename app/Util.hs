@@ -1,7 +1,9 @@
 module Util
   ( sepBy
-  , parseZoneFileZones ) where
+  , parseZoneFileZones
+  , parseNames ) where
 
+import Control.Monad ((<=<))
 import Data.List (uncons)
 import GHC.Base (failIO)
 import Text.Parsec (ParseError)
@@ -26,3 +28,6 @@ parseZoneFileZones path = do
   zones <- parseZoneFile path content >>= handleParser
   ns <- parseName path >>= handleParser
   return (ns, map compileWildcards zones)
+
+parseNames :: [String] -> IO [Name String]
+parseNames = mapM (handleParser <=< parseName)
