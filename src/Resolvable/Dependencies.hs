@@ -11,14 +11,19 @@ import Data.Maybe (mapMaybe, maybeToList)
 import Resolvable.Prolog
 import Resolvable.Resolvability
 import Resolvable.ConstrainedUnification
-import Data.List (intercalate)
+import Data.List (intercalate, partition)
 
 newtype Dependencies = Deps (M.Map (Rule RComp) [(ConstrainedUnifier, [Rule RComp])])
 
 instance Show Dependencies where
   show (Deps (M.toList -> items)) =
-      unlines $ map (uncurry showItem)
-              $ filter (not . null . snd) items
+    let (facts, rules) = partition (null . snd) items
+    in unlines  $ if null facts
+                    then []
+                    else  ( "The following rules have no dependencies:"
+                          : map (("- " ++) . showRecord . fst) facts
+                          ++ [""])
+                ++ map (uncurry showItem) rules
     where
       showRecord :: Rule RComp -> String
       showRecord (Rule (RComp _ record _) _ _) = show record
