@@ -30,50 +30,50 @@ resolvableBase ns r@(Record n (RData _ _ ty (TString . unwords -> d))) = do
   let cannot = RComp ns r
   return (Rule cannot (resolves (nameTerm ns) (typeAtom ty) n' d) neqs)
 
-resolvableStep :: [Name String] -> Name String -> Record ConstrainedName -> Fresh [Rule RComp]
--- resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> NS)) =
-resolvableStep (map nameTerm -> rootServers) ns r@(Record n d) = do
-  (n', neqs) <- nameWithSynthesis n
-  t <- TVar <$> fresh "T"
-  q <- TVar <$> fresh "Q"
-  res <- TVar <$> fresh "R"
-  let nsTerm = nameTerm ns
-  let ann = RComp ns r
-  let rules = case rtype d of
-        NS -> do
-          rootServer <- rootServers
-          glueType <- typeAtom <$> [A, AAAA]
-          let delegatedNs = nameTerm (fromMaybe undefined $ nameInData r)
-          let n'' = setListTail n' t
-          return $ Rule { rannotation = ann
-                        , rhead = resolves nsTerm q n'' res
-                        , rbody = [ resolves delegatedNs q n'' res
-                                  , resolves rootServer glueType delegatedNs TWildcard ] }
-        CNAME -> do
-          rootServer <- rootServers
-          let cname = nameTerm (fromMaybe undefined $ nameInData r)
-          return $ Rule { rannotation = ann
-                        , rhead = resolves nsTerm q n' res
-                        , rbody = [ resolves rootServer q cname res ] }
-        DNAME -> do
-          rootServer <- rootServers
-          let n'' = setListTail n' t
-          let dname = nameTerm (fromMaybe undefined $ nameInData r)
-          let rewritten = setListTail dname t
-          return $ Rule { rannotation = ann
-                        , rhead = resolves nsTerm q n'' res
-                        , rbody = [ t \= TList [] Nothing
-                                  , resolves rootServer q rewritten res ] }
-        _ -> []
-  return (map (addNeqs neqs) rules)
-  where
-    addNeqs :: [Term] -> Rule RComp -> Rule RComp
-    addNeqs ps rule@(Rule _ _ b) = rule { rbody = ps ++ b }
+captureListTail :: Term -> Term -> Term
+captureListTail t (TList pref Nothing) = TList pref (Just t)
+captureListTail _ (TList _ (Just _)) = undefined
+captureListTail _ _ = undefined
 
-    setListTail :: Term -> Term -> Term
-    setListTail (TList pref Nothing) t = TList pref (Just t)
-    setListTail (TList _ (Just _)) _ = undefined
-    setListTail _ _ = undefined
+resolvableStep :: [Name String] -> Name String -> Record ConstrainedName -> Fresh [Rule RComp]
+resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> NS)) = sequence $ do
+  rootServer <- rootServers
+  glueType <- typeAtom <$> [A, AAAA]
+  return $ do
+    t <- TVar <$> fresh "T"
+    -- Do not expect wildcard neq constraints on NS records
+    (captureListTail t -> n', _) <- nameWithSynthesis n
+    q <- TVar <$> fresh "Q"
+    res <- TVar <$> fresh "R"
+    let delegatedNs = nameTerm (fromMaybe undefined $ nameInData r)
+    return Rule { rannotation = RComp ns r
+                , rhead = resolves (nameTerm ns) q n' res
+                , rbody = [ resolves delegatedNs q n' res
+                          , resolves rootServer glueType delegatedNs TWildcard ] }
+resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> CNAME)) = sequence $ do
+  rootServer <- rootServers
+  return $ do
+    (n', neqs) <- nameWithSynthesis n
+    q <- TVar <$> fresh "Q"
+    res <- TVar <$> fresh "R"
+    let cname = nameTerm (fromMaybe undefined $ nameInData r)
+    return Rule { rannotation = RComp ns r
+                , rhead = resolves (nameTerm ns) q n' res
+                , rbody = neqs ++ [ resolves rootServer q cname res ] }
+resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> DNAME)) = sequence $ do
+  rootServer <- rootServers
+  return $ do -- Enter Fresh monad
+    -- Do not expect wildcard neq constraints on CNAME records
+    t <- TVar <$> fresh "T"
+    (captureListTail t -> n', _) <- nameWithSynthesis n
+    q <- TVar <$> fresh "Q"
+    res <- TVar <$> fresh "R"
+    let dname = nameTerm (fromMaybe undefined $ nameInData r)
+    return Rule { rannotation = RComp ns r
+                , rhead = resolves (nameTerm ns) q n' res
+                , rbody = [ t \= TList [] Nothing
+                          , resolves rootServer q (captureListTail t dname) res ] }
+resolvableStep _ _ (Record _ (rtype -> _)) = return []
 
 resolvable :: Rule ()
 resolvable =
