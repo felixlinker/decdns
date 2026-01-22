@@ -18,7 +18,7 @@ module Resolvable.Prolog
 import NameConstraint
 import ZoneFile
 
-import Data.List (intercalate, partition)
+import Data.List (intercalate, groupBy, sortOn)
 import qualified Data.List.NonEmpty as NE
 import Data.Char (toLower, toUpper)
 import Data.Semigroup (Semigroup(..), sconcat)
@@ -149,5 +149,12 @@ mapRule f (Rule a h b) = Rule a (f h) (map f b)
 
 showKnowledgeBase :: [Rule a] -> String
 showKnowledgeBase kb =
-    let (facts, rules) = partition (null . rbody) kb
-    in unlines $ map show $ facts ++ rules
+  let grouped = groupBy (\r1 r2 -> headName r1 == headName r2) kb
+      -- Note that we use negation because facts will have @not . null . rbody@
+      -- be @False@, which is ordered before @True@.
+      factsFirst = map (sortOn (not . null . rbody)) grouped
+  in unlines $ map show $ concat factsFirst
+  where
+    headName :: Rule a -> String
+    headName (Rule _ (TPred n _) _) = n
+    headName _ = undefined
