@@ -26,7 +26,7 @@ instance Show Dependencies where
                 ++ map (uncurry showItem) rules
     where
       showRecord :: Rule RComp -> String
-      showRecord (Rule (RComp _ record _) _ _) = show record
+      showRecord (Rule (RComp _ record) _ _) = show record
 
       showItem :: Rule RComp -> [(ConstrainedUnifier, [Rule RComp])] -> String
       showItem r ds = unlines ((showRecord r ++ " depends on:") : map showDep ds)

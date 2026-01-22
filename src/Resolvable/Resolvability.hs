@@ -18,8 +18,7 @@ import Control.Monad (void)
 
 data RComp = RComp
   { fromNS :: Name String
-  , fromRecord :: Record ConstrainedName
-  , resultTerm :: Term }
+  , fromRecord :: Record ConstrainedName }
   deriving (Eq, Ord)
 
 resolves :: Term -> Term -> Term -> Term -> Term
@@ -28,17 +27,18 @@ resolves ns t n r = TPred "resolves" [ ns, t, n, r ]
 resolvableBase :: Name String -> Record ConstrainedName -> Fresh (Rule RComp)
 resolvableBase ns r@(Record n (RData _ _ ty (TString . unwords -> d))) = do
   (n', neqs) <- nameWithSynthesis n
-  let cannot = RComp ns r d
+  let cannot = RComp ns r
   return (Rule cannot (resolves (nameTerm ns) (typeAtom ty) n' d) neqs)
 
 resolvableStep :: [Name String] -> Name String -> Record ConstrainedName -> Fresh [Rule RComp]
+-- resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> NS)) =
 resolvableStep (map nameTerm -> rootServers) ns r@(Record n d) = do
   (n', neqs) <- nameWithSynthesis n
   t <- TVar <$> fresh "T"
   q <- TVar <$> fresh "Q"
   res <- TVar <$> fresh "R"
   let nsTerm = nameTerm ns
-  let ann = RComp ns r res
+  let ann = RComp ns r
   let rules = case rtype d of
         NS -> do
           rootServer <- rootServers
