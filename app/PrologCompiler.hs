@@ -18,14 +18,14 @@ main = do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
       cfg <- mapM parseZoneFileZones zones
-      putStrLn (showKnowledgeBase (plResolvable rootServers cfg))
+      putStr (showKnowledgeBase (plResolvable rootServers cfg))
     "delta" -> do
       (roots, args') <- sepBy "--" args
       rootServers <- parseNames roots
       (old, new) <- sepBy "--" args'
       oldCfg <- mapM parseZoneFileZones old
       newCfg <- mapM parseZoneFileZones new
-      putStrLn (showKnowledgeBase (plRegressions rootServers oldCfg newCfg))
+      putStr (showKnowledgeBase (plRegressions rootServers oldCfg newCfg))
     "deps" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
