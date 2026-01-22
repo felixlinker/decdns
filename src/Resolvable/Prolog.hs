@@ -12,12 +12,13 @@ module Resolvable.Prolog
   , typeAtom
   , (Resolvable.Prolog.\=)
   , nameWithSynthesis
-  , nameTerm ) where
+  , nameTerm
+  , showKnowledgeBase ) where
 
 import NameConstraint
 import ZoneFile
 
-import Data.List (intercalate)
+import Data.List (intercalate, partition)
 import qualified Data.List.NonEmpty as NE
 import Data.Char (toLower, toUpper)
 import Data.Semigroup (Semigroup(..), sconcat)
@@ -145,3 +146,8 @@ instance Show (Rule a) where
 
 mapRule :: (Term -> Term) -> Rule a -> Rule a
 mapRule f (Rule a h b) = Rule a (f h) (map f b)
+
+showKnowledgeBase :: [Rule a] -> String
+showKnowledgeBase kb =
+    let (facts, rules) = partition (null . rbody) kb
+    in unlines $ map show $ facts ++ rules

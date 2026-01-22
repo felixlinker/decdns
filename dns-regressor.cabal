@@ -36,6 +36,7 @@ library
       Resolvable.Prolog
       Resolvable.Resolvability
       Resolvable.Unification
+      Resolvable.Update.Resolvability
       Util.Fresh
       ZoneFile
   other-modules:

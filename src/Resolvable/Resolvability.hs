@@ -1,9 +1,11 @@
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Resolvability
   ( RComp(..)
-  , resolvable
-  , regression
-  , fromZoneFile ) where
+  , resolves
+  , fromZoneFile
+  , NameServersConfig
+  , compileConfig
+  , plResolvable ) where
 
 import NameConstraint
 import Resolvable.Prolog as Pl
@@ -12,6 +14,7 @@ import ZoneFile
 import RecursiveResolver (nameInData)
 import Data.Maybe (fromMaybe)
 import Util.Fresh (fresh, runFresh)
+import Control.Monad (void)
 
 data RComp = RComp
   { fromNS :: Name String
@@ -85,21 +88,19 @@ resolvable =
     bagof :: Term -> Term -> Term -> Term
     bagof a b c = TPred "bagof" [ a, b, c ]
 
-(\+) :: Term -> Term
-(\+) t1 = TPred "\\+" [t1]
-
-regression :: Rule ()
-regression = Rule () (TPred "regression" [ ns, q, n ]) [ resolves_old, (\+) resolves_new ]
-  where
-    ns = TVar "NS"
-    q = TVar "Q"
-    n = TVar "N"
-
-    resolves_old = renamePred "resolves" "resolves_old" $ resolves ns q n TWildcard
-    resolves_new = renamePred "resolves" "resolves_new" $ resolves ns q n TWildcard
-
 fromZoneFile :: [Name String] -> Name String -> Zone (NameConstraint String) -> [Rule RComp]
 fromZoneFile rootServers ns (allRecords -> rs) = concatMap recordToRules rs
   where
     recordToRules :: Record ConstrainedName -> [Rule RComp]
     recordToRules r = resolvableBase ns r : resolvableStep rootServers ns r
+
+type NameServersConfig = [(Name String, [Zone (NameConstraint String)])]
+
+compileConfig :: [Name String] -> NameServersConfig -> [Rule RComp]
+compileConfig rootServers = concatMap (uncurry compileOne)
+  where
+    compileOne :: Name String -> [Zone (NameConstraint String)] -> [Rule RComp]
+    compileOne ns = concatMap (fromZoneFile rootServers ns)
+
+plResolvable :: [Name String] -> NameServersConfig -> [Rule ()]
+plResolvable rootServers = (resolvable :) . map void . compileConfig rootServers
