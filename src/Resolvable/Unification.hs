@@ -56,7 +56,7 @@ matchHead t = unifies t . rhead
 
 extendUnifier :: Term -> Term -> Unifier -> Maybe Unifier
 -- Call @apply u@ on @to@ so that the unifier stays normal
-extendUnifier from to u@(Unifier m) = unif from (apply u to)
+extendUnifier from to u@(Unifier m) = unif (apply u from) (apply u to)
   where
     unifList :: [Term] -> [Term] -> Maybe Unifier
     unifList l1 l2 = foldr (=<<) (Just u) =<< zipWithStrict extendUnifier l1 l2
