@@ -38,7 +38,7 @@ instance Show Dependencies where
       showItem r ds = unlines ((showRecord r ++ " depends on:") : map showDep ds)
 
       showDep :: (ConstrainedUnifier, [Rule RComp]) -> String
-      showDep (_, rs) = "- " ++ intercalate " AND " (map showRecord rs)
+      showDep (cu, rs) = "- " ++ intercalate " AND " (map showRecord rs) ++ " under " ++ show cu
 
 empty :: Dependencies
 empty = Deps M.empty
