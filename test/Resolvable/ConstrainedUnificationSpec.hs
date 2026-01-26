@@ -16,7 +16,6 @@ import Resolvable.ConstrainedUnification
   , mergeUnifiers
   )
 import Resolvable.Util (genTermNoWildcard)
-import Util.Fresh (runFresh, fresh)
 import Data.Maybe (fromMaybe)
 
 tests :: TestTree

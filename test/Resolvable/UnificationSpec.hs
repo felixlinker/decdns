@@ -3,9 +3,10 @@ module Resolvable.UnificationSpec (tests) where
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertFailure, testCase, (@?=))
 import Test.Tasty.QuickCheck
+import qualified Data.Map.Strict as M
 
-import Resolvable.Prolog (Term(..))
-import Resolvable.Unification (apply, unify, unifies)
+import Resolvable.Prolog (Term(..), subterm)
+import Resolvable.Unification (Unifier(..), apply, unify, unifies)
 import Resolvable.Util (genTermNoWildcard)
 
 tests :: TestTree
@@ -14,6 +15,7 @@ tests =
     "Resolvable.Unification"
     [ testProperty "apply unifier implies terms become equal" prop_unify_apply_agrees
     , testProperty "unification is symmetric in success" prop_unify_symmetric
+    , testProperty "unification yields normal unifiers" prop_unify_normal
     , testGroup
         "unit"
         [ testCase "occurs check rejects cyclic binding" occursCheckRejectsCycle
@@ -66,3 +68,14 @@ prop_unify_symmetric =
     forAll genTermNoWildcard $ \t2 ->
       unifies t1 t2 === unifies t2 t1
 
+prop_unify_normal :: Property
+prop_unify_normal =
+  forAll genTermNoWildcard $ \t1 ->
+    forAll genTermNoWildcard $ \t2 ->
+      maybe (property True) (\u -> counterexample (show u) (isNormalUnifier u)) (unify t1 t2)
+
+isNormalUnifier :: Unifier -> Bool
+isNormalUnifier (Unifier m) = all noVarInOtherTerms (M.keys m)
+  where
+    noVarInOtherTerms :: Term -> Bool
+    noVarInOtherTerms v = not $ any (subterm v) (M.elems m)
