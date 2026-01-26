@@ -16,6 +16,7 @@ import Resolvable.ConstrainedUnification
   , mergeUnifiers
   )
 import Util.Fresh (runFresh, fresh)
+import Data.Maybe (fromMaybe)
 
 tests :: TestTree
 tests =
@@ -122,14 +123,8 @@ genConstrainedUnifier = sized $ \n -> do
 
     applyOp :: ConstrainedUnifier -> Op -> ConstrainedUnifier
     applyOp u op = case op of
-      OpExtend a b ->
-        case extendUnifier a b u of
-          Nothing -> u
-          Just u' -> u'
-      OpConstraint a b ->
-        case addConstraint a b u of
-          Nothing -> u
-          Just u' -> u'
+      OpExtend a b -> fromMaybe u (extendUnifier a b u)
+      OpConstraint a b -> fromMaybe u (addConstraint a b u)
 
 genOp :: Gen String -> Gen Op
 genOp names =
