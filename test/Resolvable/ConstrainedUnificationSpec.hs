@@ -15,6 +15,7 @@ import Resolvable.ConstrainedUnification
   , identity
   , mergeUnifiers
   )
+import Resolvable.Util (genTermNoWildcard)
 import Util.Fresh (runFresh, fresh)
 import Data.Maybe (fromMaybe)
 
@@ -115,45 +116,17 @@ genConstrainedUnifier :: Gen ConstrainedUnifier
 genConstrainedUnifier = sized $ \n -> do
   let kMax = min 6 (n + 1)
   k <- chooseInt (0, kMax)
-  ops <- vectorOf k (genOp names)
+  ops <- vectorOf k genOp
   pure $ foldl' applyOp identity ops
   where
-    names :: Gen String
-    names = elements (runFresh $ mapM (const $ fresh "v") ([0..5] :: [Int]))
-
     applyOp :: ConstrainedUnifier -> Op -> ConstrainedUnifier
     applyOp u op = case op of
       OpExtend a b -> fromMaybe u (extendUnifier a b u)
       OpConstraint a b -> fromMaybe u (addConstraint a b u)
 
-genOp :: Gen String -> Gen Op
-genOp names =
+genOp :: Gen Op
+genOp =
   oneof
-    [ OpExtend <$> genTermNoWildcard names <*> genTermNoWildcard names
-    , OpConstraint <$> genTermNoWildcard names <*> genTermNoWildcard names
+    [ OpExtend <$> genTermNoWildcard <*> genTermNoWildcard
+    , OpConstraint <$> genTermNoWildcard <*> genTermNoWildcard
     ]
-
-genTermNoWildcard :: Gen String -> Gen Term
-genTermNoWildcard names = do
-  n <- chooseInt (0, 5)
-  go n
-  where
-    go :: Int -> Gen Term
-    go n
-      | n <= 0 = oneof  [ TVar <$> names
-                        , TAtom <$> names
-                        , TAtomQuoted <$> names
-                        , TString <$> names
-                        ]
-      | otherwise =
-        let rec = go (n - 1)
-        in  frequency
-            [ (4, go 0)
-            , (2, TOp <$> names <*> genList rec)
-            , (2, TPred <$> names <*> genList rec)
-            , (2, TList <$> genList rec <*> oneof [pure Nothing, Just <$> rec]) ]
-
-    genList :: Gen Term -> Gen [Term]
-    genList g = do
-      k <- chooseInt (0, 3)
-      vectorOf k g

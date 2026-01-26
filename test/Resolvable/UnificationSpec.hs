@@ -6,7 +6,7 @@ import Test.Tasty.QuickCheck
 
 import Resolvable.Prolog (Term(..))
 import Resolvable.Unification (apply, unify, unifies)
-import Util.Fresh (runFresh, fresh)
+import Resolvable.Util (genTermNoWildcard)
 
 tests :: TestTree
 tests =
@@ -54,9 +54,6 @@ wildcardKeepsIdentity =
     Nothing -> assertFailure "expected a unifier"
     Just u -> apply u (TVar "X") @?= TVar "X"
 
-names :: Gen String
-names = elements (runFresh $ mapM (const $ fresh "v") ([0..4] :: [Int]))
-
 prop_unify_apply_agrees :: Property
 prop_unify_apply_agrees =
   forAll genTermNoWildcard $ \t1 ->
@@ -69,30 +66,3 @@ prop_unify_symmetric =
     forAll genTermNoWildcard $ \t2 ->
       unifies t1 t2 === unifies t2 t1
 
-genTermNoWildcard :: Gen Term
-genTermNoWildcard = do
-  n <- chooseInt (0, 6)
-  go n
-  where
-    go :: Int -> Gen Term
-    go n
-      | n <= 0 = oneof  [ TVar <$> names
-                        , TAtom <$> names
-                        , TAtomQuoted <$> names
-                        , TString <$> names
-                        ]
-      | otherwise =
-        let rec = go (n - 1)
-        in  frequency
-            [ (4, go 0)
-            , (2, TOp <$> names <*> genList rec)
-            , (2, TPred <$> names <*> genList rec)
-            , (2, TList <$> genList rec <*> genTail) ]
-
-    genTail :: Gen (Maybe Term)
-    genTail = oneof [ pure Nothing, Just . TVar <$> names ]
-
-    genList :: Gen Term -> Gen [Term]
-    genList g = do
-      k <- chooseInt (0, 3)
-      vectorOf k g
