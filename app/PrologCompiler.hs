@@ -32,6 +32,12 @@ main = do
       parsed <- mapM parseZoneFileZones zones
       let compiled = runFresh $ compileConfig rootServers parsed
       print (fromRules compiled)
+    "resolvable" -> do
+      (roots, zones) <- sepBy "--" args
+      rootServers <- parseNames roots
+      compiled <- compileConfig rootServers <$> mapM parseZoneFileZones zones
+      let us = runFresh $ computeResolvable rootServers compiled
+      putStr $ unlines $ map show us
     _ -> fail "unknown command"
   where
     popArg :: [String] -> IO (String, [String])

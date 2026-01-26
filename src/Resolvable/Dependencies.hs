@@ -3,17 +3,23 @@
 module Resolvable.Dependencies
   ( Dependencies
   , empty
-  , fromRules ) where
+  , fromRules
+  , computeResolvable ) where
 
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.Maybe (mapMaybe, maybeToList)
 
+import ZoneFile
+import Util.Fresh
 import Resolvable.Prolog
 import Resolvable.Resolvability
 import Resolvable.ConstrainedUnification
 import Data.List (intercalate, partition)
 
-newtype Dependencies = Deps (M.Map (Rule RComp) [(ConstrainedUnifier, [Rule RComp])])
+type Conjunct = (ConstrainedUnifier, [Rule RComp])
+
+newtype Dependencies = Deps (M.Map (Rule RComp) [Conjunct])
 
 instance Show Dependencies where
   show (Deps (M.toList -> items)) =
@@ -64,3 +70,37 @@ fromRules rs = go rs empty
 
     matchRule :: ConstrainedUnifier -> Term -> Rule RComp -> Maybe (ConstrainedUnifier, Rule RComp)
     matchRule u t r = (,r) <$> extendUnifier t (rhead r) u
+
+data ConstrainedQuery = CQuery Term Neqs
+
+instance Show ConstrainedQuery where
+  show (CQuery q neqs) =
+    let showNeqs = if null neqs then "True" else intercalate " and " (map (\(a, b) -> show a ++ "\\=" ++ show b) (S.toList neqs))
+    in show q ++ " s.t. " ++ showNeqs
+
+deriveIf :: ConstrainedUnifier -> Term -> Rule a -> Maybe (ConstrainedUnifier, [Term])
+deriveIf u q (Rule _ h b) = do
+  u' <- extendUnifier q h u
+  return (u', map (apply u') b)
+
+computeResolvable :: [Name String] -> Fresh [Rule a] -> Fresh [ConstrainedQuery]
+computeResolvable rootServers rsM = do
+  rs <- rsM
+  qtype <- TVar <$> fresh "QT"
+  qname <- TVar <$> fresh "QN"
+  qresult <- TVar <$> fresh "QR"
+  return $ do
+    rootServer <- nameTerm <$> rootServers
+    let query = resolves rootServer qtype qname qresult
+    u <- rec identity (resolves rootServer qtype qname qresult) rs
+    return $ CQuery (apply u query) (constraints u)
+  where
+    solveQuery :: ConstrainedUnifier -> Term -> [Rule a] -> [(ConstrainedUnifier, [Term])]
+    solveQuery u (TPred "\\=" [ a, b ]) _ = maybe [] (return . (,[])) (addConstraint a b u)
+    solveQuery u q@(TPred "resolves" _) rs = mapMaybe (deriveIf u q) rs
+    solveQuery _ _ _ = error "unsupported predicate"
+
+    rec :: ConstrainedUnifier -> Term -> [Rule a] -> [ConstrainedUnifier]
+    rec u q rs = do
+      (u', conj) <- solveQuery u q rs
+      foldr (\q' us -> [ us' | u'' <- us, us' <- rec u'' (apply u'' q') rs ]) [u'] conj
