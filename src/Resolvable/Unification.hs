@@ -41,7 +41,6 @@ apply _ t@(TAtom _) = t
 apply u (TList (map (apply u) -> ts) t) = case fmap (apply u) t of
   Nothing -> TList ts Nothing
   Just (TList ts' t') -> TList (ts ++ ts') t'
-  t'@(Just (TVar _)) -> TList ts t'
   t' -> TList ts t'
 apply _ t@(TString _) = t
 apply u (TPred n (map (apply u) -> ts)) = TPred n ts
@@ -96,9 +95,7 @@ extendUnifier from to u@(Unifier m) = unif from (apply u to)
         unifTList (_:_)     []        _ Nothing _ = Nothing
         unifTList []        hs2'      (Just v@(TVar _)) t2' u' = extendUnifier v (TList hs2' t2') u'
         unifTList hs1'      []        t1' (Just v@(TVar _)) u' = extendUnifier v (TList hs1' t1') u'
-        unifTList []        hs2'      (Just l@(TList _ _)) t2' u' = extendUnifier l (TList hs2' t2') u'
-        unifTList hs1'      []        t1' (Just l@(TList _ _)) u' = extendUnifier l (TList hs1' t1') u'
-        -- Do not support any other terms in tails other than list and variable
+        -- Do not support any other terms in tails other than variable
         unifTList []        _         (Just _) _ _ = Nothing
         unifTList _         []        _ (Just _) _ = Nothing
         unifTList (h1:hs1') (h2:hs2') t1' t2' u' =

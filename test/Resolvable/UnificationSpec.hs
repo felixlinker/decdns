@@ -87,18 +87,10 @@ genTermNoWildcard = do
             [ (4, go 0)
             , (2, TOp <$> names <*> genList rec)
             , (2, TPred <$> names <*> genList rec)
-            , (2, TList <$> genList rec <*> genTail (n - 1)) ]
+            , (2, TList <$> genList rec <*> genTail) ]
 
-    genTail :: Int -> Gen (Maybe Term)
-    genTail n = oneof [ pure Nothing, Just <$> genTailTerm n ]
-
-    genTailTerm :: Int -> Gen Term
-    genTailTerm n
-      | n <= 0 = TVar <$> names
-      | otherwise = oneof [ TVar <$> names, genTailList (n - 1) ]
-
-    genTailList :: Int -> Gen Term
-    genTailList n = TList <$> genList (go (n - 1)) <*> genTail (n - 1)
+    genTail :: Gen (Maybe Term)
+    genTail = oneof [ pure Nothing, Just . TVar <$> names ]
 
     genList :: Gen Term -> Gen [Term]
     genList g = do
