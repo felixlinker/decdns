@@ -38,7 +38,11 @@ apply (Unifier m) v@(TVar _) = fromMaybe v (M.lookup v m)
 apply _ TWildcard = TWildcard
 apply _ t@(TAtomQuoted _) = t
 apply _ t@(TAtom _) = t
-apply u (TList (map (apply u) -> ts) (fmap (apply u) -> t)) = TList ts t
+apply u (TList (map (apply u) -> ts) t) = case fmap (apply u) t of
+  Nothing -> TList ts Nothing
+  Just (TList ts' t') -> TList (ts ++ ts') t'
+  t'@(Just (TVar _)) -> TList ts t'
+  t' -> TList ts t'
 apply _ t@(TString _) = t
 apply u (TPred n (map (apply u) -> ts)) = TPred n ts
 
