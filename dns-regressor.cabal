@@ -38,6 +38,7 @@ library
       Resolvable.Unification
       Resolvable.Update.Resolvability
       Util.Fresh
+      Util.List
       ZoneFile
   other-modules:
       Paths_dns_regressor

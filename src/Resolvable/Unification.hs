@@ -13,11 +13,7 @@ import Data.List (intercalate)
 import Data.Maybe (fromMaybe, isJust)
 
 import Resolvable.Prolog
-
-zipWithStrict :: (a -> b -> c) -> [a] -> [b] -> Maybe [c]
-zipWithStrict f (x:xs) (y:ys) = (f x y :) <$> zipWithStrict f xs ys
-zipWithStrict _ [] [] = Just []
-zipWithStrict _ _ _ = Nothing
+import Util.List (zipWithStrict)
 
 newtype Unifier = Unifier (M.Map Term Term)
   deriving Eq

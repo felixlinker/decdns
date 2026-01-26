@@ -2,6 +2,7 @@
 {-# LANGUAGE InstanceSigs #-}
 module Resolvable.Prolog
   ( Term(..)
+  , equiv
   , emptyList
   , walk
   , renamePred
@@ -25,6 +26,7 @@ import Data.Char (toLower, toUpper)
 import Data.Semigroup (Semigroup(..), sconcat)
 import Util.Fresh (Fresh, fresh)
 import Data.Maybe (maybeToList)
+import Util.List (zipWithStrict)
 
 data Term = TOp String [Term]
           | TVar String
@@ -38,6 +40,25 @@ data Term = TOp String [Term]
 
 emptyList :: Term
 emptyList = TList [] Nothing
+
+equiv :: Term -> Term -> Bool
+equiv (TOp a argsa) (TOp b argsb) = a == b && maybe False and (zipWithStrict equiv argsa argsb)
+equiv (TVar a) (TVar b) = a == b
+equiv TWildcard _ = True
+equiv _ TWildcard = True
+equiv (TAtomQuoted a) (TAtomQuoted b) = a == b
+equiv (TAtom a) (TAtom b) = a == b
+equiv (TList as mta) (TList bs mtb) = maybe False and (zipWithStrict equiv as bs) && tailEqual mta mtb
+  where
+    tailEqual :: Maybe Term -> Maybe Term -> Bool
+    tailEqual Nothing Nothing = True
+    tailEqual (Just ta) (Just tb) = equiv ta tb
+    tailEqual _ _ = False
+equiv (TString a) (TString b) = a == b
+equiv (TPred a argsa) (TPred b argsb)
+  | a == b = maybe False and (zipWithStrict equiv argsa argsb)
+  | otherwise = False
+equiv _ _ = False
 
 instance Show Term where
   show (TOp "^" [ a, b ]) = show a ++ "^" ++ show b
