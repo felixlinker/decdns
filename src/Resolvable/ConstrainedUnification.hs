@@ -1,5 +1,6 @@
 module Resolvable.ConstrainedUnification
-  ( ConstrainedUnifier
+  ( ConstrainedUnifier(..)
+  , Neqs
   , identity
   , apply
   , addConstraint
@@ -14,10 +15,14 @@ import Resolvable.Prolog
 import Control.Monad (guard)
 import Data.List (intercalate)
 import Data.Bifunctor (Bifunctor(bimap))
+import Util.List (zipStrict)
+import Data.Maybe (fromMaybe)
 
 type Neqs = S.Set (Term, Term)
 
-data ConstrainedUnifier = CUnifier U.Unifier Neqs
+data ConstrainedUnifier =
+  CUnifier  { unif :: U.Unifier
+            , constraints :: Neqs }
 
 instance Show ConstrainedUnifier where
   show (CUnifier u neqs) = show u ++ " s.t. " ++ intercalate ", " (map (\(a, b) -> show a ++ " \\= " ++ show b) $ S.toList neqs)
@@ -32,7 +37,10 @@ addConstraint :: Term -> Term -> ConstrainedUnifier -> Maybe ConstrainedUnifier
 addConstraint a b (CUnifier u neqs) =
   let a' = U.apply u a
       b' = U.apply u b
-  in if a' == b' then Nothing else Just (CUnifier u (S.insert (a', b') neqs))
+      new = fromMaybe [(a', b')] (simplifyNeq a' b')
+  in  if any (uncurry equiv) new
+      then Nothing
+      else Just (CUnifier u (foldr S.insert neqs new))
 
 extendUnifier :: Term -> Term -> ConstrainedUnifier -> Maybe ConstrainedUnifier
 extendUnifier a b (CUnifier u neqs) = do
@@ -45,3 +53,26 @@ mergeUnifiers :: ConstrainedUnifier -> ConstrainedUnifier -> Maybe ConstrainedUn
 mergeUnifiers keep (CUnifier (U.Unifier m) neqs) =
   let withNeqs = foldr (\(a, b) -> (>>= addConstraint a b)) (Just keep) neqs
   in foldr (\(a, b) -> (>>= extendUnifier a b)) withNeqs (M.toList m)
+
+simplifyNeq :: Term -> Term -> Maybe [(Term, Term)]
+simplifyNeq (TOp a argsa) (TOp b argsb)
+  | a == b = Just $ fromMaybe [] (zipStrict argsa argsb)
+  | otherwise = Just []
+simplifyNeq (TVar _) _ = Nothing
+simplifyNeq _ (TVar _) = Nothing
+simplifyNeq TWildcard _ = Nothing
+simplifyNeq _ TWildcard = Nothing
+simplifyNeq (TAtomQuoted a) (TAtomQuoted b)
+  | a /= b = Just []
+  | otherwise = Nothing
+simplifyNeq (TList [] Nothing) (TList (_:_) _) = Just []
+simplifyNeq (TList (_:_) _) (TList [] Nothing) = Just []
+-- TODO: Implement more reasoning on lists
+simplifyNeq (TList _ _) (TList _ _) = Nothing
+simplifyNeq (TString a) (TString b)
+  | a /= b = Just []
+  | otherwise = Nothing
+simplifyNeq (TPred a argsa) (TPred b argsb)
+  | a == b = Just $ fromMaybe [] (zipStrict argsa argsb)
+  | otherwise = Just []
+simplifyNeq _ _ = Just []
