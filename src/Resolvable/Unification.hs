@@ -10,7 +10,7 @@ module Resolvable.Unification
 
 import qualified Data.Map.Strict as M
 import Data.List (intercalate)
-import Data.Maybe (isNothing, fromMaybe, isJust)
+import Data.Maybe (fromMaybe, isJust)
 
 import Resolvable.Prolog
 
@@ -58,14 +58,19 @@ extendUnifier from to u@(Unifier m) = unif from (apply u to)
     unifList :: [Term] -> [Term] -> Maybe Unifier
     unifList l1 l2 = foldr (=<<) (Just u) =<< zipWithStrict extendUnifier l1 l2
 
-    unif :: Term -> Term -> Maybe Unifier
-    unif TWildcard _ = Just u
-    unif v@(TVar _) t
+    unifVar :: Term -> Term -> Maybe Unifier
+    unifVar v@(TVar _) t
       | t == v = Just u
       | subterm v t = Nothing
       | otherwise   =
         let base = Unifier $ M.insert v t $ M.map (apply (singleton v t)) m
         in  maybe (Just base) (\t' -> extendUnifier t' t u) (M.lookup v m)
+    unifVar _ _ = undefined
+
+    unif :: Term -> Term -> Maybe Unifier
+    unif TWildcard _ = Just u
+    unif v@(TVar _) t = unifVar v t
+    unif t v@(TVar _) = unifVar v t
     unif (TOp op1 args1) (TOp op2 args2)
       | op1 == op2 = unifList args1 args2
       | otherwise  = Nothing
@@ -78,17 +83,22 @@ extendUnifier from to u@(Unifier m) = unif from (apply u to)
       | a == b    = Just u
       | otherwise = Nothing
     unif (TAtom _) _ = Nothing
-    unif (TList hs1 t1) (TList hs2 t2) = unifTList hs1 hs2 t1 t2 u
+    unif (TList hs1 t1) (TList hs2 t2) = do
+      unifTList hs1 hs2 t1 t2 u
       where
         unifTList :: [Term] -> [Term] -> Maybe Term -> Maybe Term -> Unifier -> Maybe Unifier
-        unifTList []        hs2'      Nothing t2' u'
-          | null hs2' && isNothing t2' = Just u'
-          | otherwise = Nothing
-        unifTList []        hs2'      (Just v) t2' u' =
-          extendUnifier v (TList hs2' t2') u'
-        unifTList _         []        _ _ _ = Nothing
+        unifTList []        []        Nothing Nothing u' = Just u'
+        unifTList []        (_:_)     Nothing _ _ = Nothing
+        unifTList (_:_)     []        _ Nothing _ = Nothing
+        unifTList []        hs2'      (Just v@(TVar _)) t2' u' = extendUnifier v (TList hs2' t2') u'
+        unifTList hs1'      []        t1' (Just v@(TVar _)) u' = extendUnifier v (TList hs1' t1') u'
+        unifTList []        hs2'      (Just l@(TList _ _)) t2' u' = extendUnifier l (TList hs2' t2') u'
+        unifTList hs1'      []        t1' (Just l@(TList _ _)) u' = extendUnifier l (TList hs1' t1') u'
+        -- Do not support any other terms in tails other than list and variable
+        unifTList []        _         (Just _) _ _ = Nothing
+        unifTList _         []        _ (Just _) _ = Nothing
         unifTList (h1:hs1') (h2:hs2') t1' t2' u' =
-          unifTList hs1' hs2' t1' t2' =<< extendUnifier h1 h2 u'
+          extendUnifier h1 h2 u' >>= unifTList hs1' hs2' t1' t2'
     unif (TList _ _) _ = Nothing
     unif (TString a) (TString b)
       | a == b    = Just u
