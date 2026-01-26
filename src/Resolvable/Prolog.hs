@@ -48,7 +48,6 @@ instance Show Term where
   show (TAtom "") = undefined
   show (TAtom (h:t)) = toLower h : t
   show (TAtomQuoted a) =  "'" ++ a ++ "'"
-  show (TList [] _) = "[]"
   show (TList hs t) =
     "[" ++ intercalate ", " (map show hs) ++ maybe "" (\x -> " | " ++ show x) t ++ "]"
   show (TString s) = show s
