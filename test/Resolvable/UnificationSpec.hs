@@ -5,7 +5,7 @@ import Test.Tasty.HUnit (Assertion, assertFailure, testCase, (@?=))
 import Test.Tasty.QuickCheck
 
 import Resolvable.Prolog (Term(..))
-import Resolvable.Unification (apply, unify)
+import Resolvable.Unification (apply, unify, unifies)
 import Util.Fresh (runFresh, fresh)
 
 tests :: TestTree
@@ -13,6 +13,7 @@ tests =
   testGroup
     "Resolvable.Unification"
     [ testProperty "apply unifier implies terms become equal" prop_unify_apply_agrees
+    , testProperty "unification is symmetric in success" prop_unify_symmetric
     , testGroup
         "unit"
         [ testCase "occurs check rejects cyclic binding" occursCheckRejectsCycle
@@ -53,17 +54,23 @@ wildcardKeepsIdentity =
     Nothing -> assertFailure "expected a unifier"
     Just u -> apply u (TVar "X") @?= TVar "X"
 
+names :: Gen String
+names = elements (runFresh $ mapM (const $ fresh "v") ([0..4] :: [Int]))
+
 prop_unify_apply_agrees :: Property
 prop_unify_apply_agrees =
-  forAll (genTermNoWildcard names) $ \t1 ->
-    forAll (genTermNoWildcard names) $ \t2 ->
+  forAll genTermNoWildcard $ \t1 ->
+    forAll genTermNoWildcard $ \t2 ->
       maybe (property True) (\u -> apply u t1 === apply u t2) (unify t1 t2)
-  where
-    names :: Gen String
-    names = elements (runFresh $ mapM (const $ fresh "v") ([0..4] :: [Int]))
 
-genTermNoWildcard :: Gen String -> Gen Term
-genTermNoWildcard names = do
+prop_unify_symmetric :: Property
+prop_unify_symmetric =
+  forAll genTermNoWildcard $ \t1 ->
+    forAll genTermNoWildcard $ \t2 ->
+      unifies t1 t2 === unifies t2 t1
+
+genTermNoWildcard :: Gen Term
+genTermNoWildcard = do
   n <- chooseInt (0, 6)
   go n
   where
