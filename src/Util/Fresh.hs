@@ -5,10 +5,15 @@ module Util.Fresh
   , evalFreshT
   , runFresh
   , evalFresh
-  , fresh ) where
+  , fresh
+  , avoiding ) where
 
 import Control.Monad.Trans.State (StateT, evalStateT, get, put, runStateT)
 import Data.Functor.Identity (Identity, runIdentity)
+import Data.Char (isDigit)
+import Data.List (dropWhileEnd, stripPrefix)
+import Data.Maybe (fromMaybe)
+import Text.Read (readMaybe)
 
 -- | State-based transformer that yields fresh variable names.
 type FreshT m = StateT Int m
@@ -33,3 +38,12 @@ fresh prefix = do
   n <- get
   put (n + 1)
   return (prefix ++ show n)
+
+avoiding :: (Foldable t, Monad m) => t String -> FreshT m ()
+avoiding = put . foldr (max . digitTail) 0
+  where
+    digitTail :: String -> Int
+    digitTail s = fromMaybe 0 $ do
+      let prefix = dropWhileEnd isDigit s
+      suffix <- stripPrefix prefix s
+      readMaybe suffix
