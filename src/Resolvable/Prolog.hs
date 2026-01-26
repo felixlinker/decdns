@@ -2,6 +2,7 @@
 {-# LANGUAGE InstanceSigs #-}
 module Resolvable.Prolog
   ( Term(..)
+  , emptyList
   , walk
   , renamePred
   , subterm
@@ -34,6 +35,9 @@ data Term = TOp String [Term]
           | TString String
           | TPred String [Term]
   deriving (Eq, Ord)
+
+emptyList :: Term
+emptyList = TList [] Nothing
 
 instance Show Term where
   show (TOp "^" [ a, b ]) = show a ++ "^" ++ show b

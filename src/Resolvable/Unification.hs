@@ -93,8 +93,12 @@ extendUnifier from to u@(Unifier m) = unif from (apply u to)
         unifTList []        []        Nothing Nothing u' = Just u'
         unifTList []        (_:_)     Nothing _ _ = Nothing
         unifTList (_:_)     []        _ Nothing _ = Nothing
-        unifTList []        hs2'      (Just v@(TVar _)) t2' u' = extendUnifier v (TList hs2' t2') u'
-        unifTList hs1'      []        t1' (Just v@(TVar _)) u' = extendUnifier v (TList hs1' t1') u'
+        unifTList []        hs2'      (Just v@(TVar _)) t2' u'
+          | null hs2' = extendUnifier v (fromMaybe emptyList t2') u'
+          | otherwise = extendUnifier v (TList hs2' t2') u'
+        unifTList hs1'      []        t1' (Just v@(TVar _)) u'
+          | null hs1' = extendUnifier v (fromMaybe emptyList t1') u'
+          | otherwise = extendUnifier v (TList hs1' t1') u'
         -- Do not support any other terms in tails other than variable
         unifTList []        _         (Just _) _ _ = Nothing
         unifTList _         []        _ (Just _) _ = Nothing
