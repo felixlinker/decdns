@@ -102,17 +102,18 @@ computeResolvable rootServers rsM = do
     solveQuery _ _ _ = error "unsupported predicate"
 
     rec :: [Term] -> ConstrainedUnifier -> Term -> [Rule a] -> [ConstrainedUnifier]
-    rec trace u q rs = do
-      (u', conj) <- solveQuery u q rs
-      foldr solveConjunct [u'] conj
+    rec trace u q rs
+      | any (equivModuloRenaming q) trace = []
+      | otherwise = do
+        (u', conj) <- solveQuery u q rs
+        foldr solveConjunct [u'] conj
       where
+        trace' :: [Term]
+        trace' = case q of
+          TPred "resolves" _ -> q:trace
+          _ -> trace
+
         solveConjunct :: Term -> [ConstrainedUnifier] -> [ConstrainedUnifier]
         solveConjunct q' us = do
           u'' <- us
-          let q'' = apply u'' q'
-          let trace' = case q'' of
-                TPred "resolves" _ -> q'':trace
-                _ -> trace
-          if any (equivModuloRenaming q'') trace
-            then []
-            else rec trace' u'' q'' rs
+          rec trace' u'' (apply u'' q') rs
