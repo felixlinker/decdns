@@ -5,12 +5,14 @@ module Resolvable.Unification
   , apply
   , unify
   , unifies
+  , equivModuloRenaming
   , matchHead
   , extendUnifier ) where
 
 import qualified Data.Map.Strict as M
+import qualified Data.Set as S
 import Data.List (intercalate)
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe (fromMaybe, isJust, isNothing)
 
 import Resolvable.Prolog
 import Util.List (zipWithStrict)
@@ -27,6 +29,20 @@ identity = Unifier M.empty
 singleton :: Term -> Term -> Unifier
 singleton v@(TVar _) t = Unifier (M.singleton v t)
 singleton _ _ = undefined
+
+isRenaming :: Unifier -> Bool
+isRenaming (Unifier (M.elems -> ts)) = all isVar ts && not (hasDuplicates ts)
+  where
+    isVar :: Term -> Bool
+    isVar (TVar _) = True
+    isVar _ = False
+
+    hasDuplicates :: Ord a => [a] -> Bool
+    hasDuplicates = isNothing . foldr (\a -> (>>= S.alterF insertP a)) (Just S.empty)
+
+    insertP :: Bool -> Maybe Bool
+    insertP False = Just True  -- Insert if not found
+    insertP True = Nothing     -- Abort if found
 
 apply :: Unifier -> Term -> Term
 apply u (TOp op (map (apply u) -> args)) = TOp op args
@@ -46,6 +62,9 @@ unify t1 t2 = extendUnifier t1 t2 identity
 
 unifies :: Term -> Term -> Bool
 unifies t1 t2 = isJust (unify t1 t2)
+
+equivModuloRenaming :: Term -> Term -> Bool
+equivModuloRenaming t1 t2 = maybe False isRenaming (unify t1 t2)
 
 matchHead :: Term -> Rule a -> Bool
 matchHead t = unifies t . rhead
