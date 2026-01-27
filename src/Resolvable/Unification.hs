@@ -114,7 +114,9 @@ extendUnifier from to u@(Unifier m) = unif (apply u from) (apply u to)
         unifTList hs1'      []        t1' (Just v@(TVar _)) u'
           | null hs1' = extendUnifier v (fromMaybe emptyList t1') u'
           | otherwise = extendUnifier v (TList hs1' t1') u'
-        -- Do not support any other terms in tails other than variable
+        unifTList []        _         (Just TWildcard) _ u' = Just u'
+        unifTList _         []        _ (Just TWildcard) u' = Just u'
+        -- Do not support any other terms in tails other than variable and wildcard
         unifTList []        _         (Just _) _ _ = Nothing
         unifTList _         []        _ (Just _) _ = Nothing
         unifTList (h1:hs1') (h2:hs2') t1' t2' u' =
