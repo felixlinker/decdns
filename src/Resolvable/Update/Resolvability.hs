@@ -1,4 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
 module Resolvable.Update.Resolvability
   ( NameServersConfig
   , compileConfigs
@@ -23,13 +22,13 @@ regression = Rule () (TPred "regression" [ ns, q, n ]) [ resolves_old, (\+) reso
     resolves_old = renamePred "resolves" "resolves_old" $ resolves ns q n TWildcard
     resolves_new = renamePred "resolves" "resolves_new" $ resolves ns q n TWildcard
 
-compileConfigs :: [Name String] -> NameServersConfig -> NameServersConfig -> Fresh [Rule RComp]
-compileConfigs rootServers (compileConfig rootServers -> old) (compileConfig rootServers -> new) = do
+compileConfigs :: Fresh [Rule a] -> Fresh [Rule a] -> Fresh [Rule a]
+compileConfigs old new = do
   old' <- map (renamePredInRule "resolves_old") <$> old
   new' <- map (renamePredInRule "resolves_new") <$> new
   return $ old' ++ new'
   where
-    renamePredInRule :: String -> Rule RComp -> Rule RComp
+    renamePredInRule :: String -> Rule a -> Rule a
     renamePredInRule = mapRule . renamePred resolvesName
 
     resolvesName :: String
@@ -38,4 +37,7 @@ compileConfigs rootServers (compileConfig rootServers -> old) (compileConfig roo
       _ -> undefined
 
 plRegressions :: [Name String] -> NameServersConfig -> NameServersConfig -> [Rule ()]
-plRegressions rootServers old = (regression :) . map void . runFresh . compileConfigs rootServers old
+plRegressions rootServers old new = (regression :) $ map void $ runFresh $ compileConfigs (c old) (c new)
+  where
+    c :: NameServersConfig -> Fresh [Rule RComp]
+    c = compileConfig rootServers
