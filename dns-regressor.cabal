@@ -37,6 +37,7 @@ library
       Resolvable.Resolvability
       Resolvable.Unification
       Resolvable.Update.Resolvability
+      Util.Debug
       Util.Fresh
       Util.List
       ZoneFile
