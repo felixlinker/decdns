@@ -16,6 +16,7 @@ import Resolvable.Prolog
 import Resolvable.Resolvability
 import Resolvable.ConstrainedUnification
 import Data.List (intercalate, partition)
+import Resolvable.Unification (equivModuloRenaming)
 
 type Conjunct = (ConstrainedUnifier, [Rule RComp])
 
@@ -92,7 +93,7 @@ computeResolvable rootServers rsM = do
   return $ do
     rootServer <- nameTerm <$> rootServers
     let query = resolves rootServer qtype qname qresult
-    u <- rec identity (resolves rootServer qtype qname qresult) rs
+    u <- rec [] identity (resolves rootServer qtype qname qresult) rs
     return $ CQuery (apply u query) (constraints u)
   where
     solveQuery :: ConstrainedUnifier -> Term -> [Rule a] -> [(ConstrainedUnifier, [Term])]
@@ -100,7 +101,18 @@ computeResolvable rootServers rsM = do
     solveQuery u q@(TPred "resolves" _) rs = mapMaybe (deriveIf u q) rs
     solveQuery _ _ _ = error "unsupported predicate"
 
-    rec :: ConstrainedUnifier -> Term -> [Rule a] -> [ConstrainedUnifier]
-    rec u q rs = do
+    rec :: [Term] -> ConstrainedUnifier -> Term -> [Rule a] -> [ConstrainedUnifier]
+    rec trace u q rs = do
       (u', conj) <- solveQuery u q rs
-      foldr (\q' us -> [ us' | u'' <- us, us' <- rec u'' (apply u'' q') rs ]) [u'] conj
+      foldr solveConjunct [u'] conj
+      where
+        solveConjunct :: Term -> [ConstrainedUnifier] -> [ConstrainedUnifier]
+        solveConjunct q' us = do
+          u'' <- us
+          let q'' = apply u'' q'
+          let trace' = case q'' of
+                TPred "resolves" _ -> q'':trace
+                _ -> trace
+          if any (equivModuloRenaming q'') trace
+            then []
+            else rec trace' u'' q'' rs
