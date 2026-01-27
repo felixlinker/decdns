@@ -72,6 +72,7 @@ fromRules rs = go rs empty
     matchRule :: ConstrainedUnifier -> Term -> Rule RComp -> Maybe (ConstrainedUnifier, Rule RComp)
     matchRule u t r = (,r) <$> extendUnifier t (rhead r) u
 
+-- TODO: Implement equality based on equivalence modulo renaming
 data ConstrainedQuery = CQuery Term Neqs
 
 instance Show ConstrainedQuery where
