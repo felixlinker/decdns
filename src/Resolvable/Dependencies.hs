@@ -48,6 +48,7 @@ empty = Deps M.empty
 dinsert :: Rule RComp -> [(ConstrainedUnifier, [Rule RComp])] -> Dependencies -> Dependencies
 dinsert k v (Deps m) = Deps (M.insert k v m)
 
+-- TODO: Fix this; probably wrong
 fromRules :: [Rule RComp] -> Dependencies
 fromRules rs = go rs empty
   where

@@ -15,24 +15,18 @@ main :: IO ()
 main = do
   (cmd, args) <- popArg =<< getArgs
   case cmd of
-    "prolog" -> do
+    "pl-resolvable" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
       cfg <- mapM parseZoneFileZones zones
       putStr (showKnowledgeBase (plResolvable rootServers cfg))
-    "delta" -> do
+    "pl-regressions" -> do
       (roots, args') <- sepBy "--" args
       rootServers <- parseNames roots
       (old, new) <- sepBy "--" args'
       oldCfg <- mapM parseZoneFileZones old
       newCfg <- mapM parseZoneFileZones new
       putStr (showKnowledgeBase (plRegressions rootServers oldCfg newCfg))
-    "deps" -> do
-      (roots, zones) <- sepBy "--" args
-      rootServers <- parseNames roots
-      parsed <- mapM parseZoneFileZones zones
-      let compiled = runFresh $ compileConfig rootServers parsed
-      print (fromRules compiled)
     "resolvable" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
