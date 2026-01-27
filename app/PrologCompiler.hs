@@ -9,6 +9,7 @@ import Util.Fresh (runFresh)
 import System.Environment (getArgs)
 import Util
 import Data.List (uncons)
+import Resolvable.Update.Dependencies (computeRegressions)
 
 main :: IO ()
 main = do
@@ -38,6 +39,13 @@ main = do
       compiled <- compileConfig rootServers <$> mapM parseZoneFileZones zones
       let us = runFresh $ computeResolvable rootServers compiled
       putStr $ unlines $ map show us
+    "regressions" -> do
+      (roots, args') <- sepBy "--" args
+      rootServers <- parseNames roots
+      (old, new) <- sepBy "--" args'
+      oldRs <- compileConfig rootServers <$> mapM parseZoneFileZones old
+      newRs <- compileConfig rootServers <$> mapM parseZoneFileZones new
+      putStr $ unlines $ map show $ computeRegressions rootServers oldRs newRs
     _ -> fail "unknown command"
   where
     popArg :: [String] -> IO (String, [String])

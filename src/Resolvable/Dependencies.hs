@@ -2,6 +2,7 @@
 {-# LANGUAGE TupleSections #-}
 module Resolvable.Dependencies
   ( Dependencies
+  , ConstrainedQuery(..)
   , empty
   , fromRules
   , computeResolvable ) where
