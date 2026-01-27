@@ -45,14 +45,17 @@ addConstraint a b (CUnifier u neqs) =
 extendUnifier :: Term -> Term -> ConstrainedUnifier -> Maybe ConstrainedUnifier
 extendUnifier a b (CUnifier u neqs) = do
   u' <- U.extendUnifier a b u
-  let neqs' = S.map (bimap (U.apply u') (U.apply u')) neqs
-  guard (all (uncurry (/=)) (S.toList neqs'))
+  let neqs' = S.fromList $ simplify $ map (bimap (U.apply u') (U.apply u')) $ S.toList neqs
+  guard (all (uncurry (/=)) neqs')
   return $ CUnifier u' neqs'
 
 mergeUnifiers :: ConstrainedUnifier -> ConstrainedUnifier -> Maybe ConstrainedUnifier
 mergeUnifiers keep (CUnifier (U.Unifier m) neqs) =
   let withNeqs = foldr (\(a, b) -> (>>= addConstraint a b)) (Just keep) neqs
   in foldr (\(a, b) -> (>>= extendUnifier a b)) withNeqs (M.toList m)
+
+simplify :: [(Term, Term)] -> [(Term, Term)]
+simplify = concatMap (uncurry simplifyNeq)
 
 simplifyNeq :: Term -> Term -> [(Term, Term)]
 simplifyNeq a b = case (a, b) of
