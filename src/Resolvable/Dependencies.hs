@@ -75,10 +75,11 @@ fromRules rs = go rs empty
 -- TODO: Implement equality based on equivalence modulo renaming
 data ConstrainedQuery = CQuery Term Neqs
 
+toRule :: ConstrainedQuery -> Rule ()
+toRule (CQuery q (S.toList -> neqs)) = Rule () q (map (uncurry (\=)) neqs)
+
 instance Show ConstrainedQuery where
-  show (CQuery q neqs) =
-    let showNeqs = if null neqs then "True" else intercalate " and " (map (\(a, b) -> show a ++ "\\=" ++ show b) (S.toList neqs))
-    in show q ++ " s.t. " ++ showNeqs
+  show = show . toRule
 
 deriveIf :: ConstrainedUnifier -> Term -> Rule a -> Maybe (ConstrainedUnifier, [Term])
 deriveIf u q (Rule _ h b) = do
