@@ -37,7 +37,7 @@ addConstraint :: Term -> Term -> ConstrainedUnifier -> Maybe ConstrainedUnifier
 addConstraint a b (CUnifier u neqs) =
   let a' = U.apply u a
       b' = U.apply u b
-      new = fromMaybe [(a', b')] (simplifyNeq a' b')
+      new = simplifyNeq a' b'
   in  if any (uncurry equiv) new
       then Nothing
       else Just (CUnifier u (foldr S.insert neqs new))
@@ -54,25 +54,29 @@ mergeUnifiers keep (CUnifier (U.Unifier m) neqs) =
   let withNeqs = foldr (\(a, b) -> (>>= addConstraint a b)) (Just keep) neqs
   in foldr (\(a, b) -> (>>= extendUnifier a b)) withNeqs (M.toList m)
 
-simplifyNeq :: Term -> Term -> Maybe [(Term, Term)]
-simplifyNeq (TOp a argsa) (TOp b argsb)
-  | a == b = Just $ fromMaybe [] (zipStrict argsa argsb)
-  | otherwise = Just []
-simplifyNeq (TVar _) _ = Nothing
-simplifyNeq _ (TVar _) = Nothing
-simplifyNeq TWildcard _ = Nothing
-simplifyNeq _ TWildcard = Nothing
-simplifyNeq (TAtomQuoted a) (TAtomQuoted b)
-  | a /= b = Just []
-  | otherwise = Nothing
-simplifyNeq (TList [] Nothing) (TList (_:_) _) = Just []
-simplifyNeq (TList (_:_) _) (TList [] Nothing) = Just []
--- TODO: Implement more reasoning on lists
-simplifyNeq (TList _ _) (TList _ _) = Nothing
-simplifyNeq (TString a) (TString b)
-  | a /= b = Just []
-  | otherwise = Nothing
-simplifyNeq (TPred a argsa) (TPred b argsb)
-  | a == b = Just $ fromMaybe [] (zipStrict argsa argsb)
-  | otherwise = Just []
-simplifyNeq _ _ = Just []
+simplifyNeq :: Term -> Term -> [(Term, Term)]
+simplifyNeq a b = case (a, b) of
+  (TVar _, _) -> [(a, b)]
+  (_, TVar _) -> [(a, b)]
+  (TWildcard, _) -> [(a, b)] -- preserve contradiction
+  (_, TWildcard) -> [(a, b)] -- preserve contradiction
+  (TOp opa argsa, TOp opb argsb)
+    | opa == opb -> maybe [] rec (zipStrict argsa argsb)
+    | otherwise -> []
+  (TAtomQuoted ata, TAtomQuoted atb)
+    | ata /= atb -> []
+    -- otherwise: preserve contradiction
+  (TList [] Nothing, TList (_:_) _) -> []
+  (TList (_:_) _, TList [] Nothing) -> []
+  -- TODO: Implement more reasoning on lists
+  (TList _ _, TList _ _) -> [(a, b)]
+  (TString stra, TString strb)
+    | stra /= strb -> []
+    -- otherwise: preserve contradiction
+  (TPred pa argsa, TPred pb argsb)
+    | pa == pb -> maybe [] rec (zipStrict argsa argsb)
+    | otherwise -> []
+  _ -> []
+  where
+    rec :: [(Term, Term)] -> [(Term, Term)]
+    rec = concatMap (uncurry simplifyNeq)
