@@ -16,7 +16,6 @@ import Control.Monad (guard)
 import Data.List (intercalate)
 import Data.Bifunctor (Bifunctor(bimap))
 import Util.List (zipStrict)
-import Data.Maybe (fromMaybe)
 
 type Neqs = S.Set (Term, Term)
 
