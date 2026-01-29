@@ -2,6 +2,7 @@
 module Parsing.State
   ( Parser
   , ParserState
+  , OriginProvider(..)
   , parsedZone
   , lastName
   , lastTTL
@@ -18,6 +19,9 @@ import ZoneFile
 
 type Parser s m = ParsecT s ParserState m
 
+class OriginProvider a where
+  getOrigin :: a -> Maybe (Name String)
+
 data ParserState = ParserState
   { _parsedZone :: Maybe (Name String)
   , _lastName :: Maybe (Name String)
@@ -25,6 +29,13 @@ data ParserState = ParserState
   , _lastCat :: Maybe Cat }
 
 L.makeLenses ''ParserState
+
+instance OriginProvider ParserState where
+  getOrigin = L.view parsedZone
+
+-- For parsers that don't use state
+instance OriginProvider () where
+  getOrigin _ = Nothing
 
 emptyState :: ParserState
 emptyState = ParserState Nothing Nothing Nothing Nothing

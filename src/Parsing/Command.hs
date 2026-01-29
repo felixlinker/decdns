@@ -6,7 +6,6 @@ module Parsing.Command
 
 import Control.Applicative (asum)
 import Data.Functor (($>))
-import Data.Functor.Identity (Identity(Identity))
 import Text.Parsec
 
 import ZoneFile
@@ -19,7 +18,7 @@ type Query = (Name String, Type)
 data Command = Exit | Query Query | SList SList | Print
   deriving Show
 
-query :: Stream s m Char => ParsecT s u m Command
+query :: Stream s m Char => ParsecT s () m Command
 query = do
   _ <- string ":?"
   spaces
@@ -28,7 +27,7 @@ query = do
   t <- recordType
   return $ Query (n, t)
 
-nslist :: Stream s m Char => ParsecT s u m Command
+nslist :: Stream s m Char => ParsecT s () m Command
 nslist = do
   _ <- string ":slist"
   SList <$> many (spaces >> name)
@@ -39,8 +38,8 @@ exit = string ":q" $> Exit
 cprint :: Stream s m Char => ParsecT s u m Command
 cprint = string ":print" $> Print
 
-commands :: Stream s m Char => ParsecT s u m Command
+commands :: Stream s m Char => ParsecT s () m Command
 commands = asum $ map try [ query, nslist, exit, cprint ]
 
 parseCommand :: Monad m => String -> m (Either ParseError Command)
-parseCommand = runParserT commands Identity "parseCommand function"
+parseCommand = runParserT commands () "parseCommand function"
