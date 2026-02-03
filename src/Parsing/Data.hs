@@ -12,7 +12,6 @@ import Parsing.State
 import ZoneFile
 import Parsing.Name
 import Parsing.Tokens
-import Control.Monad (guard)
 
 type TypeDataParser s m = Parser s m TypeData
 
@@ -84,7 +83,7 @@ dnskey = do
   -- Can only have three values: 0, 256, and 257. SEP implies zone key flag.
   flags <- int
   spaces1
-  protocol <- int
-  guard (protocol == 3)
+  _ <- char '3'
+  spaces1
   alg <- int  -- TODO: support memnonics
   RDNSKEY (flags >= 256) (flags == 257) alg <$> untilEndOfLine
