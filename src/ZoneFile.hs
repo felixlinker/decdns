@@ -45,7 +45,7 @@ dnameRewrite qn@(Name qname) fn@(Name from) (Name to) =
     then undefined
     else Name (NE.prependList (NE.take prefixLen qname) to)
 
-data Type = CNAME | DNAME | NS | A | AAAA | TXT | MX | SOA
+data Type = CNAME | DNAME | NS | A | AAAA | TXT | MX | SOA | DNSKEY
   deriving (Eq, Ord, Show)
 
 data TypeData =
@@ -64,6 +64,10 @@ data TypeData =
           , _retry :: Int
           , _expire :: Int
           , _minimum :: Int }
+  | RDNSKEY { _zoneKey :: Bool
+            , _secureEntryPoint :: Bool
+            , _algorithm :: Int
+            , _publicKey :: String }  -- TODO: Make ByteString
   deriving (Eq, Ord)
 
 showData :: TypeData -> String
@@ -75,6 +79,13 @@ showData (RAAAA addr) = addr
 showData (RTXT addr) = addr
 showData (RMX p n) = unwords [show p, show n]
 showData (RSOA a b c d e f g) = unwords [show a, show b, show c, show d, show e, show f, show g]
+showData (RDNSKEY zk sep alg pk) = flags ++ " 3 " ++ show alg ++ " " ++ pk
+  where
+    flags :: String
+    flags
+      | sep = "257"
+      | zk = "256"
+      | otherwise = "0"
 
 instance Show TypeData where
   show t = show (dtype t) ++ " " ++ showData t
@@ -88,6 +99,7 @@ dtype (RAAAA _) = AAAA
 dtype (RTXT _) = TXT
 dtype (RMX {}) = MX
 dtype (RSOA {}) = SOA
+dtype (RDNSKEY {}) = DNSKEY
 
 data Cat = IN
   deriving (Eq, Ord, Show)

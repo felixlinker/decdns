@@ -12,6 +12,7 @@ import Parsing.State
 import ZoneFile
 import Parsing.Name
 import Parsing.Tokens
+import Control.Monad (guard)
 
 type TypeDataParser s m = Parser s m TypeData
 
@@ -24,7 +25,8 @@ recordType = asum $ map try
   , string "AAAA" $> AAAA
   , string "TXT" $> TXT
   , string "MX" $> MX
-  , string "SOA" $> SOA ]
+  , string "SOA" $> SOA
+  , string "DNSKEY" $> DNSKEY ]
 
 recordTypeData :: Stream s m Char => ParsecT s u m (TypeDataParser s m)
 recordTypeData = do
@@ -38,6 +40,7 @@ recordTypeData = do
     TXT -> return txt
     MX -> return mx
     SOA -> return soa
+    DNSKEY -> return dnskey
 
 cname :: Stream s m Char => TypeDataParser s m
 cname = RCNAME <$> name
@@ -75,3 +78,13 @@ soa = do
   expire <- int
   spaces1
   RSOA mname rnam serial refresh retry expire <$> int
+
+dnskey :: Stream s m Char => TypeDataParser s m
+dnskey = do
+  -- Can only have three values: 0, 256, and 257. SEP implies zone key flag.
+  flags <- int
+  spaces1
+  protocol <- int
+  guard (protocol == 3)
+  alg <- int  -- TODO: support memnonics
+  RDNSKEY (flags >= 256) (flags == 257) alg <$> untilEndOfLine
