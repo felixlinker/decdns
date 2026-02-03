@@ -11,7 +11,9 @@ module Resolvable.Prolog
   , mapRule
   , (Resolvable.Prolog.^)
   , dnsWildcard
+  , dtypeAtom
   , typeAtom
+  , dataAtom
   , (Resolvable.Prolog.\=)
   , nameWithSynthesis
   , nameTerm
@@ -130,6 +132,12 @@ dnsWildcard = TAtom "'*'"
 
 typeAtom :: Type -> Term
 typeAtom = TAtom . map toLower . show
+
+dtypeAtom :: TypeData -> Term
+dtypeAtom = TAtom . map toLower . show . dtype
+
+dataAtom :: TypeData -> Term
+dataAtom = TString . showData
 
 (\=) :: Term -> Term -> Term
 (\=) a b = TPred "\\=" [ a, b ]

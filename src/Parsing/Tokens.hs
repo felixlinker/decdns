@@ -2,15 +2,17 @@
 module Parsing.Tokens
   ( spaces1
   , dot
-  , recordType
+  , end
+  , untilEndOfLine
+  , int
   , category ) where
 
-import Control.Applicative (asum)
 import Data.Functor (($>))
 import Text.Parsec
 import Text.Parsec.Char as Char
 
 import ZoneFile
+import Text.Read (readMaybe)
 
 spaces1 :: Stream s m Char => ParsecT s u m ()
 spaces1 = skipMany1 space
@@ -18,16 +20,16 @@ spaces1 = skipMany1 space
 dot :: Stream s m Char => ParsecT s u m Char
 dot = Char.char '.'
 
-recordType :: Stream s m Char => ParsecT s u m Type
-recordType = asum $ map try
-  [ string "CNAME" $> CNAME
-  , string "DNAME" $> DNAME
-  , string "NS" $> NS
-  , string "A" $> A
-  , string "AAAA" $> AAAA
-  , string "TXT" $> TXT
-  , string "MX" $> MX
-  , string "SOA" $> SOA ]
+end :: Stream s m Char => ParsecT s u m ()
+end = endOfLine $> () <|> eof
+
+untilEndOfLine :: Stream s m Char => ParsecT s u m String
+untilEndOfLine = manyTill anyChar end
+
+int :: Stream s m Char => ParsecT s u m Int
+int = do
+  ttls <- many1 digit
+  maybe (fail "cannot parse int") return (readMaybe ttls)
 
 category :: Stream s m Char => ParsecT s u m Cat
 category = string "IN" $> IN

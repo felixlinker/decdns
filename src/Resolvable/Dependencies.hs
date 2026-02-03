@@ -91,13 +91,13 @@ deriveIf u q (Rule _ h b) = do
 computeResolvable :: [Name String] -> Fresh [Rule a] -> Fresh [ConstrainedQuery]
 computeResolvable rootServers rsM = do
   rs <- rsM
-  qtype <- TVar <$> fresh "QT"
+  qtyp <- TVar <$> fresh "QT"
   qname <- TVar <$> fresh "QN"
   qresult <- TVar <$> fresh "QR"
   return $ do
     rootServer <- nameTerm <$> rootServers
-    let query = resolves rootServer qtype qname qresult
-    u <- rec [] identity (resolves rootServer qtype qname qresult) rs
+    let query = resolves rootServer qtyp qname qresult
+    u <- rec [] identity (resolves rootServer qtyp qname qresult) rs
     return $ CQuery (apply u query) (constraints u)
   where
     solveQuery :: ConstrainedUnifier -> Term -> [Rule a] -> [(ConstrainedUnifier, [Term])]

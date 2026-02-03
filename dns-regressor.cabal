@@ -25,6 +25,7 @@ library
       NonDet
       Parsing
       Parsing.Command
+      Parsing.Data
       Parsing.Name
       Parsing.State
       Parsing.Tokens

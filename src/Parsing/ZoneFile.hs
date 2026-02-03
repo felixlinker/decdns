@@ -4,7 +4,6 @@ module Parsing.ZoneFile
 
 import Text.Parsec
 import Text.Parsec.Char as Char
-import Text.Read (readMaybe)
 import Control.Applicative (asum)
 import Data.Functor (($>))
 import Data.Maybe (catMaybes)
@@ -12,6 +11,7 @@ import Data.Maybe (catMaybes)
 import Parsing.State
 import Parsing.Tokens
 import Parsing.Name
+import Parsing.Data
 import ZoneFile
 import Parsing.Wellformedness (wellformed)
 
@@ -19,7 +19,7 @@ comment :: Stream s m Char => Parser s m ()
 comment = do
   spaces
   _ <- Char.char ';'
-  _ <- manyTill anyChar (endOfLine $> () <|> eof)
+  _ <- untilEndOfLine
   return ()
 
 origin :: Stream s m Char => Parser s m (Name String)
@@ -31,16 +31,12 @@ origin = do
   writeState parsedZone org
   return org
 
-ttl :: Stream s m Char => Parser s m Int
-ttl = do
-  ttls <- many1 digit
-  maybe (fail "cannot parse") return (readMaybe ttls)
-
 setTTL :: Stream s m Char => Parser s m ()
 setTTL = do
+  spaces
   _ <- string "$TTL"
   spaces1
-  t <- ttl
+  t <- int
   writeState lastTTL t
 
 record :: Stream s m Char => Parser s m (Record (Name String))
@@ -50,35 +46,35 @@ record = do
   spaces
   (c, t, ty) <- try catTtlType <|> try ttlCatType
   spaces1
-  d <- manyTill anyChar end
-  return (Record n (RData c t ty (words d)))
-  where
-    end :: Stream s m Char => Parser s m ()
-    end = endOfLine $> () <|> eof
+  Record n . RData c t <$> ty
 
-catTtlType :: Stream s m Char => Parser s m (Cat, Int, Type)
+catTtlType :: Stream s m Char => Parser s m (Cat, Int, TypeDataParser s m)
 catTtlType = do
   c <- tryOrState category lastCat
   spaces
-  t <- tryOrState ttl lastTTL
+  t <- tryOrState int lastTTL
   spaces1
-  ty <- recordType
+  ty <- recordTypeData
   return (c, t, ty)
 
-ttlCatType :: Stream s m Char => Parser s m (Cat, Int, Type)
+ttlCatType :: Stream s m Char => Parser s m (Cat, Int, TypeDataParser s m)
 ttlCatType = do
-  t <- tryOrState ttl lastTTL
+  t <- tryOrState int lastTTL
   spaces
   c <- tryOrState category lastCat
   spaces1
-  ty <- recordType
+  ty <- recordTypeData
   return (c, t, ty)
 
 line :: Stream s m Char => Parser s m (Maybe (Record (Name String)))
-line = spaces >> asum (map try
-  [ comment $> Nothing
-  , setTTL $> Nothing
-  , Just <$> record ])
+line = do
+  spaces
+  r <- asum $ map try
+      [ comment $> Nothing
+      , setTTL $> Nothing
+      , Just <$> record ]
+  spaces
+  return r
 
 zone :: Stream s m Char => Parser s m (Zone String)
 zone = do

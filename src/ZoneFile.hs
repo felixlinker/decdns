@@ -8,6 +8,9 @@ module ZoneFile
   , isSubDomain
   , dnameRewrite
   , Type(..)
+  , TypeData(..)
+  , showData
+  , dtype
   , RData(..)
   , Record(..)
   , Node(..)
@@ -45,14 +48,54 @@ dnameRewrite qn@(Name qname) fn@(Name from) (Name to) =
 data Type = CNAME | DNAME | NS | A | AAAA | TXT | MX | SOA
   deriving (Eq, Ord, Show)
 
+data TypeData =
+    RCNAME (Name String)
+  | RDNAME (Name String)
+  | RNS (Name String)
+  | RA String
+  | RAAAA String
+  | RTXT String
+  | RMX { _preference :: Int
+        , _exchange :: Name String }
+  | RSOA  { _mname :: Name String
+          , _rname :: Name String
+          , _serial :: Int
+          , _refresh :: Int
+          , _retry :: Int
+          , _expire :: Int
+          , _minimum :: Int }
+  deriving (Eq, Ord)
+
+showData :: TypeData -> String
+showData (RCNAME n) = show n
+showData (RDNAME n) = show n
+showData (RNS n) = show n
+showData (RA addr) = addr
+showData (RAAAA addr) = addr
+showData (RTXT addr) = addr
+showData (RMX p n) = unwords [show p, show n]
+showData (RSOA a b c d e f g) = unwords [show a, show b, show c, show d, show e, show f, show g]
+
+instance Show TypeData where
+  show t = show (dtype t) ++ " " ++ showData t
+
+dtype :: TypeData -> Type
+dtype (RCNAME _) = CNAME
+dtype (RDNAME _) = DNAME
+dtype (RNS _) = NS
+dtype (RA _) = A
+dtype (RAAAA _) = AAAA
+dtype (RTXT _) = TXT
+dtype (RMX {}) = MX
+dtype (RSOA {}) = SOA
+
 data Cat = IN
   deriving (Eq, Ord, Show)
 
 data RData = RData
   { rcat  :: Cat
   , rttl  :: Int
-  , rtype :: Type
-  , rdata :: [String] }
+  , rtype :: TypeData }
   deriving (Eq, Ord)
 
 data Record a = Record
@@ -61,7 +104,7 @@ data Record a = Record
   deriving (Eq, Ord)
 
 instance Show a => Show (Record a) where
-  show (Record n (RData c ttl t d)) = show n ++ " " ++ show ttl ++ " " ++ show c ++ " " ++ show t ++ " " ++ unwords d
+  show (Record n (RData c ttl t)) = show n ++ " " ++ show ttl ++ " " ++ show c ++ " " ++ show t ++ " "
 
 data Node a = Node
   { records :: [RData]

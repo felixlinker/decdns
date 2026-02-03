@@ -11,8 +11,6 @@ import NameConstraint
 import Resolvable.Prolog as Pl
 import ZoneFile
 
-import RecursiveResolver (nameInData)
-import Data.Maybe (fromMaybe)
 import Util.Fresh (Fresh, fresh, runFresh)
 import Control.Monad (void)
 
@@ -25,10 +23,10 @@ resolves :: Term -> Term -> Term -> Term -> Term
 resolves ns t n r = TPred "resolves" [ ns, t, n, r ]
 
 resolvableBase :: Name String -> Record ConstrainedName -> Fresh (Rule RComp)
-resolvableBase ns r@(Record n (RData _ _ ty (TString . unwords -> d))) = do
+resolvableBase ns r@(Record n (RData _ _ ty)) = do
   (n', neqs) <- nameWithSynthesis n
   let cannot = RComp ns r
-  return (Rule cannot (resolves (nameTerm ns) (typeAtom ty) n' d) neqs)
+  return (Rule cannot (resolves (nameTerm ns) (dtypeAtom ty) n' (dataAtom ty)) neqs)
 
 captureListTail :: Term -> Term -> Term
 captureListTail t (TList pref Nothing) = TList pref (Just t)
@@ -36,7 +34,7 @@ captureListTail _ (TList _ (Just _)) = undefined
 captureListTail _ _ = undefined
 
 resolvableStep :: [Name String] -> Name String -> Record ConstrainedName -> Fresh [Rule RComp]
-resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> NS)) = sequence $ do
+resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> RNS (nameTerm -> delegatedNs))) = sequence $ do
   rootServer <- rootServers
   glueType <- typeAtom <$> [A, AAAA]
   return $ do
@@ -45,22 +43,20 @@ resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> NS)) = seq
     (captureListTail t -> n', _) <- nameWithSynthesis n
     q <- TVar <$> fresh "Q"
     res <- TVar <$> fresh "R"
-    let delegatedNs = nameTerm (fromMaybe undefined $ nameInData r)
     return Rule { rannotation = RComp ns r
                 , rhead = resolves (nameTerm ns) q n' res
                 , rbody = [ resolves delegatedNs q n' res
                           , resolves rootServer glueType delegatedNs TWildcard ] }
-resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> CNAME)) = sequence $ do
+resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> RCNAME (nameTerm -> cname))) = sequence $ do
   rootServer <- rootServers
   return $ do
     (n', neqs) <- nameWithSynthesis n
     q <- TVar <$> fresh "Q"
     res <- TVar <$> fresh "R"
-    let cname = nameTerm (fromMaybe undefined $ nameInData r)
     return Rule { rannotation = RComp ns r
                 , rhead = resolves (nameTerm ns) q n' res
                 , rbody = neqs ++ [ resolves rootServer q cname res ] }
-resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> DNAME)) = sequence $ do
+resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> RDNAME (nameTerm -> dname))) = sequence $ do
   rootServer <- rootServers
   return $ do -- Enter Fresh monad
     -- Do not expect wildcard neq constraints on CNAME records
@@ -68,7 +64,6 @@ resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> DNAME)) = 
     (captureListTail t -> n', _) <- nameWithSynthesis n
     q <- TVar <$> fresh "Q"
     res <- TVar <$> fresh "R"
-    let dname = nameTerm (fromMaybe undefined $ nameInData r)
     return Rule { rannotation = RComp ns r
                 , rhead = resolves (nameTerm ns) q n' res
                 , rbody = [ t \= TList [] Nothing

@@ -11,7 +11,7 @@ import Text.Parsec
 import ZoneFile
 import RecursiveResolver
 import Parsing.Name
-import Parsing.Tokens
+import Parsing.Data
 
 type Query = (Name String, Type)
 
