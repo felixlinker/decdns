@@ -32,13 +32,14 @@ wellformed (Zone org r@(Node apexData rcs)) =
     noSOA :: Bool
     noSOA = all (\rd -> dtype (rtype rd) /= SOA) apexData
 
-    -- TODO: Permit RRSIG records
+    -- TODO: Permit DNSSEC records
     recordsBeyondCNAMEDelegation :: Node String -> Bool
     recordsBeyondCNAMEDelegation (Node rs cs) =
       if   any (\rd -> dtype (rtype rd) == CNAME) rs
       then length rs > 1 || not (M.null cs)
       else any recordsBeyondCNAMEDelegation (M.elems cs)
 
+    -- TODO: Permit DNSSEC records
     recordsAfterZoneCut :: Name String -> Node String -> Maybe (Record (Name String))
     recordsAfterZoneCut n (Node rs cs)
       | null nsData = asum $ map (uncurry (recordsAfterZoneCut . (<| n))) (M.toList cs)
