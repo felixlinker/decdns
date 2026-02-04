@@ -67,17 +67,17 @@ simplifyNeq a b = case (a, b) of
     | otherwise -> []
   (TAtomQuoted ata, TAtomQuoted atb)
     | ata /= atb -> []
-    -- otherwise: preserve contradiction
+    | otherwise -> [(a, b)]
   (TAtom ata, TAtom atb)
     | ata /= atb -> []
-    -- otherwise: preserve contradiction
+    | otherwise -> [(a, b)]
   (TList [] Nothing, TList (_:_) _) -> []
   (TList (_:_) _, TList [] Nothing) -> []
   -- TODO: Implement more reasoning on lists
   (TList _ _, TList _ _) -> [(a, b)]
   (TString stra, TString strb)
     | stra /= strb -> []
-    -- otherwise: preserve contradiction
+    | otherwise -> [(a, b)]
   (TPred pa argsa, TPred pb argsb)
     | pa == pb -> maybe [] rec (zipStrict argsa argsb)
     | otherwise -> []
