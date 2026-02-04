@@ -9,7 +9,10 @@ module Resolvable.Resolvability
 
 import NameConstraint
 import Resolvable.Prolog as Pl
-import ZoneFile
+import DNS.ZoneFile
+import DNS.Name
+import DNS.Record
+import qualified DNS.RecordType as T
 
 import Util.Fresh (Fresh, fresh, runFresh)
 import Control.Monad (void)
@@ -26,7 +29,7 @@ resolvableBase :: Name String -> Record ConstrainedName -> Fresh (Rule RComp)
 resolvableBase ns r@(Record n (RData _ _ ty)) = do
   (n', neqs) <- nameWithSynthesis n
   let cannot = RComp ns r
-  return (Rule cannot (resolves (nameTerm ns) (dtypeAtom ty) n' (dataAtom ty)) neqs)
+  return (Rule cannot (resolves (nameTerm ns) (typeAtom ty) n' (dataAtom ty)) neqs)
 
 captureListTail :: Term -> Term -> Term
 captureListTail t (TList pref Nothing) = TList pref (Just t)
@@ -34,9 +37,9 @@ captureListTail _ (TList _ (Just _)) = undefined
 captureListTail _ _ = undefined
 
 resolvableStep :: [Name String] -> Name String -> Record ConstrainedName -> Fresh [Rule RComp]
-resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> RNS (nameTerm -> delegatedNs))) = sequence $ do
+resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> NS (nameTerm -> delegatedNs))) = sequence $ do
   rootServer <- rootServers
-  glueType <- typeAtom <$> [A, AAAA]
+  glueType <- ttypeAtom <$> [T.A, T.AAAA]
   return $ do
     t <- TVar <$> fresh "T"
     -- Do not expect wildcard neq constraints on NS records
@@ -47,7 +50,7 @@ resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> RNS (nameT
                 , rhead = resolves (nameTerm ns) q n' res
                 , rbody = [ resolves delegatedNs q n' res
                           , resolves rootServer glueType delegatedNs TWildcard ] }
-resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> RCNAME (nameTerm -> cname))) = sequence $ do
+resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> CNAME (nameTerm -> cname))) = sequence $ do
   rootServer <- rootServers
   return $ do
     (n', neqs) <- nameWithSynthesis n
@@ -56,7 +59,7 @@ resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> RCNAME (na
     return Rule { rannotation = RComp ns r
                 , rhead = resolves (nameTerm ns) q n' res
                 , rbody = neqs ++ [ resolves rootServer q cname res ] }
-resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> RDNAME (nameTerm -> dname))) = sequence $ do
+resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> DNAME (nameTerm -> dname))) = sequence $ do
   rootServer <- rootServers
   return $ do -- Enter Fresh monad
     -- Do not expect wildcard neq constraints on CNAME records

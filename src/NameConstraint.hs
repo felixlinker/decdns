@@ -10,7 +10,9 @@ module NameConstraint
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 
-import ZoneFile
+import DNS.ZoneFile
+import DNS.Name
+import DNS.Record
 import Data.Maybe (fromMaybe)
 
 data NameConstraint a = Wildcard [a] | Exactly a

@@ -9,7 +9,7 @@ import Data.Functor (($>))
 import Text.Parsec
 import Text.Parsec.Char as Char
 
-import ZoneFile
+import DNS.Record
 import Text.Read (readMaybe)
 
 hspace :: Stream s m Char => ParsecT s u m Char

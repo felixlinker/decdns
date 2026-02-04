@@ -12,7 +12,9 @@ import Parsing.State
 import Parsing.Tokens
 import Parsing.Name
 import Parsing.Data
-import ZoneFile
+import DNS.ZoneFile
+import DNS.Name
+import DNS.Record
 import Parsing.Wellformedness (wellformed)
 
 comment :: Stream s m Char => Parser s m ()
@@ -48,7 +50,7 @@ record = do
   sep
   Record n . RData c t <$> ty
 
-catTtlType :: Stream s m Char => Parser s m (Cat, Int, TypeDataParser s m)
+catTtlType :: Stream s m Char => Parser s m (Cat, Int, TypeParser s m)
 catTtlType = do
   c <- tryOrState category lastCat
   spaces
@@ -57,7 +59,7 @@ catTtlType = do
   ty <- recordTypeData
   return (c, t, ty)
 
-ttlCatType :: Stream s m Char => Parser s m (Cat, Int, TypeDataParser s m)
+ttlCatType :: Stream s m Char => Parser s m (Cat, Int, TypeParser s m)
 ttlCatType = do
   t <- tryOrState int lastTTL
   spaces

@@ -20,7 +20,8 @@ import Control.Applicative (asum)
 import Control.Monad (when, guard, void)
 import qualified Control.Lens as L
 
-import ZoneFile
+import DNS.Name
+import DNS.Record
 import Parsing.Tokens
 
 type Parser s m = ParsecT s ParserState m

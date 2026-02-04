@@ -8,7 +8,9 @@ import System.Environment (getArgs)
 
 import NonDet
 import RecursiveResolver
-import ZoneFile
+import DNS.ZoneFile
+import DNS.Name
+import DNS.Record
 import Parsing
 import NameConstraint
 import Util (parseZoneFileZones)

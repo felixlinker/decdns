@@ -10,7 +10,9 @@ import Control.Monad (guard)
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
 
-import ZoneFile
+import DNS.ZoneFile
+import DNS.Record
+import qualified DNS.RecordType as T
 
 -- TODO: Check that NSEC type lists are well-formed
 wellformed :: Zone String -> Maybe String
@@ -20,7 +22,7 @@ wellformed (Zone org r@(Node apexData rcs)) =
         , guard (recordsBeyondCNAMEDelegation r) $> "aliased zone has records"
         ,     ("non-glue record below zone cut: " ++) . show
               -- Filter NS in case this zone is authoritative over zone
-          <$> recordsAfterZoneCut org (Node (filter ((NS /=) . dtype . rtype) apexData) rcs)
+          <$> recordsAfterZoneCut org (Node (filter ((T.NS /=) . toType . rtype) apexData) rcs)
         , guard (wildcardRestrictions orgLabel r) $> "DNAME or NS wildcard record" ]
   where
     orgLabel :: String
@@ -30,12 +32,12 @@ wellformed (Zone org r@(Node apexData rcs)) =
     wildcardOrigin = "*" == orgLabel
 
     noSOA :: Bool
-    noSOA = all (\rd -> dtype (rtype rd) /= SOA) apexData
+    noSOA = all (\rd -> toType (rtype rd) /= T.SOA) apexData
 
     -- TODO: Permit DNSSEC records
     recordsBeyondCNAMEDelegation :: Node String -> Bool
     recordsBeyondCNAMEDelegation (Node rs cs) =
-      if   any (\rd -> dtype (rtype rd) == CNAME) rs
+      if   any (\rd -> toType (rtype rd) == T.CNAME) rs
       then length rs > 1 || not (M.null cs)
       else any recordsBeyondCNAMEDelegation (M.elems cs)
 
@@ -48,10 +50,10 @@ wellformed (Zone org r@(Node apexData rcs)) =
       where
         nsData :: [RData]  -- NS records at this node
         otherData :: [RData] -- non-NS records at this node
-        (nsData, otherData) = partition (\rd -> dtype (rtype rd) == NS) rs
+        (nsData, otherData) = partition (\rd -> toType (rtype rd) == T.NS) rs
 
         getName :: RData -> Maybe (Name String)
-        getName (rtype -> RNS name) = Just name
+        getName (rtype -> NS name) = Just name
         getName _ = Nothing
 
         nsesInBailiwick :: [Name String]
@@ -63,9 +65,9 @@ wellformed (Zone org r@(Node apexData rcs)) =
           <|> asum (M.mapWithKey (findNonGlue . (<| n')) cs')
 
         isGlue :: Name String -> RData -> Bool
-        isGlue rn rd = rn `elem` nsesInBailiwick && (dtype (rtype rd) `elem` [A, AAAA])
+        isGlue rn rd = rn `elem` nsesInBailiwick && (toType (rtype rd) `elem` [T.A, T.AAAA])
 
     wildcardRestrictions :: String -> Node String -> Bool
     wildcardRestrictions label (Node rs cs)
-      | label == "*" && M.null cs = any (\rd -> dtype (rtype rd) `elem` [DNAME, NS]) rs
+      | label == "*" && M.null cs = any (\rd -> toType (rtype rd) `elem` [T.DNAME, T.NS]) rs
       | otherwise = any (uncurry wildcardRestrictions) (M.toList cs)

@@ -11,7 +11,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe (mapMaybe, maybeToList)
 
-import ZoneFile
+import DNS.Name
 import Util.Fresh
 import Resolvable.Prolog
 import Resolvable.Resolvability

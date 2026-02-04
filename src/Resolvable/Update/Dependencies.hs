@@ -5,7 +5,7 @@ module Resolvable.Update.Dependencies
 import Data.Maybe (fromMaybe, isNothing, mapMaybe)
 import qualified Data.Set as S
 
-import ZoneFile
+import DNS.Name
 import Resolvable.Dependencies
 import Resolvable.Prolog
 import Util.Fresh

@@ -3,7 +3,7 @@ module Resolvable.Update.Resolvability
   , compileConfigs
   , plRegressions ) where
 
-import ZoneFile
+import DNS.Name
 import Resolvable.Prolog
 import Resolvable.Resolvability
 import Control.Monad (void)

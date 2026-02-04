@@ -21,6 +21,10 @@ source-repository head
 
 library
   exposed-modules:
+      DNS.Name
+      DNS.Record
+      DNS.RecordType
+      DNS.ZoneFile
       NameConstraint
       NonDet
       Parsing
@@ -42,7 +46,6 @@ library
       Util.Debug
       Util.Fresh
       Util.List
-      ZoneFile
   other-modules:
       Paths_dns_regressor
   autogen-modules:
@@ -102,10 +105,10 @@ test-suite dns-regressor-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      DNS.NameSpec
       Resolvable.ConstrainedUnificationSpec
       Resolvable.UnificationSpec
       Resolvable.Util
-      ZoneFileSpec
       Paths_dns_regressor
   autogen-modules:
       Paths_dns_regressor

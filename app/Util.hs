@@ -10,7 +10,8 @@ import Text.Parsec (ParseError)
 
 import NameConstraint (NameConstraint, compileWildcards)
 import Parsing (parseName, parseZoneFile)
-import ZoneFile (Name, Zone)
+import DNS.ZoneFile (Zone)
+import DNS.Name (Name)
 
 sepBy :: String -> [String] -> IO ([String], [String])
 sepBy sep args = do

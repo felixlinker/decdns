@@ -11,7 +11,7 @@ module Resolvable.Prolog
   , mapRule
   , (Resolvable.Prolog.^)
   , dnsWildcard
-  , dtypeAtom
+  , ttypeAtom
   , typeAtom
   , dataAtom
   , (Resolvable.Prolog.\=)
@@ -20,7 +20,8 @@ module Resolvable.Prolog
   , showKnowledgeBase ) where
 
 import NameConstraint
-import ZoneFile
+import DNS.Record
+import qualified DNS.RecordType as T
 
 import Data.List (intercalate, groupBy, sortOn)
 import qualified Data.List.NonEmpty as NE
@@ -130,13 +131,13 @@ subterm t1 t2 = toBool $ walk (\t -> Or (t == t1)) t2
 dnsWildcard :: Term
 dnsWildcard = TAtom "'*'"
 
+ttypeAtom :: T.Type -> Term
+ttypeAtom = TAtom . map toLower . show
+
 typeAtom :: Type -> Term
-typeAtom = TAtom . map toLower . show
+typeAtom = TAtom . map toLower . show . toType
 
-dtypeAtom :: TypeData -> Term
-dtypeAtom = TAtom . map toLower . show . dtype
-
-dataAtom :: TypeData -> Term
+dataAtom :: Type -> Term
 dataAtom = TString . showData
 
 (\=) :: Term -> Term -> Term

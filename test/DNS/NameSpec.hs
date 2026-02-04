@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ViewPatterns #-}
-module ZoneFileSpec (tests) where
+module DNS.NameSpec (tests) where
 
 import Data.Char (toLower, toUpper)
 import qualified Data.List.NonEmpty as NE
@@ -8,7 +8,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 
-import ZoneFile (Name(..), isSubDomain, canonicalCompare)
+import DNS.Name
 
 tests :: TestTree
 tests =

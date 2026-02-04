@@ -8,7 +8,8 @@ import Control.Applicative (asum)
 import Data.Functor (($>))
 import Text.Parsec
 
-import ZoneFile
+import DNS.RecordType
+import DNS.Name
 import RecursiveResolver
 import Parsing.Name
 import Parsing.Data
