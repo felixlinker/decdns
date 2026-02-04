@@ -5,7 +5,7 @@ module Parsing.ZoneFile
 import Text.Parsec
 import Text.Parsec.Char as Char
 import Control.Applicative (asum)
-import Data.Functor (($>))
+import Data.Functor (($>), void)
 import Data.Maybe (catMaybes)
 
 import Parsing.State
@@ -19,14 +19,14 @@ comment :: Stream s m Char => Parser s m ()
 comment = do
   spaces
   _ <- Char.char ';'
-  _ <- untilEndOfLine
+  _ <- manyTill anyChar (void endOfLine <|> eof)
   return ()
 
 origin :: Stream s m Char => Parser s m (Name String)
 origin = do
   spaces
   _ <- string "$ORIGIN"
-  spaces1
+  sep
   org <- name
   writeState parsedZone org
   return org
@@ -35,7 +35,7 @@ setTTL :: Stream s m Char => Parser s m ()
 setTTL = do
   spaces
   _ <- string "$TTL"
-  spaces1
+  sep
   t <- int
   writeState lastTTL t
 
@@ -45,7 +45,7 @@ record = do
   n <- tryOrState name lastName
   spaces
   (c, t, ty) <- try catTtlType <|> try ttlCatType
-  spaces1
+  sep
   Record n . RData c t <$> ty
 
 catTtlType :: Stream s m Char => Parser s m (Cat, Int, TypeDataParser s m)
@@ -53,7 +53,7 @@ catTtlType = do
   c <- tryOrState category lastCat
   spaces
   t <- tryOrState int lastTTL
-  spaces1
+  sep
   ty <- recordTypeData
   return (c, t, ty)
 
@@ -62,7 +62,7 @@ ttlCatType = do
   t <- tryOrState int lastTTL
   spaces
   c <- tryOrState category lastCat
-  spaces1
+  sep
   ty <- recordTypeData
   return (c, t, ty)
 

@@ -57,75 +57,75 @@ ns :: Stream s m Char => TypeDataParser s m
 ns = RNS <$> name
 
 a :: Stream s m Char => TypeDataParser s m
-a = RA <$> untilEndOfLine
+a = RA <$> manyTill anyChar endOfEntry
 
 aaaa :: Stream s m Char => TypeDataParser s m
-aaaa = RAAAA <$> untilEndOfLine
+aaaa = RAAAA <$> manyTill anyChar endOfEntry
 
 txt :: Stream s m Char => TypeDataParser s m
-txt = RTXT <$> untilEndOfLine
+txt = RTXT <$> manyTill anyChar endOfEntry
 
 mx :: Stream s m Char => TypeDataParser s m
-mx = RMX <$> int <*> (spaces1 >> name)
+mx = RMX <$> int <*> (sep >> name)
 
 soa :: Stream s m Char => TypeDataParser s m
 soa = do
   mname <- name
-  spaces1
+  sep
   rnam <- name
-  spaces1
+  sep
   serial <- int
-  spaces1
+  sep
   refresh <- int
-  spaces1
+  sep
   retry <- int
-  spaces1
+  sep
   expire <- int
-  spaces1
+  sep
   RSOA mname rnam serial refresh retry expire <$> int
 
 dnskey :: Stream s m Char => TypeDataParser s m
 dnskey = do
   -- Can only have three values: 0, 256, and 257. SEP implies zone key flag.
   flags <- int
-  spaces1
+  sep
   _ <- char '3'
-  spaces1
+  sep
   alg <- int  -- TODO: support memnonics
-  RDNSKEY (flags >= 256) (flags == 257) alg <$> untilEndOfLine
+  RDNSKEY (flags >= 256) (flags == 257) alg <$> manyTill anyChar sep
 
 rrsig :: Stream s m Char => TypeDataParser s m
 rrsig = do
   typ <- recordType
-  spaces1
+  sep
   alg <- int
-  spaces1
+  sep
   lbls <- int
-  spaces1
+  sep
   orgTTL <- int
-  spaces1
+  sep
   expire <- int
-  spaces1
+  sep
   inception <- int
-  spaces1
+  sep
   tag <- int
-  spaces1
+  sep
   -- TODO: I would accept @ as a name here but must not
   signer <- name
-  spaces1
+  sep
   RRRSIG typ alg lbls orgTTL expire inception tag signer <$> manyTill anyChar space
 
 nsec :: Stream s m Char => TypeDataParser s m
 nsec = do
   next <- name
-  RNSEC next <$> manyTill (spaces1 >> recordType) end
+  RNSEC next <$> manyTill (sep >> recordType) endOfEntry
 
 ds :: Stream s m Char => TypeDataParser s m
 ds = do
   tag <- int
-  spaces1
+  sep
   alg <- int
-  spaces1
+  sep
   typ <- int
-  spaces1
-  RDS tag alg typ <$> manyTill anyChar space
+  sep
+  RDS tag alg typ <$> manyTill anyChar endOfEntry

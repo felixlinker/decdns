@@ -1,9 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Parsing.Tokens
-  ( spaces1
+  ( hspace
   , dot
-  , end
-  , untilEndOfLine
   , int
   , category ) where
 
@@ -14,17 +12,11 @@ import Text.Parsec.Char as Char
 import ZoneFile
 import Text.Read (readMaybe)
 
-spaces1 :: Stream s m Char => ParsecT s u m ()
-spaces1 = skipMany1 space
+hspace :: Stream s m Char => ParsecT s u m Char
+hspace = char ' ' <|> tab
 
 dot :: Stream s m Char => ParsecT s u m Char
 dot = Char.char '.'
-
-end :: Stream s m Char => ParsecT s u m ()
-end = endOfLine $> () <|> eof
-
-untilEndOfLine :: Stream s m Char => ParsecT s u m String
-untilEndOfLine = manyTill anyChar end
 
 int :: Stream s m Char => ParsecT s u m Int
 int = do
