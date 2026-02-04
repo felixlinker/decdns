@@ -68,6 +68,9 @@ simplifyNeq a b = case (a, b) of
   (TAtomQuoted ata, TAtomQuoted atb)
     | ata /= atb -> []
     -- otherwise: preserve contradiction
+  (TAtom ata, TAtom atb)
+    | ata /= atb -> []
+    -- otherwise: preserve contradiction
   (TList [] Nothing, TList (_:_) _) -> []
   (TList (_:_) _, TList [] Nothing) -> []
   -- TODO: Implement more reasoning on lists
