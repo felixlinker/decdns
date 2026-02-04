@@ -26,7 +26,9 @@ recordType = asum $ map try
   , string "MX" $> MX
   , string "SOA" $> SOA
   , string "DNSKEY" $> DNSKEY
-  , string "RRSIG" $> RRSIG ]
+  , string "RRSIG" $> RRSIG
+  , string "NSEC" $> NSEC
+  , string "DS" $> DS ]
 
 recordTypeData :: Stream s m Char => ParsecT s u m (TypeDataParser s m)
 recordTypeData = do
@@ -42,6 +44,8 @@ recordTypeData = do
     SOA -> return soa
     DNSKEY -> return dnskey
     RRSIG -> return rrsig
+    NSEC -> return nsec
+    DS -> return ds
 
 cname :: Stream s m Char => TypeDataParser s m
 cname = RCNAME <$> name
@@ -110,3 +114,18 @@ rrsig = do
   signer <- name
   spaces1
   RRRSIG typ alg lbls orgTTL expire inception tag signer <$> manyTill anyChar space
+
+nsec :: Stream s m Char => TypeDataParser s m
+nsec = do
+  next <- name
+  RNSEC next <$> manyTill (spaces1 >> recordType) end
+
+ds :: Stream s m Char => TypeDataParser s m
+ds = do
+  tag <- int
+  spaces1
+  alg <- int
+  spaces1
+  typ <- int
+  spaces1
+  RDS tag alg typ <$> manyTill anyChar space

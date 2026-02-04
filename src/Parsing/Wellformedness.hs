@@ -12,6 +12,7 @@ import qualified Data.List.NonEmpty as NE
 
 import ZoneFile
 
+-- TODO: Check that NSEC type lists are well-formed
 wellformed :: Zone String -> Maybe String
 wellformed (Zone org r@(Node apexData rcs)) =
   asum  [ guard wildcardOrigin $> "zone origin has wildcard"

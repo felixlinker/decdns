@@ -45,7 +45,7 @@ dnameRewrite qn@(Name qname) fn@(Name from) (Name to) =
     then undefined
     else Name (NE.prependList (NE.take prefixLen qname) to)
 
-data Type = CNAME | DNAME | NS | A | AAAA | TXT | MX | SOA | DNSKEY | RRSIG
+data Type = CNAME | DNAME | NS | A | AAAA | TXT | MX | SOA | DNSKEY | RRSIG | NSEC | DS
   deriving (Eq, Ord, Show)
 
 data TypeData =
@@ -78,6 +78,13 @@ data TypeData =
             , _signer :: Name String
             , _signature :: String   -- TODO: Make Bytestring
             }
+  | RNSEC { _nextName :: Name String
+          , _types :: [Type] }
+  | RDS { _keyTag :: Int
+        , _algorithm :: Int
+        , _digestType :: Int
+        , _digset :: String  -- TODO: Make ByteString
+        }
   deriving (Eq, Ord)
 
 showData :: TypeData -> String
@@ -99,6 +106,8 @@ showData (RDNSKEY zk sep alg pk) = flags ++ " 3 " ++ show alg ++ " " ++ pk
 showData (RRRSIG typ alg lbls orgTTL expire nbf tag signer sig) =
       show typ ++ " " ++ show alg ++ " " ++ show lbls ++ " " ++ show orgTTL ++ " "
   ++  show expire ++ " " ++ show nbf ++ " " ++ show tag ++ show signer ++ " " ++ show sig
+showData (RNSEC name types) = show name ++ " " ++ unwords (map show types)
+showData (RDS tag alg typ dig) = show tag ++ " " ++ show alg ++ " " ++ show typ ++ " " ++ dig
 
 instance Show TypeData where
   show t = show (dtype t) ++ " " ++ showData t
@@ -114,6 +123,8 @@ dtype (RMX {}) = MX
 dtype (RSOA {}) = SOA
 dtype (RDNSKEY {}) = DNSKEY
 dtype (RRRSIG {}) = RRSIG
+dtype (RNSEC {}) = NSEC
+dtype (RDS {}) = DS
 
 data Cat = IN
   deriving (Eq, Ord, Show)
