@@ -31,6 +31,7 @@ wellformed (Zone org r@(Node apexData rcs)) =
     noSOA :: Bool
     noSOA = all (\rd -> dtype (rtype rd) /= SOA) apexData
 
+    -- TODO: Permit RRSIG records
     recordsBeyondCNAMEDelegation :: Node String -> Bool
     recordsBeyondCNAMEDelegation (Node rs cs) =
       if   any (\rd -> dtype (rtype rd) == CNAME) rs

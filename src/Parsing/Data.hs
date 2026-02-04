@@ -25,7 +25,8 @@ recordType = asum $ map try
   , string "TXT" $> TXT
   , string "MX" $> MX
   , string "SOA" $> SOA
-  , string "DNSKEY" $> DNSKEY ]
+  , string "DNSKEY" $> DNSKEY
+  , string "RRSIG" $> RRSIG ]
 
 recordTypeData :: Stream s m Char => ParsecT s u m (TypeDataParser s m)
 recordTypeData = do
@@ -40,6 +41,7 @@ recordTypeData = do
     MX -> return mx
     SOA -> return soa
     DNSKEY -> return dnskey
+    RRSIG -> return rrsig
 
 cname :: Stream s m Char => TypeDataParser s m
 cname = RCNAME <$> name
@@ -87,3 +89,24 @@ dnskey = do
   spaces1
   alg <- int  -- TODO: support memnonics
   RDNSKEY (flags >= 256) (flags == 257) alg <$> untilEndOfLine
+
+rrsig :: Stream s m Char => TypeDataParser s m
+rrsig = do
+  typ <- recordType
+  spaces1
+  alg <- int
+  spaces1
+  lbls <- int
+  spaces1
+  orgTTL <- int
+  spaces1
+  expire <- int
+  spaces1
+  inception <- int
+  spaces1
+  tag <- int
+  spaces1
+  -- TODO: I would accept @ as a name here but must not
+  signer <- name
+  spaces1
+  RRRSIG typ alg lbls orgTTL expire inception tag signer <$> manyTill anyChar space
