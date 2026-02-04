@@ -105,6 +105,7 @@ test-suite dns-regressor-test
       Resolvable.ConstrainedUnificationSpec
       Resolvable.UnificationSpec
       Resolvable.Util
+      ZoneFileSpec
       Paths_dns_regressor
   autogen-modules:
       Paths_dns_regressor
