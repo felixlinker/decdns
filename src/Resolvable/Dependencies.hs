@@ -82,16 +82,16 @@ computeResolvable rootServers rsM = do
   rs <- rsM
   qtyp <- TVar <$> fresh "QT"
   qname <- TVar <$> fresh "QN"
-  qresult <- TVar <$> fresh "QR"
   return $ do
     rootServer <- nameTerm <$> rootServers
-    let query = resolves rootServer qtyp qname qresult
-    u <- rec [] identity (resolves rootServer qtyp qname qresult) rs
+    let query = presolvable rootServer qtyp qname
+    u <- rec [] identity (presolvable rootServer qtyp qname) rs
     return $ CQuery (apply u query) (constraints u)
   where
     solveQuery :: ConstrainedUnifier -> Term -> [Rule a] -> [(ConstrainedUnifier, [Term])]
     solveQuery u (TPred "\\=" [ a, b ]) _ = maybe [] (return . (,[])) (addConstraint a b u)
-    solveQuery u q@(TPred "resolves" _) rs = mapMaybe (deriveIf u q) rs
+    solveQuery u q@(TPred pname _) rs
+      | pname `elem` ["resolves", "resolvable"] = mapMaybe (deriveIf u q) rs
     solveQuery _ _ _ = error "unsupported predicate"
 
     rec :: [Term] -> ConstrainedUnifier -> Term -> [Rule a] -> [ConstrainedUnifier]

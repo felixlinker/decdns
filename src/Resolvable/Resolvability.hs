@@ -5,6 +5,7 @@ module Resolvable.Resolvability
   , fromZoneFile
   , NameServersConfig
   , compileConfig
+  , presolvable
   , plResolvable ) where
 
 import NameConstraint
@@ -14,7 +15,7 @@ import DNS.Name
 import DNS.Record
 import qualified DNS.RecordType as T
 
-import Util.Fresh (Fresh, fresh, runFresh)
+import Util.Fresh (Fresh, fresh)
 import Control.Monad (void)
 
 data RComp = RComp
@@ -73,15 +74,24 @@ resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> DNAME (nam
                           , resolves rootServer q (captureListTail t dname) res ] }
 resolvableStep _ _ (Record _ (rtype -> _)) = return []
 
-resolvable :: Rule ()
-resolvable =
-  Rule () (TPred "resolvable" [ q, rns, ns ]) [ bagof n (r Pl.^ resolves rns q n r) ns ]
+presolvable :: Term -> Term -> Term -> Term
+presolvable s q n = TPred "resolvable" [ s, q, n ]
+
+resolvable :: Fresh (Rule ())
+resolvable = do
+  s <- TVar <$> fresh "S"
+  q <- TVar <$> fresh "Q"
+  n <- TVar <$> fresh "N"
+  return $ Rule () (presolvable s q n) [ resolves s q n TWildcard ]
+
+allResolvable :: Rule ()
+allResolvable =
+  Rule () (TPred "all_resolvable" [ q, rns, ns ]) [ bagof n (presolvable rns q n) ns ]
   where
     q = TVar "Q"
     rns = TVar "RS"
     ns = TVar "Names"
     n = TVar "Name"
-    r = TVar "R"
 
     bagof :: Term -> Term -> Term -> Term
     bagof a b c = TPred "bagof" [ a, b, c ]
@@ -100,5 +110,8 @@ compileConfig rootServers = (concat <$>) . mapM (uncurry compileOne)
     compileOne :: Name String -> [Zone (NameConstraint String)] -> Fresh [Rule RComp]
     compileOne ns = (concat <$>) . mapM (fromZoneFile rootServers ns)
 
-plResolvable :: [Name String] -> NameServersConfig -> [Rule ()]
-plResolvable rootServers = (resolvable :) . map void . runFresh . compileConfig rootServers
+plResolvable :: [Name String] -> NameServersConfig -> Fresh [Rule ()]
+plResolvable rootServers cfg = do
+  res <- resolvable
+  compiled <- map void <$> compileConfig rootServers cfg
+  return $ allResolvable : res : compiled

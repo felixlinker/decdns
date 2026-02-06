@@ -19,7 +19,7 @@ main = do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
       cfg <- mapM parseZoneFileZones zones
-      putStr (showKnowledgeBase (plResolvable rootServers cfg))
+      putStr (showKnowledgeBase $ runFresh $ plResolvable rootServers cfg)
     "pl-regressions" -> do
       (roots, args') <- sepBy "--" args
       rootServers <- parseNames roots
@@ -37,8 +37,8 @@ main = do
       (roots, args') <- sepBy "--" args
       rootServers <- parseNames roots
       (old, new) <- sepBy "--" args'
-      oldRs <- compileConfig rootServers <$> mapM parseZoneFileZones old
-      newRs <- compileConfig rootServers <$> mapM parseZoneFileZones new
+      oldRs <- plResolvable rootServers <$> mapM parseZoneFileZones old
+      newRs <- plResolvable rootServers <$> mapM parseZoneFileZones new
       putStr $ unlines $ map show $ computeRegressions rootServers oldRs newRs
     "dependencies" -> do
       (roots, zones) <- sepBy "--" args
