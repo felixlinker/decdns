@@ -27,7 +27,7 @@ instance Show Dependencies where
     where
       showItem :: Record ConstrainedName -> [Record ConstrainedName] -> String
       showItem r [] = "No dependencies: " ++ show r
-      showItem r ds = unlines ((show r ++ " depends on:") : map show ds)
+      showItem r ds = unlines ((show r ++ " depends on:") : map (("  " ++) . show) ds)
 
 empty :: Dependencies
 empty = Deps M.empty
