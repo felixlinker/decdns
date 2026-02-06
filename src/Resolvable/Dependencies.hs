@@ -50,7 +50,7 @@ fromRules rs = go rs empty
     getRel (Rule _ _ body) = concat $ matchRules identity body
 
     matchRules :: ConstrainedUnifier -> [Term] -> [[Record ConstrainedName]]
-    matchRules _ [] = []
+    matchRules _ [] = [[]]
     matchRules u ((TPred "\\=" [ a, b ]):ts) = do
       u' <- maybeToList $ addConstraint a b u
       matchRules u' ts
