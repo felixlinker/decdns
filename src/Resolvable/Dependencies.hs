@@ -11,64 +11,53 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe (mapMaybe, maybeToList)
 
+import NameConstraint
 import DNS.Name
+import DNS.Record
 import Util.Fresh
 import Resolvable.Prolog
 import Resolvable.Resolvability
 import Resolvable.ConstrainedUnification
-import Data.List (intercalate, partition)
 import Resolvable.Unification (equivModuloRenaming)
 
-type Conjunct = (ConstrainedUnifier, [Rule RComp])
-
-newtype Dependencies = Deps (M.Map (Rule RComp) [Conjunct])
+newtype Dependencies = Deps (M.Map (Record ConstrainedName) (S.Set (Record ConstrainedName)))
 
 instance Show Dependencies where
-  show (Deps (M.toList -> items)) =
-    let (facts, rules) = partition (null . snd) items
-    in unlines  $ if null facts
-                    then []
-                    else  ( "The following rules have no dependencies:"
-                          : map (("- " ++) . showRecord . fst) facts
-                          ++ [""])
-                ++ map (uncurry showItem) rules
+  show (Deps (M.toList -> items)) = unlines $ map (uncurry showItem . fmap S.toList) items
     where
-      showRecord :: Rule RComp -> String
-      showRecord (Rule (RComp _ record) _ _) = show record
-
-      showItem :: Rule RComp -> [(ConstrainedUnifier, [Rule RComp])] -> String
-      showItem r ds = unlines ((showRecord r ++ " depends on:") : map showDep ds)
-
-      showDep :: (ConstrainedUnifier, [Rule RComp]) -> String
-      showDep (cu, rs) = "- " ++ intercalate " AND " (map showRecord rs) ++ " under " ++ show cu
+      showItem :: Record ConstrainedName -> [Record ConstrainedName] -> String
+      showItem r [] = "No dependencies: " ++ show r
+      showItem r ds = unlines ((show r ++ " depends on:") : map show ds)
 
 empty :: Dependencies
 empty = Deps M.empty
 
-dinsert :: Rule RComp -> [(ConstrainedUnifier, [Rule RComp])] -> Dependencies -> Dependencies
+dinsert :: Record ConstrainedName -> S.Set (Record ConstrainedName) -> Dependencies -> Dependencies
 dinsert k v (Deps m) = Deps (M.insert k v m)
 
--- TODO: Fix this; probably wrong
 fromRules :: [Rule RComp] -> Dependencies
 fromRules rs = go rs empty
   where
+    cannot :: Rule RComp -> Record ConstrainedName
+    cannot = fromRecord . rannotation
+
     go :: [Rule RComp] -> Dependencies -> Dependencies
     go [] acc = acc
-    go (r:rrec) acc = go rrec (dinsert r (getRel r) acc)
+    go (r:rrec) acc = go rrec (dinsert (cannot r) (S.fromList $ getRel r) acc)
 
-    getRel :: Rule RComp -> [(ConstrainedUnifier, [Rule RComp])]
+    getRel :: Rule RComp -> [Record ConstrainedName]
     getRel (Rule _ _ []) = []
-    getRel (Rule _ _ body) = matchRules identity body
+    getRel (Rule _ _ body) = concat $ matchRules identity body
 
-    matchRules :: ConstrainedUnifier -> [Term] -> [(ConstrainedUnifier, [Rule RComp])]
-    matchRules u [] = [(u, [])]
+    matchRules :: ConstrainedUnifier -> [Term] -> [[Record ConstrainedName]]
+    matchRules _ [] = []
     matchRules u ((TPred "\\=" [ a, b ]):ts) = do
       u' <- maybeToList $ addConstraint a b u
       matchRules u' ts
     matchRules u (t@(TPred "resolves" _):ts) = do
-      (u', h) <- mapMaybe (matchRule u t) rs
-      (u'', hs) <- matchRules u' ts
-      return (u'', h:hs)
+      (u', cannot -> h) <- mapMaybe (matchRule u t) rs
+      rec <- matchRules u' ts
+      return $ h:rec
     matchRules _ _ = error "unsupported rule body predicate"
 
     matchRule :: ConstrainedUnifier -> Term -> Rule RComp -> Maybe (ConstrainedUnifier, Rule RComp)
