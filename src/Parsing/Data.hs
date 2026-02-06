@@ -25,11 +25,7 @@ recordType = asum $ map try
   , string "AAAA" $> T.AAAA
   , string "TXT" $> T.TXT
   , string "MX" $> T.MX
-  , string "SOA" $> T.SOA
-  , string "DNSKEY" $> T.DNSKEY
-  , string "RRSIG" $> T.RRSIG
-  , string "NSEC" $> T.NSEC
-  , string "DS" $> T.DS ]
+  , string "SOA" $> T.SOA ]
 
 recordTypeData :: Stream s m Char => ParsecT s u m (TypeParser s m)
 recordTypeData = do
@@ -43,10 +39,6 @@ recordTypeData = do
     T.TXT -> return txt
     T.MX -> return mx
     T.SOA -> return soa
-    T.DNSKEY -> return dnskey
-    T.RRSIG -> return rrsig
-    T.NSEC -> return nsec
-    T.DS -> return ds
 
 cname :: Stream s m Char => TypeParser s m
 cname = CNAME <$> name
@@ -84,49 +76,3 @@ soa = do
   expire <- int
   sep
   SOA mname rnam serial refresh retry expire <$> int
-
-dnskey :: Stream s m Char => TypeParser s m
-dnskey = do
-  -- Can only have three values: 0, 256, and 257. SEP implies zone key flag.
-  flags <- int
-  sep
-  _ <- char '3'
-  sep
-  alg <- int  -- TODO: support memnonics
-  DNSKEY (flags >= 256) (flags == 257) alg <$> manyTill anyChar sep
-
-rrsig :: Stream s m Char => TypeParser s m
-rrsig = do
-  typ <- recordType
-  sep
-  alg <- int
-  sep
-  lbls <- int
-  sep
-  orgTTL <- int
-  sep
-  expire <- int
-  sep
-  inception <- int
-  sep
-  tag <- int
-  sep
-  -- TODO: I would accept @ as a name here but must not
-  signer <- name
-  sep
-  RRSIG typ alg lbls orgTTL expire inception tag signer <$> manyTill anyChar space
-
-nsec :: Stream s m Char => TypeParser s m
-nsec = do
-  next <- name
-  NSEC next <$> manyTill (sep >> recordType) endOfEntry
-
-ds :: Stream s m Char => TypeParser s m
-ds = do
-  tag <- int
-  sep
-  alg <- int
-  sep
-  typ <- int
-  sep
-  DS tag alg typ <$> manyTill anyChar endOfEntry

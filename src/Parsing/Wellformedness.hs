@@ -14,7 +14,6 @@ import DNS.ZoneFile
 import DNS.Record
 import qualified DNS.RecordType as T
 
--- TODO: Check that NSEC type lists are well-formed
 wellformed :: Zone String -> Maybe String
 wellformed (Zone org r@(Node apexData rcs)) =
   asum  [ guard wildcardOrigin $> "zone origin has wildcard"
@@ -34,14 +33,12 @@ wellformed (Zone org r@(Node apexData rcs)) =
     noSOA :: Bool
     noSOA = all (\rd -> toType (rtype rd) /= T.SOA) apexData
 
-    -- TODO: Permit DNSSEC records
     recordsBeyondCNAMEDelegation :: Node String -> Bool
     recordsBeyondCNAMEDelegation (Node rs cs) =
       if   any (\rd -> toType (rtype rd) == T.CNAME) rs
       then length rs > 1 || not (M.null cs)
       else any recordsBeyondCNAMEDelegation (M.elems cs)
 
-    -- TODO: Permit DNSSEC records
     recordsAfterZoneCut :: Name String -> Node String -> Maybe (Record (Name String))
     recordsAfterZoneCut n (Node rs cs)
       | null nsData = asum $ map (uncurry (recordsAfterZoneCut . (<| n))) (M.toList cs)
