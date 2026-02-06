@@ -40,6 +40,11 @@ main = do
       oldRs <- compileConfig rootServers <$> mapM parseZoneFileZones old
       newRs <- compileConfig rootServers <$> mapM parseZoneFileZones new
       putStr $ unlines $ map show $ computeRegressions rootServers oldRs newRs
+    "dependencies" -> do
+      (roots, zones) <- sepBy "--" args
+      rootServers <- parseNames roots
+      compiled <- runFresh . compileConfig rootServers <$> mapM parseZoneFileZones zones
+      print $ fromRules compiled
     _ -> fail "unknown command"
   where
     popArg :: [String] -> IO (String, [String])
