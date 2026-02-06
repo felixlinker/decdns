@@ -1,14 +1,18 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ViewPatterns #-}
 module DNS.Name
   ( Name(..)
   , (<|)
   , isSubDomain
+  , intersection
   , canonicalCompare
   , dnameRewrite ) where
 
 import Data.List (intercalate, isSuffixOf)
 import qualified Data.List.NonEmpty as NE
 import Data.Char (toLower)
+import Control.Monad (guard)
+import Data.Maybe (catMaybes)
 
 newtype Name a = Name { labels :: NE.NonEmpty a }
   deriving (Eq, Ord)
@@ -24,6 +28,16 @@ instance Show (Name String) where
 
 isSubDomain :: Eq a => Name a -> Name a -> Bool
 isSubDomain (Name l1) (Name l2) = NE.toList l2 `isSuffixOf` NE.toList l1
+
+intersection :: Eq a => Name a -> Name a -> Maybe (Name a)
+intersection (Name (NE.reverse -> l1)) (Name (NE.reverse -> l2)) = do
+    let prefix = catMaybes $ NE.toList $ NE.zipWith zipper l1 l2
+    Name <$> NE.nonEmpty (reverse prefix)
+  where
+    zipper :: Eq a => a -> a -> Maybe a
+    zipper a1 a2 = do
+      guard (a1 == a2)
+      return a1
 
 -- Order for NSEC records according to: https://datatracker.ietf.org/doc/html/rfc4034#section-6.1
 canonicalCompare :: Name String -> Name String -> Ordering
