@@ -5,7 +5,6 @@ module Resolvable.Update.Trivial
 import qualified Data.List as L
 import qualified Data.Set as S
 
-import DNS.Name
 import DNS.Record
 import Resolvable.Dependencies
 import Resolvable.Prolog
