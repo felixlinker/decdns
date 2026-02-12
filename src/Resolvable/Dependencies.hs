@@ -96,6 +96,7 @@ computeResolvable rootServers rsM = do
 
     rec :: [Term] -> ConstrainedUnifier -> Term -> [Rule a] -> [ConstrainedUnifier]
     rec trace u q rs
+      -- TODO: Check soundness of loop detection
       | any (equivModuloRenaming q) trace = []
       | otherwise = do
         (u', conj) <- solveQuery u q rs
