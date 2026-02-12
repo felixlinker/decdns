@@ -1,7 +1,12 @@
 module DNS.Diff
   ( Diff
-  , diff ) where
+  , diff
+  , someDeleted ) where
 
+import qualified Data.Map as M
+import qualified Data.List.NonEmpty as NE
+
+import DNS.Name
 import DNS.Record
 import DNS.ZoneFile
 
@@ -28,3 +33,14 @@ diff (Zone oldOrg oldZ) (Zone newOrg newZ)
 
     true :: a -> Bool
     true = const True
+
+someDeleted :: (Ord a, Monoid a) => Record (Name a) -> Diff a -> Bool
+someDeleted (Record (Name ls) d)
+  | r /= mempty = error "record name is relative"
+  | otherwise = go p
+  where
+    (r NE.:| p) = NE.reverse ls
+
+    go :: Ord a => [a] -> Diff a -> Bool
+    go [] (T.Node is _) = any (either ((== rtype d) . rtype) (const False)) is
+    go (h:t) (T.Node _ cs) = maybe False (go t) (M.lookup h cs)
