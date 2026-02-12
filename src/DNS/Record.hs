@@ -1,10 +1,5 @@
 module DNS.Record
-  ( Name(..)
-  , (<|)
-  , Cat(..)
-  , isSubDomain
-  , canonicalCompare
-  , dnameRewrite
+  ( Cat(..)
   , Type(..)
   , showData
   , toType

@@ -11,6 +11,7 @@ module RecursiveResolver
 import Control.Monad (guard)
 
 import NonDet
+import DNS.Name
 import DNS.Record
 import qualified DNS.RecordType as T
 import Data.List (nub)

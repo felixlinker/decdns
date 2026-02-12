@@ -20,6 +20,7 @@ module Resolvable.Prolog
   , showKnowledgeBase ) where
 
 import NameConstraint
+import DNS.Name
 import DNS.Record
 import qualified DNS.RecordType as T
 
