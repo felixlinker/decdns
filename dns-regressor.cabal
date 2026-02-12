@@ -21,6 +21,7 @@ source-repository head
 
 library
   exposed-modules:
+      DNS.Diff
       DNS.Name
       DNS.Record
       DNS.RecordType

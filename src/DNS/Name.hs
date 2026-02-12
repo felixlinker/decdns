@@ -2,6 +2,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module DNS.Name
   ( Name(..)
+  , root
   , (<|)
   , isSubDomain
   , intersection
@@ -16,6 +17,9 @@ import Data.Maybe (catMaybes)
 
 newtype Name a = Name { labels :: NE.NonEmpty a }
   deriving (Eq, Ord)
+
+root :: Monoid a => Name a
+root = Name (NE.singleton mempty)
 
 (<|) :: a -> Name a -> Name a
 (<|) l (Name ls) = Name (l NE.<| ls)

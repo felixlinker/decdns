@@ -3,11 +3,13 @@ module DNS.ZoneFile
   ( emptyZone
   , Zone(..)
   , insert
-  , allRecords ) where
+  , allRecords
+  , mergeZones ) where
 
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
 
+import DNS.Name as N
 import DNS.Record
 import qualified Util.Tree as T
 
@@ -39,3 +41,9 @@ allRecords (Zone orig ns) = go orig ns
     go :: Name a -> T.Node a RData -> [Record (Name a)]
     go n (T.Node rs ch) =
       map (Record n) rs ++ concat (M.mapWithKey (\l -> go (l <| n)) ch)
+
+mergeZones :: (Ord a, Monoid a) => [Zone a] -> Maybe (Zone a)
+mergeZones (concatMap allRecords -> zs) = foldr go (Just (emptyZone N.root)) zs
+  where
+    go :: Ord a => Record (Name a) -> Maybe (Zone a) -> Maybe (Zone a)
+    go r = ((`insert` r) =<<)
