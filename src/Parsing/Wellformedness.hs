@@ -10,18 +10,20 @@ import Control.Monad (guard)
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
 
+import DNS.Name
 import DNS.ZoneFile
 import DNS.Record
 import qualified DNS.RecordType as T
+import qualified Util.Tree as Tr
 
 wellformed :: Zone String -> Maybe String
-wellformed (Zone org r@(Node apexData rcs)) =
+wellformed (Zone org r@(Tr.Node apexData rcs)) =
   asum  [ guard wildcardOrigin $> "zone origin has wildcard"
         , guard noSOA $> "zone misses SOA record"
         , guard (recordsBeyondCNAMEDelegation r) $> "aliased zone has records"
         ,     ("non-glue record below zone cut: " ++) . show
               -- Filter NS in case this zone is authoritative over zone
-          <$> recordsAfterZoneCut org (Node (filter ((T.NS /=) . toType . rtype) apexData) rcs)
+          <$> recordsAfterZoneCut org (Tr.Node (filter ((T.NS /=) . toType . rtype) apexData) rcs)
         , guard (wildcardRestrictions orgLabel r) $> "DNAME or NS wildcard record" ]
   where
     orgLabel :: String
@@ -33,17 +35,17 @@ wellformed (Zone org r@(Node apexData rcs)) =
     noSOA :: Bool
     noSOA = all (\rd -> toType (rtype rd) /= T.SOA) apexData
 
-    recordsBeyondCNAMEDelegation :: Node String RData -> Bool
-    recordsBeyondCNAMEDelegation (Node rs cs) =
+    recordsBeyondCNAMEDelegation :: Tr.Node String RData -> Bool
+    recordsBeyondCNAMEDelegation (Tr.Node rs cs) =
       if   any (\rd -> toType (rtype rd) == T.CNAME) rs
       then length rs > 1 || not (M.null cs)
       else any recordsBeyondCNAMEDelegation (M.elems cs)
 
-    recordsAfterZoneCut :: Name String -> Node String RData -> Maybe (Record (Name String))
-    recordsAfterZoneCut n (Node rs cs)
+    recordsAfterZoneCut :: Name String -> Tr.Node String RData -> Maybe (Record (Name String))
+    recordsAfterZoneCut n (Tr.Node rs cs)
       | null nsData = asum $ map (uncurry (recordsAfterZoneCut . (<| n))) (M.toList cs)
       -- Modify node to only include other records because names can self-delegate
-      | otherwise = findNonGlue n (Node otherData cs)
+      | otherwise = findNonGlue n (Tr.Node otherData cs)
       where
         nsData :: [RData]  -- NS records at this node
         otherData :: [RData] -- non-NS records at this node
@@ -56,15 +58,15 @@ wellformed (Zone org r@(Node apexData rcs)) =
         nsesInBailiwick :: [Name String]
         nsesInBailiwick = filter (`isSubDomain` n) $ mapMaybe getName nsData
 
-        findNonGlue :: Name String -> Node String RData -> Maybe (Record (Name String))
-        findNonGlue n' (Node rds cs') =
+        findNonGlue :: Name String -> Tr.Node String RData -> Maybe (Record (Name String))
+        findNonGlue n' (Tr.Node rds cs') =
               Record n' <$> find (not . isGlue n') rds
           <|> asum (M.mapWithKey (findNonGlue . (<| n')) cs')
 
         isGlue :: Name String -> RData -> Bool
         isGlue rn rd = rn `elem` nsesInBailiwick && (toType (rtype rd) `elem` [T.A, T.AAAA])
 
-    wildcardRestrictions :: String -> Node String RData -> Bool
-    wildcardRestrictions label (Node rs cs)
+    wildcardRestrictions :: String -> Tr.Node String RData -> Bool
+    wildcardRestrictions label (Tr.Node rs cs)
       | label == "*" && M.null cs = any (\rd -> toType (rtype rd) `elem` [T.DNAME, T.NS]) rs
       | otherwise = any (uncurry wildcardRestrictions) (M.toList cs)

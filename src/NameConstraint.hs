@@ -15,6 +15,8 @@ import DNS.Name
 import DNS.Record
 import Data.Maybe (fromMaybe)
 
+import qualified Util.Tree as T
+
 data NameConstraint a = Wildcard [a] | Exactly a
   deriving (Eq, Ord)
 
@@ -30,8 +32,8 @@ instance Show ConstrainedName where
 toName :: ConstrainedName -> Name String
 toName (Name cs) = Name (NE.map show cs)
 
-existIn :: Node String v -> [String]
-existIn = filter (/= "*") . M.keys . children
+existIn :: T.Node String v -> [String]
+existIn = filter (/= "*") . M.keys . T.children
 
 compileWildcards :: Zone String -> Zone (NameConstraint String)
 compileWildcards (Zone (Name n) r) = Zone (Name (NE.map Exactly n)) (go r)
@@ -40,8 +42,8 @@ compileWildcards (Zone (Name n) r) = Zone (Name (NE.map Exactly n)) (go r)
     mapLabel exist "*" = Wildcard exist
     mapLabel _ x   = Exactly x
 
-    go :: Node String RData -> Node (NameConstraint String) RData
-    go n_@(Node _ ch) = n_ { children = M.map go $ M.mapKeys (mapLabel (existIn n_)) ch }
+    go :: T.Node String RData -> T.Node (NameConstraint String) RData
+    go n_@(T.Node _ ch) = n_ { T.children = M.map go $ M.mapKeys (mapLabel (existIn n_)) ch }
 
 match :: Name String -> ConstrainedName -> Maybe (Name String)
 match (Name (NE.reverse -> ls)) (Name (NE.reverse -> cs)) = do

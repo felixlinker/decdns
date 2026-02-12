@@ -1,7 +1,6 @@
 {-# LANGUAGE ViewPatterns #-}
 module DNS.ZoneFile
-  ( Node(..)
-  , emptyZone
+  ( emptyZone
   , Zone(..)
   , insert
   , allRecords ) where
@@ -10,23 +9,14 @@ import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
 
 import DNS.Record
-
-data Node k v = Node
-  { records :: [v]
-  , children :: M.Map k (Node k v) }
-
-instance Functor (Node k) where
-  fmap f (Node rs cs) = Node (fmap f rs) (M.map (fmap f) cs)
-
-emptyNode :: Node a v
-emptyNode = Node [] M.empty
+import qualified Util.Tree as T
 
 data Zone a = Zone
   { zoneName :: Name a
-  , root :: Node a RData }
+  , root :: T.Node a RData }
 
 emptyZone :: Name a -> Zone a
-emptyZone org = Zone org emptyNode
+emptyZone org = Zone org T.emptyNode
 
 pathInZone :: Eq a => Name a -> Name a -> Maybe [a]
 pathInZone (Name (reverse . NE.toList -> org)) (Name (reverse . NE.toList -> n)) = pathInZone' org n
@@ -41,19 +31,11 @@ pathInZone (Name (reverse . NE.toList -> org)) (Name (reverse . NE.toList -> n))
 insert :: Ord a => Zone a -> Record (Name a) -> Maybe (Zone a)
 insert (Zone norg zroot) (Record n d) = do
   p <- pathInZone norg n
-  return $ Zone norg (go p zroot)
-  where
-    go :: Ord a => [a] -> Node a RData -> Node a RData
-    go [] node@(Node rs _) = node { records = d:rs }
-    go (lr:t) node@(Node _ ch) =
-      let chf = if M.member lr ch
-            then M.update (Just . go t) lr
-            else M.insert lr (go t emptyNode)
-      in node { children = chf ch }
+  return $ Zone norg (T.insert p d zroot)
 
 allRecords :: Zone a -> [Record (Name a)]
 allRecords (Zone orig ns) = go orig ns
   where
-    go :: Name a -> Node a RData -> [Record (Name a)]
-    go n (Node rs ch) =
+    go :: Name a -> T.Node a RData -> [Record (Name a)]
+    go n (T.Node rs ch) =
       map (Record n) rs ++ concat (M.mapWithKey (\l -> go (l <| n)) ch)

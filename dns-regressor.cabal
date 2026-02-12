@@ -46,6 +46,7 @@ library
       Util.Debug
       Util.Fresh
       Util.List
+      Util.Tree
   other-modules:
       Paths_dns_regressor
   autogen-modules:
