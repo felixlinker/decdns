@@ -10,7 +10,6 @@ module Resolvable.Resolvability
 
 import NameConstraint
 import Resolvable.Prolog as Pl
-import DNS.ZoneFile
 import DNS.Name
 import DNS.Record
 import qualified DNS.RecordType as T
@@ -96,19 +95,16 @@ allResolvable =
     bagof :: Term -> Term -> Term -> Term
     bagof a b c = TPred "bagof" [ a, b, c ]
 
-fromZoneFile :: [Name String] -> Name String -> Zone (NameConstraint String) -> Fresh [Rule RComp]
-fromZoneFile rootServers ns (allRecords -> rs) = concat <$> mapM recordToRules rs
+fromZoneFile :: [Name String] -> Name String -> [Record ConstrainedName] -> Fresh [Rule RComp]
+fromZoneFile rootServers ns rs = concat <$> mapM recordToRules rs
   where
     recordToRules :: Record ConstrainedName -> Fresh [Rule RComp]
     recordToRules r = (:) <$> resolvableBase ns r <*> resolvableStep rootServers ns r
 
-type NameServersConfig = [(Name String, [Zone (NameConstraint String)])]
+type NameServersConfig = [(Name String, [Record ConstrainedName])]
 
 compileConfig :: [Name String] -> NameServersConfig -> Fresh [Rule RComp]
-compileConfig rootServers = (concat <$>) . mapM (uncurry compileOne)
-  where
-    compileOne :: Name String -> [Zone (NameConstraint String)] -> Fresh [Rule RComp]
-    compileOne ns = (concat <$>) . mapM (fromZoneFile rootServers ns)
+compileConfig rootServers = (concat <$>) . mapM (uncurry (fromZoneFile rootServers))
 
 plResolvable :: [Name String] -> NameServersConfig -> Fresh [Rule ()]
 plResolvable rootServers cfg = do

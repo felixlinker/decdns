@@ -8,10 +8,11 @@ import Data.List (uncons)
 import GHC.Base (failIO)
 import Text.Parsec (ParseError)
 
-import NameConstraint (NameConstraint, compileWildcards)
+import NameConstraint (ConstrainedName, compileWildcards)
 import Parsing (parseName, parseZoneFile)
-import DNS.ZoneFile (Zone)
+import DNS.ZoneFile (allRecords)
 import DNS.Name (Name)
+import DNS.Record (Record)
 
 sepBy :: String -> [String] -> IO ([String], [String])
 sepBy sep args = do
@@ -23,12 +24,12 @@ handleParser :: Either ParseError a -> IO a
 handleParser = either (failIO . show) return
 
 -- | Parse a zone file and return its origin together with compiled zones.
-parseZoneFileZones :: FilePath -> IO (Name String, [Zone (NameConstraint String)])
+parseZoneFileZones :: FilePath -> IO (Name String, [Record ConstrainedName])
 parseZoneFileZones path = do
   content <- readFile path
   zones <- parseZoneFile path content >>= handleParser
   ns <- parseName path >>= handleParser
-  return (ns, map compileWildcards zones)
+  return (ns, concatMap (allRecords . compileWildcards) zones)
 
 parseNames :: [String] -> IO [Name String]
 parseNames = mapM (handleParser <=< parseName)

@@ -8,18 +8,12 @@ import System.Environment (getArgs)
 
 import NonDet
 import RecursiveResolver
-import DNS.ZoneFile
 import DNS.Name
 import DNS.Record
 import Parsing
 import NameConstraint
 import Util (parseZoneFileZones)
 import Control.Monad (forM_)
-
-parseZoneFileFile :: FilePath -> IO (Name String, [Record ConstrainedName])
-parseZoneFileFile path = do
-  (ns, zfs) <- parseZoneFileZones path
-  return (ns, concatMap allRecords zfs)
 
 rToName :: Record ConstrainedName -> Record (Name String)
 rToName (Record n d) = Record (toName n) d
@@ -61,6 +55,6 @@ runCommands nses = go (M.keys nses)
 main :: IO ()
 main = do
   files <- getArgs
-  zoneFiles <- M.fromList <$> mapM parseZoneFileFile files
+  zoneFiles <- M.fromList <$> mapM parseZoneFileZones files
   putStrLn "Resolve query with :?"
   runCommands zoneFiles
