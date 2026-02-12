@@ -1,5 +1,6 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE TupleSections #-}
 module Resolvable.Prolog
   ( Term(..)
   , equiv
@@ -144,7 +145,7 @@ dataAtom = TString . showData
 (\=) :: Term -> Term -> Term
 (\=) a b = TPred "\\=" [ a, b ]
 
-nameWithSynthesis :: ConstrainedName -> Fresh (Term, [Term])
+nameWithSynthesis :: ConstrainedName -> Fresh (Term, [(Term, Term)])
 nameWithSynthesis (Name (l NE.:| ls)) = case l of
   Wildcard [] -> do
     return (TList (reverse (TWildcard : exactlyNatoms ls)) (Just TWildcard), [])
@@ -153,8 +154,8 @@ nameWithSynthesis (Name (l NE.:| ls)) = case l of
     return (TList (reverse (h : exactlyNatoms ls)) (Just TWildcard), neqs h cs)
   _ -> return (TList (reverse (exactlyNatoms (l:ls))) Nothing, [])
   where
-    neqs :: Term -> [String] -> [Term]
-    neqs var = map ((var \=) . TAtom)
+    neqs :: Term -> [String] -> [(Term, Term)]
+    neqs var = map ((var,) . TAtom)
 
     exactlyNatoms :: [NameConstraint String] -> [Term]
     exactlyNatoms [] = []

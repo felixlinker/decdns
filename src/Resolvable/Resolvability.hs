@@ -27,7 +27,7 @@ resolves ns t n r = TPred "resolves" [ ns, t, n, r ]
 
 resolvableBase :: Name String -> Record ConstrainedName -> Fresh (Rule RComp)
 resolvableBase ns r@(Record n (RData _ _ ty)) = do
-  (n', neqs) <- nameWithSynthesis n
+  (n', map (uncurry (\=)) -> neqs) <- nameWithSynthesis n
   let cannot = RComp ns r
   return (Rule cannot (resolves (nameTerm ns) (typeAtom ty) n' (dataAtom ty)) neqs)
 
@@ -53,7 +53,7 @@ resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> NS (nameTe
 resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> CNAME (nameTerm -> cname))) = sequence $ do
   rootServer <- rootServers
   return $ do
-    (n', neqs) <- nameWithSynthesis n
+    (n', map (uncurry (\=)) -> neqs) <- nameWithSynthesis n
     q <- TVar <$> fresh "Q"
     res <- TVar <$> fresh "R"
     return Rule { rannotation = RComp ns r
