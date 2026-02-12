@@ -23,6 +23,7 @@ tests =
         , testCase "list tail unifies against longer list" listTailUnifies
         , testCase "fails on different arity" mismatchedArityFails
         , testCase "wildcard unifies without binding" wildcardKeepsIdentity
+        , testCase "wildcard unification is symmetric" wildcardUnificationSymmetric
         ]
     ]
 
@@ -55,6 +56,17 @@ wildcardKeepsIdentity =
   case unify TWildcard (TAtom "a") of
     Nothing -> assertFailure "expected a unifier"
     Just u -> apply u (TVar "X") @?= TVar "X"
+
+wildcardUnificationSymmetric :: Assertion
+wildcardUnificationSymmetric = do
+  let t = TPred "p" [TVar "X", TAtom "a"]
+  let assertIdentity u = apply u (TVar "X")
+  case unify TWildcard t of
+    Nothing -> assertFailure "expected wildcard on lhs to unify"
+    Just u -> assertIdentity u @?= TVar "X"
+  case unify t TWildcard of
+    Nothing -> assertFailure "expected wildcard on rhs to unify"
+    Just u -> assertIdentity u @?= TVar "X"
 
 prop_unify_apply_agrees :: Property
 prop_unify_apply_agrees =

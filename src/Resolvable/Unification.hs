@@ -87,6 +87,7 @@ extendUnifier from to u@(Unifier m) = unif (apply u from) (apply u to)
 
     unif :: Term -> Term -> Maybe Unifier
     unif TWildcard _ = Just u
+    unif _ TWildcard = Just u
     unif v@(TVar _) t = unifVar v t
     unif t v@(TVar _) = unifVar v t
     unif (TOp op1 args1) (TOp op2 args2)
