@@ -11,16 +11,19 @@ import qualified Data.List.NonEmpty as NE
 
 import DNS.Record
 
-data Node a = Node
-  { records :: [RData]
-  , children :: M.Map a (Node a) }
+data Node k v = Node
+  { records :: [v]
+  , children :: M.Map k (Node k v) }
 
-emptyNode :: Node a
+instance Functor (Node k) where
+  fmap f (Node rs cs) = Node (fmap f rs) (M.map (fmap f) cs)
+
+emptyNode :: Node a v
 emptyNode = Node [] M.empty
 
 data Zone a = Zone
   { zoneName :: Name a
-  , root :: Node a }
+  , root :: Node a RData }
 
 emptyZone :: Name a -> Zone a
 emptyZone org = Zone org emptyNode
@@ -40,7 +43,7 @@ insert (Zone norg zroot) (Record n d) = do
   p <- pathInZone norg n
   return $ Zone norg (go p zroot)
   where
-    go :: Ord a => [a] -> Node a -> Node a
+    go :: Ord a => [a] -> Node a RData -> Node a RData
     go [] node@(Node rs _) = node { records = d:rs }
     go (lr:t) node@(Node _ ch) =
       let chf = if M.member lr ch
@@ -51,6 +54,6 @@ insert (Zone norg zroot) (Record n d) = do
 allRecords :: Zone a -> [Record (Name a)]
 allRecords (Zone orig ns) = go orig ns
   where
-    go :: Name a -> Node a -> [Record (Name a)]
+    go :: Name a -> Node a RData -> [Record (Name a)]
     go n (Node rs ch) =
       map (Record n) rs ++ concat (M.mapWithKey (\l -> go (l <| n)) ch)

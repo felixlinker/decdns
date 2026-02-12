@@ -33,13 +33,13 @@ wellformed (Zone org r@(Node apexData rcs)) =
     noSOA :: Bool
     noSOA = all (\rd -> toType (rtype rd) /= T.SOA) apexData
 
-    recordsBeyondCNAMEDelegation :: Node String -> Bool
+    recordsBeyondCNAMEDelegation :: Node String RData -> Bool
     recordsBeyondCNAMEDelegation (Node rs cs) =
       if   any (\rd -> toType (rtype rd) == T.CNAME) rs
       then length rs > 1 || not (M.null cs)
       else any recordsBeyondCNAMEDelegation (M.elems cs)
 
-    recordsAfterZoneCut :: Name String -> Node String -> Maybe (Record (Name String))
+    recordsAfterZoneCut :: Name String -> Node String RData -> Maybe (Record (Name String))
     recordsAfterZoneCut n (Node rs cs)
       | null nsData = asum $ map (uncurry (recordsAfterZoneCut . (<| n))) (M.toList cs)
       -- Modify node to only include other records because names can self-delegate
@@ -56,7 +56,7 @@ wellformed (Zone org r@(Node apexData rcs)) =
         nsesInBailiwick :: [Name String]
         nsesInBailiwick = filter (`isSubDomain` n) $ mapMaybe getName nsData
 
-        findNonGlue :: Name String -> Node String -> Maybe (Record (Name String))
+        findNonGlue :: Name String -> Node String RData -> Maybe (Record (Name String))
         findNonGlue n' (Node rds cs') =
               Record n' <$> find (not . isGlue n') rds
           <|> asum (M.mapWithKey (findNonGlue . (<| n')) cs')
@@ -64,7 +64,7 @@ wellformed (Zone org r@(Node apexData rcs)) =
         isGlue :: Name String -> RData -> Bool
         isGlue rn rd = rn `elem` nsesInBailiwick && (toType (rtype rd) `elem` [T.A, T.AAAA])
 
-    wildcardRestrictions :: String -> Node String -> Bool
+    wildcardRestrictions :: String -> Node String RData -> Bool
     wildcardRestrictions label (Node rs cs)
       | label == "*" && M.null cs = any (\rd -> toType (rtype rd) `elem` [T.DNAME, T.NS]) rs
       | otherwise = any (uncurry wildcardRestrictions) (M.toList cs)
