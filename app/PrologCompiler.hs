@@ -10,6 +10,8 @@ import System.Environment (getArgs)
 import Util
 import Data.List (uncons)
 import Resolvable.Update.Dependencies (computeRegressions)
+import Resolvable.Update.Trivial (partitionTrivial)
+import Control.Monad (unless)
 
 main :: IO ()
 main = do
@@ -34,12 +36,16 @@ main = do
       let us = runFresh $ computeResolvable rootServers compiled
       putStr $ unlines $ map show us
     "regressions" -> do
-      (roots, args') <- sepBy "--" args
-      rootServers <- parseNames roots
+      (sroots, args') <- sepBy "--" args
+      roots <- parseNames sroots
       (old, new) <- sepBy "--" args'
-      oldRs <- plResolvable rootServers <$> mapM parseZoneFileZones old
-      newRs <- plResolvable rootServers <$> mapM parseZoneFileZones new
-      putStr $ unlines $ map show $ computeRegressions rootServers oldRs newRs
+      oldRecs <- mapM parseZoneFileZones old
+      newRecs <- mapM parseZoneFileZones new
+      let (trivial, nonTrivial) = runFresh $ partitionTrivial (concatMap snd oldRecs) (concatMap snd newRecs) $ computeRegressions roots (plResolvable roots oldRecs) (plResolvable roots newRecs)
+      putStr $ unlines $ map show nonTrivial
+      unless (null trivial) $ do
+        putStrLn "\nThe following regressions may be inteded as all records that directly answer the query have been deleted."
+        putStr $ unlines $ map show trivial
     "dependencies" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots

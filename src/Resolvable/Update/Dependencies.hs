@@ -13,15 +13,15 @@ import qualified Resolvable.ConstrainedUnification as CU
 import qualified Resolvable.Unification as U
 import Data.Bifunctor (Bifunctor(bimap))
 
-computeRegressions :: [Name String] -> Fresh [Rule a] -> Fresh [Rule a] -> [ConstrainedQuery]
-computeRegressions rootServers oldf newf =
-  let (old, new) = runFresh $ (,) <$> c oldf <*> c newf
-  in do
-    q <- old
-    let mappings = map (matchDelta q) new
-    if all isNothing mappings
-      then [q]
-      else concatMap (fromMaybe []) mappings
+computeRegressions :: [Name String] -> Fresh [Rule a] -> Fresh [Rule a] -> Fresh [ConstrainedQuery]
+computeRegressions rootServers oldf newf = do
+  (old, new) <- (,) <$> c oldf <*> c newf
+  return $ do  -- Enter list monad
+      q <- old
+      let mappings = map (matchDelta q) new
+      if all isNothing mappings
+        then [q]
+        else concatMap (fromMaybe []) mappings
   where
     c :: Fresh [Rule a] -> Fresh [ConstrainedQuery]
     c = computeResolvable rootServers

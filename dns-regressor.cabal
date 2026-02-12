@@ -44,6 +44,7 @@ library
       Resolvable.Unification
       Resolvable.Update.Dependencies
       Resolvable.Update.Resolvability
+      Resolvable.Update.Trivial
       Util.Debug
       Util.Fresh
       Util.List
