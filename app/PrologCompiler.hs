@@ -44,7 +44,7 @@ main = do
       let (trivial, nonTrivial) = runFresh $ partitionTrivial (concatMap snd oldRecs) (concatMap snd newRecs) $ computeRegressions roots (plResolvable roots oldRecs) (plResolvable roots newRecs)
       putStr $ unlines $ map show nonTrivial
       unless (null trivial) $ do
-        putStrLn "\nThe following regressions may be inteded as all records that directly answer the query have been deleted."
+        putStrLn "\n% The following regressions may be inteded as all records that directly answer the query have been deleted."
         putStr $ unlines $ map show trivial
     "dependencies" -> do
       (roots, zones) <- sepBy "--" args
