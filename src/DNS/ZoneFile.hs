@@ -4,7 +4,8 @@ module DNS.ZoneFile
   , Zone(..)
   , insert
   , allRecords
-  , mergeZones ) where
+  , mergeZones
+  , noMatching ) where
 
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
@@ -47,3 +48,10 @@ mergeZones (concatMap allRecords -> zs) = foldr go (Just (emptyZone N.root)) zs
   where
     go :: Ord a => Record (Name a) -> Maybe (Zone a) -> Maybe (Zone a)
     go r = ((`insert` r) =<<)
+
+noMatching :: Ord a => Record (Name a) -> Zone a -> Bool
+noMatching (Record n d) (Zone org z) = maybe True (`go` z) (pathInZone org n)
+  where
+    go :: Ord a => [a] -> T.Node a RData -> Bool
+    go [] (T.Node is _) = all ((/= rtype d) . rtype) is
+    go (h:t) (T.Node _ cs) = maybe True (go t) (M.lookup h cs)
