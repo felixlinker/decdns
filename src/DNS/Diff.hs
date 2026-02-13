@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 module DNS.Diff
   ( Diff
   , diff
@@ -6,41 +7,62 @@ module DNS.Diff
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
 
-import DNS.Name
+import DNS.Name as N
 import DNS.Record
 import DNS.ZoneFile
 
 import qualified Util.Tree as T
+import Data.Functor.Identity (Identity(runIdentity))
+import Data.Bifunctor (Bifunctor(bimap))
 
 -- Left is deleted, Right is added
-type Diff a = T.Node a (Either RData RData)
+newtype Diff a = Diff (Either a a)
 
-diff :: Ord a => Zone a -> Zone a -> Diff a
-diff (Zone oldOrg oldZ) (Zone newOrg newZ)
-  | oldOrg == newOrg = T.mapItems nubEither $ T.merge (fmap Left oldZ) (fmap Right newZ)
+instance Functor Diff where
+  fmap f (Diff e) = Diff $ bimap f f e
+
+instance Applicative Diff where
+  pure a = Diff $ Left a
+  (Diff (Left f)) <*> d = fmap f d
+  (Diff (Right f)) <*> d = fmap f d
+
+deleted :: a -> Diff a
+deleted = Diff . Left
+
+added :: a  -> Diff a
+added = Diff . Right
+
+deither :: (a -> b) -> (a -> b) -> Diff a -> b
+deither l r (Diff e) = either l r e
+
+type ZoneDiff = AZone Diff
+
+diff :: (Monoid a, Ord a) => Zone a -> Zone a -> ZoneDiff a
+diff (Zone oldOrg (fmap runIdentity -> oldZ)) (Zone newOrg (fmap runIdentity -> newZ))
+  | oldOrg == newOrg = Zone N.root $ T.mapItems nubEither $ T.merge (fmap deleted oldZ) (fmap added newZ)
   -- TODO: For now. I expect diff to be called after mergeZones anyway, which
   -- creates a zone for the root name anyways.
   | otherwise = error "diff must be called on two zones of the same origin"
   where
-    nubEither :: Eq a => [Either a a] -> [Either a a]
-    nubEither es = filter (either ((`all` es) . rightNeq) ((`all` es) . leftNeq)) es
+    nubEither :: Eq a => [Diff a] -> [Diff a]
+    nubEither es = filter (deither ((`all` es) . rightNeq) ((`all` es) . leftNeq)) es
 
-    leftNeq :: Eq a => a -> Either a a -> Bool
-    leftNeq x = either (/= x) true
+    leftNeq :: Eq a => a -> Diff a -> Bool
+    leftNeq x = deither (/= x) true
 
-    rightNeq :: Eq a => a -> Either a a -> Bool
-    rightNeq x = either true (/= x)
+    rightNeq :: Eq a => a -> Diff a -> Bool
+    rightNeq x = deither true (/= x)
 
     true :: a -> Bool
     true = const True
 
-someDeleted :: (Ord a, Monoid a) => NamedRecord a -> Diff a -> Bool
-someDeleted (Record (Name ls) d)
+someDeleted :: (Ord a, Monoid a) => NamedRecord a -> ZoneDiff a -> Bool
+someDeleted (Record (Name ls) d) (Zone _ ns)
   | r /= mempty = error "record name is relative"
-  | otherwise = go p
+  | otherwise = go p ns
   where
     (r NE.:| p) = NE.reverse ls
 
-    go :: Ord a => [a] -> Diff a -> Bool
-    go [] (T.Node is _) = any (either ((== rtype d) . rtype) (const False)) is
+    go :: Ord a => [a] -> T.Node a (Diff RData) -> Bool
+    go [] (T.Node is _) = any (deither ((== rtype d) . rtype) (const False)) is
     go (h:t) (T.Node _ cs) = maybe False (go t) (M.lookup h cs)

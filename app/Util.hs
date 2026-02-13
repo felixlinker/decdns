@@ -12,7 +12,7 @@ import NameConstraint (ConstrainedRecord, compileWildcards)
 import Parsing (parseName, parseZoneFile)
 import DNS.ZoneFile (allRecords)
 import DNS.Name (Name)
-import DNS.Record (Record)
+import Data.Functor.Identity (Identity(runIdentity))
 
 sepBy :: String -> [String] -> IO ([String], [String])
 sepBy sep args = do
@@ -29,7 +29,7 @@ parseZoneFileZones path = do
   content <- readFile path
   zones <- parseZoneFile path content >>= handleParser
   ns <- parseName path >>= handleParser
-  return (ns, concatMap (allRecords . compileWildcards) zones)
+  return (ns, concatMap (runIdentity . allRecords . compileWildcards) zones)
 
 parseNames :: [String] -> IO [Name String]
 parseNames = mapM (handleParser <=< parseName)

@@ -37,14 +37,14 @@ toName (Name cs) = Name (NE.map show cs)
 existIn :: T.Node String v -> [String]
 existIn = filter (/= "*") . M.keys . T.children
 
-compileWildcards :: Zone String -> Zone (NameConstraint String)
+compileWildcards :: AZone f String -> AZone f (NameConstraint String)
 compileWildcards (Zone (Name n) r) = Zone (Name (NE.map Exactly n)) (go r)
   where
     mapLabel :: [String] -> String -> NameConstraint String
     mapLabel exist "*" = Wildcard exist
     mapLabel _ x   = Exactly x
 
-    go :: T.Node String RData -> T.Node (NameConstraint String) RData
+    go :: T.Node String (f RData) -> T.Node (NameConstraint String) (f RData)
     go n_@(T.Node _ ch) = n_ { T.children = M.map go $ M.mapKeys (mapLabel (existIn n_)) ch }
 
 match :: Name String -> ConstrainedName -> Maybe (Name String)

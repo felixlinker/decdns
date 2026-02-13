@@ -15,9 +15,10 @@ import DNS.ZoneFile
 import DNS.Record
 import qualified DNS.RecordType as T
 import qualified Util.Tree as Tr
+import Data.Functor.Identity (Identity(runIdentity))
 
 wellformed :: Zone String -> Maybe String
-wellformed (Zone org r@(Tr.Node apexData rcs)) =
+wellformed (Zone org (fmap runIdentity -> r@(Tr.Node apexData rcs))) =
   asum  [ guard wildcardOrigin $> "zone origin has wildcard"
         , guard noSOA $> "zone misses SOA record"
         , guard (recordsBeyondCNAMEDelegation r) $> "aliased zone has records"
