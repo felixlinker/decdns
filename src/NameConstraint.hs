@@ -19,6 +19,7 @@ import Data.Maybe (fromMaybe)
 
 import qualified Util.Tree as T
 
+-- TODO: Refactor to LabelConstraint
 data NameConstraint a = Wildcard [a] | Exactly a
   deriving (Eq, Ord)
 
