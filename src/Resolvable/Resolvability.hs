@@ -19,13 +19,13 @@ import Control.Monad (void)
 
 data RComp = RComp
   { fromNS :: Name String
-  , fromRecord :: Record ConstrainedName }
+  , fromRecord :: ConstrainedRecord }
   deriving (Eq, Ord)
 
 resolves :: Term -> Term -> Term -> Term -> Term
 resolves ns t n r = TPred "resolves" [ ns, t, n, r ]
 
-resolvableBase :: Name String -> Record ConstrainedName -> Fresh (Rule RComp)
+resolvableBase :: Name String -> ConstrainedRecord -> Fresh (Rule RComp)
 resolvableBase ns r@(Record n (RData _ _ ty)) = do
   (n', map (uncurry (\=)) -> neqs) <- nameWithSynthesis n
   let cannot = RComp ns r
@@ -36,7 +36,7 @@ captureListTail t (TList pref Nothing) = TList pref (Just t)
 captureListTail _ (TList _ (Just _)) = undefined
 captureListTail _ _ = undefined
 
-resolvableStep :: [Name String] -> Name String -> Record ConstrainedName -> Fresh [Rule RComp]
+resolvableStep :: [Name String] -> Name String -> ConstrainedRecord -> Fresh [Rule RComp]
 resolvableStep (map nameTerm -> rootServers) ns r@(Record n (rtype -> NS (nameTerm -> delegatedNs))) = sequence $ do
   rootServer <- rootServers
   glueType <- ttypeAtom <$> [T.A, T.AAAA]
@@ -95,13 +95,13 @@ allResolvable =
     bagof :: Term -> Term -> Term -> Term
     bagof a b c = TPred "bagof" [ a, b, c ]
 
-fromZoneFile :: [Name String] -> Name String -> [Record ConstrainedName] -> Fresh [Rule RComp]
+fromZoneFile :: [Name String] -> Name String -> [ConstrainedRecord] -> Fresh [Rule RComp]
 fromZoneFile rootServers ns rs = concat <$> mapM recordToRules rs
   where
-    recordToRules :: Record ConstrainedName -> Fresh [Rule RComp]
+    recordToRules :: ConstrainedRecord -> Fresh [Rule RComp]
     recordToRules r = (:) <$> resolvableBase ns r <*> resolvableStep rootServers ns r
 
-type NameServersConfig = [(Name String, [Record ConstrainedName])]
+type NameServersConfig = [(Name String, [ConstrainedRecord])]
 
 compileConfig :: [Name String] -> NameServersConfig -> Fresh [Rule RComp]
 compileConfig rootServers = (concat <$>) . mapM (uncurry (fromZoneFile rootServers))

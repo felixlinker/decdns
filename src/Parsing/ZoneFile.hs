@@ -41,7 +41,7 @@ setTTL = do
   t <- int
   writeState lastTTL t
 
-record :: Stream s m Char => Parser s m (Record (Name String))
+record :: Stream s m Char => Parser s m StandardRecord
 record = do
   spaces
   n <- tryOrState name lastName
@@ -68,7 +68,7 @@ ttlCatType = do
   ty <- recordTypeData
   return (c, t, ty)
 
-line :: Stream s m Char => Parser s m (Maybe (Record (Name String)))
+line :: Stream s m Char => Parser s m (Maybe StandardRecord)
 line = do
   spaces
   r <- asum $ map try
@@ -85,7 +85,7 @@ zone = do
   z <- foldl safeInsert (return (emptyZone org)) rs
   maybe (return z) (\msg -> fail ("zone ill-formed: " ++ msg)) (wellformed z)
   where
-    safeInsert :: MonadFail m => m (Zone String) -> Record (Name String) -> m (Zone String)
+    safeInsert :: MonadFail m => m (Zone String) -> StandardRecord -> m (Zone String)
     safeInsert zm r = do
       z <- zm
       maybe (fail "cannot insert record - illformed zone") return (insert z r)

@@ -8,7 +8,7 @@ import Data.List (uncons)
 import GHC.Base (failIO)
 import Text.Parsec (ParseError)
 
-import NameConstraint (ConstrainedName, compileWildcards)
+import NameConstraint (ConstrainedRecord, compileWildcards)
 import Parsing (parseName, parseZoneFile)
 import DNS.ZoneFile (allRecords)
 import DNS.Name (Name)
@@ -24,7 +24,7 @@ handleParser :: Either ParseError a -> IO a
 handleParser = either (failIO . show) return
 
 -- | Parse a zone file and return its origin together with compiled zones.
-parseZoneFileZones :: FilePath -> IO (Name String, [Record ConstrainedName])
+parseZoneFileZones :: FilePath -> IO (Name String, [ConstrainedRecord])
 parseZoneFileZones path = do
   content <- readFile path
   zones <- parseZoneFile path content >>= handleParser

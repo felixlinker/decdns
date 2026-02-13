@@ -15,17 +15,17 @@ import NameConstraint
 import Util (parseZoneFileZones)
 import Control.Monad (forM_)
 
-rToName :: Record ConstrainedName -> Record (Name String)
+rToName :: ConstrainedRecord -> StandardRecord
 rToName (Record n d) = Record (toName n) d
 
-printNameServer :: Name String -> [Record ConstrainedName] -> IO ()
+printNameServer :: Name String -> [ConstrainedRecord] -> IO ()
 printNameServer n (map rToName -> rs) = do
   putStrLn $ "name server " ++ show n ++ " serves..."
   forM_ rs (\r -> do
     putStr "  "
     print r)
 
-runCommands :: M.Map (Name String) [Record ConstrainedName] -> IO ()
+runCommands :: M.Map (Name String) [ConstrainedRecord] -> IO ()
 runCommands nses = go (M.keys nses)
   where
     printHelp :: IO ()

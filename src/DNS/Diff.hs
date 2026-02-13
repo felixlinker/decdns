@@ -34,7 +34,7 @@ diff (Zone oldOrg oldZ) (Zone newOrg newZ)
     true :: a -> Bool
     true = const True
 
-someDeleted :: (Ord a, Monoid a) => Record (Name a) -> Diff a -> Bool
+someDeleted :: (Ord a, Monoid a) => NamedRecord a -> Diff a -> Bool
 someDeleted (Record (Name ls) d)
   | r /= mempty = error "record name is relative"
   | otherwise = go p

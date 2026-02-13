@@ -3,6 +3,7 @@
 module NameConstraint
   ( NameConstraint(..)
   , ConstrainedName
+  , ConstrainedRecord
   , toName
   , compileWildcards
   , synthesize ) where
@@ -25,6 +26,7 @@ instance Show (NameConstraint String) where
   show (Exactly l) = l
 
 type ConstrainedName = Name (NameConstraint String)
+type ConstrainedRecord = Record ConstrainedName
 
 instance Show ConstrainedName where
   show = show . toName
@@ -67,5 +69,5 @@ match (Name (NE.reverse -> ls)) (Name (NE.reverse -> cs)) = do
     rec (a:as) (c:ncs) =
       match' (a NE.:| as) (c NE.:| ncs)
 
-synthesize :: Name String -> Record ConstrainedName -> Record (Name String)
+synthesize :: Name String -> ConstrainedRecord -> StandardRecord
 synthesize qname (Record cs d) = Record (fromMaybe (toName cs) (match qname cs)) d

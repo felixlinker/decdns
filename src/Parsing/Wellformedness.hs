@@ -41,7 +41,7 @@ wellformed (Zone org r@(Tr.Node apexData rcs)) =
       then length rs > 1 || not (M.null cs)
       else any recordsBeyondCNAMEDelegation (M.elems cs)
 
-    recordsAfterZoneCut :: Name String -> Tr.Node String RData -> Maybe (Record (Name String))
+    recordsAfterZoneCut :: Name String -> Tr.Node String RData -> Maybe StandardRecord
     recordsAfterZoneCut n (Tr.Node rs cs)
       | null nsData = asum $ map (uncurry (recordsAfterZoneCut . (<| n))) (M.toList cs)
       -- Modify node to only include other records because names can self-delegate
@@ -58,7 +58,7 @@ wellformed (Zone org r@(Tr.Node apexData rcs)) =
         nsesInBailiwick :: [Name String]
         nsesInBailiwick = filter (`isSubDomain` n) $ mapMaybe getName nsData
 
-        findNonGlue :: Name String -> Tr.Node String RData -> Maybe (Record (Name String))
+        findNonGlue :: Name String -> Tr.Node String RData -> Maybe StandardRecord
         findNonGlue n' (Tr.Node rds cs') =
               Record n' <$> find (not . isGlue n') rds
           <|> asum (M.mapWithKey (findNonGlue . (<| n')) cs')

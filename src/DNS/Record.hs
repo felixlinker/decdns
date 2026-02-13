@@ -4,7 +4,9 @@ module DNS.Record
   , showData
   , toType
   , RData(..)
-  , Record(..) ) where
+  , Record(..)
+  , NamedRecord
+  , StandardRecord ) where
 
 import DNS.Name
 import qualified DNS.RecordType as T
@@ -63,6 +65,9 @@ data Record a = Record
   { rname :: a
   , rrdata :: RData }
   deriving (Eq, Ord)
+
+type NamedRecord a = Record (Name a)
+type StandardRecord = NamedRecord String
 
 instance Show a => Show (Record a) where
   show (Record n (RData c ttl t)) = show n ++ " " ++ show ttl ++ " " ++ show c ++ " " ++ show t ++ " "

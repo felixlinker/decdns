@@ -13,43 +13,42 @@ import Data.Maybe (mapMaybe, maybeToList)
 
 import NameConstraint
 import DNS.Name
-import DNS.Record
 import Util.Fresh
 import Resolvable.Prolog
 import Resolvable.Resolvability
 import Resolvable.ConstrainedUnification
 import Resolvable.Unification (equivModuloRenaming)
 
-newtype Dependencies = Deps (M.Map (Record ConstrainedName) (S.Set (Record ConstrainedName)))
+newtype Dependencies = Deps (M.Map ConstrainedRecord (S.Set ConstrainedRecord))
 
 instance Show Dependencies where
   show (Deps (M.toList -> items)) = unlines $ map (uncurry showItem . fmap S.toList) items
     where
-      showItem :: Record ConstrainedName -> [Record ConstrainedName] -> String
+      showItem :: ConstrainedRecord -> [ConstrainedRecord] -> String
       showItem r [] = "No dependencies: " ++ show r
       showItem r ds = unlines ((show r ++ " depends on:") : map (("  " ++) . show) ds)
 
 empty :: Dependencies
 empty = Deps M.empty
 
-dinsert :: Record ConstrainedName -> S.Set (Record ConstrainedName) -> Dependencies -> Dependencies
+dinsert :: ConstrainedRecord -> S.Set ConstrainedRecord -> Dependencies -> Dependencies
 dinsert k v (Deps m) = Deps (M.insert k v m)
 
 fromRules :: [Rule RComp] -> Dependencies
 fromRules rs = go rs empty
   where
-    cannot :: Rule RComp -> Record ConstrainedName
+    cannot :: Rule RComp -> ConstrainedRecord
     cannot = fromRecord . rannotation
 
     go :: [Rule RComp] -> Dependencies -> Dependencies
     go [] acc = acc
     go (r:rrec) acc = go rrec (dinsert (cannot r) (S.fromList $ getRel r) acc)
 
-    getRel :: Rule RComp -> [Record ConstrainedName]
+    getRel :: Rule RComp -> [ConstrainedRecord]
     getRel (Rule _ _ []) = []
     getRel (Rule _ _ body) = concat $ matchRules identity body
 
-    matchRules :: ConstrainedUnifier -> [Term] -> [[Record ConstrainedName]]
+    matchRules :: ConstrainedUnifier -> [Term] -> [[ConstrainedRecord]]
     matchRules _ [] = [[]]
     matchRules u ((TPred "\\=" [ a, b ]):ts) = do
       u' <- maybeToList $ addConstraint a b u

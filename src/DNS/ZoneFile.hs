@@ -31,25 +31,25 @@ pathInZone (Name (reverse . NE.toList -> org)) (Name (reverse . NE.toList -> n))
       | a == b = pathInZone' as bs
       | otherwise = Nothing
 
-insert :: Ord a => Zone a -> Record (Name a) -> Maybe (Zone a)
+insert :: Ord a => Zone a -> NamedRecord a -> Maybe (Zone a)
 insert (Zone norg zroot) (Record n d) = do
   p <- pathInZone norg n
   return $ Zone norg (T.insert p d zroot)
 
-allRecords :: Zone a -> [Record (Name a)]
+allRecords :: Zone a -> [NamedRecord a]
 allRecords (Zone orig ns) = go orig ns
   where
-    go :: Name a -> T.Node a RData -> [Record (Name a)]
+    go :: Name a -> T.Node a RData -> [NamedRecord a]
     go n (T.Node rs ch) =
       map (Record n) rs ++ concat (M.mapWithKey (\l -> go (l <| n)) ch)
 
 mergeZones :: (Ord a, Monoid a) => [Zone a] -> Maybe (Zone a)
 mergeZones (concatMap allRecords -> zs) = foldr go (Just (emptyZone N.root)) zs
   where
-    go :: Ord a => Record (Name a) -> Maybe (Zone a) -> Maybe (Zone a)
+    go :: Ord a => NamedRecord a -> Maybe (Zone a) -> Maybe (Zone a)
     go r = ((`insert` r) =<<)
 
-noMatching :: Ord a => Record (Name a) -> Zone a -> Bool
+noMatching :: Ord a => NamedRecord a -> Zone a -> Bool
 noMatching (Record n d) (Zone org z) = maybe True (`go` z) (pathInZone org n)
   where
     go :: Ord a => [a] -> T.Node a RData -> Bool

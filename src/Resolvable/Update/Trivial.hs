@@ -13,7 +13,7 @@ import qualified Resolvable.ConstrainedUnification as C
 
 import Resolvable.Resolvability (presolvable)
 import Data.Maybe (isJust)
-import NameConstraint (ConstrainedName)
+import NameConstraint (ConstrainedRecord)
 import Util.Fresh
 
 matchesQuery :: ConstrainedQuery -> Term -> C.Neqs -> Bool
@@ -21,7 +21,7 @@ matchesQuery (CQuery t neqs) t' neqs' = isJust $ do
   cu <- C.extendUnifier t t' (C.CUnifier U.identity neqs)
   foldr (\(n1, n2) -> (C.addConstraint n1 n2 =<<)) (Just cu) neqs'
 
-partitionTrivial :: [Record ConstrainedName] -> [Record ConstrainedName] -> Fresh [ConstrainedQuery] -> Fresh ([ConstrainedQuery], [ConstrainedQuery])
+partitionTrivial :: [ConstrainedRecord] -> [ConstrainedRecord] -> Fresh [ConstrainedQuery] -> Fresh ([ConstrainedQuery], [ConstrainedQuery])
 partitionTrivial old new fqs = do
   qs <- fqs
   old' <- cOld
@@ -34,7 +34,7 @@ partitionTrivial old new fqs = do
     cNew :: Fresh [(Term, C.Neqs)]
     cNew = mapM cResolvable new
 
-    cResolvable :: Record ConstrainedName -> Fresh (Term, C.Neqs)
+    cResolvable :: ConstrainedRecord -> Fresh (Term, C.Neqs)
     cResolvable (Record cn d) = do
       (n, S.fromList -> neqs) <- nameWithSynthesis cn
       return (presolvable TWildcard (typeAtom (rtype d)) n, neqs)
