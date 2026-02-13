@@ -82,13 +82,8 @@ zone :: Stream s m Char => Parser s m (Zone String)
 zone = do
   org <- origin
   rs <- catMaybes <$> many line
-  z <- foldl safeInsert (return (emptyZone org)) rs
+  let z = foldl insert (emptyZone org) rs
   maybe (return z) (\msg -> fail ("zone ill-formed: " ++ msg)) (wellformed z)
-  where
-    safeInsert :: MonadFail m => m (Zone String) -> StandardRecord -> m (Zone String)
-    safeInsert zm r = do
-      z <- zm
-      maybe (fail "cannot insert record - illformed zone") return (insert z r)
 
 zoneFile :: Stream s m Char => Parser s m [Zone String]
 zoneFile = many zone

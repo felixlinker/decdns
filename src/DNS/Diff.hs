@@ -58,7 +58,9 @@ diff (Zone oldOrg (fmap deleted -> oldZ)) (Zone newOrg (fmap added -> newZ))
     true = const True
 
 hasChanges :: (Label a, Ord a) => Name (LabelConstraint a) -> ZoneDiff a -> Bool
-hasChanges n (Zone org ns) = maybe False (`go` ns) (pathInZone (exactly org) n)
+hasChanges n (Zone org ns) = case pathInZone (exactly org) n of
+  Path _ [] p -> go p ns
+  _ -> False
   where
     go :: (Label a, Ord a) => [LabelConstraint a] -> T.Node a (Diff RData) -> Bool
     go [] (T.Node is _) = not $ null is

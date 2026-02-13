@@ -1,6 +1,8 @@
 module Util.Tree
   ( Node(..)
+  , leaf
   , emptyNode
+  , insertNode
   , insert
   , mapItems
   , fmerge
@@ -17,14 +19,11 @@ data Node k v = Node
 instance Functor (Node k) where
   fmap f (Node rs cs) = Node (fmap f rs) (M.map (fmap f) cs)
 
-emptyNode :: Node a v
-emptyNode = Node [] M.empty
+leaf :: [v] -> Node a v
+leaf as = Node as M.empty
 
-insert :: Ord k => [k] -> v -> Node k v -> Node k v
-insert [] v n@(Node ds _) = n { items = v:ds }
-insert (h:t) v n@(Node _ cs) =
-  let rec = insert t v $ fromMaybe emptyNode $ M.lookup h cs
-  in  n { children = M.insert h rec cs }
+emptyNode :: Node a v
+emptyNode = leaf []
 
 mapItems :: ([a] -> [b]) -> Node k a -> Node k b
 mapItems f (Node is cs) = Node (f is) (M.map (mapItems f) cs)
@@ -38,3 +37,12 @@ fmerge f (Node i1 cs1) (Node i2 cs2) =
 
 merge :: Ord k => Node k v -> Node k v -> Node k v
 merge = fmerge (++)
+
+insertNode :: Ord k => [k] -> Node k v -> Node k v -> Node k v
+insertNode [] new old = merge new old
+insertNode (h:t) new n@(Node _ cs) =
+  let rec = insertNode t new $ fromMaybe emptyNode $ M.lookup h cs
+  in  n { children = M.insert h rec cs }
+
+insert :: Ord k => [k] -> v -> Node k v -> Node k v
+insert p = insertNode p . leaf . (:[])

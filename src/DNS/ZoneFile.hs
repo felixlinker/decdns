@@ -1,6 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module DNS.ZoneFile
   ( emptyZone
+  , Path(..)
   , pathInZone
   , AZone(..)
   , Zone
@@ -25,20 +26,37 @@ type Zone a = AZone a RData
 emptyZone :: Name a -> Zone a
 emptyZone org = Zone org T.emptyNode
 
-pathInZone :: Eq a => Name a -> Name a -> Maybe [a]
-pathInZone (Name (reverse . NE.toList -> org)) (Name (reverse . NE.toList -> n)) = pathInZone' org n
-  where
-    pathInZone' :: Eq a => [a] -> [a] -> Maybe [a]
-    pathInZone' [] bs = Just bs
-    pathInZone' (_:_) [] = Nothing
-    pathInZone' (a:as) (b:bs)
-      | a == b = pathInZone' as bs
-      | otherwise = Nothing
+data Path a = Path
+  -- New origin of the zone; longest common ancestor between new and old name
+  (Name a)
+  -- Path of the old data in the zone
+  [a]
+  -- Path of the new data in the zone
+  [a]
 
-insert :: Ord a => AZone a b -> Named a b -> Maybe (AZone a b)
-insert (Zone norg zroot) (Named n d) = do
-  p <- pathInZone norg n
-  return $ Zone norg (T.insert p d zroot)
+pathInZone :: (Label a, Eq a) => Name a -> Name a -> Path a
+pathInZone (Name (NE.reverse -> (orgr NE.:| org))) (Name (NE.reverse -> (nr NE.:| n)))
+  | orgr == nr && nr == lempty = pathInZone' (Name $ NE.singleton lempty) org n
+  | otherwise = error "at least one name is relative"
+  where
+    pathInZone' :: Eq a => Name a -> [a] -> [a] -> Path a
+    pathInZone' acc [] bs = Path acc [] bs
+    pathInZone' acc as [] = Path acc as []
+    pathInZone' acc (a:as) (b:bs)
+      | a == b = pathInZone' (a <| acc) as bs
+      | otherwise = Path acc as bs
+
+mergeZones :: (Label a, Ord a) => Zone a -> Zone a -> Zone a
+mergeZones (Zone org1 t1) (Zone org2 t2) = case pathInZone org1 org2 of
+  Path org1' p1 p2 -> Zone org1'
+    $ T.insertNode p2 t2
+    $ T.insertNode p1 t1 T.emptyNode
+
+insert :: (Label a, Ord a) => AZone a b -> Named a b -> AZone a b
+insert (Zone norg zroot) (Named n d) = case pathInZone norg n of
+  Path norg' zp rp -> Zone norg'
+    $ T.insert rp d
+    $ T.insertNode zp zroot T.emptyNode
 
 allData :: AZone a b -> [Named a b]
 allData (Zone orig ns) = go orig ns
@@ -49,14 +67,10 @@ allData (Zone orig ns) = go orig ns
           rec = concat $ M.mapWithKey (\l -> go (l <| n)) ch
       in base ++ rec
 
-mergeZones :: (Label a, Ord a) => [Zone a] -> Maybe (Zone a)
-mergeZones (concatMap allData -> zs) = foldr go (Just (emptyZone N.root)) zs
-  where
-    go :: Ord a => Named a b -> Maybe (AZone a b) -> Maybe (AZone a b)
-    go r = ((`insert` r) =<<)
-
-noMatching :: Ord a => NamedRecord a -> Zone a -> Bool
-noMatching (Named n d) (Zone org z) = maybe True (`go` z) (pathInZone org n)
+noMatching :: (Label a, Ord a) => NamedRecord a -> Zone a -> Bool
+noMatching (Named n d) (Zone org z) = case pathInZone org n of
+  Path _ [] p -> go p z
+  _ -> False
   where
     go :: Ord a => [a] -> T.Node a RData -> Bool
     go [] (T.Node is _) = all ((/= rtype d) . rtype) is
