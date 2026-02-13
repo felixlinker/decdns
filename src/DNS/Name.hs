@@ -1,7 +1,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 module DNS.Name
-  ( Name(..)
+  ( Label(..)
+  , Name(..)
   , root
   , (<|)
   , isSubDomain
@@ -15,11 +16,17 @@ import Data.Char (toLower)
 import Control.Monad (guard)
 import Data.Maybe (catMaybes)
 
+class Label a where
+  lempty :: a
+
+instance Label String where
+  lempty = ""
+
 newtype Name a = Name { labels :: NE.NonEmpty a }
   deriving (Eq, Ord)
 
-root :: Monoid a => Name a
-root = Name (NE.singleton mempty)
+root :: Label a => Name a
+root = Name (NE.singleton lempty)
 
 (<|) :: a -> Name a -> Name a
 (<|) l (Name ls) = Name (l NE.<| ls)

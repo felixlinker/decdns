@@ -21,6 +21,9 @@ import qualified Util.Tree as T
 data NameConstraint a = Wildcard [a] | Exactly a
   deriving (Eq, Ord)
 
+instance Label a => Label (NameConstraint a) where
+  lempty = Exactly lempty
+
 instance Show (NameConstraint String) where
   show (Wildcard _) = "*"
   show (Exactly l) = l

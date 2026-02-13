@@ -49,7 +49,7 @@ allRecords (Zone orig ns) = go orig ns
           base = traverse (fmap (Record n)) rs
       in (++) <$> base <*> rec
 
-mergeZones :: (Ord a, Monoid a) => [Zone a] -> Maybe (Zone a)
+mergeZones :: (Label a, Ord a) => [Zone a] -> Maybe (Zone a)
 mergeZones (concat . traverse (runIdentity . allRecords) -> zs) = foldr go (Just (emptyZone N.root)) zs
   where
     go :: (Applicative f, Ord a) => NamedRecord a -> Maybe (AZone f a) -> Maybe (AZone f a)

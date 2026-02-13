@@ -37,7 +37,7 @@ deither l r (Diff e) = either l r e
 
 type ZoneDiff = AZone Diff
 
-diff :: (Monoid a, Ord a) => Zone a -> Zone a -> ZoneDiff a
+diff :: (Label a, Ord a) => Zone a -> Zone a -> ZoneDiff a
 diff (Zone oldOrg (fmap runIdentity -> oldZ)) (Zone newOrg (fmap runIdentity -> newZ))
   | oldOrg == newOrg = Zone N.root $ T.mapItems nubEither $ T.merge (fmap deleted oldZ) (fmap added newZ)
   -- TODO: For now. I expect diff to be called after mergeZones anyway, which
@@ -56,9 +56,9 @@ diff (Zone oldOrg (fmap runIdentity -> oldZ)) (Zone newOrg (fmap runIdentity -> 
     true :: a -> Bool
     true = const True
 
-someDeleted :: (Ord a, Monoid a) => NamedRecord a -> ZoneDiff a -> Bool
+someDeleted :: (Label a, Ord a) => NamedRecord a -> ZoneDiff a -> Bool
 someDeleted (Record (Name ls) d) (Zone _ ns)
-  | r /= mempty = error "record name is relative"
+  | r /= lempty = error "record name is relative"
   | otherwise = go p ns
   where
     (r NE.:| p) = NE.reverse ls
