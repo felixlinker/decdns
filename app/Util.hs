@@ -29,7 +29,7 @@ parseZoneFileZones path = do
   content <- readFile path
   zones <- parseZoneFile path content >>= handleParser
   ns <- parseName path >>= handleParser
-  return (ns, concatMap (runIdentity . allRecords . compileWildcards) zones)
+  return (ns, concatMap (map runIdentity . allRecords . compileWildcards) zones)
 
 parseNames :: [String] -> IO [Name String]
 parseNames = mapM (handleParser <=< parseName)

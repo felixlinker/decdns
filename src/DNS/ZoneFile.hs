@@ -40,17 +40,17 @@ insert (Zone norg zroot) (Record n d) = do
   p <- pathInZone norg n
   return $ Zone norg (T.insert p (pure d) zroot)
 
-allRecords :: Applicative f => AZone f a -> f [NamedRecord a]
+allRecords :: Functor f => AZone f a -> [f (NamedRecord a)]
 allRecords (Zone orig ns) = go orig ns
   where
-    go :: Applicative f => Name a -> T.Node a (f RData) -> f [NamedRecord a]
+    go :: Functor f => Name a -> T.Node a (f RData) -> [f (NamedRecord a)]
     go n (T.Node rs ch) =
-      let rec = concat <$> M.traverseWithKey (\l -> go (l <| n)) ch
-          base = traverse (fmap (Record n)) rs
-      in (++) <$> base <*> rec
+      let base = map (fmap (Record n)) rs
+          rec = concat $ M.mapWithKey (\l -> go (l <| n)) ch
+      in base ++ rec
 
 mergeZones :: (Label a, Ord a) => [Zone a] -> Maybe (Zone a)
-mergeZones (concat . traverse (runIdentity . allRecords) -> zs) = foldr go (Just (emptyZone N.root)) zs
+mergeZones (map runIdentity . concatMap allRecords -> zs) = foldr go (Just (emptyZone N.root)) zs
   where
     go :: (Applicative f, Ord a) => NamedRecord a -> Maybe (AZone f a) -> Maybe (AZone f a)
     go r = ((`insert` r) =<<)
