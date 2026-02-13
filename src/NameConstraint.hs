@@ -5,6 +5,7 @@ module NameConstraint
   , ConstrainedName
   , ConstrainedRecord
   , toName
+  , toStandard
   , compileWildcards
   , synthesize ) where
 
@@ -36,6 +37,9 @@ instance Show ConstrainedName where
 
 toName :: ConstrainedName -> Name String
 toName (Name cs) = Name (NE.map show cs)
+
+toStandard :: ConstrainedRecord -> StandardRecord
+toStandard = fmap toName
 
 existIn :: T.Node String v -> [String]
 existIn = filter (/= "*") . M.keys . T.children

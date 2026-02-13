@@ -66,6 +66,9 @@ data Record a = Record
   , rrdata :: RData }
   deriving (Eq, Ord)
 
+instance Functor Record where
+  fmap f (Record n d) = Record (f n) d
+
 type NamedRecord a = Record (Name a)
 type StandardRecord = NamedRecord String
 
