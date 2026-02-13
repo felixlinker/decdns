@@ -3,6 +3,7 @@ module Util.Tree
   , emptyNode
   , insert
   , mapItems
+  , fmerge
   , merge ) where
 
 import qualified Data.Map as M
@@ -28,6 +29,12 @@ insert (h:t) v n@(Node _ cs) =
 mapItems :: ([a] -> [b]) -> Node k a -> Node k b
 mapItems f (Node is cs) = Node (f is) (M.map (mapItems f) cs)
 
+fmerge :: Ord k => ([v1] -> [v2] -> [v3]) -> Node k v1 -> Node k v2 -> Node k v3
+fmerge f (Node i1 cs1) (Node i2 cs2) =
+  Node (f i1 i2) (MM.merge (MM.mapMissing (const emptyL)) (MM.mapMissing (const emptyR)) (MM.zipWithMatched (const (fmerge f))) cs1 cs2)
+  where
+    emptyL = mapItems (`f` [])
+    emptyR = mapItems (f [])
+
 merge :: Ord k => Node k v -> Node k v -> Node k v
-merge (Node i1 cs1) (Node i2 cs2) =
-  Node (i1 ++ i2) (MM.merge MM.preserveMissing MM.preserveMissing (MM.zipWithMatched (const merge)) cs1 cs2)
+merge = fmerge (++)
