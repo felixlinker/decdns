@@ -1,6 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module DNS.Diff
-  ( Diff
+  ( Diff(..)
+  , ZoneDiff
   , diff
   , someDeleted ) where
 
@@ -16,7 +17,8 @@ import Data.Functor.Identity (Identity(runIdentity))
 import Data.Bifunctor (Bifunctor(bimap))
 
 -- Left is deleted, Right is added
-newtype Diff a = Diff (Either a a)
+newtype Diff a = Diff
+  { diffEither :: Either a a }
 
 instance Functor Diff where
   fmap f (Diff e) = Diff $ bimap f f e
@@ -33,13 +35,13 @@ added :: a  -> Diff a
 added = Diff . Right
 
 deither :: (a -> b) -> (a -> b) -> Diff a -> b
-deither l r (Diff e) = either l r e
+deither l r = either l r . diffEither
 
 type ZoneDiff = AZone Diff
 
 diff :: (Label a, Ord a) => Zone a -> Zone a -> ZoneDiff a
-diff (Zone oldOrg (fmap runIdentity -> oldZ)) (Zone newOrg (fmap runIdentity -> newZ))
-  | oldOrg == newOrg = Zone N.root $ T.mapItems nubEither $ T.merge (fmap deleted oldZ) (fmap added newZ)
+diff (Zone oldOrg (fmap (deleted . runIdentity) -> oldZ)) (Zone newOrg (fmap (added . runIdentity) -> newZ))
+  | oldOrg == newOrg = Zone N.root $ T.mapItems nubEither $ T.merge oldZ newZ
   -- TODO: For now. I expect diff to be called after mergeZones anyway, which
   -- creates a zone for the root name anyways.
   | otherwise = error "diff must be called on two zones of the same origin"

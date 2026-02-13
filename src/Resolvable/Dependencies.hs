@@ -1,9 +1,11 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TupleSections #-}
 module Resolvable.Dependencies
-  ( Dependencies
+  ( Dependencies(..)
   , ConstrainedQuery(..)
   , empty
+  , leafs
+  , roots
   , fromRules
   , computeResolvable ) where
 
