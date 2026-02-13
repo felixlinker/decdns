@@ -22,43 +22,59 @@ import Resolvable.Resolvability
 import Resolvable.ConstrainedUnification
 import Resolvable.Unification (equivModuloRenaming)
 
-newtype Dependencies = Deps
-  { deps :: M.Map StandardRecord (S.Set StandardRecord) }
+data ResolvableAt a = ResolvableAt
+  { qn :: a
+  , sn :: a }
+  deriving (Eq, Ord)
 
-instance Show Dependencies where
+instance Show a => Show (ResolvableAt a) where
+  show (ResolvableAt q s) = show q ++ " @ " ++ show s
+
+fromAnnot :: RComp -> ResolvableAt ConstrainedName
+fromAnnot (RComp ns (Record n _)) = ResolvableAt n (exactly ns)
+
+newtype Dependencies a = Deps
+  { deps :: M.Map (ResolvableAt a) (S.Set (ResolvableAt a)) }
+
+instance Show a => Show (Dependencies a) where
   show (Deps (M.toList -> items)) = unlines $ map (uncurry showItem . fmap S.toList) items
     where
-      showItem :: Show a => Record a -> [Record a] -> String
+      showItem :: Show a => ResolvableAt a -> [ResolvableAt a] -> String
       showItem r [] = "No dependencies: " ++ show r
       showItem r ds = unlines ((show r ++ " depends on:") : map (("  " ++) . show) ds)
 
-empty :: Dependencies
+empty :: Dependencies a
 empty = Deps M.empty
 
-dinsert :: StandardRecord -> S.Set StandardRecord -> Dependencies -> Dependencies
-dinsert k v (Deps m) = Deps (M.insert k v m)
+leafs :: Ord a => Dependencies a -> S.Set (ResolvableAt a)
+leafs (Deps d) = S.fromAscList $ map fst $ filter (null . snd) $ M.toAscList d
 
-fromRules :: [Rule RComp] -> Dependencies
+roots :: Ord a => Dependencies a -> S.Set (ResolvableAt a)
+roots (Deps d) = S.filter (not . (`S.member` img)) (M.keysSet d)
+  where
+    img = S.unions $ M.elems d
+
+dinsert :: RComp -> [RComp] -> Dependencies ConstrainedName -> Dependencies ConstrainedName
+dinsert k v (Deps m) = Deps (M.insert (fromAnnot k) (S.fromList $ map fromAnnot v) m)
+
+fromRules :: [Rule RComp] -> Dependencies ConstrainedName
 fromRules rs = go rs empty
   where
-    cannot :: Rule RComp -> ConstrainedRecord
-    cannot = fromRecord . rannotation
-
-    go :: [Rule RComp] -> Dependencies -> Dependencies
+    go :: [Rule RComp] -> Dependencies ConstrainedName -> Dependencies ConstrainedName
     go [] acc = acc
-    go (r:rrec) acc = go rrec (dinsert (toStandard $ cannot r) (S.fromList $ getRel r) acc)
+    go (r:rrec) acc = go rrec (dinsert (rannotation r) (map rannotation $ getRel r) acc)
 
-    getRel :: Rule RComp -> [StandardRecord]
+    getRel :: Rule RComp -> [Rule RComp]
     getRel (Rule _ _ []) = []
-    getRel (Rule _ _ body) = map toStandard $ concat $ matchRules identity body
+    getRel (Rule _ _ body) = concat $ matchRules identity body
 
-    matchRules :: ConstrainedUnifier -> [Term] -> [[ConstrainedRecord]]
+    matchRules :: ConstrainedUnifier -> [Term] -> [[Rule RComp]]
     matchRules _ [] = [[]]
     matchRules u ((TPred "\\=" [ a, b ]):ts) = do
       u' <- maybeToList $ addConstraint a b u
       matchRules u' ts
     matchRules u (t@(TPred "resolves" _):ts) = do
-      (u', cannot -> h) <- mapMaybe (matchRule u t) rs
+      (u', h) <- mapMaybe (matchRule u t) rs
       rec <- matchRules u' ts
       return $ h:rec
     matchRules _ _ = error "unsupported rule body predicate"
