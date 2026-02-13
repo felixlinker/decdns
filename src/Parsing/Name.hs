@@ -10,7 +10,7 @@ import Data.Maybe (isJust)
 import Text.Parsec
 import Text.Parsec.Char as Char
 
-import DNS.Name
+import DNS.Name (Name(..), (<|))
 import Parsing.Tokens
 import Parsing.State (OriginProvider (getOrigin))
 

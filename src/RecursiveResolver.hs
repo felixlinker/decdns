@@ -31,7 +31,7 @@ resolve query ses qn qt = snd <$> rresolve [] ses qn qt
     rresolve :: Trace -> SList -> QName -> QType -> NonDet (SList, Trace)
     rresolve trace slist qname qtype = do
       ns <- choose slist
-      r@(Record n d) <- choose $ query ns qname
+      r@(Named n d) <- choose $ query ns qname
       let traceEl = (n, toType $ rtype d)
       guard (traceEl `notElem` trace)
       guard (qname `isSubDomain` n)
@@ -43,8 +43,8 @@ resolve query ses qn qt = snd <$> rresolve [] ses qn qt
           typ <- choose [ T.A, T.AAAA ]
           (slist', trace'') <- rresolve trace' slist ref typ
           rresolve trace'' (nub $ ref:slist') qname qtype
-        CNAME ref | rname r == qname -> rresolve trace' slist ref qtype
+        CNAME ref | name r == qname -> rresolve trace' slist ref qtype
         DNAME ref -> do
-          let rewritten = dnameRewrite qname (rname r) ref
+          let rewritten = dnameRewrite qname (name r) ref
           rresolve trace' slist rewritten qtype
         _ -> NonDet.fail

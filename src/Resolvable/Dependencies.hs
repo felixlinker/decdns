@@ -14,7 +14,6 @@ import qualified Data.Set as S
 import Data.Maybe (mapMaybe, maybeToList)
 
 import NameConstraint
-import DNS.Record
 import DNS.Name
 import Util.Fresh
 import Resolvable.Prolog
@@ -31,7 +30,7 @@ instance Show a => Show (ResolvableAt a) where
   show (ResolvableAt q s) = show q ++ " @ " ++ show s
 
 fromAnnot :: RComp -> ResolvableAt ConstrainedName
-fromAnnot (RComp ns (Record n _)) = ResolvableAt n (exactly ns)
+fromAnnot (RComp ns (Named n _)) = ResolvableAt n (exactly ns)
 
 newtype Dependencies a = Deps
   { deps :: M.Map (ResolvableAt a) (S.Set (ResolvableAt a)) }

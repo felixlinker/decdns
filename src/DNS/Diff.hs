@@ -3,18 +3,17 @@ module DNS.Diff
   ( Diff(..)
   , ZoneDiff
   , diff
-  , someDeleted ) where
+  , hasChanges ) where
 
 import qualified Data.Map as M
-import qualified Data.List.NonEmpty as NE
 
 import DNS.Name as N
 import DNS.Record
 import DNS.ZoneFile
 
 import qualified Util.Tree as T
-import Data.Functor.Identity (Identity(runIdentity))
 import Data.Bifunctor (Bifunctor(bimap))
+import NameConstraint
 
 -- Left is deleted, Right is added
 newtype Diff a = Diff
@@ -37,10 +36,10 @@ added = Diff . Right
 deither :: (a -> b) -> (a -> b) -> Diff a -> b
 deither l r = either l r . diffEither
 
-type ZoneDiff = AZone Diff
+type ZoneDiff a = AZone a (Diff RData)
 
 diff :: (Label a, Ord a) => Zone a -> Zone a -> ZoneDiff a
-diff (Zone oldOrg (fmap (deleted . runIdentity) -> oldZ)) (Zone newOrg (fmap (added . runIdentity) -> newZ))
+diff (Zone oldOrg (fmap deleted -> oldZ)) (Zone newOrg (fmap added -> newZ))
   | oldOrg == newOrg = Zone N.root $ T.mapItems nubEither $ T.merge oldZ newZ
   -- TODO: For now. I expect diff to be called after mergeZones anyway, which
   -- creates a zone for the root name anyways.
@@ -58,13 +57,18 @@ diff (Zone oldOrg (fmap (deleted . runIdentity) -> oldZ)) (Zone newOrg (fmap (ad
     true :: a -> Bool
     true = const True
 
-someDeleted :: (Label a, Ord a) => NamedRecord a -> ZoneDiff a -> Bool
-someDeleted (Record (Name ls) d) (Zone _ ns)
-  | r /= lempty = error "record name is relative"
-  | otherwise = go p ns
+hasChanges :: (Label a, Ord a) => Name (LabelConstraint a) -> ZoneDiff a -> Bool
+hasChanges n (Zone org ns) = maybe False (`go` ns) (pathInZone (exactly org) n)
   where
-    (r NE.:| p) = NE.reverse ls
+    go :: (Label a, Ord a) => [LabelConstraint a] -> T.Node a (Diff RData) -> Bool
+    go [] (T.Node is _) = not $ null is
+    go [Wildcard ls] node@(T.Node _ cs) =
+          -- Either there is a wildcard label with changes
+          rec lwildcard [] node
+          -- Or there is a label matched by the wildcard with changes
+      ||  any (\(l, T.items -> is) -> not (null is) && notElem l ls) (M.toList cs)
+    go (Wildcard _ : _) _ = undefined  -- Cannot have wildcard within a name
+    go (Exactly l : t) node = rec l t node
 
-    go :: Ord a => [a] -> T.Node a (Diff RData) -> Bool
-    go [] (T.Node is _) = any (deither ((== rtype d) . rtype) (const False)) is
-    go (h:t) (T.Node _ cs) = maybe False (go t) (M.lookup h cs)
+    rec :: (Label a, Ord a) => a -> [LabelConstraint a] -> T.Node a (Diff RData) -> Bool
+    rec l r (T.Node _ cs) = maybe False (go r) (M.lookup l cs)

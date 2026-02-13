@@ -5,6 +5,7 @@ module Resolvable.Update.Trivial
 import qualified Data.List as L
 import qualified Data.Set as S
 
+import DNS.Name
 import DNS.Record
 import Resolvable.Dependencies
 import Resolvable.Prolog
@@ -35,7 +36,7 @@ partitionTrivial old new fqs = do
     cNew = mapM cResolvable new
 
     cResolvable :: ConstrainedRecord -> Fresh (Term, C.Neqs)
-    cResolvable (Record cn d) = do
+    cResolvable (Named cn d) = do
       (n, S.fromList -> neqs) <- nameWithSynthesis cn
       return (presolvable TWildcard (typeAtom (rtype d)) n, neqs)
 

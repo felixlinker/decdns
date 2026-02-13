@@ -157,7 +157,7 @@ nameWithSynthesis (Name (l NE.:| ls)) = case l of
     neqs :: Term -> [String] -> [(Term, Term)]
     neqs var = map ((var,) . TAtom)
 
-    exactlyNatoms :: [NameConstraint String] -> [Term]
+    exactlyNatoms :: [LabelConstraint String] -> [Term]
     exactlyNatoms [] = []
     exactlyNatoms (Wildcard _ : t) = dnsWildcard : exactlyNatoms t
     exactlyNatoms (Exactly "" : t) = exactlyNatoms t

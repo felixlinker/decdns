@@ -3,6 +3,7 @@
 module DNS.Name
   ( Label(..)
   , Name(..)
+  , Named(..)
   , root
   , (<|)
   , isSubDomain
@@ -17,9 +18,11 @@ import Control.Monad (guard)
 import Data.Maybe (catMaybes)
 
 class Label a where
+  lwildcard :: a
   lempty :: a
 
 instance Label String where
+  lwildcard = "*"
   lempty = ""
 
 newtype Name a = Name { labels :: NE.NonEmpty a }
@@ -36,6 +39,14 @@ instance Functor Name where
 
 instance Show (Name String) where
   show (Name ls) = intercalate "." (NE.toList ls)
+
+data Named a b = Named
+  { name :: Name a
+  , value :: b }
+  deriving (Eq, Ord)
+
+instance Functor (Named a) where
+  fmap f (Named n d) = Named n (f d)
 
 isSubDomain :: Eq a => Name a -> Name a -> Bool
 isSubDomain (Name l1) (Name l2) = NE.toList l2 `isSuffixOf` NE.toList l1

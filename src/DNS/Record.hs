@@ -1,10 +1,12 @@
+{-# LANGUAGE FlexibleInstances #-}
 module DNS.Record
   ( Cat(..)
   , Type(..)
   , showData
   , toType
   , RData(..)
-  , Record(..)
+  , Record
+  , record
   , NamedRecord
   , StandardRecord ) where
 
@@ -61,16 +63,12 @@ data RData = RData
   , rtype :: Type }
   deriving (Eq, Ord)
 
-data Record a = Record
-  { rname :: a
-  , rrdata :: RData }
-  deriving (Eq, Ord)
-
-instance Functor Record where
-  fmap f (Record n d) = Record (f n) d
-
-type NamedRecord a = Record (Name a)
+type Record a = Named a RData
+type NamedRecord a = Record a
 type StandardRecord = NamedRecord String
 
-instance Show a => Show (Record a) where
-  show (Record n (RData c ttl t)) = show n ++ " " ++ show ttl ++ " " ++ show c ++ " " ++ show t ++ " "
+record :: Name a -> RData -> Record a
+record = Named
+
+instance Show (Named String RData) where
+  show (Named n (RData c ttl t)) = show n ++ " " ++ show ttl ++ " " ++ show c ++ " " ++ show t ++ " "

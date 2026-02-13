@@ -15,10 +15,9 @@ import DNS.ZoneFile
 import DNS.Record
 import qualified DNS.RecordType as T
 import qualified Util.Tree as Tr
-import Data.Functor.Identity (Identity(runIdentity))
 
 wellformed :: Zone String -> Maybe String
-wellformed (Zone org (fmap runIdentity -> r@(Tr.Node apexData rcs))) =
+wellformed (Zone org r@(Tr.Node apexData rcs)) =
   asum  [ guard wildcardOrigin $> "zone origin has wildcard"
         , guard noSOA $> "zone misses SOA record"
         , guard (recordsBeyondCNAMEDelegation r) $> "aliased zone has records"
@@ -53,7 +52,7 @@ wellformed (Zone org (fmap runIdentity -> r@(Tr.Node apexData rcs))) =
         (nsData, otherData) = partition (\rd -> toType (rtype rd) == T.NS) rs
 
         getName :: RData -> Maybe (Name String)
-        getName (rtype -> NS name) = Just name
+        getName (rtype -> NS nsName) = Just nsName
         getName _ = Nothing
 
         nsesInBailiwick :: [Name String]
@@ -61,7 +60,7 @@ wellformed (Zone org (fmap runIdentity -> r@(Tr.Node apexData rcs))) =
 
         findNonGlue :: Name String -> Tr.Node String RData -> Maybe StandardRecord
         findNonGlue n' (Tr.Node rds cs') =
-              Record n' <$> find (not . isGlue n') rds
+              Named n' <$> find (not . isGlue n') rds
           <|> asum (M.mapWithKey (findNonGlue . (<| n')) cs')
 
         isGlue :: Name String -> RData -> Bool

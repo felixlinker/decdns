@@ -1,7 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
 module NameConstraint
-  ( NameConstraint(..)
+  ( LabelConstraint(..)
   , ConstrainedName
   , ConstrainedRecord
   , toName
@@ -19,24 +19,25 @@ import Data.Maybe (fromMaybe)
 
 import qualified Util.Tree as T
 
--- TODO: Refactor to LabelConstraint
-data NameConstraint a = Wildcard [a] | Exactly a
+data LabelConstraint a = Wildcard [a] | Exactly a
   deriving (Eq, Ord)
 
-instance Label a => Label (NameConstraint a) where
+instance Label a => Label (LabelConstraint a) where
+  lwildcard = Wildcard []
   lempty = Exactly lempty
 
-instance Show (NameConstraint String) where
+instance Show (LabelConstraint String) where
   show (Wildcard _) = "*"
   show (Exactly l) = l
 
-type ConstrainedName = Name (NameConstraint String)
-type ConstrainedRecord = Record ConstrainedName
+type ConstrainedLabel = LabelConstraint String
+type ConstrainedName = Name ConstrainedLabel
+type ConstrainedRecord = Record ConstrainedLabel
 
 instance Show ConstrainedName where
   show = show . toName
 
-exactly :: Name String -> ConstrainedName
+exactly :: Name a -> Name (LabelConstraint a)
 exactly (Name ls) = Name (NE.map Exactly ls)
 
 toName :: ConstrainedName -> Name String
@@ -45,14 +46,14 @@ toName (Name cs) = Name (NE.map show cs)
 existIn :: T.Node String v -> [String]
 existIn = filter (/= "*") . M.keys . T.children
 
-compileWildcards :: AZone f String -> AZone f (NameConstraint String)
+compileWildcards :: Zone String -> Zone (LabelConstraint String)
 compileWildcards (Zone (Name n) r) = Zone (Name (NE.map Exactly n)) (go r)
   where
-    mapLabel :: [String] -> String -> NameConstraint String
+    mapLabel :: [String] -> String -> LabelConstraint String
     mapLabel exist "*" = Wildcard exist
     mapLabel _ x   = Exactly x
 
-    go :: T.Node String (f RData) -> T.Node (NameConstraint String) (f RData)
+    go :: T.Node String RData -> T.Node (LabelConstraint String) RData
     go n_@(T.Node _ ch) = n_ { T.children = M.map go $ M.mapKeys (mapLabel (existIn n_)) ch }
 
 match :: Name String -> ConstrainedName -> Maybe (Name String)
@@ -61,7 +62,7 @@ match (Name (NE.reverse -> ls)) (Name (NE.reverse -> cs)) = do
   n <- NE.nonEmpty (reverse matched)
   return $ Name n
   where
-    match' :: NE.NonEmpty String -> NE.NonEmpty (NameConstraint String) -> Maybe [String]
+    match' :: NE.NonEmpty String -> NE.NonEmpty (LabelConstraint String) -> Maybe [String]
     match' (a NE.:| as) ((Exactly c) NE.:| ncs)
       | a == c = (a:) <$> rec as ncs
       | otherwise = Nothing
@@ -70,7 +71,7 @@ match (Name (NE.reverse -> ls)) (Name (NE.reverse -> cs)) = do
       | a == "*" = (a:) <$> rec as ncs
       | otherwise = Nothing
 
-    rec :: [String] -> [NameConstraint String] -> Maybe [String]
+    rec :: [String] -> [LabelConstraint String] -> Maybe [String]
     rec [] [] = Just []
     rec _ [] = Just []
     rec [] _ = Nothing
@@ -78,4 +79,4 @@ match (Name (NE.reverse -> ls)) (Name (NE.reverse -> cs)) = do
       match' (a NE.:| as) (c NE.:| ncs)
 
 synthesize :: Name String -> ConstrainedRecord -> StandardRecord
-synthesize qname (Record cs d) = Record (fromMaybe (toName cs) (match qname cs)) d
+synthesize qname (Named cs d) = Named (fromMaybe (toName cs) (match qname cs)) d

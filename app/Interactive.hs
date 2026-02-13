@@ -16,7 +16,7 @@ import Util (parseZoneFileZones)
 import Control.Monad (forM_)
 
 rToName :: ConstrainedRecord -> StandardRecord
-rToName (Record n d) = Record (toName n) d
+rToName (Named n d) = Named (toName n) d
 
 printNameServer :: Name String -> [ConstrainedRecord] -> IO ()
 printNameServer n (map rToName -> rs) = do

@@ -9,7 +9,7 @@ import Data.Functor (($>))
 import Text.Parsec
 
 import DNS.RecordType
-import DNS.Name
+import DNS.Name (Name)
 import RecursiveResolver
 import Parsing.Name
 import Parsing.Data
