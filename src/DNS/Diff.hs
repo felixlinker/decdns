@@ -27,11 +27,6 @@ newtype Diff a = Diff
 instance Functor Diff where
   fmap f (Diff e) = Diff $ bimap f f e
 
-instance Applicative Diff where
-  pure a = Diff $ Left a
-  (Diff (Left f)) <*> d = fmap f d
-  (Diff (Right f)) <*> d = fmap f d
-
 deleted :: a -> Diff a
 deleted = Diff . Left
 

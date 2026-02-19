@@ -34,7 +34,7 @@ main = do
       rootServers <- parseNames roots
       compiled <- compileConfig rootServers <$> mapM parseZoneFileZones zones
       let us = runFresh $ computeResolvable rootServers compiled
-      putStr $ unlines $ map show us
+      mapM_ print us
     "regressions" -> do
       (sroots, args') <- sepBy "--" args
       roots <- parseNames sroots
@@ -42,10 +42,10 @@ main = do
       oldRecs <- mapM parseZoneFileZones old
       newRecs <- mapM parseZoneFileZones new
       let (trivial, nonTrivial) = runFresh $ partitionTrivial (concatMap snd oldRecs) (concatMap snd newRecs) $ computeRegressions roots (plResolvable roots oldRecs) (plResolvable roots newRecs)
-      putStr $ unlines $ map show nonTrivial
+      mapM_ print nonTrivial
       unless (null trivial) $ do
         putStrLn "\n% The following regressions may be inteded as all records that directly answer the query have been deleted."
-        putStr $ unlines $ map show trivial
+        mapM_ print trivial
     "dependencies" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
