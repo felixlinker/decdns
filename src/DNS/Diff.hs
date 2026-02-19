@@ -1,6 +1,10 @@
 {-# LANGUAGE ViewPatterns #-}
 module DNS.Diff
   ( Diff(..)
+  , added
+  , deleted
+  , deither
+  , item
   , ZoneDiff
   , diff
   , hasChanges ) where
@@ -18,6 +22,7 @@ import NameConstraint
 -- Left is deleted, Right is added
 newtype Diff a = Diff
   { diffEither :: Either a a }
+  deriving (Eq, Ord)
 
 instance Functor Diff where
   fmap f (Diff e) = Diff $ bimap f f e
@@ -35,6 +40,10 @@ added = Diff . Right
 
 deither :: (a -> b) -> (a -> b) -> Diff a -> b
 deither l r = either l r . diffEither
+
+item :: Diff a -> a
+item (Diff (Left a)) = a
+item (Diff (Right a)) = a
 
 type ZoneDiff a = AZone a (Diff RData)
 

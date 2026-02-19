@@ -1,7 +1,8 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TupleSections #-}
 module Resolvable.Dependencies
-  ( Dependencies(..)
+  ( ResolvableAt(..)
+  , Dependencies(..)
   , ConstrainedQuery(..)
   , empty
   , leafs
@@ -21,16 +22,18 @@ import Resolvable.Resolvability
 import Resolvable.ConstrainedUnification
 import Resolvable.Unification (equivModuloRenaming)
 
-data ResolvableAt a = ResolvableAt
-  { qn :: a
-  , sn :: a }
+newtype ResolvableAt a = ResolvableAt
+  { rat :: Named String a }
   deriving (Eq, Ord)
 
+instance Functor ResolvableAt where
+  fmap f (ResolvableAt nd) = ResolvableAt $ fmap f nd
+
 instance Show a => Show (ResolvableAt a) where
-  show (ResolvableAt q s) = show q ++ " @ " ++ show s
+  show (rat -> Named q s) = show q ++ " @ " ++ show s
 
 fromAnnot :: RComp -> ResolvableAt ConstrainedName
-fromAnnot (RComp ns (Named n _)) = ResolvableAt n (exactly ns)
+fromAnnot (RComp ns (Named n _)) = ResolvableAt (Named ns n)
 
 newtype Dependencies a = Deps
   { deps :: M.Map (ResolvableAt a) (S.Set (ResolvableAt a)) }
