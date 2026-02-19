@@ -40,7 +40,7 @@ fresh prefix = do
   return (prefix ++ show n)
 
 avoiding :: (Foldable t, Monad m) => t String -> FreshT m ()
-avoiding = put . foldr (max . digitTail) 0
+avoiding = put . foldr (\v -> (+ 1) . max (digitTail v)) 0
   where
     digitTail :: String -> Int
     digitTail s = fromMaybe 0 $ do
