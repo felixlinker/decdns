@@ -6,6 +6,7 @@ module DNS.ZoneFile
   , AZone(..)
   , Zone
   , insert
+  , fromList
   , get
   , adjustData
   , allData
@@ -23,9 +24,12 @@ data AZone a b = Zone
   { zoneName :: Name a
   , root :: T.Node a b }
 
+instance Functor (AZone a) where
+  fmap f (Zone n r) = Zone n (fmap f r)
+
 type Zone a = AZone a RData
 
-emptyZone :: Name a -> Zone a
+emptyZone :: Name a -> AZone a b
 emptyZone org = Zone org T.emptyNode
 
 data Path a = Path
@@ -59,6 +63,9 @@ insert (Zone norg zroot) (Named n d) = case pathInZone norg n of
   Path norg' zp rp -> Zone norg'
     $ T.insert rp d
     $ T.insertNode zp zroot T.emptyNode
+
+fromList :: (Label a, Ord a) => [Named a b] -> AZone a b
+fromList = foldl insert (emptyZone N.root)
 
 get :: (Label a, Ord a) => Name a -> AZone a b -> Maybe [b]
 get n (Zone org r) = case pathInZone org n of
