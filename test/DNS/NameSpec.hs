@@ -8,7 +8,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 
-import DNS.Name
+import DNS.Name hiding (name)
 
 tests :: TestTree
 tests =
