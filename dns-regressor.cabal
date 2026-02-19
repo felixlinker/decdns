@@ -109,10 +109,15 @@ test-suite dns-regressor-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      DNS.DiffSpec
       DNS.NameSpec
+      NonDetSpec
       Resolvable.ConstrainedUnificationSpec
       Resolvable.UnificationSpec
       Resolvable.Util
+      Util.FreshSpec
+      Util.ListSpec
+      Util.TreeSpec
       Paths_dns_regressor
   autogen-modules:
       Paths_dns_regressor
