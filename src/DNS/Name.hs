@@ -6,6 +6,7 @@ module DNS.Name
   , Named(..)
   , root
   , (<|)
+  , mapLabels
   , isSubDomain
   , intersection
   , canonicalCompare
@@ -47,6 +48,9 @@ data Named a b = Named
 
 instance Functor (Named a) where
   fmap f (Named n d) = Named n (f d)
+
+mapLabels :: (a1 -> a2) -> Named a1 b -> Named a2 b
+mapLabels f (Named (Name ls) v) = Named (Name (NE.map f ls)) v
 
 isSubDomain :: Eq a => Name a -> Name a -> Bool
 isSubDomain (Name l1) (Name l2) = NE.toList l2 `isSuffixOf` NE.toList l1

@@ -1,17 +1,24 @@
 module PrologCompiler (main) where
 
+import DNS.ZoneFile (fromList, AZone)
+import DNS.Diff
+import NameConstraint (ConstrainedLabel)
 import Resolvable.Prolog
 import Resolvable.Resolvability
 import Resolvable.Update.Resolvability
-import Resolvable.Dependencies
+import Resolvable.Update.Rollout (rollout)
+import Resolvable.Dependencies ( computeResolvable, fromRules )
 import Util.Fresh (runFresh)
 
 import System.Environment (getArgs)
 import Util
 import Data.List (uncons)
+import qualified Data.Map as M
+import qualified Data.Map.Merge.Lazy as MM
 import Resolvable.Update.Dependencies (computeRegressions)
 import Resolvable.Update.Trivial (partitionTrivial)
 import Control.Monad (unless)
+import DNS.Name (mapLabels, Named (Named))
 
 main :: IO ()
 main = do
@@ -21,7 +28,7 @@ main = do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
       cfg <- mapM parseZoneFileZones zones
-      putStr (showKnowledgeBase $ runFresh $ plResolvable rootServers cfg)
+      putStr (showKnowledgeBase $ runFresh $ plResolvable =<< compileConfig rootServers cfg)
     "pl-regressions" -> do
       (roots, args') <- sepBy "--" args
       rootServers <- parseNames roots
@@ -41,11 +48,29 @@ main = do
       (old, new) <- sepBy "--" args'
       oldRecs <- mapM parseZoneFileZones old
       newRecs <- mapM parseZoneFileZones new
-      let (trivial, nonTrivial) = runFresh $ partitionTrivial (concatMap snd oldRecs) (concatMap snd newRecs) $ computeRegressions roots (plResolvable roots oldRecs) (plResolvable roots newRecs)
+      let oldRecsC = compileConfig roots oldRecs
+      let newRecsC = compileConfig roots newRecs
+      let (trivial, nonTrivial) = runFresh $ partitionTrivial (concatMap snd oldRecs) (concatMap snd newRecs) $ computeRegressions roots (plResolvable =<< oldRecsC) (plResolvable =<< newRecsC)
       mapM_ print nonTrivial
       unless (null trivial) $ do
         putStrLn "\n% The following regressions may be inteded as all records that directly answer the query have been deleted."
         mapM_ print trivial
+      let nsDiff = MM.merge
+            (MM.mapMissing (\_ -> fmap deleted))
+            (MM.mapMissing (\_ -> fmap added))
+            (MM.zipWithMatched (const diff))
+            (M.map toZone $ M.fromList oldRecs)
+            (M.map toZone $ M.fromList newRecs)
+      let oldDeps = runFresh $ fromRules <$> oldRecsC
+      let newDeps = runFresh $ fromRules <$> newRecsC
+      let rolloutSeq = rollout nsDiff oldDeps newDeps
+      unless (null rolloutSeq) $ do
+        putStrLn "\nYou can roll out updates as follow."
+        mapM_ (\(s, subSeq) -> do
+            putStrLn $ "step " ++ show s
+            mapM_ (putStrLn . ("  - " ++) . show) subSeq
+          )
+          (zip [(1 :: Int)..] rolloutSeq)
     "dependencies" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
@@ -53,5 +78,8 @@ main = do
       print $ fromRules compiled
     _ -> fail "unknown command"
   where
+    toZone :: [Named ConstrainedLabel b] -> AZone String b
+    toZone = fromList . map (mapLabels show)
+
     popArg :: [String] -> IO (String, [String])
     popArg = maybe (fail "too few arguments") return . uncons

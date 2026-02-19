@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module NameConstraint
   ( LabelConstraint(..)
+  , ConstrainedLabel
   , ConstrainedName
   , ConstrainedRecord
   , toName

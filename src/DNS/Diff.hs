@@ -27,6 +27,10 @@ newtype Diff a = Diff
 instance Functor Diff where
   fmap f (Diff e) = Diff $ bimap f f e
 
+instance Show a => Show (Diff a) where
+  show (Diff (Left a)) = "delete: " ++ show a
+  show (Diff (Right a)) = "add: " ++ show a
+
 deleted :: a -> Diff a
 deleted = Diff . Left
 

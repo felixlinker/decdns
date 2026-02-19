@@ -106,8 +106,7 @@ type NameServersConfig = [(Name String, [ConstrainedRecord])]
 compileConfig :: [Name String] -> NameServersConfig -> Fresh [Rule RComp]
 compileConfig rootServers = (concat <$>) . mapM (uncurry (fromZoneFile rootServers))
 
-plResolvable :: [Name String] -> NameServersConfig -> Fresh [Rule ()]
-plResolvable rootServers cfg = do
+plResolvable :: [Rule RComp] -> Fresh [Rule ()]
+plResolvable compiled = do
   res <- resolvable
-  compiled <- map void <$> compileConfig rootServers cfg
-  return $ allResolvable : res : compiled
+  return $ allResolvable : res : map void compiled
