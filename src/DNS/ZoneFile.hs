@@ -6,6 +6,8 @@ module DNS.ZoneFile
   , AZone(..)
   , Zone
   , insert
+  , get
+  , adjustData
   , allData
   , mergeZones
   , noMatching ) where
@@ -57,6 +59,18 @@ insert (Zone norg zroot) (Named n d) = case pathInZone norg n of
   Path norg' zp rp -> Zone norg'
     $ T.insert rp d
     $ T.insertNode zp zroot T.emptyNode
+
+get :: (Label a, Ord a) => Name a -> AZone a b -> Maybe [b]
+get n (Zone org r) = case pathInZone org n of
+  Path _ [] p -> T.get p r
+  _ -> Nothing
+
+adjustData :: (Label a, Ord a) => ([b] -> [b]) -> Name a -> AZone a b -> AZone a b
+adjustData f nam z@(Zone org r) = case pathInZone org nam of
+  Path _ [] p -> Zone org (T.alter mapItems Nothing p r)
+  _ -> z
+  where
+    mapItems nod@(T.Node is _) = nod { T.items = f is }
 
 allData :: AZone a b -> [Named a b]
 allData (Zone orig ns) = go orig ns

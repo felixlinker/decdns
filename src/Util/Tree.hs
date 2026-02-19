@@ -2,6 +2,8 @@ module Util.Tree
   ( Node(..)
   , leaf
   , emptyNode
+  , get
+  , alter
   , insertNode
   , insert
   , mapItems
@@ -10,7 +12,6 @@ module Util.Tree
 
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
-import Data.Maybe (fromMaybe)
 
 data Node k v = Node
   { items :: [v]
@@ -38,11 +39,16 @@ fmerge f (Node i1 cs1) (Node i2 cs2) =
 merge :: Ord k => Node k v -> Node k v -> Node k v
 merge = fmerge (++)
 
+get :: Ord k => [k] -> Node k v -> Maybe [v]
+get [] (Node is _) = Just is
+get (h:t) (Node _ cs) = get t =<< M.lookup h cs
+
+alter :: Ord k => (Node k v -> Node k v) -> Maybe (Node k v) -> [k] -> Node k v -> Node k v
+alter nf _ [] n = nf n
+alter nf def (h:t) (Node is cs) = Node is $ M.alter (maybe (alter nf def t <$> def) (Just . alter nf def t)) h cs
+
 insertNode :: Ord k => [k] -> Node k v -> Node k v -> Node k v
-insertNode [] new old = merge new old
-insertNode (h:t) new n@(Node _ cs) =
-  let rec = insertNode t new $ fromMaybe emptyNode $ M.lookup h cs
-  in  n { children = M.insert h rec cs }
+insertNode p new = alter (const new) (Just emptyNode) p
 
 insert :: Ord k => [k] -> v -> Node k v -> Node k v
 insert p = insertNode p . leaf . (:[])
