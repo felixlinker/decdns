@@ -85,7 +85,7 @@ allData (Zone orig ns) = go orig ns
     go :: Name a -> T.Node a b -> [Named a b]
     go n (T.Node d ch) =
       let base = map (Named n) d
-          rec = concat $ M.mapWithKey (\l -> go (l <| n)) ch
+          rec = concatMap (uncurry (\l -> go (l <| n))) (M.toAscList ch)
       in base ++ rec
 
 noMatching :: (Label a, Ord a) => NamedRecord a -> Zone a -> Bool
