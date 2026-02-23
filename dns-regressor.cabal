@@ -26,6 +26,7 @@ library
       DNS.Record
       DNS.RecordType
       DNS.ZoneFile
+      DNS.ZoneFile.Printing
       NameConstraint
       NonDet
       Parsing
