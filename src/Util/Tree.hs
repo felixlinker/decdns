@@ -53,4 +53,4 @@ insertNode :: Ord k => [k] -> Node k v -> Node k v -> Node k v
 insertNode p new = alter (const new) (Just emptyNode) p
 
 insert :: Ord k => [k] -> v -> Node k v -> Node k v
-insert p v = alter (mapItems (v:)) (Just emptyNode) p
+insert p v = alter (\n@(Node is _) -> n { items = v:is }) (Just emptyNode) p
