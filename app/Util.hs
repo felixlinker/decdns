@@ -10,8 +10,9 @@ import Text.Parsec (ParseError)
 
 import NameConstraint (ConstrainedRecord, compileWildcards)
 import Parsing (parseName, parseZoneFile)
-import DNS.ZoneFile (allData)
+import DNS.ZoneFile (allData, Zone)
 import DNS.Name (Name)
+import Parsing.Wellformedness (wellformed)
 
 sepBy :: String -> [String] -> IO ([String], [String])
 sepBy sep args = do
@@ -27,8 +28,12 @@ parseZoneFileZones :: FilePath -> IO (Name String, [ConstrainedRecord])
 parseZoneFileZones path = do
   content <- readFile path
   zones <- parseZoneFile path content >>= handleParser
+  mapM_ wf zones
   ns <- parseName path >>= handleParser
   return (ns, concatMap (allData . compileWildcards) zones)
+  where
+    wf :: Zone String -> IO ()
+    wf zone = maybe (return ()) failIO (wellformed zone)
 
 parseNames :: [String] -> IO [Name String]
 parseNames = mapM (handleParser <=< parseName)

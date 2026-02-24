@@ -82,8 +82,7 @@ zone :: Stream s m Char => Parser s m (Zone String)
 zone = do
   org <- origin
   rs <- catMaybes <$> many line
-  let z = foldl insert (emptyZone org) rs
-  maybe (return z) (\msg -> fail ("zone ill-formed: " ++ msg)) (wellformed z)
+  return $ foldl insert (emptyZone org) rs
 
 zoneFile :: Stream s m Char => Parser s m [Zone String]
 zoneFile = many zone
