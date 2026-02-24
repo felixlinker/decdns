@@ -7,6 +7,7 @@ import qualified Resolvable.ConstrainedUnificationSpec as ConstrainedUnification
 import qualified DNS.NameSpec as NameSpec
 import qualified DNS.DiffSpec as DiffSpec
 import qualified DNS.ZoneFile.PrintingSpec as ZoneFilePrintingSpec
+import qualified Parsing.ZoneFileSpec as ZoneFileSpec
 import qualified Util.ListSpec as ListSpec
 import qualified Util.TreeSpec as TreeSpec
 import qualified Util.FreshSpec as FreshSpec
@@ -21,6 +22,7 @@ main =
       , ConstrainedUnificationSpec.tests
       , NameSpec.tests
       , DiffSpec.tests
+      , ZoneFileSpec.tests
       , ZoneFilePrintingSpec.tests
       , ListSpec.tests
       , TreeSpec.tests

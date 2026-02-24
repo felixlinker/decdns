@@ -114,6 +114,7 @@ test-suite dns-regressor-test
       DNS.NameSpec
       DNS.ZoneFile.PrintingSpec
       NonDetSpec
+      Parsing.ZoneFileSpec
       Resolvable.ConstrainedUnificationSpec
       Resolvable.UnificationSpec
       Resolvable.Util
