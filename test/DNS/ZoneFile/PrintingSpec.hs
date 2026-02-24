@@ -170,4 +170,6 @@ genHexGroup = do
   vectorOf n (elements (['0' .. '9'] ++ ['a' .. 'f']))
 
 genTxtAtom :: Gen String
-genTxtAtom = dropWhile (== ' ') <$> listOf (elements (['a' .. 'z'] ++ "-_./: "))
+genTxtAtom =
+  let chars = ['a' .. 'z'] ++ "-_./:"
+  in (:) <$> elements chars <*> listOf (elements (' ':chars))
