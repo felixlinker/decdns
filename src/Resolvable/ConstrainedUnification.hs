@@ -24,7 +24,9 @@ data ConstrainedUnifier =
             , constraints :: Neqs }
 
 instance Show ConstrainedUnifier where
-  show (CUnifier u neqs) = show u ++ " s.t. " ++ intercalate ", " (map (\(a, b) -> show a ++ " \\= " ++ show b) $ S.toList neqs)
+  show (CUnifier u neqs) =
+    let cond = intercalate ", " (map (\(a, b) -> show a ++ " \\= " ++ show b) $ S.toList neqs)
+    in  show u ++ " s.t. " ++ (if null cond then "True" else cond)
 
 identity :: ConstrainedUnifier
 identity = CUnifier U.identity S.empty
