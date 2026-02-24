@@ -28,14 +28,14 @@ tests =
 newtype ArbZone = ArbZone { unArbZone :: Zone String }
 
 instance Show ArbZone where
-  show = printZone . unArbZone
+  show = unlines . printZone True . unArbZone
 
 instance Arbitrary ArbZone where
   arbitrary = ArbZone <$> genZone
 
 propPrintParseRoundTrip :: ArbZone -> Property
 propPrintParseRoundTrip (ArbZone z) =
-  let printed = printZone z
+  let printed = unlines $ printZone True z
       parsed = runIdentity (parseZoneFile "<quickcheck>" printed)
   in case parsed of
       Left err ->

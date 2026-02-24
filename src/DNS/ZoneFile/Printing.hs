@@ -13,21 +13,21 @@ import DNS.Record (RData (RData))
 import DNS.ZoneFile
 import qualified Util.Tree as T
 
-showRecord :: String -> String -> Int -> RData -> (Int, String)
-showRecord rname lastName lastTTL (RData (show -> c) t (show -> d)) =
+showRecord :: Bool -> String -> String -> Int -> RData -> (Int, String)
+showRecord abrev rname lastName lastTTL (RData (show -> c) t (show -> d)) =
   let thisName = fromLast lastName rname
       thisTTL = show <$> fromLast lastTTL t
   in (t, unwords (catMaybes [thisName, thisTTL, Just c, Just d]))
   where
     fromLast :: Eq a => a -> a -> Maybe a
     fromLast l this
-      | l == this = Nothing
+      | l == this && abrev = Nothing
       | otherwise = Just this
 
-printZone :: Zone String -> String
-printZone (Zone rootn r) =
+printZone :: Bool -> Zone String -> [String]
+printZone abrev (Zone rootn r) =
   -- We pick safe defaults for go, i.e., a name and TTL that are impossible
-  unlines $ ("$ORIGIN " ++ show rootn) : snd (go [] "" (-1) r)
+  ("$ORIGIN " ++ show rootn) : snd (go [] "" (-1) r)
   where
     go  :: [String] -- Current name (as list; empty on root node)
         -> String   -- Previous name
@@ -35,12 +35,12 @@ printZone (Zone rootn r) =
         -> T.Node String RData
         -> (Int, [String])
     go nameAcc prevName prevTTL (T.Node d cs) =
-      let (lastTTL, thisData) = mapAccumL (showRecord showNameRel prevName) prevTTL d
+      let (lastTTL, thisData) = mapAccumL (showRecord abrev showNameRel prevName) prevTTL d
           (lastTTL', recData) = mapAccumL (\ttlAcc (l, dat) -> go (l:nameAcc) showNameRel ttlAcc dat) lastTTL (M.toAscList cs)
        in  (lastTTL', thisData ++ concat recData)
        where
         showNameRel :: String
         showNameRel = maybe "@" (intercalate "." . NE.toList) (NE.nonEmpty nameAcc)
 
-printZones :: [Zone String] -> String
-printZones = unlines . map printZone
+printZones :: Bool -> [Zone String] -> [String]
+printZones = concatMap . printZone
