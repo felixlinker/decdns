@@ -35,6 +35,7 @@ library
       Parsing.Name
       Parsing.State
       Parsing.Tokens
+      Parsing.Util
       Parsing.Wellformedness
       Parsing.ZoneFile
       RecursiveResolver

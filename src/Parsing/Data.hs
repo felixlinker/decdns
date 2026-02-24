@@ -9,6 +9,7 @@ import Control.Applicative (asum)
 import Text.Parsec
 
 import Parsing.State
+import Parsing.Util
 import DNS.Record
 import qualified DNS.RecordType as T
 import Parsing.Name
@@ -50,13 +51,13 @@ ns :: Stream s m Char => TypeParser s m
 ns = NS <$> name
 
 a :: Stream s m Char => TypeParser s m
-a = A <$> manyTill anyChar endOfEntry
+a = A <$> manyTill1 anyChar endOfEntry
 
 aaaa :: Stream s m Char => TypeParser s m
-aaaa = AAAA <$> manyTill anyChar endOfEntry
+aaaa = AAAA <$> manyTill1 anyChar endOfEntry
 
 txt :: Stream s m Char => TypeParser s m
-txt = TXT <$> manyTill anyChar endOfEntry
+txt = TXT <$> manyTill1 anyChar endOfEntry
 
 mx :: Stream s m Char => TypeParser s m
 mx = MX <$> int <*> (sep >> name)
