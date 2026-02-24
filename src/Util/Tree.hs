@@ -45,7 +45,9 @@ get (h:t) (Node _ cs) = get t =<< M.lookup h cs
 
 alter :: Ord k => (Node k v -> Node k v) -> Maybe (Node k v) -> [k] -> Node k v -> Node k v
 alter nf _ [] n = nf n
-alter nf def (h:t) (Node is cs) = Node is $ M.alter (maybe (alter nf def t <$> def) (Just . alter nf def t)) h cs
+alter nf def (h:t) (Node is cs) =
+  let rec = alter nf def t
+  in Node is $ M.alter (maybe (rec <$> def) (Just . rec)) h cs
 
 insertNode :: Ord k => [k] -> Node k v -> Node k v -> Node k v
 insertNode p new = alter (const new) (Just emptyNode) p
