@@ -4,7 +4,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit ((@?=), testCase)
 import Test.Tasty.QuickCheck
 
-import NonDet (NonDet, some)
+import NonDet (NonDet)
 import qualified NonDet
 
 tests :: TestTree

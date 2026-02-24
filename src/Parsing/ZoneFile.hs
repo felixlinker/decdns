@@ -15,7 +15,6 @@ import Parsing.Data
 import DNS.ZoneFile
 import DNS.Name (Name, Named(Named))
 import DNS.Record (StandardRecord, Cat, RData(..))
-import Parsing.Wellformedness (wellformed)
 
 comment :: Stream s m Char => Parser s m ()
 comment = do

@@ -9,7 +9,7 @@ import qualified DNS.DiffSpec as DiffSpec
 import qualified Util.ListSpec as ListSpec
 import qualified Util.TreeSpec as TreeSpec
 import qualified Util.FreshSpec as FreshSpec
-import qualified NonDetSpec as NonDetSpec
+import qualified NonDetSpec
 
 main :: IO ()
 main =

@@ -3,7 +3,6 @@ module Util.FreshSpec (tests) where
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit ((@?=), testCase)
 import Test.Tasty.QuickCheck
-import qualified Data.List as L
 import qualified Data.Set as S
 
 import Util.Fresh (avoiding, fresh, runFresh)
