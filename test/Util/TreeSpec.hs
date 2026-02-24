@@ -1,6 +1,7 @@
 module Util.TreeSpec (tests) where
 
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, (@?=), testCase)
 import Test.Tasty.QuickCheck
@@ -26,15 +27,15 @@ prop_insertGetRoundtrip p v =
 
 prop_insertCommutativeDistinctPaths :: [String] -> Int -> [String] -> Int -> Property
 prop_insertCommutativeDistinctPaths p1 v1 p2 v2 =
-  let left = T.insert p1 v1 (T.insert p2 v2 (T.emptyNode :: T.Node String Int))
-      right = T.insert p2 v2 (T.insert p1 v1 (T.emptyNode :: T.Node String Int))
+  let left = T.insert p1 v1 (T.insert p2 v2 T.emptyNode)
+      right = T.insert p2 v2 (T.insert p1 v1 T.emptyNode)
   in toCanon left === toCanon right
 
-data CanonTree k v = CanonTree [v] [(k, CanonTree k v)]
+data CanonTree k v = CanonTree (S.Set v) [(k, CanonTree k v)]
   deriving (Eq, Show)
 
-toCanon :: T.Node a b -> CanonTree a b
-toCanon (T.Node is cs) = CanonTree is [(k, toCanon n) | (k, n) <- M.toAscList cs]
+toCanon :: Ord v => T.Node k v -> CanonTree k v
+toCanon (T.Node is cs) = CanonTree (S.fromList is) [(k, toCanon n) | (k, n) <- M.toAscList cs]
 
 replacesSubtree :: Assertion
 replacesSubtree = do
