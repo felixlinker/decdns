@@ -86,4 +86,5 @@ simplifyNeq a b = case (a, b) of
   _ -> []
   where
     rec :: [(Term, Term)] -> [(Term, Term)]
-    rec = concatMap (uncurry simplifyNeq)
+    rec [] = [(a, b)]  -- preserve contradiction
+    rec zipped = concatMap (uncurry simplifyNeq) zipped
