@@ -21,8 +21,8 @@ recordType = asum $ map try
   [ string "CNAME" $> T.CNAME
   , string "DNAME" $> T.DNAME
   , string "NS" $> T.NS
-  , string "A" $> T.A
   , string "AAAA" $> T.AAAA
+  , string "A" $> T.A
   , string "TXT" $> T.TXT
   , string "MX" $> T.MX
   , string "SOA" $> T.SOA ]

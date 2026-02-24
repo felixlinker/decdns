@@ -18,7 +18,7 @@ import qualified Data.Map.Merge.Lazy as MM
 import Resolvable.Update.Dependencies (computeRegressions)
 import Resolvable.Update.Trivial (partitionTrivial)
 import Control.Monad (unless)
-import DNS.Name (mapLabels, Named (Named))
+import DNS.Name (mapLabels, Named)
 
 main :: IO ()
 main = do

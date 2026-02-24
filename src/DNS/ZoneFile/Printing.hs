@@ -4,6 +4,7 @@ module DNS.ZoneFile.Printing
   , printZones
   ) where
 
+import Data.List (intercalate)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import Data.Maybe (catMaybes)
@@ -38,7 +39,7 @@ printZone (Zone rootn r) =
        in printD ++ concat (M.mapWithKey (\l -> go showNameRel lastTTL (l:nameAcc)) cs)
        where
         showNameRel :: String
-        showNameRel = maybe "@" show (NE.nonEmpty nameAcc)
+        showNameRel = maybe "@" (intercalate "." . NE.toList) (NE.nonEmpty nameAcc)
         foldf :: Int      -- Last TTL
               -> [String] -- Data accumulator
               -> RData    -- Data to print
