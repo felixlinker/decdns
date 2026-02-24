@@ -27,8 +27,11 @@ showRecord abrev rname lastName lastTTL (RData (show -> c) t (show -> d)) =
 printZone :: Bool -> Zone String -> [String]
 printZone abrev (Zone rootn r) =
   -- We pick safe defaults for go, i.e., a name and TTL that are impossible
-  ("$ORIGIN " ++ show rootn) : snd (go [] "" (-1) r)
+  ("$ORIGIN " ++ show rootn) : map indent (snd (go [] "" (-1) r))
   where
+    indent :: String -> String
+    indent = ("  " ++)
+
     go  :: [String] -- Current name (as list; empty on root node)
         -> String   -- Previous name
         -> Int      -- Previous ttl
