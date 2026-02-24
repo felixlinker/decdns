@@ -98,10 +98,7 @@ instance Arbitrary ArbName where
   arbitrary = genName
 
 genName :: Gen ArbName
-genName = do
-  k <- chooseInt (1, 5)
-  lbls <- vectorOf k genLabel
-  return (ArbName $ name lbls)
+genName = ArbName . name <$> listOf1 genLabel
 
 genLabel :: Gen String
 genLabel = do
@@ -113,9 +110,7 @@ genDifferentLabel :: String -> Gen String
 genDifferentLabel s = suchThat genLabel (\t -> map toLower t /= map toLower s)
 
 genLabels :: Gen [String]
-genLabels = do
-  k <- chooseInt (0, 3)
-  vectorOf k genLabel
+genLabels = listOf genLabel
 
 prefixName :: [String] -> Name String -> Name String
 prefixName prefix (Name ls) = Name (NE.prependList prefix ls)
