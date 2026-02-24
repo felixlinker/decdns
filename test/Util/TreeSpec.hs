@@ -1,5 +1,6 @@
 module Util.TreeSpec (tests) where
 
+import qualified Data.Map as M
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, (@?=), testCase)
 import Test.Tasty.QuickCheck
@@ -14,6 +15,7 @@ tests =
     , testCase "get returns Nothing for missing path" $
         T.get ["a", "b"] (T.emptyNode :: T.Node String Int) @?= Nothing
     , testCase "insertNode replaces existing subtree at path" replacesSubtree
+    , testProperty "insert is commutative" prop_insertCommutativeDistinctPaths
     , testCase "merge keeps values from both trees" mergesValues
     ]
 
@@ -21,6 +23,18 @@ prop_insertGetRoundtrip :: [String] -> Int -> Property
 prop_insertGetRoundtrip p v =
   let n = T.insert p v (T.emptyNode :: T.Node String Int)
   in T.get p n === Just [v]
+
+prop_insertCommutativeDistinctPaths :: [String] -> Int -> [String] -> Int -> Property
+prop_insertCommutativeDistinctPaths p1 v1 p2 v2 =
+  let left = T.insert p1 v1 (T.insert p2 v2 (T.emptyNode :: T.Node String Int))
+      right = T.insert p2 v2 (T.insert p1 v1 (T.emptyNode :: T.Node String Int))
+  in toCanon left === toCanon right
+
+data CanonTree k v = CanonTree [v] [(k, CanonTree k v)]
+  deriving (Eq, Show)
+
+toCanon :: T.Node a b -> CanonTree a b
+toCanon (T.Node is cs) = CanonTree is [(k, toCanon n) | (k, n) <- M.toAscList cs]
 
 replacesSubtree :: Assertion
 replacesSubtree = do
