@@ -112,6 +112,7 @@ test-suite dns-regressor-test
   other-modules:
       DNS.DiffSpec
       DNS.NameSpec
+      DNS.ZoneFile.PrintingSpec
       NonDetSpec
       Resolvable.ConstrainedUnificationSpec
       Resolvable.UnificationSpec
