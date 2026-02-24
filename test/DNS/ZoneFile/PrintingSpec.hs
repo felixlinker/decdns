@@ -17,6 +17,7 @@ import DNS.Record
 import DNS.ZoneFile (Zone, allData, emptyZone, insert, zoneName)
 import DNS.ZoneFile.Printing (printZone)
 import Parsing.ZoneFile (parseZoneFile)
+import Data.Maybe (fromMaybe)
 
 tests :: TestTree
 tests =
@@ -25,18 +26,24 @@ tests =
     [ testProperty "parsing a printed zone yields the same zone" propPrintParseRoundTrip
     ]
 
-newtype ArbZone = ArbZone { unArbZone :: Zone String }
+data ArbZone = ArbZone
+  { unArbZone :: Zone String
+  , serialization :: String }
 
 instance Show ArbZone where
-  show = unlines . printZone True . unArbZone
+  show = serialization
 
 instance Arbitrary ArbZone where
-  arbitrary = ArbZone <$> genZone
+  arbitrary = do
+    z <- genZone
+    abrev <- arbitrary :: Gen Bool
+    let (origin NE.:| rs) = fromMaybe undefined $ NE.nonEmpty $ printZone abrev z
+    rs' <- if abrev then return rs else shuffle rs
+    return $ ArbZone z (unlines (origin:rs'))
 
 propPrintParseRoundTrip :: ArbZone -> Property
-propPrintParseRoundTrip (ArbZone z) =
-  let printed = unlines $ printZone True z
-      parsed = runIdentity (parseZoneFile "<quickcheck>" printed)
+propPrintParseRoundTrip (ArbZone z printed) =
+  let parsed = runIdentity (parseZoneFile "<quickcheck>" printed)
   in case parsed of
       Left err ->
         counterexample (show err) False
