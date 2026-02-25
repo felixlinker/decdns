@@ -28,6 +28,21 @@ updateDeps diffs o@(Deps old) n@(Deps new) =
     changed :: ResolvableAt ConstrainedName -> Bool
     changed (ResolvableAt (Named s q)) = maybe False (hasChanges q) $ M.lookup s diffs
 
+pickDiffs :: NSDiffs -> ResolvableAt (Diff ConstrainedName) -> (NSDiffs, [Diff StandardRecord])
+pickDiffs m (ResolvableAt (Named n d)) = fromMaybe (m, []) $ do
+  z <- M.lookup n m
+  let k = toName (item d)
+  is <- get k z
+  let picked = mapMaybe pick is
+  let m' = M.insert n (adjustData (filter (`notElem` picked)) k z) m
+  return (m', map (fmap (Named k)) picked)
+  where
+    -- @pick@ picks the right "extracting" function for a diff based on
+    -- whether we want to add or deletes the records associated with the
+    -- name
+    pick :: Diff a -> Maybe (Diff a)
+    pick d' = deither (const (deither Just (const Nothing))) (const (deither (const Nothing) Just)) d d' $> d'
+
 rollout :: NSDiffs -> Dependencies ConstrainedName -> Dependencies ConstrainedName -> [[Diff StandardRecord]]
 rollout diffs old new
   | M.null diffs = []
@@ -43,18 +58,3 @@ rollout diffs old new
         acc = foldr (foldF . fmap added . fst) (diffs, []) addNow
         (diffs', changes) = foldr (foldF . fmap deleted . fst) acc delNow
     in changes : rollout diffs' (Deps old') (Deps new')
-    where
-      pickDiffs :: NSDiffs -> ResolvableAt (Diff ConstrainedName) -> (NSDiffs, [Diff StandardRecord])
-      pickDiffs m (ResolvableAt (Named n d)) = fromMaybe (m, []) $ do
-        z <- M.lookup n m
-        let k = toName (item d)
-        is <- get k z
-        let picked = mapMaybe pick is
-        let m' = M.insert n (adjustData (filter (`notElem` picked)) k z) m
-        return (m', map (fmap (Named k)) picked)
-        where
-          -- @pick@ picks the right "extracting" function for a diff based on
-          -- whether we want to add or deletes the records associated with the
-          -- name
-          pick :: Diff a -> Maybe (Diff a)
-          pick d' = deither (const (deither Just (const Nothing))) (const (deither (const Nothing) Just)) d d' $> d'
