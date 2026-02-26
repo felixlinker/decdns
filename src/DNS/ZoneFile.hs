@@ -1,9 +1,12 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module DNS.ZoneFile
   ( emptyZone
   , Path(..)
   , pathInZone
   , AZone(..)
+  , zshow
   , Zone
   , insert
   , fromList
@@ -15,6 +18,7 @@ module DNS.ZoneFile
 
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
+import qualified Control.Monad.Trans.State as St
 
 import DNS.Name as N
 import DNS.Record
@@ -26,6 +30,20 @@ data AZone a b = Zone
 
 instance Functor (AZone a) where
   fmap f (Zone n r) = Zone n (fmap f r)
+
+zshow :: forall a b s. Show (Name a) => ([a] -> b -> St.State s String) -> s -> AZone a b -> [String]
+zshow printf initSt (Zone org r) = ("$ORIGIN " ++ show org) : St.evalState (go [] r) initSt
+  where
+    go  :: [a] -> T.Node a b -> St.State s [String]
+    go nameAcc (T.Node d cs) = do
+      showD <- mapM (printf nameAcc) d
+      showCs <- concat <$> mapM (\(l, n) -> go (l:nameAcc) n) (M.toAscList cs)
+      return $ showD ++ showCs
+
+instance (Show (Name a), Show b) => Show (AZone a b) where
+  show = unlines . zshow printf ()
+    where
+      printf ls d = return $ maybe "@" (show . Name) (NE.nonEmpty ls) ++ " " ++ show d
 
 type Zone a = AZone a RData
 

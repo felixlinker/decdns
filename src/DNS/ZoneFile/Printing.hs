@@ -4,47 +4,35 @@ module DNS.ZoneFile.Printing
   , printZones
   ) where
 
-import Data.List (mapAccumL)
 import qualified Data.List.NonEmpty as NE
-import qualified Data.Map as M
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromMaybe)
+import qualified Control.Monad.Trans.State as St
 
 import DNS.Name (Name(Name))
 import DNS.Record (RData (RData))
 import DNS.ZoneFile
-import qualified Util.Tree as T
 
-showRecord :: Bool -> String -> String -> Int -> RData -> (Int, String)
-showRecord abrev rname lastName lastTTL (RData (show -> c) t (show -> d)) =
+type State = (String, Int)  -- (last name, last TTL)
+
+showRecord :: Bool -> [String] -> RData -> St.State State String
+showRecord abrev labels (RData (show -> c) t (show -> d)) = do
+  (lastName, lastTTL) <- St.get
+  let rname = maybe "@" (show . Name) (NE.nonEmpty labels)
   let thisName = fromLast lastName rname
-      thisTTL = show <$> fromLast lastTTL t
-  in (t, unwords (catMaybes [thisName, thisTTL, Just c, Just d]))
+  let thisTTL = fromLast lastTTL t
+  St.put (fromMaybe lastName thisName, fromMaybe lastTTL thisTTL)
+  return $ indent $ unwords (catMaybes [thisName, show <$> thisTTL, Just c, Just d])
   where
+    indent :: String -> String
+    indent = ("  " ++)
+
     fromLast :: Eq a => a -> a -> Maybe a
     fromLast l this
       | l == this && abrev = Nothing
       | otherwise = Just this
 
 printZone :: Bool -> Zone String -> [String]
-printZone abrev (Zone rootn r) =
-  -- We pick safe defaults for go, i.e., a name and TTL that are impossible
-  ("$ORIGIN " ++ show rootn) : map indent (snd (go [] "" (-1) r))
-  where
-    indent :: String -> String
-    indent = ("  " ++)
-
-    go  :: [String] -- Current name (as list; empty on root node)
-        -> String   -- Previous name
-        -> Int      -- Previous ttl
-        -> T.Node String RData
-        -> (Int, [String])
-    go nameAcc prevName prevTTL (T.Node d cs) =
-      let (lastTTL, thisData) = mapAccumL (showRecord abrev showNameRel prevName) prevTTL d
-          (lastTTL', recData) = mapAccumL (\ttlAcc (l, dat) -> go (l:nameAcc) showNameRel ttlAcc dat) lastTTL (M.toAscList cs)
-       in  (lastTTL', thisData ++ concat recData)
-       where
-        showNameRel :: String
-        showNameRel = maybe "@" (show . Name) (NE.nonEmpty nameAcc)
+printZone abrev = zshow (showRecord abrev) ("", -1)
 
 printZones :: Bool -> [Zone String] -> [String]
 printZones = concatMap . printZone
