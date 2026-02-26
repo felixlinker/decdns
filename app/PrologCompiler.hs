@@ -42,6 +42,17 @@ main = do
       compiled <- compileConfig rootServers <$> mapM parseZoneFileZones zones
       let us = runFresh $ computeResolvable rootServers compiled
       mapM_ print us
+    "diff" -> do
+      (old, new) <- sepBy "--" args
+      oldRecs <- mapM parseZoneFileZones old
+      newRecs <- mapM parseZoneFileZones new
+      let nsDiff = MM.merge
+            (MM.mapMissing (\_ -> fmap deleted))
+            (MM.mapMissing (\_ -> fmap added))
+            (MM.zipWithMatched (const diff))
+            (M.map toZone $ M.fromList oldRecs)
+            (M.map toZone $ M.fromList newRecs)
+      mapM_ (\(ns, d) -> print ns >> print d) (M.toList nsDiff)
     "regressions" -> do
       (sroots, args') <- sepBy "--" args
       roots <- parseNames sroots
