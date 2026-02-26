@@ -44,7 +44,7 @@ relName = do
   return $ Name $ NE.fromList ls
 
 name :: (Stream s m Char, OriginProvider u) => ParsecT s u m (Name String)
-name = choice [origin, absName, relName]
+name = choice [origin, try absName, relName]
 
 skipPath :: Stream s m Char => ParsecT s u m ()
 skipPath = do
