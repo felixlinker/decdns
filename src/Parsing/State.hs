@@ -99,4 +99,4 @@ hspaces1 :: Stream s m Char => Parser s m ()
 hspaces1 = skipMany1 hspace'
 
 sep :: Stream s m Char => Parser s m ()
-sep = choice [ hspaces1, open, endOfEntry ]
+sep = asum $ map try [ hspaces1, open, endOfEntry ]

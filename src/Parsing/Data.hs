@@ -18,7 +18,7 @@ import Parsing.Tokens
 type TypeParser s m = Parser s m Type
 
 recordType :: Stream s m Char => ParsecT s u m T.Type
-recordType = choice
+recordType = asum $ map try
   [ string "CNAME" $> T.CNAME
   , string "DNAME" $> T.DNAME
   , string "NS" $> T.NS
