@@ -84,7 +84,7 @@ zone = do
   return $ foldl insert (emptyZone org) rs
 
 zoneFile :: Stream s m Char => Parser s m [Zone String]
-zoneFile = many zone
+zoneFile = many zone <* eof
 
 parseZoneFile :: Stream s m Char => SourceName -> s -> m (Either ParseError [Zone String])
 parseZoneFile = runParserT zoneFile emptyState
