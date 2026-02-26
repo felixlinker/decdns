@@ -32,7 +32,7 @@ showRecord abrev labels (RData (show -> c) t (show -> d)) = do
       | otherwise = Just this
 
 printZone :: Bool -> Zone String -> [String]
-printZone abrev = zshow (showRecord abrev) ("", -1)
+printZone abrev z@(Zone org _) = ("$ORIGIN " ++ show org) : zshow (showRecord abrev) ("", -1) z
 
 printZones :: Bool -> [Zone String] -> [String]
 printZones = concatMap . printZone

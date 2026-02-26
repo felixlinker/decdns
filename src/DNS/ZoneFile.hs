@@ -31,8 +31,8 @@ data AZone a b = Zone
 instance Functor (AZone a) where
   fmap f (Zone n r) = Zone n (fmap f r)
 
-zshow :: forall a b s. Show (Name a) => ([a] -> b -> St.State s String) -> s -> AZone a b -> [String]
-zshow printf initSt (Zone org r) = ("$ORIGIN " ++ show org) : St.evalState (go [] r) initSt
+zshow :: forall a b s. ([a] -> b -> St.State s String) -> s -> AZone a b -> [String]
+zshow printf initSt (Zone _ r) = St.evalState (go [] r) initSt
   where
     go  :: [a] -> T.Node a b -> St.State s [String]
     go nameAcc (T.Node d cs) = do
