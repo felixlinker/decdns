@@ -38,10 +38,11 @@ absName = do
   ls <- endBy1 Parsing.Name.label dot
   return $ Name $ NE.fromList $ ls ++ [""]
 
-relName :: Stream s m Char => ParsecT s u m (Name String)
+relName :: (Stream s m Char, OriginProvider u) => ParsecT s u m (Name String)
 relName = do
   ls <- sepBy1 Parsing.Name.label dot
-  return $ Name $ NE.fromList ls
+  Just (Name org) <- getOrigin <$> getState
+  return $ Name $ NE.prependList ls org
 
 name :: (Stream s m Char, OriginProvider u) => ParsecT s u m (Name String)
 name = choice [origin, try absName, relName]
