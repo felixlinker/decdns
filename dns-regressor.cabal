@@ -116,6 +116,7 @@ test-suite dns-regressor-test
       NonDetSpec
       Parsing.ZoneFileSpec
       Resolvable.ConstrainedUnificationSpec
+      Resolvable.DependenciesSpec
       Resolvable.UnificationSpec
       Resolvable.Util
       Util.FreshSpec
