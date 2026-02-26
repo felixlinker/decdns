@@ -4,11 +4,12 @@ module DNS.ZoneFile.Printing
   , printZones
   ) where
 
-import Data.List (intercalate, mapAccumL)
+import Data.List (mapAccumL)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import Data.Maybe (catMaybes)
 
+import DNS.Name (Name(Name))
 import DNS.Record (RData (RData))
 import DNS.ZoneFile
 import qualified Util.Tree as T
@@ -43,7 +44,7 @@ printZone abrev (Zone rootn r) =
        in  (lastTTL', thisData ++ concat recData)
        where
         showNameRel :: String
-        showNameRel = maybe "@" (intercalate "." . NE.toList) (NE.nonEmpty nameAcc)
+        showNameRel = maybe "@" (show . Name) (NE.nonEmpty nameAcc)
 
 printZones :: Bool -> [Zone String] -> [String]
 printZones = concatMap . printZone
