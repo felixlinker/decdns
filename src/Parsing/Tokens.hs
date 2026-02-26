@@ -2,6 +2,7 @@
 module Parsing.Tokens
   ( hspace
   , dot
+  , colon
   , int
   , category ) where
 
@@ -17,6 +18,9 @@ hspace = char ' ' <|> tab
 
 dot :: Stream s m Char => ParsecT s u m Char
 dot = Char.char '.'
+
+colon :: Stream s m Char => ParsecT s u m Char
+colon = Char.char ':'
 
 int :: Stream s m Char => ParsecT s u m Int
 int = do

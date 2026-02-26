@@ -9,11 +9,11 @@ import Control.Applicative (asum)
 import Text.Parsec
 
 import Parsing.State
-import Parsing.Util
 import DNS.Record
 import qualified DNS.RecordType as T
 import Parsing.Name
 import Parsing.Tokens
+import Data.Char (isPrint)
 
 type TypeParser s m = Parser s m Type
 
@@ -52,13 +52,13 @@ ns :: Stream s m Char => TypeParser s m
 ns = NS <$> name
 
 a :: Stream s m Char => TypeParser s m
-a = A <$> manyTill1 anyChar endOfEntry
+a = A <$> many1 (digit <|> dot)
 
 aaaa :: Stream s m Char => TypeParser s m
-aaaa = AAAA <$> manyTill1 anyChar endOfEntry
+aaaa = AAAA <$> many1 (hexDigit <|> colon)
 
 txt :: Stream s m Char => TypeParser s m
-txt = TXT <$> manyTill1 anyChar endOfEntry
+txt = TXT <$> many1 (satisfy isPrint)
 
 mx :: Stream s m Char => TypeParser s m
 mx = MX <$> int <*> (sep >> name)
