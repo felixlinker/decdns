@@ -14,7 +14,7 @@ import Parsing.Name
 import Parsing.Data
 import DNS.ZoneFile
 import DNS.Name (Name, Named(Named))
-import DNS.Record (StandardRecord, Cat, RData(..))
+import DNS.Record (StandardRecord, RData(..), Record)
 
 comment :: Stream s m Char => Parser s m ()
 comment = do
@@ -41,31 +41,49 @@ setTTL = do
   writeState lastTTL t
 
 record :: Stream s m Char => Parser s m StandardRecord
-record = do
+record = try catTtlType <|> try nameCatTtlType <|> nameTtlCatType
+
+-- This parser is required because the category can be parsed as label. We
+-- prioritize that parsing over parsing it as name for correctness in more
+-- cases.
+catTtlType :: Stream s m Char => Parser s m (Record String)
+catTtlType = do
+  spaces
+  n <- readState lastName
+  spaces
+  c <- tryOrState category lastCat
+  spaces
+  t <- tryOrState int lastTTL
+  spaces
+  ty <- recordTypeData
+  sep
+  return $ Named n (RData c t ty)
+
+nameCatTtlType :: Stream s m Char => Parser s m (Record String)
+nameCatTtlType = do
   spaces
   n <- tryOrState name lastName
   spaces
-  (c, t, ty) <- try catTtlType <|> try ttlCatType
-  sep
-  Named n . RData c t <$> ty
-
-catTtlType :: Stream s m Char => Parser s m (Cat, Int, TypeParser s m)
-catTtlType = do
   c <- tryOrState category lastCat
   spaces
   t <- tryOrState int lastTTL
-  sep
+  spaces
   ty <- recordTypeData
-  return (c, t, ty)
+  sep
+  return $ Named n (RData c t ty)
 
-ttlCatType :: Stream s m Char => Parser s m (Cat, Int, TypeParser s m)
-ttlCatType = do
+nameTtlCatType :: Stream s m Char => Parser s m (Record String)
+nameTtlCatType = do
+  spaces
+  n <- tryOrState name lastName
+  spaces
   t <- tryOrState int lastTTL
   spaces
   c <- tryOrState category lastCat
-  sep
+  spaces
   ty <- recordTypeData
-  return (c, t, ty)
+  sep
+  return $ Named n (RData c t ty)
 
 line :: Stream s m Char => Parser s m (Maybe StandardRecord)
 line = do
@@ -84,7 +102,7 @@ zone = do
   return $ foldl insert (emptyZone org) rs
 
 zoneFile :: Stream s m Char => Parser s m [Zone String]
-zoneFile = many zone <* eof
+zoneFile = many zone
 
 parseZoneFile :: Stream s m Char => SourceName -> s -> m (Either ParseError [Zone String])
-parseZoneFile = runParserT zoneFile emptyState
+parseZoneFile = runParserT (zoneFile <* eof) emptyState

@@ -28,18 +28,19 @@ recordType = asum $ map try
   , string "MX" $> T.MX
   , string "SOA" $> T.SOA ]
 
-recordTypeData :: Stream s m Char => ParsecT s u m (TypeParser s m)
+recordTypeData :: Stream s m Char => TypeParser s m
 recordTypeData = do
   typ <- recordType
+  sep
   case typ of
-    T.CNAME -> return cname
-    T.DNAME -> return dname
-    T.NS -> return ns
-    T.A -> return a
-    T.AAAA -> return aaaa
-    T.TXT -> return txt
-    T.MX -> return mx
-    T.SOA -> return soa
+    T.CNAME -> cname
+    T.DNAME -> dname
+    T.NS -> ns
+    T.A -> a
+    T.AAAA -> aaaa
+    T.TXT -> txt
+    T.MX -> mx
+    T.SOA -> soa
 
 cname :: Stream s m Char => TypeParser s m
 cname = CNAME <$> name
