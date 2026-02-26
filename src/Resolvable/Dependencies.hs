@@ -57,7 +57,7 @@ roots (Deps d) = S.filter (not . (`S.member` img)) (M.keysSet d)
     img = S.unions $ M.elems d
 
 dinsert :: RComp -> [RComp] -> Dependencies ConstrainedName -> Dependencies ConstrainedName
-dinsert k v (Deps m) = Deps (M.insert (fromAnnot k) (S.fromList $ map fromAnnot v) m)
+dinsert k (S.fromList . map fromAnnot -> vs) (Deps m) = Deps (M.alter (Just . maybe vs (vs <>)) (fromAnnot k) m)
 
 fromRules :: [Rule RComp] -> Dependencies ConstrainedName
 fromRules rs = go rs empty
