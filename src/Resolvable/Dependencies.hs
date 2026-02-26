@@ -30,7 +30,7 @@ instance Functor ResolvableAt where
   fmap f (ResolvableAt nd) = ResolvableAt $ fmap f nd
 
 instance Show a => Show (ResolvableAt a) where
-  show (rat -> Named q s) = show q ++ " @ " ++ show s
+  show (rat -> Named q s) = show s ++ " @ " ++ show q
 
 fromAnnot :: RComp -> ResolvableAt ConstrainedName
 fromAnnot (RComp ns (Named n _)) = ResolvableAt (Named ns n)
