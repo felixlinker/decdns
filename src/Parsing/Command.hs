@@ -40,7 +40,7 @@ cprint :: Stream s m Char => ParsecT s u m Command
 cprint = string ":print" $> Print
 
 commands :: Stream s m Char => ParsecT s () m Command
-commands = asum $ map try [ query, nslist, exit, cprint ]
+commands = choice [ query, nslist, exit, cprint ]
 
 parseCommand :: Monad m => String -> m (Either ParseError Command)
 parseCommand = runParserT commands () "parseCommand function"

@@ -45,7 +45,7 @@ record = do
   spaces
   n <- tryOrState name lastName
   spaces
-  (c, t, ty) <- try catTtlType <|> try ttlCatType
+  (c, t, ty) <- choice [catTtlType, ttlCatType]
   sep
   Named n . RData c t <$> ty
 
