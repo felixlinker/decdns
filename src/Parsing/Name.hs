@@ -13,6 +13,7 @@ import Text.Parsec.Char as Char
 import DNS.Name (Name(..))
 import Parsing.Tokens
 import Parsing.State (OriginProvider (getOrigin))
+import Data.Char (toLower)
 
 origin :: (Stream s m Char, OriginProvider u) => ParsecT s u m (Name String)
 origin = do
@@ -31,7 +32,7 @@ label = do
   p0 <- letter
   p1 <- many letDigHyp
   p2 <- many letDig
-  return $ p0 : p1 ++ p2
+  return $ map toLower $ p0 : p1 ++ p2
 
 absName :: Stream s m Char => ParsecT s u m (Name String)
 absName = do
