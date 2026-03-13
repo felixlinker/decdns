@@ -1,5 +1,10 @@
 {- HLINT ignore "Use <$>" -}
-module DNS.ZoneFile.PrintingSpec (tests) where
+module DNS.ZoneFile.PrintingSpec
+  ( tests
+  , ArbZone(..)
+  , genZone
+  , genTXTRecord
+  ) where
 
 import qualified Data.List.NonEmpty as NE
 import Data.Functor.Identity (runIdentity)

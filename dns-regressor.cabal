@@ -119,6 +119,7 @@ test-suite dns-regressor-test
       Resolvable.ConstrainedUnificationSpec
       Resolvable.DependenciesSpec
       Resolvable.UnificationSpec
+      Resolvable.Update.RolloutSpec
       Resolvable.Util
       Util.FreshSpec
       Util.ListSpec

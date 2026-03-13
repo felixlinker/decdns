@@ -5,6 +5,7 @@ import Test.Tasty (defaultMain, testGroup)
 import qualified Resolvable.UnificationSpec as UnificationSpec
 import qualified Resolvable.ConstrainedUnificationSpec as ConstrainedUnificationSpec
 import qualified Resolvable.DependenciesSpec as DependenciesSpec
+import qualified Resolvable.Update.RolloutSpec as RolloutSpec
 import qualified DNS.NameSpec as NameSpec
 import qualified DNS.DiffSpec as DiffSpec
 import qualified DNS.ZoneFile.PrintingSpec as ZoneFilePrintingSpec
@@ -22,6 +23,7 @@ main =
       [ UnificationSpec.tests
       , ConstrainedUnificationSpec.tests
       , DependenciesSpec.tests
+      , RolloutSpec.tests
       , NameSpec.tests
       , DiffSpec.tests
       , ZoneFileSpec.tests
