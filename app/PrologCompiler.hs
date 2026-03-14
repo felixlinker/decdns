@@ -39,7 +39,8 @@ main = do
     "resolvable" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
-      compiled <- compileConfig rootServers <$> mapM parseZoneFileZones zones
+      cfg <- mapM parseZoneFileZones zones
+      let compiled = plResolvable =<< compileConfig rootServers cfg
       let us = runFresh $ computeResolvable rootServers compiled
       mapM_ print us
     "diff" -> do
