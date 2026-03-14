@@ -96,7 +96,7 @@ instance Show ConstrainedQuery where
 deriveIf :: ConstrainedUnifier -> Term -> Rule a -> Maybe (ConstrainedUnifier, [Term])
 deriveIf u q (Rule _ h b) = do
   u' <- extendUnifier q h u
-  return (u', map (apply u') b)
+  return (u', b)
 
 computeResolvable :: [Name String] -> Fresh [Rule a] -> Fresh [ConstrainedQuery]
 computeResolvable rootServers rsM = do
@@ -106,7 +106,7 @@ computeResolvable rootServers rsM = do
   return $ do
     rootServer <- nameTerm <$> rootServers
     let query = presolvable rootServer qtyp qname
-    u <- rec [] identity (presolvable rootServer qtyp qname) rs
+    u <- rec [] identity query rs
     return $ CQuery (apply u query) (constraints u)
   where
     solveQuery :: ConstrainedUnifier -> Term -> [Rule a] -> [(ConstrainedUnifier, [Term])]
@@ -131,4 +131,4 @@ computeResolvable rootServers rsM = do
         solveConjunct :: Term -> [ConstrainedUnifier] -> [ConstrainedUnifier]
         solveConjunct q' us = do
           u'' <- us
-          rec trace' u'' (apply u'' q') rs
+          rec trace' u'' q' rs
