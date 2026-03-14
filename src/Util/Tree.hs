@@ -1,7 +1,9 @@
 module Util.Tree
   ( Node(..)
+  , Util.Tree.null
   , leaf
   , emptyNode
+  , prune
   , get
   , alter
   , insertNode
@@ -20,11 +22,17 @@ data Node k v = Node
 instance Functor (Node k) where
   fmap f (Node rs cs) = Node (fmap f rs) (M.map (fmap f) cs)
 
+null :: Node k v -> Bool
+null (Node is cs) = Prelude.null is && M.null cs
+
 leaf :: [v] -> Node a v
 leaf as = Node as M.empty
 
 emptyNode :: Node a v
 emptyNode = leaf []
+
+prune :: Node a v -> Node a v
+prune n@(Node _ cs) = n { children = M.filter Util.Tree.null (M.map prune cs) }
 
 mapItems :: ([a] -> [b]) -> Node k a -> Node k b
 mapItems f (Node is cs) = Node (f is) (M.map (mapItems f) cs)

@@ -34,7 +34,7 @@ pickDiffs m (ResolvableAt (Named n d)) = fromMaybe (m, []) $ do
   let k = toName (item d)
   is <- get k z
   let picked = mapMaybe pick is
-  let m' = M.insert n (adjustData (filter (`notElem` picked)) k z) m
+  let m' = M.insert n (prune $ adjustData (filter (`notElem` picked)) k z) m
   return (m', map (fmap (Named k)) picked)
   where
     -- @pick@ picks the right "extracting" function for a diff based on
@@ -43,9 +43,14 @@ pickDiffs m (ResolvableAt (Named n d)) = fromMaybe (m, []) $ do
     pick :: Diff a -> Maybe (Diff a)
     pick d' = deither (const (deither Just (const Nothing))) (const (deither (const Nothing) Just)) d d' $> d'
 
-rollout :: NSDiffs -> Dependencies ConstrainedName -> Dependencies ConstrainedName -> [[Diff StandardRecord]]
-rollout diffs old new
-  | M.null diffs = []
+type Rollout = [[Diff StandardRecord]]
+
+rollout :: NSDiffs -> Dependencies ConstrainedName -> Dependencies ConstrainedName -> Rollout
+rollout = rollout' id
+
+rollout' :: (Rollout -> Rollout) -> NSDiffs -> Dependencies ConstrainedName -> Dependencies ConstrainedName -> Rollout
+rollout' acc diffs old new
+  | M.null diffs = acc []
   | otherwise =
     let (Deps old', Deps new') = updateDeps diffs old new
         canAdd r ds = maybe True null (M.lookup r old') && null ds
@@ -55,6 +60,13 @@ rollout diffs old new
         delNow = filter (uncurry canDel) (M.toAscList old')
 
         foldF r (d, l) = (l ++) <$> pickDiffs d r
-        acc = foldr (foldF . fmap added . fst) (diffs, []) addNow
-        (diffs', changes) = foldr (foldF . fmap deleted . fst) acc delNow
-    in changes : rollout diffs' (Deps old') (Deps new')
+        facc = foldr (foldF . fmap added . fst) (diffs, []) addNow
+        (diffs', changes) = foldr (foldF . fmap deleted . fst) facc delNow
+    in
+      if null changes
+      then error $ "no changes - rolled out so far: " ++ show (acc [])
+      else rollout'
+        ((changes :) . acc)
+        (M.filter (not . isEmpty) diffs')
+        (Deps old')
+        (Deps new')

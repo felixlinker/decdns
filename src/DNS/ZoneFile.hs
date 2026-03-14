@@ -6,12 +6,14 @@ module DNS.ZoneFile
   , Path(..)
   , pathInZone
   , AZone(..)
+  , isEmpty
   , zshow
   , Zone
   , insert
   , fromList
   , get
   , adjustData
+  , prune
   , allData
   , mergeZones
   , noMatching ) where
@@ -49,6 +51,9 @@ type Zone a = AZone a RData
 
 emptyZone :: Name a -> AZone a b
 emptyZone org = Zone org T.emptyNode
+
+isEmpty :: AZone a b -> Bool
+isEmpty (Zone _ r) = T.null r
 
 data Path a = Path
   -- New origin of the zone; longest common ancestor between new and old name
@@ -96,6 +101,9 @@ adjustData f nam z@(Zone org r) = case pathInZone org nam of
   _ -> z
   where
     mapItems nod@(T.Node is _) = nod { T.items = f is }
+
+prune :: AZone a b -> AZone a b
+prune z@(Zone _ r) = z { DNS.ZoneFile.root = T.prune r }
 
 allData :: AZone a b -> [Named a b]
 allData (Zone orig ns) = go orig ns
