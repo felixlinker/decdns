@@ -16,13 +16,13 @@ import Data.Maybe (mapMaybe, fromMaybe)
 type NSDiffs = M.Map (Name String) (ZoneDiff String)
 
 updateDeps :: NSDiffs -> Dependencies ConstrainedName -> Dependencies ConstrainedName -> (Dependencies ConstrainedName, Dependencies ConstrainedName)
-updateDeps diffs o@(Deps old) n@(Deps new) =
-  let unchangedLeafs = S.filter (not . changed) (leafs n)
-      unchangedRoots = S.filter (not . changed) (roots o)
-      old' = Deps (foldr M.delete old unchangedRoots)
-      new' = Deps (M.map (S.\\ unchangedLeafs) new)
+updateDeps diffs old new =
+  let unchangedLeafs = S.filter (not . changed) (leafs new)
+      unchangedRoots = S.filter (not . changed) (roots old)
+      old' = foldr ddelete old unchangedRoots
+      new' = foldr ddelete new unchangedLeafs
   in if null unchangedLeafs && null unchangedRoots
-    then (o, n)
+    then (old, new)
     else updateDeps diffs old' new'
   where
     changed :: ResolvableAt ConstrainedName -> Bool

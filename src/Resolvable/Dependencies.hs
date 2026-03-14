@@ -3,6 +3,7 @@
 module Resolvable.Dependencies
   ( ResolvableAt(..)
   , Dependencies(..)
+  , ddelete
   , ConstrainedQuery(..)
   , empty
   , leafs
@@ -58,6 +59,9 @@ roots (Deps d) = S.filter (not . (`S.member` img)) (M.keysSet d)
 
 dinsert :: RComp -> [RComp] -> Dependencies ConstrainedName -> Dependencies ConstrainedName
 dinsert k (S.fromList . map fromAnnot -> vs) (Deps m) = Deps (M.alter (Just . maybe vs (vs <>)) (fromAnnot k) m)
+
+ddelete :: Ord a => ResolvableAt a -> Dependencies a -> Dependencies a
+ddelete key (Deps m) = Deps $ M.map (S.delete key) $ M.delete key m
 
 fromRules :: [Rule RComp] -> Dependencies ConstrainedName
 fromRules rs = go rs empty
