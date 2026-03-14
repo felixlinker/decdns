@@ -7,7 +7,7 @@ import Test.Tasty.HUnit (Assertion, (@?=), testCase)
 import DNS.Diff
 import DNS.Name (Name (..), Named (..), (<|))
 import DNS.Record
-import DNS.ZoneFile (fromList, get)
+import DNS.ZoneFile (emptyZone, fromList, get, insert, zoneName)
 import NameConstraint (LabelConstraint (..), exactly)
 
 tests :: TestTree
@@ -16,6 +16,7 @@ tests =
     "DNS.Diff"
     [ testCase "diff reports added and deleted records at same name" reportsAddsAndDeletes
     , testCase "diff empty for unchanged records" unchangedIsEmpty
+    , testCase "diff preserves non-root origin" preservesNonRootOrigin
     , testCase "hasChanges detects exact-name changes" exactChangeDetection
     , testCase "hasChanges wildcard respects excluded labels" wildcardChangeDetection
     ]
@@ -34,6 +35,16 @@ unchangedIsEmpty = do
       z = fromList [Named n (mkData "192.0.2.10")]
       dz = diff z z
   maybe False null (get n dz) @?= True
+
+preservesNonRootOrigin :: Assertion
+preservesNonRootOrigin = do
+  let org = mkName ["example", "com"]
+      n = "www" <| org
+      oldZ = insert (emptyZone org) (Named n (mkData "192.0.2.1"))
+      newZ = insert (emptyZone org) (Named n (mkData "192.0.2.2"))
+      dz = diff oldZ newZ
+  zoneName dz @?= org
+  hasChanges (exactly n) dz @?= True
 
 exactChangeDetection :: Assertion
 exactChangeDetection = do

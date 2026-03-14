@@ -46,11 +46,9 @@ item (Diff (Right a)) = a
 
 type ZoneDiff a = AZone a (Diff RData)
 
-diff :: (Label a, Ord a) => Zone a -> Zone a -> ZoneDiff a
+diff :: Ord a => Zone a -> Zone a -> ZoneDiff a
 diff (Zone oldOrg (fmap deleted -> oldZ)) (Zone newOrg (fmap added -> newZ))
-  | oldOrg == newOrg = Zone N.root $ T.mapItems nubEither $ T.merge oldZ newZ
-  -- TODO: For now. I expect diff to be called after mergeZones anyway, which
-  -- creates a zone for the root name anyways.
+  | oldOrg == newOrg = Zone oldOrg $ T.mapItems nubEither $ T.merge oldZ newZ
   | otherwise = error "diff must be called on two zones of the same origin"
   where
     nubEither :: Eq a => [Diff a] -> [Diff a]
