@@ -53,21 +53,18 @@ canonicalCompareNextLabel :: Assertion
 canonicalCompareNextLabel =
   canonicalCompare (name ["a", "example", "com"]) (name ["b", "example", "com"]) @?= LT
 
-propIsSubDomainReflexive :: ArbName -> Property
-propIsSubDomainReflexive (aname -> n) =
-  isSubDomain n n === True
+propIsSubDomainReflexive :: ArbName -> Bool
+propIsSubDomainReflexive (aname -> n) = isSubDomain n n
 
 propIsSubDomainPrefix :: ArbName -> Property
 propIsSubDomainPrefix (aname -> n) =
-  forAll genLabels $ \prefix ->
-    let n' = prefixName prefix n
-    in isSubDomain n' n === True
+  forAll genLabels $ \prefix -> isSubDomain (prefixName prefix n) n
 
 propIsSubDomainDiffTld :: ArbName -> Property
 propIsSubDomainDiffTld (aname -> n@(Name ls)) =
   forAll (genDifferentLabel (NE.last ls)) $ \otherTld ->
     let n' = Name (replaceLast ls otherTld)
-    in isSubDomain n n' === False
+    in not (isSubDomain n n')
 
 propCanonicalCompareCaseInsensitive :: ArbName -> Property
 propCanonicalCompareCaseInsensitive (aname -> n) =
