@@ -72,6 +72,3 @@ record = Named
 
 instance Show RData where
   show (RData c ttl t) = show ttl ++ " " ++ show c ++ " " ++ show t
-
-instance Show (Named String RData) where
-  show (Named n d) = show n ++ " " ++ show d

@@ -33,8 +33,8 @@ instance Functor ResolvableAt where
 instance Show a => Show (ResolvableAt a) where
   show (rat -> Named q s) = show s ++ " @ " ++ show q
 
-fromAnnot :: RComp -> ResolvableAt ConstrainedName
-fromAnnot (RComp ns (Named n _)) = ResolvableAt (Named ns n)
+fromRule :: Rule RComp -> ResolvableAt ConstrainedName
+fromRule (rannotation -> RComp ns (Named n _)) = ResolvableAt (Named ns n)
 
 newtype Dependencies a = Deps
   { deps :: M.Map (ResolvableAt a) (S.Set (ResolvableAt a)) }
@@ -57,8 +57,8 @@ roots (Deps d) = S.filter (not . (`S.member` img)) (M.keysSet d)
   where
     img = S.unions $ M.elems d
 
-dinsert :: RComp -> [RComp] -> Dependencies ConstrainedName -> Dependencies ConstrainedName
-dinsert k (S.fromList . map fromAnnot -> vs) (Deps m) = Deps (M.alter (Just . maybe vs (vs <>)) (fromAnnot k) m)
+dinsert :: Ord a => ResolvableAt a -> S.Set (ResolvableAt a) -> Dependencies a -> Dependencies a
+dinsert k vs (Deps m) = Deps (M.alter (Just . maybe vs (vs <>)) k m)
 
 ddelete :: Ord a => ResolvableAt a -> Dependencies a -> Dependencies a
 ddelete key (Deps m) = Deps $ M.map (S.delete key) $ M.delete key m
@@ -68,7 +68,9 @@ fromRules rs = go rs empty
   where
     go :: [Rule RComp] -> Dependencies ConstrainedName -> Dependencies ConstrainedName
     go [] acc = acc
-    go (r:rrec) acc = go rrec (dinsert (rannotation r) (map rannotation $ getRel r) acc)
+    go (r:rrec) acc =
+      let vs = S.fromList $ map fromRule (getRel r)
+      in go rrec (dinsert (fromRule r) vs acc)
 
     getRel :: Rule RComp -> [Rule RComp]
     getRel (Rule _ _ []) = []

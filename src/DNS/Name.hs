@@ -46,6 +46,9 @@ data Named a b = Named
   , value :: b }
   deriving (Eq, Ord)
 
+instance Show a => Show (Named String a) where
+  show (Named n d) = show n ++ " " ++ show d
+
 instance Functor (Named a) where
   fmap f (Named n d) = Named n (f d)
 
