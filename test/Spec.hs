@@ -8,8 +8,9 @@ import qualified Resolvable.DependenciesSpec as DependenciesSpec
 import qualified Resolvable.Update.RolloutSpec as RolloutSpec
 import qualified DNS.NameSpec as NameSpec
 import qualified DNS.DiffSpec as DiffSpec
+import qualified DNS.ZoneFileSpec as DNSZoneFileSpec
 import qualified DNS.ZoneFile.PrintingSpec as ZoneFilePrintingSpec
-import qualified Parsing.ZoneFileSpec as ZoneFileSpec
+import qualified Parsing.ZoneFileSpec as ParsingZoneFileSpec
 import qualified Util.ListSpec as ListSpec
 import qualified Util.TreeSpec as TreeSpec
 import qualified Util.FreshSpec as FreshSpec
@@ -26,7 +27,8 @@ main =
       , RolloutSpec.tests
       , NameSpec.tests
       , DiffSpec.tests
-      , ZoneFileSpec.tests
+      , DNSZoneFileSpec.tests
+      , ParsingZoneFileSpec.tests
       , ZoneFilePrintingSpec.tests
       , ListSpec.tests
       , TreeSpec.tests

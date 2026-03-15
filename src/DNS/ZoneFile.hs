@@ -12,7 +12,7 @@ module DNS.ZoneFile
   , insert
   , fromList
   , get
-  , adjustData
+  , set
   , prune
   , allData
   , mergeZones
@@ -95,12 +95,10 @@ get n (Zone org r) = case pathInZone org n of
   Path _ [] p -> T.get p r
   _ -> Nothing
 
-adjustData :: (Label a, Ord a) => ([b] -> [b]) -> Name a -> AZone a b -> AZone a b
-adjustData f nam z@(Zone org r) = case pathInZone org nam of
-  Path _ [] p -> Zone org (T.alter mapItems Nothing p r)
+set :: (Label a, Ord a) => Name a -> [b] -> AZone a b -> AZone a b
+set nam is z@(Zone org r) = case pathInZone org nam of
+  Path _ [] p -> Zone org (T.alter (const (T.leaf is)) (Just T.emptyNode) p r)
   _ -> z
-  where
-    mapItems nod@(T.Node is _) = nod { T.items = f is }
 
 prune :: AZone a b -> AZone a b
 prune z@(Zone _ r) = z { DNS.ZoneFile.root = T.prune r }
