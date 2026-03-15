@@ -32,7 +32,7 @@ emptyNode :: Node a v
 emptyNode = leaf []
 
 prune :: Node a v -> Node a v
-prune n@(Node _ cs) = n { children = M.filter Util.Tree.null (M.map prune cs) }
+prune n@(Node _ cs) = n { children = M.filter (not . Util.Tree.null) (M.map prune cs) }
 
 mapItems :: ([a] -> [b]) -> Node k a -> Node k b
 mapItems f (Node is cs) = Node (f is) (M.map (mapItems f) cs)

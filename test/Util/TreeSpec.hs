@@ -14,6 +14,8 @@ tests =
   testGroup
     "Util.Tree"
     [ testProperty "insert/get roundtrip at path" prop_insertGetRoundtrip
+    , testProperty "pruning a tree without elements yields null" prop_pruneEmptyTreeIsNull
+    , testCase "null detects empty and non-empty nodes" nullDetectsEmptyAndNonEmptyNodes
     , testCase "get returns Nothing for missing path" $
         T.get ["a", "b"] (T.emptyNode :: T.Node String Int) @?= Nothing
     , testCase "alter applies function at root for empty path" altersRoot
@@ -34,6 +36,27 @@ prop_insertCommutativeDistinctPaths p1 v1 p2 v2 =
   let left = T.insert p1 v1 (T.insert p2 v2 T.emptyNode)
       right = T.insert p2 v2 (T.insert p1 v1 T.emptyNode)
   in toCanon left === toCanon right
+
+prop_pruneEmptyTreeIsNull :: Property
+prop_pruneEmptyTreeIsNull =
+  forAllShrinkShow genEmptyTree (const []) (show . toCanon) $ \tree ->
+    T.null (T.prune (tree :: T.Node String Int)) === True
+
+genEmptyTree :: Gen (T.Node String Int)
+genEmptyTree = go =<< chooseInt (0, 2)
+  where
+    go 0 = pure T.emptyNode
+    go n = do
+      n' <- chooseInt (0, n - 1)
+      width <- chooseInt (0, 3)
+      keys <- vectorOf width (arbitrary :: Gen String)
+      children <- vectorOf width (go n')
+      pure $ T.Node [] (M.fromList (zip keys children))
+
+nullDetectsEmptyAndNonEmptyNodes :: Assertion
+nullDetectsEmptyAndNonEmptyNodes = do
+  T.null (T.emptyNode :: T.Node String Int) @?= True
+  T.null (T.leaf [1 :: Int]) @?= False
 
 altersRoot :: Assertion
 altersRoot = do
