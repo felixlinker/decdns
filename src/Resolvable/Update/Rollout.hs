@@ -4,6 +4,7 @@ module Resolvable.Update.Rollout
 import Data.Functor (($>))
 import qualified Data.Map as M
 import qualified Data.Set as S
+import Data.Maybe (fromMaybe)
 
 import DNS.Diff
 import DNS.Name
@@ -11,7 +12,6 @@ import DNS.Record
 import Resolvable.Dependencies
 import DNS.ZoneFile
 import NameConstraint
-import Data.Maybe (mapMaybe, fromMaybe)
 
 type NSDiffs = M.Map (Name String) (ZoneDiff String)
 
