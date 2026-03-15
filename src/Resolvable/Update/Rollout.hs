@@ -65,8 +65,4 @@ rollout' acc diffs old new
     in
       if null changes
       then error $ "no changes - rolled out so far: " ++ show (acc [])
-      else rollout'
-        ((changes :) . acc)
-        (M.filter (not . isEmpty) diffs')
-        (Deps old')
-        (Deps new')
+      else rollout' ((changes :) . acc) diffs' (Deps old') (Deps new')
