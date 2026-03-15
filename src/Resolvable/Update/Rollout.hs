@@ -1,7 +1,9 @@
 module Resolvable.Update.Rollout
   ( rollout ) where
 
+import Control.Monad (guard)
 import Data.Functor (($>))
+import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe (fromMaybe)
@@ -32,16 +34,17 @@ pickDiffs :: NSDiffs -> ResolvableAt (Diff ConstrainedName) -> (NSDiffs, [Diff S
 pickDiffs m (ResolvableAt (Named n d)) = fromMaybe (m, []) $ do
   z <- M.lookup n m
   let k = toName (item d)
-  is <- get k z
-  let picked = mapMaybe pick is
-  let m' = M.insert n (prune $ adjustData (filter (`notElem` picked)) k z) m
+  (picked, is) <- L.partition pick <$> get k z
+  let z' = prune $ set k is z
+  let m' = M.alter (const $ guard (not $ isEmpty z') $> z') n m
   return (m', map (fmap (Named k)) picked)
   where
     -- @pick@ picks the right "extracting" function for a diff based on
     -- whether we want to add or deletes the records associated with the
     -- name
-    pick :: Diff a -> Maybe (Diff a)
-    pick d' = deither (const (deither Just (const Nothing))) (const (deither (const Nothing) Just)) d d' $> d'
+    pick :: Diff a -> Bool
+    pick (Diff (Left _)) = deither (const True) (const False) d
+    pick (Diff (Right _)) = deither (const False) (const True) d
 
 type Rollout = [[Diff StandardRecord]]
 
