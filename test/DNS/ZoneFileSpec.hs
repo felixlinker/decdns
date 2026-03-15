@@ -13,7 +13,7 @@ import Test.Tasty.QuickCheck
 
 import DNS.Name (Name (Name), Named (Named))
 import DNS.Record
-import DNS.ZoneFile (Zone, emptyZone, get, insert, set)
+import DNS.ZoneFile
 import Data.Maybe (fromMaybe)
 import DNS.ZoneFile.Printing (printZone)
 
@@ -22,6 +22,7 @@ tests =
   testGroup
     "DNS.ZoneFile"
     [ testProperty "getting data set on an empty zone returns that data" propSetGetRoundTrip
+    , testProperty "pruning setting an empty array results in an empty tree" propPruningSetEmpty
     ]
 
 propSetGetRoundTrip :: Property
@@ -30,6 +31,12 @@ propSetGetRoundTrip =
     forAll (genSubDomain org) $ \n ->
       forAll (arbitrary :: Gen [Int]) $ \xs ->
         get n (set n xs (emptyZone org)) === Just xs
+
+propPruningSetEmpty :: Property
+propPruningSetEmpty =
+  forAll genAbsoluteName $ \org ->
+    forAll (genSubDomain org) $ \n ->
+        isEmpty $ prune (set n [] (emptyZone org))
 
 data ArbZone = ArbZone
   { unArbZone :: Zone String
