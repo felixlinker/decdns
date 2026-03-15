@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Parsing.ZoneFile
-  ( parseZoneFile ) where
+  ( parseZone
+  , parseZoneFile ) where
 
 import Text.Parsec
 import Text.Parsec.Char as Char
@@ -103,6 +104,9 @@ zone = do
 
 zoneFile :: Stream s m Char => Parser s m [Zone String]
 zoneFile = many zone <* eof
+
+parseZone :: Stream s m Char => SourceName -> s -> m (Either ParseError (Zone String))
+parseZone = runParserT zone emptyState
 
 parseZoneFile :: Stream s m Char => SourceName -> s -> m (Either ParseError [Zone String])
 parseZoneFile = runParserT zoneFile emptyState
