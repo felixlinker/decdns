@@ -51,6 +51,7 @@ library
       Util.Debug.Stub
       Util.Fresh
       Util.List
+      Util.PartialOrder
       Util.Tree
   other-modules:
       Paths_dns_regressor
