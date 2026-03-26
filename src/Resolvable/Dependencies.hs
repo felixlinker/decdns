@@ -1,17 +1,13 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Resolvable.Dependencies
   ( ResolvableAt(..)
-  , Dependencies(..)
-  , ddelete
+  , Dependencies
   , ConstrainedQuery(..)
-  , empty
-  , leafs
-  , roots
   , fromRules
   , computeResolvable ) where
 
-import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe (mapMaybe, maybeToList)
 
@@ -22,6 +18,7 @@ import Resolvable.Prolog
 import Resolvable.Resolvability
 import Resolvable.ConstrainedUnification
 import Resolvable.Unification (equivModuloRenaming)
+import qualified Util.PartialOrder as PO
 
 newtype ResolvableAt a = ResolvableAt
   { rat :: Named String a }
@@ -36,41 +33,23 @@ instance Show a => Show (ResolvableAt a) where
 fromRule :: Rule RComp -> ResolvableAt ConstrainedName
 fromRule (rannotation -> RComp ns (Named n _)) = ResolvableAt (Named ns n)
 
-newtype Dependencies a = Deps
-  { deps :: M.Map (ResolvableAt a) (S.Set (ResolvableAt a)) }
+type Dependencies a = PO.PartialOrder (ResolvableAt a)
 
 instance Show a => Show (Dependencies a) where
-  show (Deps (M.toList -> items)) = unlines $ map (uncurry showItem . fmap S.toList) items
+  show (PO.toList -> items) = unlines $ map (uncurry showItem . fmap S.toList) items
     where
       showItem :: Show a => ResolvableAt a -> [ResolvableAt a] -> String
       showItem r [] = "No dependencies: " ++ show r
       showItem r ds = unlines ((show r ++ " depends on:") : map (("  " ++) . show) ds)
 
-empty :: Dependencies a
-empty = Deps M.empty
-
-leafs :: Ord a => Dependencies a -> S.Set (ResolvableAt a)
-leafs (Deps d) = S.fromAscList $ map fst $ filter (null . snd) $ M.toAscList d
-
-roots :: Ord a => Dependencies a -> S.Set (ResolvableAt a)
-roots (Deps d) = S.filter (not . (`S.member` img)) (M.keysSet d)
-  where
-    img = S.unions $ M.elems d
-
-dinsert :: Ord a => ResolvableAt a -> S.Set (ResolvableAt a) -> Dependencies a -> Dependencies a
-dinsert k vs (Deps m) = Deps (M.alter (Just . maybe vs (vs <>)) k m)
-
-ddelete :: Ord a => ResolvableAt a -> Dependencies a -> Dependencies a
-ddelete key (Deps m) = Deps $ M.map (S.delete key) $ M.delete key m
-
 fromRules :: [Rule RComp] -> Dependencies ConstrainedName
-fromRules rs = go rs empty
+fromRules rs = go rs PO.empty
   where
     go :: [Rule RComp] -> Dependencies ConstrainedName -> Dependencies ConstrainedName
     go [] acc = acc
     go (r:rrec) acc =
       let vs = S.fromList $ map fromRule (getRel r)
-      in go rrec (dinsert (fromRule r) vs acc)
+      in go rrec (PO.insert (fromRule r) vs acc)
 
     getRel :: Rule RComp -> [Rule RComp]
     getRel (Rule _ _ []) = []

@@ -14,16 +14,17 @@ import DNS.Record
 import Resolvable.Dependencies
 import DNS.ZoneFile
 import NameConstraint
+import qualified Util.PartialOrder as PO
 
 type NSDiffs = M.Map (Name String) (ZoneDiff String)
 
 updateDeps :: NSDiffs -> Dependencies ConstrainedName -> Dependencies ConstrainedName -> (Dependencies ConstrainedName, Dependencies ConstrainedName)
 updateDeps diffs old new =
-  let unchangedLeafs = S.filter (not . changed) (leafs new)
-      unchangedRoots = S.filter (not . changed) (roots old)
-      old' = foldr ddelete old unchangedRoots
-      new' = foldr ddelete new unchangedLeafs
-  in if null unchangedLeafs && null unchangedRoots
+  let unchangedNew = S.filter (not . changed) (PO.maxima new)
+      unchangedOld = S.filter (not . changed) (PO.minima old)
+      old' = foldr PO.remove old unchangedOld
+      new' = foldr PO.remove new unchangedNew
+  in if null unchangedNew && null unchangedOld
     then (old, new)
     else updateDeps diffs old' new'
   where
@@ -55,12 +56,12 @@ rollout' :: (Rollout -> Rollout) -> NSDiffs -> Dependencies ConstrainedName -> D
 rollout' acc diffs old new
   | M.null diffs = acc []
   | otherwise =
-    let (Deps old', Deps new') = updateDeps diffs old new
-        canAdd r ds = maybe True null (M.lookup r old') && null ds
-        canDel r _ = maybe True null (M.lookup r new')
+    let (old', new') = updateDeps diffs old new
+        canAdd r ds = null (PO.rel r old') && null ds
+        canDel r _ = maybe True null (PO.rel r new')
 
-        addNow = filter (uncurry canAdd) (M.toAscList new')
-        delNow = filter (uncurry canDel) (M.toAscList old')
+        addNow = filter (uncurry canChange) (PO.toAscList new')
+        delNow = filter (uncurry canChange) (PO.toAscList old')
 
         foldF r (d, l) = (l ++) <$> pickDiffs d r
         facc = foldr (foldF . fmap added . fst) (diffs, []) addNow
@@ -68,4 +69,4 @@ rollout' acc diffs old new
     in
       if null changes
       then error $ "no changes - rolled out so far: " ++ show (acc [])
-      else rollout' ((changes :) . acc) diffs' (Deps old') (Deps new')
+      else rollout' ((changes :) . acc) diffs' old' new'
