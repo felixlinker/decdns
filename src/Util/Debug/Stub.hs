@@ -6,8 +6,8 @@ module Util.Debug.Stub
 dbgWith :: (a -> String) -> a -> a
 dbgWith _ = id
 
-dbgMsg :: Show a => String -> a -> a
+dbgMsg :: String -> a -> a
 dbgMsg _ = id
 
-dbg :: Show a => a -> a
+dbg :: a -> a
 dbg = id
