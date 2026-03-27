@@ -8,8 +8,8 @@ import DNS.Diff (added, deleted, diff)
 import DNS.Record (StandardRecord)
 import DNS.ZoneFile (Zone, allData, insert, zoneName)
 import qualified DNS.ZoneFileSpec as ZS
-import Resolvable.Dependencies (empty)
 import Resolvable.Update.Rollout (rollout)
+import qualified Util.PartialOrder as PO
 
 tests :: TestTree
 tests =
@@ -24,14 +24,14 @@ propImmediateTxtAdd (ZS.ArbZone z _) =
   forAll (freshTxtFor z) $ \txt ->
     let z' = insert z txt
         diffs = M.singleton (zoneName z) (diff z z')
-    in rollout diffs empty empty === [[added txt]]
+    in rollout diffs PO.empty PO.empty === [[added txt]]
 
 propImmediateTxtDelete :: ZS.ArbZone -> Property
 propImmediateTxtDelete (ZS.ArbZone z _) =
   forAll (freshTxtFor z) $ \txt ->
     let zWithTxt = insert z txt
         diffs = M.singleton (zoneName zWithTxt) (diff zWithTxt z)
-    in rollout diffs empty empty === [[deleted txt]]
+    in rollout diffs PO.empty PO.empty === [[deleted txt]]
 
 freshTxtFor :: Zone String -> Gen StandardRecord
 freshTxtFor z =
