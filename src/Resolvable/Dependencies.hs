@@ -8,8 +8,11 @@ module Resolvable.Dependencies
   , fromRules
   , computeResolvable ) where
 
+import Data.Functor (($>))
+import Control.Monad ((<=<), guard)
 import qualified Data.Set as S
-import Data.Maybe (mapMaybe, maybeToList)
+import qualified Data.List.NonEmpty as NE
+import Data.Maybe (mapMaybe, fromMaybe)
 
 import NameConstraint
 import DNS.Name
@@ -30,8 +33,27 @@ instance Functor ResolvableAt where
 instance Show a => Show (ResolvableAt a) where
   show (rat -> Named q s) = show s ++ " @ " ++ show q
 
-fromRule :: Rule RComp -> ResolvableAt ConstrainedName
-fromRule (rannotation -> RComp ns (Named n _)) = ResolvableAt (Named ns n)
+progressing :: ResolvableAt ConstrainedName -> ResolvableAt ConstrainedName -> Maybe (ResolvableAt ConstrainedName)
+progressing (rat -> Named ns r) k@(rat -> Named ns' r') =
+  -- TODO: isSubDomain might not behave correctly on wildcards
+  guard (not (isSubDomain r' r) || ns /= ns') $> k
+
+fromAtom :: Term -> Maybe String
+fromAtom (TAtom s) = Just s
+fromAtom _ = Nothing
+
+fromNameTerm :: Term -> Maybe (Name String)
+fromNameTerm (TList l _) = do
+  l' <- mapM fromAtom l
+  return $ Name $ NE.reverse $ "" NE.:| l'
+fromNameTerm _ = Nothing
+
+fromResolves :: Term -> Maybe (ResolvableAt ConstrainedName)
+fromResolves (TPred "resolves" [ ns, _, n, _ ]) = do
+  ns' <- fromNameTerm ns
+  n' <- exactly <$> fromNameTerm n
+  return $ ResolvableAt (Named ns' n')
+fromResolves _ = Nothing
 
 type Dependencies a = PO.PartialOrder (ResolvableAt a)
 
@@ -42,32 +64,17 @@ instance Show a => Show (Dependencies a) where
       showItem r [] = "No dependencies: " ++ show r
       showItem r ds = unlines ((show r ++ " depends on:") : map (("  " ++) . show) ds)
 
+-- TODO: Handle wildcards and DNAME
 fromRules :: [Rule RComp] -> Dependencies ConstrainedName
 fromRules rs = go rs PO.empty
   where
     go :: [Rule RComp] -> Dependencies ConstrainedName -> Dependencies ConstrainedName
     go [] acc = acc
-    go (r:rrec) acc =
-      let vs = S.fromList $ map fromRule (getRel r)
-      in go rrec (PO.insert (fromRule r) vs acc)
-
-    getRel :: Rule RComp -> [Rule RComp]
-    getRel (Rule _ _ []) = []
-    getRel (Rule _ _ body) = concat $ matchRules identity body
-
-    matchRules :: ConstrainedUnifier -> [Term] -> [[Rule RComp]]
-    matchRules _ [] = [[]]
-    matchRules u ((TPred "\\=" [ a, b ]):ts) = do
-      u' <- maybeToList $ addConstraint a b u
-      matchRules u' ts
-    matchRules u (t@(TPred "resolves" _):ts) = do
-      (u', h) <- mapMaybe (matchRule u t) rs
-      rec <- matchRules u' ts
-      return $ h:rec
-    matchRules _ _ = error "unsupported rule body predicate"
-
-    matchRule :: ConstrainedUnifier -> Term -> Rule RComp -> Maybe (ConstrainedUnifier, Rule RComp)
-    matchRule u t r = (,r) <$> extendUnifier t (rhead r) u
+    go (r:rrec) acc = fromMaybe acc $ do
+      h <- fromResolves $ rhead r
+      -- TODO: The guard is for dropping redundant NS records, but I think this is too general
+      let vs = S.fromList $ mapMaybe (progressing h <=< fromResolves) (rbody r)
+      return $ go rrec (PO.insert h vs acc)
 
 -- TODO: Implement equality based on equivalence modulo renaming
 data ConstrainedQuery = CQuery Term Neqs
