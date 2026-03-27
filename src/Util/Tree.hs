@@ -26,6 +26,7 @@ data Node k v = Node
   -- TODO: items should simply be of type v, but that refactor is probably not worth it
   { items :: [v]
   , children :: M.Map k (Node k v) }
+  deriving Eq
 
 instance (Show k, Show v) => Show (Node k v) where
   show (Node is cs) = unlines

@@ -31,6 +31,7 @@ import Data.Bifunctor (Bifunctor(bimap))
 data AZone a b = Zone
   { zoneName :: Name a
   , root :: T.Node a b }
+  deriving Eq
 
 instance Functor (AZone a) where
   fmap f (Zone n r) = Zone n (fmap f r)
