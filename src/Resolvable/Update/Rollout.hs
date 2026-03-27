@@ -1,6 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Update.Rollout
-  ( rollout ) where
+  ( Rollout
+  , rollout ) where
 
 import qualified Data.Map as M
 import qualified Data.Set as S

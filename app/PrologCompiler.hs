@@ -6,7 +6,7 @@ import NameConstraint (ConstrainedLabel)
 import Resolvable.Prolog
 import Resolvable.Resolvability
 import Resolvable.Update.Resolvability
-import Resolvable.Update.Rollout (rollout)
+import Resolvable.Update.Rollout (Rollout, rollout)
 import Resolvable.Dependencies ( computeResolvable, fromRules )
 import Util.Fresh (runFresh)
 
@@ -18,7 +18,10 @@ import qualified Data.Map.Merge.Lazy as MM
 import Resolvable.Update.Dependencies (computeRegressions)
 import Resolvable.Update.Trivial (partitionTrivial)
 import Control.Monad (unless)
-import DNS.Name (mapLabels, Named)
+import DNS.Name (mapLabels, Named, Name)
+
+indent :: String -> String
+indent s = if null s then "" else "  " ++ s
 
 main :: IO ()
 main = do
@@ -77,12 +80,8 @@ main = do
       let newDeps = runFresh $ fromRules <$> newRecsC
       let rolloutSeq = rollout nsDiff oldDeps newDeps
       unless (null rolloutSeq) $ do
-        putStrLn "\nYou can roll out updates as follow."
-        mapM_ (\(s, subSeq) -> do
-            putStrLn $ "step " ++ show s
-            mapM_ (putStrLn . ("  - " ++) . show) subSeq
-          )
-          (zip [(1 :: Int)..] rolloutSeq)
+        putStrLn "\n% You can roll out updates as follow."
+        mapM_ putStrLn (showRollOut rolloutSeq)
     "dependencies" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
@@ -95,3 +94,14 @@ main = do
 
     popArg :: [String] -> IO (String, [String])
     popArg = maybe (fail "too few arguments") return . uncons
+
+    showRollOut :: Rollout -> [String]
+    showRollOut r = map ("% " ++) $ do
+      (i, ds) <- zip [(1 :: Int)..] r
+      ("step " ++ show i) : M.foldrWithKey (\ns d -> (showNSDiffs ns d ++)) [] ds
+
+    showNSDiffs :: Name String -> ZoneDiff String -> [String]
+    showNSDiffs ns d =
+        map indent
+      $ ("on server " ++ show ns ++ " roll out:")
+        : map indent (lines (show d))
