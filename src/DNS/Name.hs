@@ -6,6 +6,7 @@ module DNS.Name
   , Named(..)
   , root
   , (<|)
+  , prependLabels
   , mapLabels
   , isSubDomain
   , intersection
@@ -34,6 +35,9 @@ root = Name (NE.singleton lempty)
 
 (<|) :: a -> Name a -> Name a
 (<|) l (Name ls) = Name (l NE.<| ls)
+
+prependLabels :: [a] -> Name a -> Name a
+prependLabels ls (Name ls') = Name (NE.prependList ls ls')
 
 instance Functor Name where
   fmap f (Name ls) = Name (fmap f ls)

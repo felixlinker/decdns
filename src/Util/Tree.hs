@@ -23,9 +23,9 @@ import Util.Func
 import Data.Functor.Identity (Identity(runIdentity))
 
 data Node k v = Node
+  -- TODO: items should simply be of type v, but that refactor is probably not worth it
   { items :: [v]
   , children :: M.Map k (Node k v) }
-  deriving Eq
 
 instance (Show k, Show v) => Show (Node k v) where
   show (Node is cs) = unlines
@@ -37,6 +37,9 @@ instance (Show k, Show v) => Show (Node k v) where
 
       showChild :: k -> Node k v -> [String]
       showChild k n = ["/" ++ show k, show n]
+
+instance Foldable (Node k) where
+  foldr f acc (Node vs cs) = foldr (flip (foldr f)) (foldr f acc vs) cs
 
 instance Functor (Node k) where
   fmap f (Node rs cs) = Node (fmap f rs) (M.map (fmap f) cs)

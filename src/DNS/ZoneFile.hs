@@ -16,7 +16,8 @@ module DNS.ZoneFile
   , prune
   , allData
   , mergeZones
-  , noMatching ) where
+  , noMatching
+  , partition ) where
 
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
@@ -25,6 +26,7 @@ import qualified Control.Monad.Trans.State as St
 import DNS.Name as N
 import DNS.Record
 import qualified Util.Tree as T
+import Data.Bifunctor (Bifunctor(bimap))
 
 data AZone a b = Zone
   { zoneName :: Name a
@@ -97,7 +99,7 @@ get n (Zone org r) = case pathInZone org n of
 
 set :: (Label a, Ord a) => Name a -> [b] -> AZone a b -> AZone a b
 set nam is z@(Zone org r) = case pathInZone org nam of
-  Path _ [] p -> Zone org (T.alter (const (T.leaf is)) (Just T.emptyNode) p r)
+  Path _ [] p -> Zone org (T.alter (const (T.leaf is)) (Just . (`T.leafAt` is)) p r)
   _ -> z
 
 prune :: AZone a b -> AZone a b
@@ -120,3 +122,6 @@ noMatching (Named n d) (Zone org z) = case pathInZone org n of
     go :: Ord a => [a] -> T.Node a RData -> Bool
     go [] (T.Node is _) = all ((/= rtype d) . rtype) is
     go (h:t) (T.Node _ cs) = maybe True (go t) (M.lookup h cs)
+
+partition :: (Name a -> b -> Bool) -> AZone a b -> (AZone a b, AZone a b)
+partition p (Zone org r) = bimap (Zone org) (Zone org) (T.partition (p . (`prependLabels` org)) r)

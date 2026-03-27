@@ -49,7 +49,7 @@ wellformed (Zone org r@(Tr.Node apexData rcs)) =
       where
         nsData :: [RData]  -- NS records at this node
         otherData :: [RData] -- non-NS records at this node
-        (nsData, otherData) = partition (\rd -> toType (rtype rd) == T.NS) rs
+        (nsData, otherData) = Data.List.partition (\rd -> toType (rtype rd) == T.NS) rs
 
         getName :: RData -> Maybe (Name String)
         getName (rtype -> NS nsName) = Just nsName

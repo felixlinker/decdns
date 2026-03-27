@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 module Util.TreeSpec (tests) where
 
 import qualified Data.Map as M
@@ -15,6 +16,8 @@ tests =
     [ testProperty "leafAt/get roundtrip at path" prop_leafAtGetRoundtrip
     , testProperty "insert/get roundtrip at path" prop_insertGetRoundtrip
     , testProperty "pruning a tree without elements yields null" prop_pruneEmptyTreeIsNull
+    , testProperty "merging a partition is the identity" prop_mergePartionedIdentity
+    , testProperty "partition correctly partitions" prop_mergeCorrectness
     , testCase "null detects empty and non-empty nodes" nullDetectsEmptyAndNonEmptyNodes
     , testCase "get returns Nothing for missing path" $
         T.get ["a", "b"] (T.emptyNode :: T.Node String Int) @?= Nothing
@@ -25,6 +28,33 @@ tests =
     , testProperty "insert is commutative" prop_insertCommutativeDistinctPaths
     , testCase "merge keeps values from both trees" mergesValues
     ]
+
+newtype TNode k v = TNode { tt :: T.Node k v }
+
+onTree :: (T.Node k1 v1 -> T.Node k2 v2) -> TNode k1 v1 -> TNode k2 v2
+onTree f (tt -> t) = TNode (f t)
+
+instance (Ord v, Eq k, Eq v) => Eq (TNode k v) where
+  (tt -> T.Node vs (M.map TNode -> cs)) == (tt -> T.Node vs' (M.map TNode -> cs')) =
+    (S.fromList vs == S.fromList vs') && (cs == cs')
+
+instance (Show k, Show v) => Show (TNode k v) where
+  show = show . tt
+
+genTree :: Gen (TNode String Int)
+genTree = (fmap TNode . go) =<< chooseInt (0, 2)
+  where
+    go 0 = pure T.emptyNode
+    go n = do
+      n' <- chooseInt (0, n - 1)
+      vs <- listOf arbitrary :: Gen [Int]
+      width <- chooseInt (0, 3)
+      keys <- vectorOf width (arbitrary :: Gen String)
+      children <- vectorOf width (go n')
+      pure $ T.Node vs (M.fromList (zip keys children))
+
+genEmptyTree :: Gen (TNode String Int)
+genEmptyTree = onTree (T.mapItems (const [])) <$> genTree
 
 prop_leafAtGetRoundtrip :: [String] -> Int -> Property
 prop_leafAtGetRoundtrip p v =
@@ -44,19 +74,19 @@ prop_insertCommutativeDistinctPaths p1 v1 p2 v2 =
 
 prop_pruneEmptyTreeIsNull :: Property
 prop_pruneEmptyTreeIsNull =
-  forAllShrinkShow genEmptyTree (const []) (show . toCanon) $ \tree ->
-    T.null (T.prune (tree :: T.Node String Int)) === True
+  forAll genEmptyTree $ \tree ->
+    property $ T.null (T.prune (tt (tree :: TNode String Int)))
 
-genEmptyTree :: Gen (T.Node String Int)
-genEmptyTree = go =<< chooseInt (0, 2)
-  where
-    go 0 = pure T.emptyNode
-    go n = do
-      n' <- chooseInt (0, n - 1)
-      width <- chooseInt (0, 3)
-      keys <- vectorOf width (arbitrary :: Gen String)
-      children <- vectorOf width (go n')
-      pure $ T.Node [] (M.fromList (zip keys children))
+prop_mergePartionedIdentity :: Property
+prop_mergePartionedIdentity =
+  forAll genTree $ \tree ->
+    onTree (uncurry T.merge . T.partition (const even)) tree === tree
+
+prop_mergeCorrectness :: Property
+prop_mergeCorrectness =
+  forAll genTree $ \tree ->
+    let (top, bot) = T.partition (const even) (tt tree)
+    in property $ all even top && not (any even bot)
 
 nullDetectsEmptyAndNonEmptyNodes :: Assertion
 nullDetectsEmptyAndNonEmptyNodes = do
