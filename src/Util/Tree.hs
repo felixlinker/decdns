@@ -24,6 +24,7 @@ import Data.Functor.Identity (Identity(runIdentity))
 
 data Node k v = Node
   -- TODO: items should simply be of type v, but that refactor is probably not worth it
+  -- TODO: If I refactor as per above, I also should refactor items to a set
   { items :: [v]
   , children :: M.Map k (Node k v) }
   deriving Eq
