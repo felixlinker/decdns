@@ -25,6 +25,18 @@ import Data.Functor.Identity (Identity(runIdentity))
 data Node k v = Node
   { items :: [v]
   , children :: M.Map k (Node k v) }
+  deriving Eq
+
+instance (Show k, Show v) => Show (Node k v) where
+  show (Node is cs) = unlines
+    ( ("Node " ++ show is ++ "; children:")
+    : indent (concatMap (uncurry showChild) (M.toList cs)))
+    where
+      indent :: [String] -> [String]
+      indent = map ("  " ++)
+
+      showChild :: k -> Node k v -> [String]
+      showChild k n = ["/" ++ show k, show n]
 
 instance Functor (Node k) where
   fmap f (Node rs cs) = Node (fmap f rs) (M.map (fmap f) cs)
