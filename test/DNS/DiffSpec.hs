@@ -7,7 +7,7 @@ import Test.Tasty.HUnit (Assertion, (@?=), testCase)
 import DNS.Diff
 import DNS.Name (Name (..), Named (..), (<|))
 import DNS.Record
-import DNS.ZoneFile (emptyZone, fromList, get, insert, zoneName)
+import DNS.ZoneFile (emptyZone, fromList, get, insert, isEmpty, zoneName)
 import NameConstraint (LabelConstraint (..), exactly)
 
 tests :: TestTree
@@ -34,7 +34,8 @@ unchangedIsEmpty = do
   let n = mkName ["api", "example", "com"]
       z = fromList [Named n (mkData "192.0.2.10")]
       dz = diff z z
-  maybe False null (get n dz) @?= True
+  isEmpty dz @?= True
+  get n dz @?= Nothing
 
 preservesNonRootOrigin :: Assertion
 preservesNonRootOrigin = do
