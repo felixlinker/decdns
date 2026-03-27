@@ -50,6 +50,7 @@ library
       Util.Debug
       Util.Debug.Stub
       Util.Fresh
+      Util.Func
       Util.List
       Util.PartialOrder
       Util.Tree

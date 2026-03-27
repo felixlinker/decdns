@@ -7,24 +7,29 @@ import Test.Tasty.HUnit (Assertion, (@?=), testCase)
 import Test.Tasty.QuickCheck
 
 import qualified Util.Tree as T
-import Util.Tree (Node(items))
 
 tests :: TestTree
 tests =
   testGroup
     "Util.Tree"
-    [ testProperty "insert/get roundtrip at path" prop_insertGetRoundtrip
+    [ testProperty "leafAt/get roundtrip at path" prop_leafAtGetRoundtrip
+    , testProperty "insert/get roundtrip at path" prop_insertGetRoundtrip
     , testProperty "pruning a tree without elements yields null" prop_pruneEmptyTreeIsNull
     , testCase "null detects empty and non-empty nodes" nullDetectsEmptyAndNonEmptyNodes
     , testCase "get returns Nothing for missing path" $
         T.get ["a", "b"] (T.emptyNode :: T.Node String Int) @?= Nothing
-    , testCase "alter applies function at root for empty path" altersRoot
-    , testCase "alter creates missing path when given default node" altersMissingPathWithDefault
+    , testCase "alter applies function at root for empty path" insertRoot
+    , testCase "alter creates missing path when given default node" insertMissingPath
     , testCase "alter is no-op on missing path without default" alterMissingPathWithoutDefault
     , testCase "insertNode replaces existing subtree at path" replacesSubtree
     , testProperty "insert is commutative" prop_insertCommutativeDistinctPaths
     , testCase "merge keeps values from both trees" mergesValues
     ]
+
+prop_leafAtGetRoundtrip :: [String] -> Int -> Property
+prop_leafAtGetRoundtrip p v =
+  let n = T.leafAt p [v]
+  in T.get p n === Just [v]
 
 prop_insertGetRoundtrip :: [String] -> Int -> Property
 prop_insertGetRoundtrip p v =
@@ -58,23 +63,23 @@ nullDetectsEmptyAndNonEmptyNodes = do
   T.null (T.emptyNode :: T.Node String Int) @?= True
   T.null (T.leaf [1 :: Int]) @?= False
 
-altersRoot :: Assertion
-altersRoot = do
+insertRoot :: Assertion
+insertRoot = do
   let base = T.Node [1 :: Int] (M.fromList [("x", T.leaf [2 :: Int])])
-      out = T.alter (\n@(T.Node is _) -> n { items = 0 : is }) Nothing [] base
+      out = T.insert [] 0 base
   T.get [] out @?= Just [0, 1]
   T.get ["x"] out @?= Just [2]
 
-altersMissingPathWithDefault :: Assertion
-altersMissingPathWithDefault = do
-  let out = T.alter (\n@(T.Node is _) -> n { items = 1 : is }) (Just T.emptyNode) ["a", "b"] (T.emptyNode :: T.Node String Int)
+insertMissingPath :: Assertion
+insertMissingPath = do
+  let out = T.insert ["a", "b"] 1 (T.emptyNode :: T.Node String Int)
   T.get ["a"] out @?= Just []
   T.get ["a", "b"] out @?= Just [1]
 
 alterMissingPathWithoutDefault :: Assertion
 alterMissingPathWithoutDefault = do
   let base = T.insert ["keep"] (7 :: Int) (T.emptyNode :: T.Node String Int)
-      out = T.alter (const (T.leaf [1 :: Int])) Nothing ["missing"] base
+      out = T.alter (const (T.leaf [1 :: Int])) (const Nothing) ["missing"] base
   toCanon out @?= toCanon base
 
 data CanonTree k v = CanonTree (S.Set v) [(k, CanonTree k v)]
