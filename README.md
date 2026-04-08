@@ -29,35 +29,42 @@ Zone files must be provided as paths to files (or globs), and the respective fil
 Description: This tool runs an interactive, non-deterministic resolver and can enumerate every way by which a query is resolvable.
 
 Instructions:
-- Execute by running `stack run dns-regressor-interactive <LIST OF ZONE FILES>`
+- Execute by running `stack run dns-regressor-interactive -- [zone files...]`
 - When in interactive mode, you can use these commands:
-  - `:slist <NAMES>`: Set the list of name server that resolution can start from.
-  - `:? <QNAME> <QTYPE>`: Show every way by which querying for `QNAME` and `QTYPE` could be resolved.
+  - `:slist [names...]`: Set the list of name server that resolution can start from.
+  - `:? [qname] [qtype]`: Show every way by which querying for `QNAME` and `QTYPE` could be resolved.
   - `:print`: Print all parsed zone file contents.
   - `:q`: Exit the interactive mode.
 
 ### `dns-regressor-prolog`
 
 Description: This tool reasons statically about DNS zone files, as described above.
-It takes a command and a list of arguments.
+It takes a command and a list of arguments:
+
+```sh
+stack run dns-regressor-prolog -- [command] [args]
+```
 
 Available commands are:
 
-- `pl-resolvable <LIST OF NAMES> -- <LIST OF ZONE FILES>`:
+- `pl-resolvable [names...] -- [zone files...]`:
   Compile a list of zone files to a Prolog program that can reason about resolvability and print it to stdout.
   Resolution will start at the name servers provided as first list of arguments.
-- `pl-regressions <LIST OF NAMES> -- <LIST OF OLD ZONE FILES> -- <LIST OF NEW ZONE FILES>`:
+- `pl-regressions [names...] -- [old zone files...] -- [new zone files...]`:
   Compile a list of old and new zone files to a Prolog program that can reason about regressions in resolvability during an update.
   Arguments are as with the previous command, but the list of zone files reflect the old and new configuration respectively.
-- `resolvable <LIST OF NAMES> -- <LIST OF ZONE FILES>`:
+- `resolvable [names...] -- [zone files...]`:
   Like `pl-resolvable`, but reason statically and symbolically.
   Out is printed to stdout as Prolog facts.
-- `regressions <LIST OF NAMES> -- <LIST OF OLD ZONE FILES> -- <LIST OF NEW ZONE FILES>`:
+- `regressions [names...] -- [old zone files...] -- [new zone files...]`:
   Like `pl-regressions`, but reason statically and symbolically.
   Out is printed to stdout as Prolog facts.
   Also prints the order in which the updates can be rolled out.
-- `diff <LIST OF OLD ZONE FILES> -- <LIST OF NEW ZONE FILES>`:
+- `diff [old zone files...] -- [new zone files...]`:
   Print the diff of the zone file configurations.
-- `dependencies <LIST OF NAMES> -- <LIST OF ZONE FILES>`:
+- `dependencies [names...] -- [zone files...]`:
   Arguments like for `pl-resolvable`.
   Computes resolution of which name at a specific name server can lead to resolution of a different name at a different name server.
+- `parse-only [zone files...]`:
+  Parses the list of zone files and prints all records to stdout.
+  This command is supposed to aid debugging.
