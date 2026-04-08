@@ -6,6 +6,9 @@ The tools purpose and CLI usage is documented in the `README.md`.
 - Re-run tests whenever possible.
 If you implement new features, also implement corresponding test cases.
 You can re-run all tests by executing `stack test`.
+- If you find that a test case fails, always fix that.
+You may fix a failing test case both by changing the implementation or the test case.
+Always think about which option is the correct one and include your reasoning in your final report.
 - Favor simple code. Simplify your logic whenever possible.
 - The repository contains the following packages:
   - `src/DNS`: Type definitions and auxiliary functions for handling DNS zones.
