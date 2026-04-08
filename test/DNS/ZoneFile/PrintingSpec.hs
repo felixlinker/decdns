@@ -18,6 +18,7 @@ tests =
   testGroup
     "ZoneFile.Printing"
     [ testProperty "parsing a printed zone yields the same zone" propPrintParseRoundTrip
+    , testProperty "parsing a printed zone with DNSSEC records yields the same zone" propPrintParseRoundTripDNSSEC
     ]
 
 propPrintParseRoundTrip :: ZS.ArbZone -> Property
@@ -30,6 +31,10 @@ propPrintParseRoundTrip (ZS.ArbZone z printed) =
         normalizeZone z' === normalizeZone z
       Right zs ->
         counterexample ("expected 1 zone, got " ++ show (length zs)) False
+
+propPrintParseRoundTripDNSSEC :: Property
+propPrintParseRoundTripDNSSEC =
+  forAll ZS.genArbZoneWithDNSSEC propPrintParseRoundTrip
 
 normalizeZone :: Zone String -> (Name String, [StandardRecord])
 normalizeZone z = (zoneName z, sort (allData z))

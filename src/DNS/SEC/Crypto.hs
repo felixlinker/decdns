@@ -1,6 +1,10 @@
 module DNS.SEC.Crypto
   ( AlgorithmType(..)
-  , DigestType(..) ) where
+  , algorithmFromInt
+  , algorithmFromMnemonic
+  , DigestType(..)
+  , digestFromInt
+  ) where
 
 data AlgorithmType
   = RSAMD5
@@ -23,32 +27,77 @@ data AlgorithmType
   | PRIVATEOID
   deriving (Eq, Ord)
 
+algorithmToInt :: AlgorithmType -> Int
+algorithmToInt RSAMD5 = 1
+algorithmToInt DH = 2
+algorithmToInt DSA = 3
+algorithmToInt RSASHA1 = 5
+algorithmToInt DSA_NSEC3_SHA1 = 6
+algorithmToInt RSASHA1_NSEC3_SHA1 = 7
+algorithmToInt RSASHA256 = 8
+algorithmToInt RSASHA512 = 10
+algorithmToInt ECC_GOST = 12
+algorithmToInt ECDSAP256SHA256 = 13
+algorithmToInt ECDSAP384SHA384 = 14
+algorithmToInt ED25519 = 15
+algorithmToInt ED448 = 16
+algorithmToInt SM2SM3 = 17
+algorithmToInt ECC_GOST12 = 23
+algorithmToInt INDIRECT = 252
+algorithmToInt PRIVATEDNS = 253
+algorithmToInt PRIVATEOID = 254
+
 instance Show AlgorithmType where
-  show RSAMD5 = "1"
-  show DH = "2"
-  show DSA = "3"
-  show RSASHA1 = "5"
-  show DSA_NSEC3_SHA1 = "6"
-  show RSASHA1_NSEC3_SHA1 = "7"
-  show RSASHA256 = "8"
-  show RSASHA512 = "10"
-  show ECC_GOST = "12"
-  show ECDSAP256SHA256 = "13"
-  show ECDSAP384SHA384 = "14"
-  show ED25519 = "15"
-  show ED448 = "16"
-  show SM2SM3 = "17"
-  show ECC_GOST12 = "23"
-  show INDIRECT = "252"
-  show PRIVATEDNS = "253"
-  show PRIVATEOID = "254"
+  show = show . algorithmToInt
+
+algorithmFromInt :: Int -> Maybe AlgorithmType
+algorithmFromInt 1 = Just RSAMD5
+algorithmFromInt 2 = Just DH
+algorithmFromInt 3 = Just DSA
+algorithmFromInt 5 = Just RSASHA1
+algorithmFromInt 6 = Just DSA_NSEC3_SHA1
+algorithmFromInt 7 = Just RSASHA1_NSEC3_SHA1
+algorithmFromInt 8 = Just RSASHA256
+algorithmFromInt 10 = Just RSASHA512
+algorithmFromInt 12 = Just ECC_GOST
+algorithmFromInt 13 = Just ECDSAP256SHA256
+algorithmFromInt 14 = Just ECDSAP384SHA384
+algorithmFromInt 15 = Just ED25519
+algorithmFromInt 16 = Just ED448
+algorithmFromInt 17 = Just SM2SM3
+algorithmFromInt 23 = Just ECC_GOST12
+algorithmFromInt 252 = Just INDIRECT
+algorithmFromInt 253 = Just PRIVATEDNS
+algorithmFromInt 254 = Just PRIVATEOID
+algorithmFromInt _ = Nothing
+
+algorithmFromMnemonic :: String -> Maybe AlgorithmType
+algorithmFromMnemonic "RSAMD5" = Just RSAMD5
+algorithmFromMnemonic "DH" = Just DH
+algorithmFromMnemonic "DSA" = Just DSA
+algorithmFromMnemonic "RSASHA1" = Just RSASHA1
+algorithmFromMnemonic "INDIRECT" = Just INDIRECT
+algorithmFromMnemonic "PRIVATEDNS" = Just PRIVATEDNS
+algorithmFromMnemonic "PRIVATEOID" = Just PRIVATEOID
+algorithmFromMnemonic _ = Nothing
 
 data DigestType = NULL | SHA1 | SHA256 | GOST_R_31_11_94 | SHA384
   deriving (Eq, Ord)
 
+digestToInt :: DigestType -> Int
+digestToInt NULL = 0
+digestToInt SHA1 = 1
+digestToInt SHA256 = 2
+digestToInt GOST_R_31_11_94 = 3
+digestToInt SHA384 = 4
+
 instance Show DigestType where
-  show NULL = "0"
-  show SHA1 = "1"
-  show SHA256 = "2"
-  show GOST_R_31_11_94 = "3"
-  show SHA384 = "4"
+  show = show . digestToInt
+
+digestFromInt :: Int -> Maybe DigestType
+digestFromInt 0 = Just NULL
+digestFromInt 1 = Just SHA1
+digestFromInt 2 = Just SHA256
+digestFromInt 3 = Just GOST_R_31_11_94
+digestFromInt 4 = Just SHA384
+digestFromInt _ = Nothing

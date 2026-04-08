@@ -2,6 +2,7 @@
 module DNS.Record
   ( Cat(..)
   , DNSKeyFlag(..)
+  , dnsKeyFlagsFromInt
   , Type(..)
   , showData
   , toType
@@ -12,6 +13,11 @@ module DNS.Record
   , StandardRecord ) where
 
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base64 as B64
+import qualified Data.ByteString.Char8 as C
+import Data.Bits ((.|.), (.&.), complement)
+import Data.Char (toUpper)
+import Numeric (showHex)
 
 import DNS.Name
 import qualified DNS.RecordType as T
@@ -65,10 +71,24 @@ showData (AAAA addr) = addr
 showData (TXT addr) = addr
 showData (MX p n) = unwords [show p, show n]
 showData (SOA a b c d e f g) = unwords [show a, show b, show c, show d, show e, show f, show g]
-showData (DNSKEY {}) = undefined
-showData (RRSIG {}) = undefined
-showData (NSEC {}) = undefined
-showData (DS {}) = undefined
+showData (DNSKEY flags algorithm publicKey) =
+  unwords [show (dnsKeyFlagsToInt flags), "3", show algorithm, base64Text publicKey]
+showData (RRSIG typeCovered algorithm labelCount originalTTL signatureExpiration signatureInception keyTag signersName signature) =
+  unwords
+    [ show typeCovered
+    , show algorithm
+    , show labelCount
+    , show originalTTL
+    , show signatureExpiration
+    , show signatureInception
+    , show keyTag
+    , show signersName
+    , base64Text signature
+    ]
+showData (NSEC nextDomainName typeBitMaps) =
+  unwords (show nextDomainName : map show typeBitMaps)
+showData (DS keyTag algorithm digestType digest) =
+  unwords [show keyTag, show algorithm, show digestType, hexText digest]
 
 instance Show Type where
   show t = show (toType t) ++ " " ++ showData t
@@ -105,3 +125,33 @@ record = Named
 
 instance Show RData where
   show (RData c ttl t) = show ttl ++ " " ++ show c ++ " " ++ show t
+
+dnsKeyFlagsToInt :: [DNSKeyFlag] -> Int
+dnsKeyFlagsToInt = foldr ((.|.) . dnsKeyFlagToInt) 0
+
+dnsKeyFlagToInt :: DNSKeyFlag -> Int
+dnsKeyFlagToInt ZoneKey = 256
+dnsKeyFlagToInt Other = 128
+dnsKeyFlagToInt SecureEntryPoint = 1
+
+base64Text :: BS.ByteString -> String
+base64Text = C.unpack . B64.encode
+
+hexText :: BS.ByteString -> String
+hexText = concatMap (map toUpper . pad . (`showHex` "")) . BS.unpack
+  where
+    pad [x] = ['0', x]
+    pad xs = xs
+
+knownDNSKeyFlagsMask :: Int
+knownDNSKeyFlagsMask = dnsKeyFlagsToInt [ZoneKey, Other, SecureEntryPoint]
+
+dnsKeyFlagsFromInt :: Int -> [DNSKeyFlag]
+dnsKeyFlagsFromInt flags =
+  concat
+    [ [ZoneKey | flags .&. dnsKeyFlagToInt ZoneKey /= 0]
+    , [SecureEntryPoint | flags .&. dnsKeyFlagToInt SecureEntryPoint /= 0]
+    , [Other | flags .&. otherDNSKeyFlagsMask /= 0]
+    ]
+  where
+    otherDNSKeyFlagsMask = dnsKeyFlagToInt Other .|. complement knownDNSKeyFlagsMask

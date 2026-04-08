@@ -12,11 +12,12 @@ module Parsing.State
   , readState
   , writeState
   , tryOrState
+  , dataSpace
+  , fieldSep
   , endOfEntry
   , sep ) where
 
 import Text.Parsec
-import Control.Applicative (asum)
 import Control.Monad (when, guard, void)
 import qualified Control.Lens as L
 
@@ -84,19 +85,20 @@ close = do
 
 endOfEntry :: Stream s m Char => Parser s m ()
 endOfEntry = do
+  skipMany dataSpace
   c <- lensState parensStack
   if c > 0
-    then close
+    then close >> endOfEntry
     else void endOfLine <|> eof
 
-hspace' :: Stream s m Char => Parser s m Char
-hspace' = hspace <|> do
+dataSpace :: Stream s m Char => Parser s m Char
+dataSpace = hspace <|> do
   c <- lensState parensStack
   guard (c > 0)
   newline
 
-hspaces1 :: Stream s m Char => Parser s m ()
-hspaces1 = skipMany1 hspace'
+fieldSep :: Stream s m Char => Parser s m ()
+fieldSep = skipMany1 (void dataSpace <|> open)
 
 sep :: Stream s m Char => Parser s m ()
-sep = asum $ map try [ hspaces1, open, endOfEntry ]
+sep = try endOfEntry <|> fieldSep
