@@ -13,15 +13,12 @@ module DNS.Record
   , StandardRecord ) where
 
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Base64 as B64
-import qualified Data.ByteString.Char8 as C
 import Data.Bits ((.|.), (.&.), complement)
-import Data.Char (toUpper)
-import Numeric (showHex)
 
 import DNS.Name
 import qualified DNS.RecordType as T
 import DNS.SEC.Crypto
+import Util.Bytes
 
 data DNSKeyFlag = ZoneKey | Other | SecureEntryPoint
   deriving (Eq, Ord)
@@ -72,7 +69,7 @@ showData (TXT addr) = addr
 showData (MX p n) = unwords [show p, show n]
 showData (SOA a b c d e f g) = unwords [show a, show b, show c, show d, show e, show f, show g]
 showData (DNSKEY flags algorithm publicKey) =
-  unwords [show (dnsKeyFlagsToInt flags), "3", show algorithm, base64Text publicKey]
+  unwords [show (dnsKeyFlagsToInt flags), "3", show algorithm, toB64 publicKey]
 showData (RRSIG typeCovered algorithm labelCount originalTTL signatureExpiration signatureInception keyTag signersName signature) =
   unwords
     [ show typeCovered
@@ -83,12 +80,12 @@ showData (RRSIG typeCovered algorithm labelCount originalTTL signatureExpiration
     , show signatureInception
     , show keyTag
     , show signersName
-    , base64Text signature
+    , toB64 signature
     ]
 showData (NSEC nextDomainName typeBitMaps) =
   unwords (show nextDomainName : map show typeBitMaps)
 showData (DS keyTag algorithm digestType digest) =
-  unwords [show keyTag, show algorithm, show digestType, hexText digest]
+  unwords [show keyTag, show algorithm, show digestType, toHex digest]
 
 instance Show Type where
   show t = show (toType t) ++ " " ++ showData t
@@ -133,15 +130,6 @@ dnsKeyFlagToInt :: DNSKeyFlag -> Int
 dnsKeyFlagToInt ZoneKey = 256
 dnsKeyFlagToInt Other = 128
 dnsKeyFlagToInt SecureEntryPoint = 1
-
-base64Text :: BS.ByteString -> String
-base64Text = C.unpack . B64.encode
-
-hexText :: BS.ByteString -> String
-hexText = concatMap (map toUpper . pad . (`showHex` "")) . BS.unpack
-  where
-    pad [x] = ['0', x]
-    pad xs = xs
 
 knownDNSKeyFlagsMask :: Int
 knownDNSKeyFlagsMask = dnsKeyFlagsToInt [ZoneKey, Other, SecureEntryPoint]

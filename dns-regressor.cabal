@@ -48,6 +48,7 @@ library
       Resolvable.Update.Resolvability
       Resolvable.Update.Rollout
       Resolvable.Update.Trivial
+      Util.Bytes
       Util.Debug
       Util.Debug.Stub
       Util.Fresh
