@@ -26,7 +26,11 @@ recordType = asum $ map try
   , string "A" $> T.A
   , string "TXT" $> T.TXT
   , string "MX" $> T.MX
-  , string "SOA" $> T.SOA ]
+  , string "SOA" $> T.SOA
+  , string "DNSKEY" $> T.DNSKEY
+  , string "RRSIG" $> T.RRSIG
+  , string "NSEC" $> T.NSEC
+  , string "DS" $> T.DS ]
 
 recordTypeData :: Stream s m Char => TypeParser s m
 recordTypeData = do
@@ -41,6 +45,10 @@ recordTypeData = do
     T.TXT -> txt
     T.MX -> mx
     T.SOA -> soa
+    T.DNSKEY -> undefined
+    T.RRSIG -> undefined
+    T.NSEC -> undefined
+    T.DS -> undefined
 
 cname :: Stream s m Char => TypeParser s m
 cname = CNAME <$> name

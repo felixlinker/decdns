@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module DNS.Record
   ( Cat(..)
+  , DNSKeyFlag(..)
   , Type(..)
   , showData
   , toType
@@ -10,8 +11,14 @@ module DNS.Record
   , NamedRecord
   , StandardRecord ) where
 
+import qualified Data.ByteString as BS
+
 import DNS.Name
 import qualified DNS.RecordType as T
+import DNS.SEC.Crypto
+
+data DNSKeyFlag = ZoneKey | Other | SecureEntryPoint
+  deriving (Eq, Ord)
 
 data Type =
     CNAME (Name String)
@@ -29,6 +36,24 @@ data Type =
         , _retry :: Int
         , _expire :: Int
         , _minimum :: Int }
+  | DNSKEY  { _flags :: [DNSKeyFlag]
+            , _algorithm :: AlgorithmType
+            , _publicKey :: BS.ByteString }
+  | RRSIG { _typeCovered :: T.Type
+          , _algorithm :: AlgorithmType
+          , _labels :: Int
+          , _originalTTL :: Int
+          , _signatureExpiration :: Int
+          , _signatureInception :: Int
+          , _keyTag :: Int
+          , _signersName :: Name String
+          , _signature :: BS.ByteString }
+    | NSEC  { _nextDomainName :: Name String
+            , _typeBitMaps :: [T.Type] }
+    | DS  { _keyTag :: Int
+          , _algorithm :: AlgorithmType
+          , _digestType :: DigestType
+          , _digest :: BS.ByteString }
   deriving (Eq, Ord)
 
 showData :: Type -> String
@@ -40,6 +65,10 @@ showData (AAAA addr) = addr
 showData (TXT addr) = addr
 showData (MX p n) = unwords [show p, show n]
 showData (SOA a b c d e f g) = unwords [show a, show b, show c, show d, show e, show f, show g]
+showData (DNSKEY {}) = undefined
+showData (RRSIG {}) = undefined
+showData (NSEC {}) = undefined
+showData (DS {}) = undefined
 
 instance Show Type where
   show t = show (toType t) ++ " " ++ showData t
@@ -53,6 +82,10 @@ toType (AAAA _) = T.AAAA
 toType (TXT _) = T.TXT
 toType (MX {}) = T.MX
 toType (SOA {}) = T.SOA
+toType (DNSKEY {}) = T.DNSKEY
+toType (RRSIG {}) = T.RRSIG
+toType (NSEC {}) = T.NSEC
+toType (DS {}) = T.DS
 
 data Cat = IN
   deriving (Eq, Ord, Show)

@@ -25,6 +25,7 @@ library
       DNS.Name
       DNS.Record
       DNS.RecordType
+      DNS.SEC.Crypto
       DNS.ZoneFile
       DNS.ZoneFile.Printing
       NameConstraint
@@ -63,6 +64,8 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
+    , base64-bytestring
+    , bytestring
     , containers
     , lens
     , parsec
@@ -82,6 +85,8 @@ executable dns-regressor-interactive
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N -main-is Interactive
   build-depends:
       base >=4.7 && <5
+    , base64-bytestring
+    , bytestring
     , containers
     , dns-regressor
     , lens
@@ -102,6 +107,8 @@ executable dns-regressor-prolog
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N -main-is PrologCompiler
   build-depends:
       base >=4.7 && <5
+    , base64-bytestring
+    , bytestring
     , containers
     , dns-regressor
     , lens
@@ -137,6 +144,8 @@ test-suite dns-regressor-test
       HUnit
     , QuickCheck
     , base >=4.7 && <5
+    , base64-bytestring
+    , bytestring
     , containers
     , dns-regressor
     , lens

@@ -21,6 +21,8 @@ dependencies:
 - transformers
 - parsec
 - lens
+- bytestring
+- base64-bytestring
 
 ghc-options:
 - -Wall
