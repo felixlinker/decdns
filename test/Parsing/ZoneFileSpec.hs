@@ -1,4 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
 module Parsing.ZoneFileSpec (tests) where
 
 import qualified Data.ByteString as BS
@@ -17,6 +16,8 @@ import Test.Tasty.QuickCheck
 import Text.Parsec (eof, runParserT)
 import Control.Monad (foldM)
 import Util.Bytes
+import Data.Maybe (fromMaybe)
+import Data.List (unsnoc)
 
 tests :: TestTree
 tests =
@@ -78,13 +79,11 @@ parsesExplicitOwnerNamedIN = do
 
 propParsesMultilineDNSKEYBlob :: Property
 propParsesMultilineDNSKEYBlob =
-  forAll (genSplitBlob genB64) $ \blob ->
-    parsesRecordType dnskeyRec (showWithBlob dnskeyRec blob)
+  forAll (genSplitBytesRec dnskeyRec) (uncurry parsesRecordType)
 
 propParsesMultilineDSBlob :: Property
 propParsesMultilineDSBlob =
-  forAll (genSplitBlob genHex) $ \blob ->
-    parsesRecordType dsRec (showWithBlob dsRec blob)
+  forAll (genSplitBytesRec dsRec) (uncurry parsesRecordType)
 
 parsesRecordType :: DNS.Record.Type -> String -> Property
 parsesRecordType expected input =
@@ -95,15 +94,15 @@ parsesRecordType expected input =
         Right actual ->
           actual === expected
 
--- NOTE: showWithBlob relies on the invariant that the record provided contains
--- a null bytestring.
-showWithBlob :: DNS.Record.Type -> String -> String
-showWithBlob (show -> prefix) blob =
-  prefix ++ unwords ["(", blob, ")"]
+genSplitBytesRec :: Gen Type -> Gen (Type, String)
+genSplitBytesRec recGen = do
+  r <- recGen
+  (prefix, blob) <- maybe (error "could not unsnoc") return $ unsnoc $ words $ show r
+  serialized <- genSplitBlob blob
+  return (r, unwords $ prefix ++ ["(", serialized, ")"])
 
-genSplitBlob :: Gen String -> Gen String
-genSplitBlob blobGen = do
-  blob <- blobGen
+genSplitBlob :: String -> Gen String
+genSplitBlob blob = do
   chunked <- split blob
   initSep <- genSep
   foldM sepF initSep chunked
@@ -129,14 +128,8 @@ genSep = listOf1 (elements [' ', '\t', '\n'])
 genBytes :: Gen BS.ByteString
 genBytes = BS.pack <$> listOf1 arbitrary
 
-genHex :: Gen String
-genHex = toHex <$> genBytes
+dnskeyRec :: Gen Type
+dnskeyRec = DNSKEY [] RSASHA256 <$> genBytes
 
-genB64 :: Gen String
-genB64 = toB64 <$> genBytes
-
-dnskeyRec :: DNS.Record.Type
-dnskeyRec = DNSKEY [] RSASHA256 BS.empty
-
-dsRec :: DNS.Record.Type
-dsRec = DS 60485 RSASHA256 SHA256 BS.empty
+dsRec :: Gen Type
+dsRec = DS 60485 RSASHA256 SHA256 <$> genBytes
