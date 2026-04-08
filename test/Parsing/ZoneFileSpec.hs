@@ -1,11 +1,22 @@
+{-# LANGUAGE ViewPatterns #-}
 module Parsing.ZoneFileSpec (tests) where
 
+import qualified Data.ByteString as BS
+import Data.Functor.Identity (runIdentity)
+
 import DNS.Name (Named (name, value))
-import DNS.Record (RData (rttl))
+import DNS.Record (RData (rttl), Type (DNSKEY, DS))
+import DNS.SEC.Crypto (AlgorithmType (RSASHA256), DigestType (SHA256))
 import DNS.ZoneFile (allData)
+import Parsing.Data (recordTypeData)
+import Parsing.State (emptyState, sep)
 import Parsing.ZoneFile (parseZoneFile)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit
+import Test.Tasty.QuickCheck
+import Text.Parsec (eof, runParserT)
+import Control.Monad (foldM)
+import Util.Bytes
 
 tests :: TestTree
 tests =
@@ -14,6 +25,8 @@ tests =
     [ testCase "parses $TTL and applies it to records without explicit TTL" parsesTTLDirective
     , testCase "parses omitted owner when line starts with IN" parsesOmittedOwnerStartingWithClass
     , testCase "backtracks to explicit owner when owner is IN" parsesExplicitOwnerNamedIN
+    , testProperty "parses multiline DNSKEY base64 blobs" propParsesMultilineDNSKEYBlob
+    , testProperty "parses multiline DS hex blobs" propParsesMultilineDSBlob
     ]
 
 parsesTTLDirective :: Assertion
@@ -62,3 +75,68 @@ parsesExplicitOwnerNamedIN = do
   case zones of
     [z] -> length (allData z) @?= 2
     zs -> assertFailure ("expected 1 zone, got " ++ show (length zs))
+
+propParsesMultilineDNSKEYBlob :: Property
+propParsesMultilineDNSKEYBlob =
+  forAll (genSplitBlob genB64) $ \blob ->
+    parsesRecordType dnskeyRec (showWithBlob dnskeyRec blob)
+
+propParsesMultilineDSBlob :: Property
+propParsesMultilineDSBlob =
+  forAll (genSplitBlob genHex) $ \blob ->
+    parsesRecordType dsRec (showWithBlob dsRec blob)
+
+parsesRecordType :: DNS.Record.Type -> String -> Property
+parsesRecordType expected input =
+  counterexample input $
+      case runIdentity (runParserT (recordTypeData <* sep <* eof) emptyState "<quickcheck>" input) of
+        Left err ->
+          counterexample (show err) False
+        Right actual ->
+          actual === expected
+
+-- NOTE: showWithBlob relies on the invariant that the record provided contains
+-- a null bytestring.
+showWithBlob :: DNS.Record.Type -> String -> String
+showWithBlob (show -> prefix) blob =
+  prefix ++ unwords ["(", blob, ")"]
+
+genSplitBlob :: Gen String -> Gen String
+genSplitBlob blobGen = do
+  blob <- blobGen
+  chunked <- split blob
+  initSep <- genSep
+  foldM sepF initSep chunked
+  where
+    sepF :: String -> String -> Gen String
+    sepF acc chunk = do
+      seperator <- genSep
+      return $ acc ++ chunk ++ seperator
+
+split :: String -> Gen [String]
+split blob = go blob =<< chooseInt (1, length blob)
+  where
+    go :: String -> Int -> Gen [String]
+    go "" _ = return []
+    go s maxLen = do
+      i <- chooseInt (1, maxLen)
+      let (h, t) = splitAt i s
+      (h:) <$> go t maxLen
+
+genSep :: Gen String
+genSep = listOf1 (elements [' ', '\t', '\n'])
+
+genBytes :: Gen BS.ByteString
+genBytes = BS.pack <$> listOf1 arbitrary
+
+genHex :: Gen String
+genHex = toHex <$> genBytes
+
+genB64 :: Gen String
+genB64 = toB64 <$> genBytes
+
+dnskeyRec :: DNS.Record.Type
+dnskeyRec = DNSKEY [] RSASHA256 BS.empty
+
+dsRec :: DNS.Record.Type
+dsRec = DS 60485 RSASHA256 SHA256 BS.empty
