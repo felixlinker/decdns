@@ -2,7 +2,7 @@ module PrologCompiler (main) where
 
 import DNS.ZoneFile (fromList, AZone)
 import DNS.Diff
-import NameConstraint (ConstrainedLabel)
+import NameConstraint (ConstrainedLabel, toStandardRecord)
 import Resolvable.Prolog
 import Resolvable.Resolvability
 import Resolvable.Update.Resolvability
@@ -87,6 +87,9 @@ main = do
       rootServers <- parseNames roots
       compiled <- runFresh . compileConfig rootServers <$> mapM parseZoneFileZones zones
       print $ fromRules compiled
+    "parse-only" -> do
+      parsed <- concatMap (map toStandardRecord . snd) <$> mapM parseZoneFileZones args
+      mapM_ print parsed
     _ -> fail "unknown command"
   where
     toZone :: [Named ConstrainedLabel b] -> AZone String b

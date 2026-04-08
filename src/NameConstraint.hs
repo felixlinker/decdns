@@ -5,6 +5,7 @@ module NameConstraint
   , ConstrainedLabel
   , ConstrainedName
   , ConstrainedRecord
+  , toStandardRecord
   , toName
   , exactly
   , compileWildcards
@@ -34,6 +35,9 @@ instance Show (LabelConstraint String) where
 type ConstrainedLabel = LabelConstraint String
 type ConstrainedName = Name ConstrainedLabel
 type ConstrainedRecord = Record ConstrainedLabel
+
+toStandardRecord :: ConstrainedRecord -> StandardRecord
+toStandardRecord (Named n d) = Named (toName n) d
 
 instance Show ConstrainedName where
   show = show . toName

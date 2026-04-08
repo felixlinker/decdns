@@ -9,17 +9,13 @@ import System.Environment (getArgs)
 import NonDet
 import RecursiveResolver
 import DNS.Name
-import DNS.Record
 import Parsing
 import NameConstraint
 import Util (parseZoneFileZones)
 import Control.Monad (forM_)
 
-rToName :: ConstrainedRecord -> StandardRecord
-rToName (Named n d) = Named (toName n) d
-
 printNameServer :: Name String -> [ConstrainedRecord] -> IO ()
-printNameServer n (map rToName -> rs) = do
+printNameServer n (map toStandardRecord -> rs) = do
   putStrLn $ "name server " ++ show n ++ " serves..."
   forM_ rs (\r -> do
     putStr "  "
