@@ -6,10 +6,7 @@ module Parsing.Data
 
 import Data.Functor (($>))
 import Control.Applicative (asum)
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Base64 as B64
-import qualified Data.ByteString.Char8 as C
-import Data.Char (digitToInt, isHexDigit, isPrint, toUpper)
+import Data.Char (isPrint)
 import Text.Parsec
 
 import Parsing.State
@@ -101,7 +98,7 @@ dnskey = do
   fieldSep
   algorithm <- algorithmType
   fieldSep
-  DNSKEY (dnsKeyFlagsFromInt flagValue) algorithm <$> base64Blob
+  DNSKEY (dnsKeyFlagsFromInt flagValue) algorithm <$> base64WithSeparators (many1 dataSpace)
 
 rrsig :: Stream s m Char => TypeParser s m
 rrsig = do
@@ -121,7 +118,7 @@ rrsig = do
   fieldSep
   signersName <- name
   fieldSep
-  RRSIG typeCovered algorithm labelCount originalTTL signatureExpiration signatureInception keyTag signersName <$> base64Blob
+  RRSIG typeCovered algorithm labelCount originalTTL signatureExpiration signatureInception keyTag signersName <$> base64WithSeparators (many1 dataSpace)
 
 nsec :: Stream s m Char => TypeParser s m
 nsec = do
@@ -139,7 +136,7 @@ ds = do
   fieldSep
   digestType <- digestTypeCode
   fieldSep
-  DS keyTag algorithm digestType <$> hexBlob
+  DS keyTag algorithm digestType <$> hexWithSeparators (many1 dataSpace)
 
 algorithmType :: Stream s m Char => Parser s m AlgorithmType
 algorithmType =
@@ -163,34 +160,3 @@ digestTypeCode :: Stream s m Char => Parser s m DigestType
 digestTypeCode = do
   n <- int
   maybe (fail "unknown DNSSEC digest type") return (digestFromInt n)
-
--- TODO: Remove code redundancies to Parsing.Tokens
-base64Blob :: Stream s m Char => Parser s m BS.ByteString
-base64Blob = blobWithSpace base64Chunk decodeBase64
-
-hexBlob :: Stream s m Char => Parser s m BS.ByteString
-hexBlob = blobWithSpace hexChunk decodeHex
-
-blobWithSpace :: Stream s m Char => Parser s m String -> (String -> Parser s m a) -> Parser s m a
-blobWithSpace chunk decode = decode . concat =<< sepBy1 chunk (many1 dataSpace)
-
-base64Chunk :: Stream s m Char => Parser s m String
-base64Chunk = many1 (oneOf (['A' .. 'Z'] ++ ['a' .. 'z'] ++ ['0' .. '9'] ++ "+/="))
-
-hexChunk :: Stream s m Char => Parser s m String
-hexChunk = many1 (satisfy isHexDigit)
-
-decodeBase64 :: String -> Parser s m BS.ByteString
-decodeBase64 = either fail return . B64.decode . C.pack
-
--- TODO: Move into Parsing.Tokens
-decodeHex :: String -> Parser s m BS.ByteString
-decodeHex xs
-  | odd (length xs) = fail "hex text must contain an even number of digits"
-  | otherwise = return (BS.pack (go xs))
-  where
-    go [] = []
-    go (hi:lo:rest) = hexPair hi lo : go rest
-    go _ = error "decodeHex called with odd-length input"
-
-    hexPair hi lo = fromIntegral (16 * digitToInt (toUpper hi) + digitToInt (toUpper lo))
