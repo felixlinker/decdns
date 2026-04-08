@@ -47,10 +47,6 @@ base64s = many1 base64c
 hexs :: Stream s m Char => ParsecT s u m String
 hexs = many1 (satisfy isHexDigit)
 
--- TODO: Permit nesting in parantheses
-base64sWithSpace :: Stream s m Char => ParsecT s u m String
-base64sWithSpace = concat <$> sepBy1 base64s hspace
-
 b64dec :: String -> ParsecT s u m BS.ByteString
 b64dec = either fail return . B64.decode . C.pack
 
