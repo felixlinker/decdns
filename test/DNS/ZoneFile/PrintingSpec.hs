@@ -25,9 +25,6 @@ propPrintParseRoundTrip (ZS.ArbZone z printed) =
       Left err ->
         counterexample (show err) False
       Right [z'] ->
-        normalizeZone z' === normalizeZone z
+        ZS.normalizeZone z' === ZS.normalizeZone z
       Right zs ->
         counterexample ("expected 1 zone, got " ++ show (length zs)) False
-
-normalizeZone :: Zone String -> [StandardRecord]
-normalizeZone = sort . allData

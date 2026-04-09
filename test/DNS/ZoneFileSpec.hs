@@ -5,6 +5,7 @@ module DNS.ZoneFileSpec
   , genZone
   , genTXTRecord
   , genAbsoluteName
+  , normalizeZone
   ) where
 
 import qualified Data.ByteString as BS
@@ -21,6 +22,7 @@ import DNS.SEC.Crypto
 import DNS.ZoneFile
 import Data.Maybe (fromMaybe)
 import DNS.ZoneFile.Printing (printZone)
+import Data.List (sort)
 
 tests :: TestTree
 tests =
@@ -28,7 +30,12 @@ tests =
     "DNS.ZoneFile"
     [ testProperty "getting data set on an empty zone returns that data" propSetGetRoundTrip
     , testProperty "pruning setting an empty array results in an empty tree" propPruningSetEmpty
+    , testProperty "inserting two records is commutative" propInsertCommutative
+    , testProperty "constructing a zone from its list of records preserves the zone" propAllDataFromListRoundtrip
     ]
+
+normalizeZone :: Zone String -> [StandardRecord]
+normalizeZone = sort . allData
 
 propSetGetRoundTrip :: Property
 propSetGetRoundTrip =
@@ -42,6 +49,24 @@ propPruningSetEmpty =
   forAll genAbsoluteName $ \org ->
     forAll (genSubDomain org) $ \n ->
         isEmpty $ prune (set n [] (emptyZone org))
+
+propInsertCommutative :: Property
+propInsertCommutative =
+  forAll genAbsRecord $ \r1 ->
+    forAll genAbsRecord $ \r2 ->
+      normalizeZone (mkZone r1 r2) === normalizeZone (mkZone r2 r1)
+  where
+    mkZone :: StandardRecord -> StandardRecord -> Zone String
+    mkZone r1 = insert (singleton r1)
+
+propAllDataFromListRoundtrip :: Property
+propAllDataFromListRoundtrip =
+  forAll genZone $ \z ->
+    forAll (shuffle (allData z)) $ \rs ->
+      maybe
+      (counterexample "could not construct zone" (property False))
+      ((normalizeZone z ===) . normalizeZone . fst)
+      (L.uncons (fromRecordList rs))
 
 data ArbZone = ArbZone
   { unArbZone :: Zone String
@@ -86,12 +111,14 @@ genZone :: Gen (Zone String)
 genZone = do
   org <- genAbsoluteName
   soa <- genSOARecord org
-  recGens <- listOf genRecord
-  recs <- mapM ($ org) recGens
+  recs <- listOf (genRecord org)
   return $ foldl insert (emptyZone org) (soa : recs)
 
-genRecord :: Gen (Name String -> Gen StandardRecord)
-genRecord = elements
+genAbsRecord :: Gen StandardRecord
+genAbsRecord = genRecord =<< genAbsoluteName
+
+genRecord :: Name String -> Gen StandardRecord
+genRecord org = oneof $ map ($ org)
   [ genNSRecord
   , genARecord
   , genAAAARecord
