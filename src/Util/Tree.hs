@@ -7,7 +7,7 @@ module Util.Tree
   , emptyNode
   , prune
   , get
-  , alter
+  , adjust
   , insertNode
   , insert
   , mapItems
@@ -20,7 +20,6 @@ import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
 
 import Util.Func
-import Data.Functor.Identity (Identity(runIdentity))
 
 data Node k v = Node
   -- TODO: items should simply be of type v, but that refactor is probably not worth it
@@ -81,25 +80,25 @@ get :: Ord k => [k] -> Node k v -> Maybe [v]
 get [] (Node is _) = Just is
 get (h:t) (Node _ cs) = get t =<< M.lookup h cs
 
-alterF :: forall f k v. Ord k => ([k] -> Node k v -> f (Node k v)) -> [k] -> Node k v -> f (Node k v)
-alterF nf = go
+adjust :: forall k v. Ord k => ([k] -> Node k v -> Node k v) -> [k] -> Node k v -> Node k v
+adjust nf = go
   where
-    go :: [k] -> Node k v -> f (Node k v)
+    go :: [k] -> Node k v -> Node k v
     go [] n = nf [] n
-    go p@(h:t) n@(Node _ cs) = maybe (nf p n) (go t) (M.lookup h cs)
-
-alter :: Ord k => ([k] -> Node k v -> Node k v) -> [k] -> Node k v -> Node k v
-alter nf = runIdentity <.> alterF (pure <.> nf)
+    go p@(h:t) n@(Node _ cs) =
+      if h `M.member` cs
+        then n { children = M.adjust (go t) h cs }
+        else nf p n
 
 insertNode :: forall k v. Ord k => [k] -> Node k v -> Node k v -> Node k v
-insertNode p new = alter insF p
+insertNode p new = adjust insF p
   where
     insF :: [k] -> Node k v -> Node k v
     insF [] _ = new
     insF (h:t) n@(Node _ cs) = n { children = M.insert h (prepend t new) cs }
 
 insert :: forall k v. Ord k => [k] -> v -> Node k v -> Node k v
-insert p v = alter insF p
+insert p v = adjust insF p
   where
     insF :: [k] -> Node k v -> Node k v
     insF [] n@(Node is _) = n { items = v:is }

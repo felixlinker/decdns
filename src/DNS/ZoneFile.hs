@@ -83,7 +83,7 @@ fromRecordList rList =
     namedRList r@(Named n _) = Named n r
 
     insertRecord :: Record a -> AZone a (Record a) -> AZone a (Record a)
-    insertRecord r@(Named n _) z@(Zone org rn) = z { root = T.alter (const (T.mapItems (r:))) p rn }
+    insertRecord r@(Named n _) z@(Zone org rn) = z { root = T.adjust (const (T.mapItems (r:))) p rn }
       where
         p :: [a]
         (Path _ _ p) = pathInZone org n
@@ -130,7 +130,7 @@ get n (Zone org r) = case pathInZone org n of
 
 set :: forall a b. (Label a, Ord a) => Name a -> [b] -> AZone a b -> AZone a b
 set nam is z@(Zone org r) = case pathInZone org nam of
-  Path _ [] p -> Zone org (T.alter setF p r)
+  Path _ [] p -> Zone org (T.adjust setF p r)
   _ -> z
   where
     setF :: [a] -> T.Node a b -> T.Node a b
