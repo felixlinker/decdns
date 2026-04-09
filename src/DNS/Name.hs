@@ -43,7 +43,10 @@ instance Functor Name where
   fmap f (Name ls) = Name (fmap f ls)
 
 instance Show (Name String) where
-  show (Name ls) = intercalate "." (NE.toList ls)
+  show (Name ls) =
+    let l = NE.last ls
+        i = NE.init ls
+    in  if l == "" then intercalate "." i ++ "." else intercalate "." (i ++ [l])
 
 data Named a b = Named
   { name :: Name a
