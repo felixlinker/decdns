@@ -2,6 +2,7 @@
 module Util.Tree
   ( Node(..)
   , Util.Tree.null
+  , prepend
   , leaf
   , leafAt
   , emptyNode

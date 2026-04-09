@@ -46,10 +46,12 @@ item (Diff (Right a)) = a
 
 type ZoneDiff a = AZone a (Diff RData)
 
-diff :: Ord a => Zone a -> Zone a -> ZoneDiff a
-diff (Zone oldOrg (fmap deleted -> oldZ)) (Zone newOrg (fmap added -> newZ))
-  | oldOrg == newOrg = prune $ Zone oldOrg $ T.mapItems nubEither $ T.merge oldZ newZ
-  | otherwise = error "diff must be called on two zones of the same origin"
+diff :: (Label a, Ord a) => Zone a -> Zone a -> ZoneDiff a
+diff (fmap deleted -> Zone oldOrg oldRs) (fmap added -> Zone newOrg newRs) =
+  let Path zOrg oldP newP = pathInZone oldOrg newOrg
+      oldRs' = T.prepend oldP oldRs
+      newRs' = T.prepend newP newRs
+  in prune $ Zone zOrg $ T.mapItems nubEither $ T.merge oldRs' newRs'
   where
     nubEither :: Eq a => [Diff a] -> [Diff a]
     nubEither es = filter (deither ((`all` es) . rightNeq) ((`all` es) . leftNeq)) es
