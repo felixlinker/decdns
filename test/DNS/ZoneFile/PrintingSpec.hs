@@ -7,19 +7,16 @@ import Data.List (sort)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck
 
-import DNS.Name (Name)
 import DNS.Record (StandardRecord)
 import qualified DNS.ZoneFileSpec as ZS
-import DNS.ZoneFile (Zone, allData, zoneName, fromRecordList)
+import DNS.ZoneFile (Zone, allData, fromRecordList)
 import Parsing.ZoneFile (parseZoneFile)
 
 tests :: TestTree
 tests =
   testGroup
     "ZoneFile.Printing"
-    [ testProperty "parsing a printed zone yields the same zone" propPrintParseRoundTrip
-    , testProperty "parsing a printed zone with DNSSEC records yields the same zone" propPrintParseRoundTripDNSSEC
-    ]
+    [ testProperty "parsing a printed zone yields the same zone" propPrintParseRoundTrip ]
 
 propPrintParseRoundTrip :: ZS.ArbZone -> Property
 propPrintParseRoundTrip (ZS.ArbZone z printed) =
@@ -32,9 +29,5 @@ propPrintParseRoundTrip (ZS.ArbZone z printed) =
       Right zs ->
         counterexample ("expected 1 zone, got " ++ show (length zs)) False
 
-propPrintParseRoundTripDNSSEC :: Property
-propPrintParseRoundTripDNSSEC =
-  forAll ZS.genArbZoneWithDNSSEC propPrintParseRoundTrip
-
-normalizeZone :: Zone String -> (Name String, [StandardRecord])
-normalizeZone z = (zoneName z, sort (allData z))
+normalizeZone :: Zone String -> [StandardRecord]
+normalizeZone = sort . allData

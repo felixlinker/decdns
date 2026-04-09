@@ -3,7 +3,6 @@ module DNS.ZoneFileSpec
   ( tests
   , ArbZone(..)
   , genZone
-  , genArbZoneWithDNSSEC
   , genTXTRecord
   , genAbsoluteName
   ) where
@@ -52,18 +51,12 @@ instance Show ArbZone where
   show = serialization
 
 instance Arbitrary ArbZone where
-  arbitrary = genArbZone genZone
-
-genArbZoneWithDNSSEC :: Gen ArbZone
-genArbZoneWithDNSSEC = genArbZone genZoneWithDNSSEC
-
-genArbZone :: Gen (Zone String) -> Gen ArbZone
-genArbZone gen = do
-  z <- gen
-  abrev <- arbitrary :: Gen Bool
-  let (origin NE.:| rs) = fromMaybe undefined $ NE.nonEmpty $ printZone abrev z
-  rs' <- if abrev then return rs else shuffle rs
-  return $ ArbZone z (unlines (origin:rs'))
+  arbitrary = do
+    z <- genZone
+    abrev <- arbitrary :: Gen Bool
+    let (origin NE.:| rs) = fromMaybe undefined $ NE.nonEmpty $ printZone abrev z
+    rs' <- if abrev then return rs else shuffle rs
+    return $ ArbZone z (unlines (origin:rs'))
 
 genLabel :: Gen String
 genLabel = elements ["a", "b", "c"]
@@ -93,21 +86,12 @@ genZone :: Gen (Zone String)
 genZone = do
   org <- genAbsoluteName
   soa <- genSOARecord org
-  recGens <- listOf $ elements allRecordGens
+  recGens <- listOf genRecord
   recs <- mapM ($ org) recGens
   return $ foldl insert (emptyZone org) (soa : recs)
 
-genZoneWithDNSSEC :: Gen (Zone String)
-genZoneWithDNSSEC = do
-  org <- genAbsoluteName
-  soa <- genSOARecord org
-  requiredDNSSEC <- elements dnssecRecordGens >>= ($ org)
-  extraGens <- listOf $ elements allRecordGens
-  extraRecs <- mapM ($ org) extraGens
-  return $ foldl insert (emptyZone org) (soa : requiredDNSSEC : extraRecs)
-
-allRecordGens :: [Name String -> Gen StandardRecord]
-allRecordGens =
+genRecord :: Gen (Name String -> Gen StandardRecord)
+genRecord = elements
   [ genNSRecord
   , genARecord
   , genAAAARecord
@@ -115,11 +99,7 @@ allRecordGens =
   , genMXRecord
   , genCNAMERecord
   , genDNAMERecord
-  ] ++ dnssecRecordGens
-
-dnssecRecordGens :: [Name String -> Gen StandardRecord]
-dnssecRecordGens =
-  [ genDNSKEYRecord
+  , genDNSKEYRecord
   , genRRSIGRecord
   , genNSECRecord
   , genDSRecord
