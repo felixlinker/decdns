@@ -17,7 +17,7 @@ import Data.Word (Word8)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck
 
-import DNS.Name (Name (Name), Named (Named))
+import DNS.Name (Name (Name), Named (Named), (<|))
 import DNS.Record
 import qualified DNS.RecordType as RT
 import DNS.SEC.Crypto
@@ -34,6 +34,7 @@ tests =
     , testProperty "pruning setting an empty array results in an empty tree" propPruningSetEmpty
     , testProperty "inserting two records is commutative" propInsertCommutative
     , testProperty "constructing a zone from its list of records preserves the zone" propAllDataFromListRoundtrip
+    , testProperty "path computation can be inverted" propPathComputation
     ]
 
 normalizeZone :: Zone String -> [StandardRecord]
@@ -69,6 +70,13 @@ propAllDataFromListRoundtrip =
       (counterexample "could not construct zone" (property False))
       ((normalizeZone z ===) . normalizeZone . fst)
       (L.uncons (fromRecordList rs))
+
+propPathComputation :: Property
+propPathComputation =
+  forAll genAbsoluteName $ \n1 ->
+    forAll genAbsoluteName $ \n2 ->
+      let Path org left right = pathInZone n1 n2
+      in n1 === foldl (flip (<|)) org left .&. n2 === foldl (flip (<|)) org right
 
 data ArbZone = ArbZone
   { unArbZone :: Zone String
