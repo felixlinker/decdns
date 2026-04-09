@@ -47,8 +47,8 @@ propSetGetRoundTrip =
 propPruningSetEmpty :: Property
 propPruningSetEmpty =
   forAll genAbsoluteName $ \org ->
-    forAll (genSubDomain org) $ \n ->
-        isEmpty $ prune (set n [] (emptyZone org))
+    forAll (listOf1 $ genSubDomain org) $ \ns ->
+      isEmpty $ prune (foldr (`set` []) (emptyZone org) ns)
 
 propInsertCommutative :: Property
 propInsertCommutative =
