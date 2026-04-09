@@ -69,7 +69,7 @@ isEmpty (Zone _ r) = T.null r
 fromRecordList :: forall a. (Label a, Ord a) => [Record a] -> [Zone a]
 fromRecordList rList =
   let (soas, other) = L.partition ((== Ty.SOA) . toType . rtype . value) rList
-  in  maybe [] (\z -> toZones (foldr insertRecord z other)) (fromList (map namedRList soas))
+  in  maybe [] (\z -> toZones (foldr insertRecord z other)) (fromList (map namedRec soas))
   where
     toZones :: AZone a (Record a) -> [Zone a]
     toZones (Zone _ rn) = go rn []
@@ -79,8 +79,8 @@ fromRecordList rList =
           let rec = foldr go acc cs
           in  maybe rec (:rec) (fromList rs)
 
-    namedRList :: Record a -> Named a (Record a)
-    namedRList r@(Named n _) = Named n r
+    namedRec :: Record a -> Named a (Record a)
+    namedRec r@(Named n _) = Named n r
 
     insertRecord :: Record a -> AZone a (Record a) -> AZone a (Record a)
     insertRecord r@(Named n _) z@(Zone org rn) = z { root = T.adjust (const (T.mapItems (r:))) p rn }
