@@ -18,7 +18,7 @@ hspace :: Stream s m Char => ParsecT s u m ()
 hspace = void $ char ' ' <|> tab
 
 eol :: Stream s m Char => ParsecT s u m ()
-eol = void endOfLine <|> eof
+eol = void endOfLine
 
 dot :: Stream s m Char => ParsecT s u m Char
 dot = Char.char '.'
