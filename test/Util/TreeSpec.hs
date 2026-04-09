@@ -21,8 +21,8 @@ tests =
     , testCase "null detects empty and non-empty nodes" nullDetectsEmptyAndNonEmptyNodes
     , testCase "get returns Nothing for missing path" $
         T.get ["a", "b"] (T.emptyNode :: T.Node String Int) @?= Nothing
-    , testCase "alter applies function at root for empty path" insertRoot
-    , testCase "alter creates missing path when given default node" insertMissingPath
+    , testCase "insert works with empty path" insertRoot
+    , testCase "insert works on empty tree" insertMissingPath
     , testCase "insertNode replaces existing subtree at path" replacesSubtree
     , testProperty "insert is commutative" prop_insertCommutativeDistinctPaths
     , testCase "merge keeps values from both trees" mergesValues
