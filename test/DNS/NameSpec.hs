@@ -22,11 +22,16 @@ tests =
     , testProperty "canonicalCompare orders by TLD first" propCanonicalCompareTldFirst
     , testGroup
         "unit"
-        [ testCase "examples from RFC 4034" canonicalCompareRfc4034Example
+        [ testCase "show root as dot" showRootAsDot
+        , testCase "examples from RFC 4034" canonicalCompareRfc4034Example
         , testCase "more specific name sorts before parent" canonicalCompareSpecificBeforeParent
         , testCase "compares next label when TLD matches" canonicalCompareNextLabel
         ]
     ]
+
+showRootAsDot :: Assertion
+showRootAsDot =
+  show (root :: Name String) @?= "."
 
 ordered :: [Name String]
 ordered = map name
