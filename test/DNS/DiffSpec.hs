@@ -7,7 +7,7 @@ import Test.Tasty.HUnit (Assertion, (@?=), testCase)
 import DNS.Diff
 import DNS.Name (Name (..), Named (..), Label, (<|), root)
 import DNS.Record
-import DNS.ZoneFile (AZone, emptyZone, fromList, get, insert, isEmpty, zoneName)
+import DNS.ZoneFile (AZone, emptyZone, fromList, get, insert, isEmpty, zoneName, singleton)
 import NameConstraint (LabelConstraint (..), exactly)
 
 tests :: TestTree
@@ -24,16 +24,16 @@ tests =
 reportsAddsAndDeletes :: Assertion
 reportsAddsAndDeletes = do
   let n = mkName ["www", "example", "com"]
-  oldZ <- zoneFromList [Named n (mkData "192.0.2.1")]
-  newZ <- zoneFromList [Named n (mkData "192.0.2.2")]
+      oldZ = singleton (Named n (mkData "192.0.2.1"))
+      newZ = singleton (Named n (mkData "192.0.2.2"))
   let dz = diff oldZ newZ
   (get n dz == Just [deleted (mkData "192.0.2.1"), added (mkData "192.0.2.2")]) @?= True
 
 unchangedIsEmpty :: Assertion
 unchangedIsEmpty = do
   let n = mkName ["api", "example", "com"]
-  z <- zoneFromList [Named n (mkData "192.0.2.10")]
-  let dz = diff z z
+      z = singleton (Named n (mkData "192.0.2.10"))
+      dz = diff z z
   isEmpty dz @?= True
   get n dz @?= Nothing
 
@@ -51,7 +51,7 @@ exactChangeDetection :: Assertion
 exactChangeDetection = do
   let n = mkName ["db", "example", "com"]
       oldZ = emptyZone root
-  newZ <- zoneFromList [Named n (mkData "198.51.100.1")]
+      newZ = singleton (Named n (mkData "198.51.100.1"))
   let dz = diff oldZ newZ
   hasChanges (exactly n) dz @?= True
   hasChanges (exactly (mkName ["other", "example", "com"])) dz @?= False
