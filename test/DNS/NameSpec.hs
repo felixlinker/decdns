@@ -2,13 +2,14 @@
 {-# LANGUAGE ViewPatterns #-}
 module DNS.NameSpec (tests) where
 
-import Data.Char (toLower, toUpper)
+import Data.Char (toLower)
 import qualified Data.List.NonEmpty as NE
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 
 import DNS.Name hiding (name)
+import DNS.ZoneFileSpec (genLabel, genName, genAbsoluteName)
 
 tests :: TestTree
 tests =
@@ -17,9 +18,10 @@ tests =
     [ testProperty "isSubDomain is reflexive" propIsSubDomainReflexive
     , testProperty "isSubDomain holds for prefixed names" propIsSubDomainPrefix
     , testProperty "isSubDomain rejects different TLD" propIsSubDomainDiffTld
-    , testProperty "canonicalCompare is case-insensitive" propCanonicalCompareCaseInsensitive
     , testProperty "canonicalCompare is antisymmetric" propCanonicalCompareAntisymmetric
     , testProperty "canonicalCompare orders by TLD first" propCanonicalCompareTldFirst
+    , testProperty "show absolute names with trailing dot" propShowAbsoluteNameEndsWithDot
+    , testProperty "show relative names without trailing dot" propShowRelativeNameDoesNotEndWithDot
     , testGroup
         "unit"
         [ testCase "show root as dot" showRootAsDot
@@ -58,72 +60,51 @@ canonicalCompareNextLabel :: Assertion
 canonicalCompareNextLabel =
   canonicalCompare (name ["a", "example", "com"]) (name ["b", "example", "com"]) @?= LT
 
-propIsSubDomainReflexive :: ArbName -> Bool
-propIsSubDomainReflexive (aname -> n) = isSubDomain n n
+propIsSubDomainReflexive :: Property
+propIsSubDomainReflexive =
+  forAll genName $ \n -> counterexample (show n) (isSubDomain n n)
 
-propIsSubDomainPrefix :: ArbName -> Property
-propIsSubDomainPrefix (aname -> n) =
-  forAll genLabels $ \prefix -> isSubDomain (prefixName prefix n) n
+propIsSubDomainPrefix :: Property
+propIsSubDomainPrefix =
+  forAll genName $ \n ->
+    forAll (listOf genLabel) $ \prefix ->
+      isSubDomain (prependLabels prefix n) n
 
-propIsSubDomainDiffTld :: ArbName -> Property
-propIsSubDomainDiffTld (aname -> n@(Name ls)) =
-  forAll (genDifferentLabel (NE.last ls)) $ \otherTld ->
-    let n' = Name (replaceLast ls otherTld)
-    in not (isSubDomain n n')
+propIsSubDomainDiffTld :: Property
+propIsSubDomainDiffTld =
+  forAll genName $ \(Name ls) ->
+    forAll genDifferentLabels $ \(l1, l2) ->
+        not $ isSubDomain
+          (Name (ls <> NE.singleton l1))
+          (Name (ls <> NE.singleton l2))
 
-propCanonicalCompareCaseInsensitive :: ArbName -> Property
-propCanonicalCompareCaseInsensitive (aname -> n) =
-  canonicalCompare n (fmap (map toUpper) n) === EQ
-
-propCanonicalCompareAntisymmetric :: ArbName -> ArbName -> Property
-propCanonicalCompareAntisymmetric (aname -> n1) (aname -> n2) =
-  canonicalCompare n1 n2 === invert (canonicalCompare n2 n1)
+propCanonicalCompareAntisymmetric :: Property
+propCanonicalCompareAntisymmetric =
+  forAll genName $ \n1 ->
+    forAll genName $ \n2 ->
+      canonicalCompare n1 n2 === invert (canonicalCompare n2 n1)
 
 propCanonicalCompareTldFirst :: Property
 propCanonicalCompareTldFirst =
-  forAll genLabel $ \tld1 ->
-    forAll (genDifferentLabel tld1) $ \tld2 ->
-      forAll genLabels $ \rest ->
-        let n1 = name (rest ++ [tld1])
-            n2 = name (rest ++ [tld2])
-        in canonicalCompare n1 n2 === compare (map toLower tld1) (map toLower tld2)
+  forAll genDifferentLabels $ \(tld1, tld2) ->
+    forAll genName $ \(Name ls) ->
+      let n1 = Name (ls <> NE.singleton tld1)
+          n2 = Name (ls <> NE.singleton tld2)
+      in canonicalCompare n1 n2 === compare (map toLower tld1) (map toLower tld2)
 
-newtype ArbName = ArbName (Name String)
+propShowAbsoluteNameEndsWithDot :: Property
+propShowAbsoluteNameEndsWithDot =
+  forAll genAbsoluteName $ \(show -> n) -> counterexample n (last n === '.')
 
-instance Show ArbName where
-  show = show . aname
+propShowRelativeNameDoesNotEndWithDot :: Property
+propShowRelativeNameDoesNotEndWithDot =
+  forAll genName $ \(show -> n) -> counterexample n (last n =/= '.')
 
-aname :: ArbName -> Name String
-aname (ArbName n) = n
-
-instance Arbitrary ArbName where
-  arbitrary = genName
-
-genName :: Gen ArbName
-genName = ArbName . name <$> listOf1 genLabel
-
-genLabel :: Gen String
-genLabel = do
-  first <- elements (['a'..'z'] ++ ['A'..'Z'])
-  rest <- listOf (elements (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9']))
-  return (first : rest)
-
-genDifferentLabel :: String -> Gen String
-genDifferentLabel s = suchThat genLabel (\t -> map toLower t /= map toLower s)
-
-genLabels :: Gen [String]
-genLabels = listOf genLabel
-
-prefixName :: [String] -> Name String -> Name String
-prefixName prefix (Name ls) = Name (NE.prependList prefix ls)
-
-replaceLast :: NE.NonEmpty a -> a -> NE.NonEmpty a
-replaceLast (_ NE.:| []) a = a NE.:| []
-replaceLast (x NE.:| t) a = x NE.:| go t
-  where
-    go [] = []
-    go [_] = [a]
-    go (y:t') = y : go t'
+genDifferentLabels :: Gen (String, String)
+genDifferentLabels = do
+  l1 <- arbitrary :: Gen Char
+  l2 <- suchThat arbitrary (/= l1)
+  return (l1:"", l2:"")
 
 name :: [String] -> Name String
 name [] = error "name: empty label list"

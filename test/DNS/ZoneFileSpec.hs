@@ -4,6 +4,8 @@ module DNS.ZoneFileSpec
   , ArbZone(..)
   , genZone
   , genTXTRecord
+  , genLabel
+  , genName
   , genAbsoluteName
   , normalizeZone
   ) where
