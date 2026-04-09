@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
+{-# LANGUAGE FlexibleInstances #-}
 module DNS.ZoneFile
   ( singleton
   , emptyZone
@@ -95,6 +96,10 @@ data Path a = Path
   [a]
   -- Path of the new data in the zone
   [a]
+  deriving Eq
+
+instance Show (Path String) where
+  show (Path n l r) = "Path (" ++ show n ++ ") " ++ show l ++ " " ++ show r
 
 pathInZone :: (Label a, Eq a) => Name a -> Name a -> Path a
 pathInZone (Name (NE.reverse -> (orgr NE.:| org))) (Name (NE.reverse -> (nr NE.:| n)))
