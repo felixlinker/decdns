@@ -3,29 +3,20 @@ module Parsing.ZoneFile
   ( parseZoneFile ) where
 
 import Text.Parsec
-import Text.Parsec.Char as Char
 import Control.Applicative (asum)
-import Data.Functor (($>), void)
+import Data.Functor (($>))
 import Data.Maybe (catMaybes)
 
 import Parsing.State
 import Parsing.Tokens
 import Parsing.Name
 import Parsing.Data
-import DNS.ZoneFile
 import DNS.Name (Name, Named(Named))
 import DNS.Record (StandardRecord, RData(..), Record)
 
-comment :: Stream s m Char => Parser s m ()
-comment = do
-  spaces
-  _ <- Char.char ';'
-  _ <- manyTill anyChar (void endOfLine <|> eof)
-  return ()
-
 origin :: Stream s m Char => Parser s m (Name String)
 origin = do
-  spaces
+  skipSep
   _ <- string "$ORIGIN"
   sep
   org <- name
@@ -34,7 +25,7 @@ origin = do
 
 setTTL :: Stream s m Char => Parser s m ()
 setTTL = do
-  spaces
+  skipSep
   _ <- string "$TTL"
   sep
   t <- int
@@ -48,51 +39,51 @@ record = try catTtlType <|> try nameCatTtlType <|> nameTtlCatType
 -- cases.
 catTtlType :: Stream s m Char => Parser s m (Record String)
 catTtlType = do
-  spaces
+  skipSep
   n <- readState lastName
-  spaces
+  skipSep
   c <- tryOrState category lastCat
-  spaces
+  skipSep
   t <- tryOrState int lastTTL
-  spaces
+  skipSep
   ty <- recordTypeData
   sep
   return $ Named n (RData c t ty)
 
 nameCatTtlType :: Stream s m Char => Parser s m (Record String)
 nameCatTtlType = do
-  spaces
+  skipSep
   n <- tryOrState name lastName
-  spaces
+  skipSep
   c <- tryOrState category lastCat
-  spaces
+  skipSep
   t <- tryOrState int lastTTL
-  spaces
+  skipSep
   ty <- recordTypeData
   sep
   return $ Named n (RData c t ty)
 
 nameTtlCatType :: Stream s m Char => Parser s m (Record String)
 nameTtlCatType = do
-  spaces
+  skipSep
   n <- tryOrState name lastName
-  spaces
+  skipSep
   t <- tryOrState int lastTTL
-  spaces
+  skipSep
   c <- tryOrState category lastCat
-  spaces
+  skipSep
   ty <- recordTypeData
   sep
   return $ Named n (RData c t ty)
 
 line :: Stream s m Char => Parser s m (Maybe StandardRecord)
 line = do
-  spaces
+  skipSepNewLine -- to skip leading comments and new lines
   r <- asum $ map try
-      [ comment $> Nothing
+      [ origin $> Nothing
       , setTTL $> Nothing
       , Just <$> record ]
-  spaces
+  endOfEntry
   return r
 
 zoneFile :: Stream s m Char => Parser s m [StandardRecord]

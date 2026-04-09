@@ -12,13 +12,14 @@ module Parsing.State
   , readState
   , writeState
   , tryOrState
-  , dataSpace
-  , fieldSep
+  , comment
   , endOfEntry
+  , skipSep
+  , skipSepNewLine
   , sep ) where
 
 import Text.Parsec
-import Control.Monad (when, guard, void)
+import Control.Monad (when, guard, void, unless)
 import qualified Control.Lens as L
 
 import DNS.Name
@@ -35,7 +36,7 @@ data ParserState = ParserState
   , _lastName :: Maybe (Name String)
   , _lastTTL :: Maybe Int
   , _lastCat :: Maybe Cat
-  , _parensStack :: Int }
+  , _parens :: Bool }
 
 L.makeLenses ''ParserState
 
@@ -47,13 +48,13 @@ instance OriginProvider () where
   getOrigin _ = Nothing
 
 emptyState :: ParserState
-emptyState = ParserState Nothing Nothing Nothing Nothing 0
+emptyState = ParserState Nothing Nothing Nothing Nothing False
+
+setLensState :: Monad m => L.Lens' ParserState a -> a -> Parser s m ()
+setLensState l a = modifyState (L.set l a)
 
 writeState :: Monad m => L.Lens' ParserState (Maybe a) -> a -> Parser s m ()
-writeState l a = modifyState (L.set l (return a))
-
-applyState :: Monad m => L.Lens' ParserState a -> (a -> a) -> Parser s m ()
-applyState l = modifyState . L.over l
+writeState l = setLensState l . return
 
 lensState :: Monad m => L.Lens' ParserState a -> Parser s m a
 lensState l = L.view l <$> getState
@@ -74,31 +75,41 @@ tryOrState p l = tryP <|> readState l
 open :: Stream s m Char => Parser s m ()
 open = do
   _ <- char '('
-  applyState parensStack (+ 1)
+  p <- lensState parens
+  when p (fail "do not nest parentheses")
+  setLensState parens True
 
 close :: Stream s m Char => Parser s m ()
 close = do
   _ <- char ')'
-  c <- lensState parensStack
-  when (c == 0) (fail "parentheses closed but not opened")
-  applyState parensStack (\x -> x - 1)
+  p <- lensState parens
+  unless p (fail "parentheses closed but not opened")
+  setLensState parens False
+
+hspace' :: Stream s m Char => Bool -> Parser s m ()
+hspace' acceptNl = do
+  inParens <- lensState parens
+  if acceptNl || inParens then eol <|> hspace else hspace
+
+comment :: Stream s m Char => Parser s m ()
+comment = do
+  _ <- char ';'
+  void $ manyTill anyChar (try eol)
+
+sepOne :: Stream s m Char => Bool -> Parser s m ()
+sepOne acceptNl = open <|> close <|> comment <|> hspace' acceptNl
+
+skipSep :: Stream s m Char => Parser s m ()
+skipSep = skipMany (sepOne False)
+
+skipSepNewLine :: Stream s m Char => Parser s m ()
+skipSepNewLine = skipMany (sepOne True)
+
+sep :: Stream s m Char => Parser s m ()
+sep = skipMany1 (sepOne False)
 
 endOfEntry :: Stream s m Char => Parser s m ()
 endOfEntry = do
-  skipMany dataSpace
-  c <- lensState parensStack
-  if c > 0
-    then close >> endOfEntry
-    else void endOfLine <|> eof
-
-dataSpace :: Stream s m Char => Parser s m Char
-dataSpace = hspace <|> do
-  c <- lensState parensStack
-  guard (c > 0)
-  newline
-
-fieldSep :: Stream s m Char => Parser s m ()
-fieldSep = skipMany1 (void dataSpace <|> open)
-
-sep :: Stream s m Char => Parser s m ()
-sep = try endOfEntry <|> fieldSep
+  skipSepNewLine
+  inParens <- lensState parens
+  guard (not inParens)

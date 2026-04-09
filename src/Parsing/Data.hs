@@ -4,18 +4,19 @@ module Parsing.Data
   , recordType
   , recordTypeData ) where
 
+import Data.Char (isPrint)
 import Data.Functor (($>))
 import Control.Applicative (asum)
-import Data.Char (isPrint)
+import Control.Monad (when)
 import Text.Parsec
 
 import Parsing.State
+import Parsing.Bytes
 import DNS.Record
 import qualified DNS.RecordType as T
 import DNS.SEC.Crypto
 import Parsing.Name
 import Parsing.Tokens
-import Control.Monad (when)
 
 type TypeParser s m = Parser s m Type
 
@@ -92,51 +93,51 @@ soa = do
 dnskey :: Stream s m Char => TypeParser s m
 dnskey = do
   flagValue <- int
-  fieldSep
+  sep
   protocol <- int
   when (protocol /= 3) (fail "DNSKEY protocol must be 3")
-  fieldSep
+  sep
   algorithm <- algorithmType
-  fieldSep
-  DNSKEY (dnsKeyFlagsFromInt flagValue) algorithm <$> base64WithSeparators (many1 dataSpace)
+  sep
+  DNSKEY (dnsKeyFlagsFromInt flagValue) algorithm <$> base64WithSep
 
 rrsig :: Stream s m Char => TypeParser s m
 rrsig = do
   typeCovered <- recordType
-  fieldSep
+  sep
   algorithm <- algorithmType
-  fieldSep
+  sep
   labelCount <- int
-  fieldSep
+  sep
   originalTTL <- int
-  fieldSep
+  sep
   signatureExpiration <- int
-  fieldSep
+  sep
   signatureInception <- int
-  fieldSep
+  sep
   keyTag <- int
-  fieldSep
+  sep
   signersName <- name
-  fieldSep
-  RRSIG typeCovered algorithm labelCount originalTTL signatureExpiration signatureInception keyTag signersName <$> base64WithSeparators (many1 dataSpace)
+  sep
+  RRSIG typeCovered algorithm labelCount originalTTL signatureExpiration signatureInception keyTag signersName <$> base64WithSep
 
 nsec :: Stream s m Char => TypeParser s m
 nsec = do
   nextDomainName <- name
-  fieldSep
+  sep
   firstType <- recordType
-  restTypes <- many (try (fieldSep >> recordType))
+  restTypes <- many (try (sep >> recordType))
   return $ NSEC nextDomainName (firstType : restTypes)
 
 ds :: Stream s m Char => TypeParser s m
 ds = do
   keyTag <- int
-  fieldSep
+  sep
   algorithm <- algorithmType
-  fieldSep
+  sep
   digestType <- digestTypeCode
-  fieldSep
-  DS keyTag algorithm digestType <$> hexWithSeparators (many1 dataSpace)
+  sep
+  DS keyTag algorithm digestType <$> hexWithSep
 
 algorithmType :: Stream s m Char => Parser s m AlgorithmType
 algorithmType =

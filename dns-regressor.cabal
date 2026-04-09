@@ -31,6 +31,7 @@ library
       NameConstraint
       NonDet
       Parsing
+      Parsing.Bytes
       Parsing.Command
       Parsing.Data
       Parsing.Name

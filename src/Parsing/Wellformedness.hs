@@ -60,8 +60,15 @@ wellformed (Zone org r@(Tr.Node apexData rcs)) =
 
         findNonGlue :: Name String -> Tr.Node String RData -> Maybe StandardRecord
         findNonGlue n' (Tr.Node rds cs') =
-              Named n' <$> find (not . isGlue n') rds
+              Named n' <$> find (not . isAllowedAtZoneCut n') rds
           <|> asum (M.mapWithKey (findNonGlue . (<| n')) cs')
+
+        isAllowedAtZoneCut :: Name String -> RData -> Bool
+        isAllowedAtZoneCut rn rd =
+             isGlue rn rd
+          || ( rn == n
+            && toType (rtype rd) `elem` [T.DS, T.NSEC, T.RRSIG]
+             )
 
         isGlue :: Name String -> RData -> Bool
         isGlue rn rd = rn `elem` nsesInBailiwick && (toType (rtype rd) `elem` [T.A, T.AAAA])
