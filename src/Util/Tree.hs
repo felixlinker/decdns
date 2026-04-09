@@ -81,25 +81,29 @@ get :: Ord k => [k] -> Node k v -> Maybe [v]
 get [] (Node is _) = Just is
 get (h:t) (Node _ cs) = get t =<< M.lookup h cs
 
-alterFWithPath :: (Functor f, Ord k) => ([k] -> Node k v -> f (Node k v)) -> ([k] -> [k] -> f (Maybe (Node k v))) -> [k] -> Node k v -> f (Node k v)
-alterFWithPath nf def = go []
+alterF :: forall f k v. Ord k => ([k] -> Node k v -> f (Node k v)) -> [k] -> Node k v -> f (Node k v)
+alterF nf = go
   where
-    go p [] n = nf p n
-    go p (h:t) (Node is cs) =
-      let rec = alterFWithPath nf def t
-      in Node is <$> M.alterF (maybe (def (h:p) t) (fmap Just . rec)) h cs
+    go :: [k] -> Node k v -> f (Node k v)
+    go [] n = nf [] n
+    go p@(h:t) n@(Node _ cs) = maybe (nf p n) (go t) (M.lookup h cs)
 
-alterF :: (Functor f, Ord k) => (Node k v -> f (Node k v)) -> ([k] -> f (Maybe (Node k v))) -> [k] -> Node k v -> f (Node k v)
-alterF nf def = alterFWithPath (const nf) (const def)
+alter :: Ord k => ([k] -> Node k v -> Node k v) -> [k] -> Node k v -> Node k v
+alter nf = runIdentity <.> alterF (pure <.> nf)
 
-alter :: Ord k => (Node k v -> Node k v) -> ([k] -> Maybe (Node k v)) -> [k] -> Node k v -> Node k v
-alter nf def = runIdentity <.> alterF (pure . nf) (pure . def)
+insertNode :: forall k v. Ord k => [k] -> Node k v -> Node k v -> Node k v
+insertNode p new = alter insF p
+  where
+    insF :: [k] -> Node k v -> Node k v
+    insF [] _ = new
+    insF (h:t) n@(Node _ cs) = n { children = M.insert h (prepend t new) cs }
 
-insertNode :: Ord k => [k] -> Node k v -> Node k v -> Node k v
-insertNode p new = alter (const new) (Just . (`prepend` new)) p
-
-insert :: Ord k => [k] -> v -> Node k v -> Node k v
-insert p v = alter (\n@(Node is _) -> n { items = v:is }) (Just . (`leafAt` [v])) p
+insert :: forall k v. Ord k => [k] -> v -> Node k v -> Node k v
+insert p v = alter insF p
+  where
+    insF :: [k] -> Node k v -> Node k v
+    insF [] n@(Node is _) = n { items = v:is }
+    insF (h:t) n@(Node _ cs) = n { children = M.insert h (leafAt t [v]) cs }
 
 partition :: forall k v. ([k] -> v -> Bool) -> Node k v -> (Node k v, Node k v)
 partition p = go []

@@ -1,14 +1,17 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DisambiguateRecordFields #-}
 module DNS.ZoneFile
-  ( emptyZone
+  ( singleton
+  , emptyZone
   , Path(..)
   , pathInZone
   , AZone(..)
   , isEmpty
   , zshow
   , Zone
+  , fromRecordList
   , insert
   , fromList
   , get
@@ -20,11 +23,13 @@ module DNS.ZoneFile
   , partition ) where
 
 import qualified Data.Map as M
+import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE
 import qualified Control.Monad.Trans.State as St
 
 import DNS.Name as N
 import DNS.Record
+import qualified DNS.RecordType as Ty
 import qualified Util.Tree as T
 import Data.Bifunctor (Bifunctor(bimap))
 
@@ -55,8 +60,33 @@ type Zone a = AZone a RData
 emptyZone :: Name a -> AZone a b
 emptyZone org = Zone org T.emptyNode
 
+singleton :: Named a b -> AZone a b
+singleton (Named n d) = Zone n (T.leaf [d])
+
 isEmpty :: AZone a b -> Bool
 isEmpty (Zone _ r) = T.null r
+
+fromRecordList :: forall a. (Label a, Ord a) => [Record a] -> [Zone a]
+fromRecordList rList =
+  let (soas, other) = L.partition ((== Ty.SOA) . toType . rtype . value) rList
+  in  maybe [] (\z -> toZones (foldr insertRecord z other)) (fromList (map namedRList soas))
+  where
+    toZones :: AZone a (Record a) -> [Zone a]
+    toZones (Zone _ rn) = go rn []
+      where
+        go :: T.Node a (Record a) -> [Zone a] -> [Zone a]
+        go (T.Node rs cs) acc =
+          let rec = foldr go acc cs
+          in  maybe rec (:rec) (fromList rs)
+
+    namedRList :: Record a -> Named a (Record a)
+    namedRList r@(Named n _) = Named n r
+
+    insertRecord :: Record a -> AZone a (Record a) -> AZone a (Record a)
+    insertRecord r@(Named n _) z@(Zone org rn) = z { root = T.alter (const (T.mapItems (r:))) p rn }
+      where
+        p :: [a]
+        (Path _ _ p) = pathInZone org n
 
 data Path a = Path
   -- New origin of the zone; longest common ancestor between new and old name
@@ -68,7 +98,7 @@ data Path a = Path
 
 pathInZone :: (Label a, Eq a) => Name a -> Name a -> Path a
 pathInZone (Name (NE.reverse -> (orgr NE.:| org))) (Name (NE.reverse -> (nr NE.:| n)))
-  | orgr == nr && nr == lempty = pathInZone' (Name $ NE.singleton lempty) org n
+  | orgr == nr && nr == lempty = pathInZone' N.root org n
   | otherwise = error "at least one name is relative"
   where
     pathInZone' :: Eq a => Name a -> [a] -> [a] -> Path a
@@ -90,18 +120,22 @@ insert (Zone norg zroot) (Named n d) = case pathInZone norg n of
     $ T.insert rp d
     $ T.insertNode zp zroot T.emptyNode
 
-fromList :: (Label a, Ord a) => [Named a b] -> AZone a b
-fromList = foldl insert (emptyZone N.root)
+fromList :: (Label a, Ord a) => [Named a b] -> Maybe (AZone a b)
+fromList = fmap (uncurry (foldl insert . singleton)) . L.uncons
 
 get :: (Label a, Ord a) => Name a -> AZone a b -> Maybe [b]
 get n (Zone org r) = case pathInZone org n of
   Path _ [] p -> T.get p r
   _ -> Nothing
 
-set :: (Label a, Ord a) => Name a -> [b] -> AZone a b -> AZone a b
+set :: forall a b. (Label a, Ord a) => Name a -> [b] -> AZone a b -> AZone a b
 set nam is z@(Zone org r) = case pathInZone org nam of
-  Path _ [] p -> Zone org (T.alter (const (T.leaf is)) (Just . (`T.leafAt` is)) p r)
+  Path _ [] p -> Zone org (T.alter setF p r)
   _ -> z
+  where
+    setF :: [a] -> T.Node a b -> T.Node a b
+    setF [] n = n { T.items = is }
+    setF (h:t) n@(T.Node _ cs) = n { T.children = M.insert h (T.leafAt t is) cs }
 
 prune :: AZone a b -> AZone a b
 prune z@(Zone _ r) = z { DNS.ZoneFile.root = T.prune r }

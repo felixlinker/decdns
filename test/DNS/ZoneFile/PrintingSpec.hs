@@ -10,7 +10,7 @@ import Test.Tasty.QuickCheck
 import DNS.Name (Name)
 import DNS.Record (StandardRecord)
 import qualified DNS.ZoneFileSpec as ZS
-import DNS.ZoneFile (Zone, allData, zoneName)
+import DNS.ZoneFile (Zone, allData, zoneName, fromRecordList)
 import Parsing.ZoneFile (parseZoneFile)
 
 tests :: TestTree
@@ -23,7 +23,7 @@ tests =
 
 propPrintParseRoundTrip :: ZS.ArbZone -> Property
 propPrintParseRoundTrip (ZS.ArbZone z printed) =
-  let parsed = runIdentity (parseZoneFile "<quickcheck>" printed)
+  let parsed = fromRecordList <$> runIdentity (parseZoneFile "<quickcheck>" printed)
   in case parsed of
       Left err ->
         counterexample (show err) False

@@ -19,6 +19,7 @@ import Resolvable.Update.Dependencies (computeRegressions)
 import Resolvable.Update.Trivial (partitionTrivial)
 import Control.Monad (unless)
 import DNS.Name (mapLabels, Named, Name)
+import Data.Maybe (mapMaybe)
 
 indent :: String -> String
 indent s = if null s then "" else "  " ++ s
@@ -54,8 +55,8 @@ main = do
             (MM.mapMissing (\_ -> fmap deleted))
             (MM.mapMissing (\_ -> fmap added))
             (MM.zipWithMatched (const diff))
-            (M.map toZone $ M.fromList oldRecs)
-            (M.map toZone $ M.fromList newRecs)
+            (M.fromList $ mapMaybe (traverse toZone) oldRecs)
+            (M.fromList $ mapMaybe (traverse toZone) newRecs)
       mapM_ (\(ns, d) -> print ns >> print d) (M.toList nsDiff)
     "regressions" -> do
       (sroots, args') <- sepBy "--" args
@@ -74,8 +75,8 @@ main = do
             (MM.mapMissing (\_ -> fmap deleted))
             (MM.mapMissing (\_ -> fmap added))
             (MM.zipWithMatched (const diff))
-            (M.map toZone $ M.fromList oldRecs)
-            (M.map toZone $ M.fromList newRecs)
+            (M.fromList $ mapMaybe (traverse toZone) oldRecs)
+            (M.fromList $ mapMaybe (traverse toZone) newRecs)
       let oldDeps = runFresh $ fromRules <$> oldRecsC
       let newDeps = runFresh $ fromRules <$> newRecsC
       let rolloutSeq = rollout nsDiff oldDeps newDeps
@@ -92,7 +93,7 @@ main = do
       mapM_ print parsed
     _ -> fail "unknown command"
   where
-    toZone :: [Named ConstrainedLabel b] -> AZone String b
+    toZone :: [Named ConstrainedLabel b] -> Maybe (AZone String b)
     toZone = fromList . map (mapLabels show)
 
     popArg :: [String] -> IO (String, [String])

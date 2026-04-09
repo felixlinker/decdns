@@ -23,7 +23,6 @@ tests =
         T.get ["a", "b"] (T.emptyNode :: T.Node String Int) @?= Nothing
     , testCase "alter applies function at root for empty path" insertRoot
     , testCase "alter creates missing path when given default node" insertMissingPath
-    , testCase "alter is no-op on missing path without default" alterMissingPathWithoutDefault
     , testCase "insertNode replaces existing subtree at path" replacesSubtree
     , testProperty "insert is commutative" prop_insertCommutativeDistinctPaths
     , testCase "merge keeps values from both trees" mergesValues
@@ -105,12 +104,6 @@ insertMissingPath = do
   let out = T.insert ["a", "b"] 1 (T.emptyNode :: T.Node String Int)
   T.get ["a"] out @?= Just []
   T.get ["a", "b"] out @?= Just [1]
-
-alterMissingPathWithoutDefault :: Assertion
-alterMissingPathWithoutDefault = do
-  let base = T.insert ["keep"] (7 :: Int) (T.emptyNode :: T.Node String Int)
-      out = T.alter (const (T.leaf [1 :: Int])) (const Nothing) ["missing"] base
-  toCanon out @?= toCanon base
 
 data CanonTree k v = CanonTree (S.Set v) [(k, CanonTree k v)]
   deriving (Eq, Show)

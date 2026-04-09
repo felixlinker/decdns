@@ -5,9 +5,9 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, (@?=), testCase)
 
 import DNS.Diff
-import DNS.Name (Name (..), Named (..), (<|))
+import DNS.Name (Name (..), Named (..), Label, (<|), root)
 import DNS.Record
-import DNS.ZoneFile (emptyZone, fromList, get, insert, isEmpty, zoneName)
+import DNS.ZoneFile (AZone, emptyZone, fromList, get, insert, isEmpty, zoneName)
 import NameConstraint (LabelConstraint (..), exactly)
 
 tests :: TestTree
@@ -24,16 +24,16 @@ tests =
 reportsAddsAndDeletes :: Assertion
 reportsAddsAndDeletes = do
   let n = mkName ["www", "example", "com"]
-      oldZ = fromList [Named n (mkData "192.0.2.1")]
-      newZ = fromList [Named n (mkData "192.0.2.2")]
-      dz = diff oldZ newZ
+  oldZ <- zoneFromList [Named n (mkData "192.0.2.1")]
+  newZ <- zoneFromList [Named n (mkData "192.0.2.2")]
+  let dz = diff oldZ newZ
   (get n dz == Just [deleted (mkData "192.0.2.1"), added (mkData "192.0.2.2")]) @?= True
 
 unchangedIsEmpty :: Assertion
 unchangedIsEmpty = do
   let n = mkName ["api", "example", "com"]
-      z = fromList [Named n (mkData "192.0.2.10")]
-      dz = diff z z
+  z <- zoneFromList [Named n (mkData "192.0.2.10")]
+  let dz = diff z z
   isEmpty dz @?= True
   get n dz @?= Nothing
 
@@ -50,9 +50,9 @@ preservesNonRootOrigin = do
 exactChangeDetection :: Assertion
 exactChangeDetection = do
   let n = mkName ["db", "example", "com"]
-      oldZ = fromList ([] :: [Named String RData])
-      newZ = fromList [Named n (mkData "198.51.100.1")]
-      dz = diff oldZ newZ
+      oldZ = emptyZone root
+  newZ <- zoneFromList [Named n (mkData "198.51.100.1")]
+  let dz = diff oldZ newZ
   hasChanges (exactly n) dz @?= True
   hasChanges (exactly (mkName ["other", "example", "com"])) dz @?= False
 
@@ -60,9 +60,9 @@ wildcardChangeDetection :: Assertion
 wildcardChangeDetection = do
   let foo = mkName ["foo", "example", "com"]
       bar = mkName ["bar", "example", "com"]
-      oldZ = fromList ([] :: [Named String RData])
-      newZ = fromList [Named foo (mkData "203.0.113.1"), Named bar (mkData "203.0.113.2")]
-      dz = diff oldZ newZ
+      oldZ = emptyZone root
+  newZ <- zoneFromList [Named foo (mkData "203.0.113.1"), Named bar (mkData "203.0.113.2")]
+  let dz = diff oldZ newZ
       wildcard = Wildcard ["foo"] <| exactly (mkName ["example", "com"])
   hasChanges wildcard dz @?= True
 
@@ -72,3 +72,6 @@ mkData ip = RData IN 300 (A ip)
 mkName :: [String] -> Name String
 mkName [] = error "mkName: empty list"
 mkName xs = Name (NE.fromList (xs ++ [""]))
+
+zoneFromList :: (Label a, Ord a) => [Named a b] -> IO (AZone a b)
+zoneFromList = maybe (fail "could not create zone") return . fromList

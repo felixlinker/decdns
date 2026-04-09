@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Parsing.ZoneFile
-  ( parseZone
-  , parseZoneFile ) where
+  ( parseZoneFile ) where
 
 import Text.Parsec
 import Text.Parsec.Char as Char
@@ -96,17 +95,8 @@ line = do
   spaces
   return r
 
-zone :: Stream s m Char => Parser s m (Zone String)
-zone = do
-  org <- origin
-  rs <- catMaybes <$> many line
-  return $ foldl insert (emptyZone org) rs
+zoneFile :: Stream s m Char => Parser s m [StandardRecord]
+zoneFile = catMaybes <$> many line
 
-zoneFile :: Stream s m Char => Parser s m [Zone String]
-zoneFile = many zone <* eof
-
-parseZone :: Stream s m Char => SourceName -> s -> m (Either ParseError (Zone String))
-parseZone = runParserT zone emptyState
-
-parseZoneFile :: Stream s m Char => SourceName -> s -> m (Either ParseError [Zone String])
-parseZoneFile = runParserT zoneFile emptyState
+parseZoneFile :: Stream s m Char => SourceName -> s -> m (Either ParseError [StandardRecord])
+parseZoneFile = runParserT (zoneFile <* eof) emptyState

@@ -6,7 +6,7 @@ import Data.Functor.Identity (runIdentity)
 import DNS.Name (Named (name, value))
 import DNS.Record (RData (rttl), Type (DNSKEY, DS))
 import DNS.SEC.Crypto (AlgorithmType (RSASHA256), DigestType (SHA256))
-import DNS.ZoneFile (allData)
+import DNS.ZoneFile (allData, fromRecordList)
 import Parsing.Data (recordTypeData)
 import Parsing.State (emptyState, sep)
 import Parsing.ZoneFile (parseZoneFile)
@@ -39,7 +39,7 @@ parsesTTLDirective = do
         , "www IN A 192.0.2.2"
         ]
 
-  zones <-  either (fail . show) id <$> parseZoneFile "<test>" input
+  zones <-  either (fail . show) fromRecordList <$> parseZoneFile "<test>" input
   case zones of
     [z] -> do
       let d = allData z
@@ -56,7 +56,7 @@ parsesOmittedOwnerStartingWithClass = do
         , "IN AAAA 2001:db8::1"
         ]
 
-  zones <- either (fail . show) id <$> parseZoneFile "<test>" input
+  zones <- either (fail . show) fromRecordList <$> parseZoneFile "<test>" input
   case zones of
     [z] -> do
       let recs = allData z
@@ -72,7 +72,7 @@ parsesExplicitOwnerNamedIN = do
         , "IN 300 IN A 192.0.2.10"
         ]
 
-  zones <- either (fail . show) id <$> parseZoneFile "<test>" input
+  zones <- either (fail . show) fromRecordList <$> parseZoneFile "<test>" input
   case zones of
     [z] -> length (allData z) @?= 2
     zs -> assertFailure ("expected 1 zone, got " ++ show (length zs))
