@@ -109,8 +109,8 @@ pathInZone (Name (NE.reverse -> (orgr NE.:| org))) (Name (NE.reverse -> (nr NE.:
     pathInZone' :: Eq a => Name a -> [a] -> [a] -> Path a
     pathInZone' acc [] bs = Path acc [] bs
     pathInZone' acc as [] = Path acc as []
-    pathInZone' acc (a:as) (b:bs)
-      | a == b = pathInZone' (a <| acc) as bs
+    pathInZone' acc as@(a:asT) bs@(b:bsT)
+      | a == b = pathInZone' (a <| acc) asT bsT
       | otherwise = Path acc as bs
 
 mergeZones :: (Label a, Ord a) => Zone a -> Zone a -> Zone a
