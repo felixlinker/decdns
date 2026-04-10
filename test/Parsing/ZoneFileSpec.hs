@@ -15,8 +15,6 @@ import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 import Text.Parsec (runParserT)
 import Control.Monad (foldM)
-import Util.Bytes
-import Data.Maybe (fromMaybe)
 import Data.List (unsnoc)
 
 tests :: TestTree
@@ -39,13 +37,9 @@ parsesTTLDirective = do
         , "www IN A 192.0.2.2"
         ]
 
-  zones <-  either (fail . show) fromRecordList <$> parseZoneFile "<test>" input
-  case zones of
-    [z] -> do
-      let d = allData z
-      length d @?= 2
-      mapM_ ((3600 @=?) . rttl . value) d
-    zs -> assertFailure ("expected 1 zone, got " ++ show (length zs))
+  records <- either (fail . show) pure =<< parseZoneFile "<test>" input
+  length records @?= 2
+  mapM_ ((3600 @=?) . rttl . value) records
 
 parsesOmittedOwnerStartingWithClass :: Assertion
 parsesOmittedOwnerStartingWithClass = do
