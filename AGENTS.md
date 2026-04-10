@@ -1,6 +1,6 @@
 - This repository contains a Haskell implementation of a tool that can reason about resolvability of DNS zones during updates.
 The tools purpose and CLI usage is documented in the `README.md`.
-- Aim to reuse as much existing code as possible.
+- Aim to reuse as much existing code as possible. You may export previously unexported functions from a module to reuse them.
 - Always check whether you can reuse existing code before implementing new features.
 - When you find yourself reimplementing functionality or logic that has already been implemented, directly reuse or, when not immediately possible, generalize existing code.
 - Re-run tests whenever possible.
