@@ -1,11 +1,11 @@
 module Resolvable.DependenciesSpec (tests) where
 
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as S
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertBool, testCase)
 
-import DNS.Name (Name (Name), Named (Named))
+import DNS.Name (Named (Named))
+import DNS.NameSpec (mkName)
 import DNS.Record (Cat (IN), RData (RData), Type (A, NS), record)
 import NameConstraint (exactly)
 import Resolvable.Dependencies (ResolvableAt (ResolvableAt), fromRules)
@@ -54,6 +54,3 @@ rootDelegationDependsOnDelegatedResolution = do
   assertBool
     "expected dependency on delegated nameserver resolving the delegated name"
     (delegatedResolution `S.member` delegationDeps)
-
-mkName :: [String] -> Name String
-mkName = Name . NE.fromList

@@ -8,6 +8,7 @@ module DNS.ZoneFileSpec
   , genName
   , genAbsoluteName
   , normalizeZone
+  , zoneFromList
   ) where
 
 import qualified Data.ByteString as BS
@@ -19,7 +20,7 @@ import Test.Tasty.QuickCheck
 import Test.Tasty.HUnit
 
 import qualified DNS.Name as N
-import DNS.Name (Name (Name), Named (Named), (<|))
+import DNS.Name (Name (Name), Named (Named), (<|), Label)
 import DNS.Record
 import qualified DNS.RecordType as RT
 import DNS.SEC.Crypto
@@ -42,6 +43,9 @@ tests =
 
 normalizeZone :: Zone String -> [StandardRecord]
 normalizeZone = sort . allData
+
+zoneFromList :: (Label a, Ord a) => [Named a b] -> IO (AZone a b)
+zoneFromList = maybe (fail "could not create zone") return . fromList
 
 getEmptyIsNothing :: Assertion
 getEmptyIsNothing = get ("a" <| N.root) (emptyZone N.root :: Zone String) @?= Nothing

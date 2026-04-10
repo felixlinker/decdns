@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ViewPatterns #-}
-module DNS.NameSpec (tests) where
+module DNS.NameSpec
+  ( tests
+  , mkName ) where
 
 import Data.Char (toLower)
 import qualified Data.List.NonEmpty as NE
@@ -36,7 +38,7 @@ showRootAsDot =
   show (root :: Name String) @?= "."
 
 ordered :: [Name String]
-ordered = map name
+ordered = map mkName
   [ [ "example" ]
   , [ "a", "example" ]
   , [ "yljkjljk", "a", "example" ]
@@ -54,11 +56,11 @@ canonicalCompareRfc4034Example =
 
 canonicalCompareSpecificBeforeParent :: Assertion
 canonicalCompareSpecificBeforeParent =
-  canonicalCompare (name ["example", "com"]) (name ["com"]) @?= GT
+  canonicalCompare (mkName ["example", "com"]) (mkName ["com"]) @?= GT
 
 canonicalCompareNextLabel :: Assertion
 canonicalCompareNextLabel =
-  canonicalCompare (name ["a", "example", "com"]) (name ["b", "example", "com"]) @?= LT
+  canonicalCompare (mkName ["a", "example", "com"]) (mkName ["b", "example", "com"]) @?= LT
 
 propIsSubDomainReflexive :: Property
 propIsSubDomainReflexive =
@@ -106,9 +108,8 @@ genDifferentLabels = do
   l2 <- suchThat arbitrary (/= l1)
   return (l1:"", l2:"")
 
-name :: [String] -> Name String
-name [] = error "name: empty label list"
-name xs = Name (NE.fromList xs)
+mkName :: [String] -> Name String
+mkName = Name . NE.fromList
 
 invert :: Ordering -> Ordering
 invert LT = GT
