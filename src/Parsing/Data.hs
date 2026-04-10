@@ -54,13 +54,13 @@ recordTypeData = do
     T.DS -> ds
 
 cname :: Stream s m Char => TypeParser s m
-cname = CNAME <$> name
+cname = CNAME <$> absName
 
 dname :: Stream s m Char => TypeParser s m
-dname = DNAME <$> name
+dname = DNAME <$> absName
 
 ns :: Stream s m Char => TypeParser s m
-ns = NS <$> name
+ns = NS <$> absName
 
 a :: Stream s m Char => TypeParser s m
 a = A <$> many1 (digit <|> dot)
@@ -72,13 +72,13 @@ txt :: Stream s m Char => TypeParser s m
 txt = TXT <$> many1 (satisfy isPrint)
 
 mx :: Stream s m Char => TypeParser s m
-mx = MX <$> int <*> (sep >> name)
+mx = MX <$> int <*> (sep >> absName)
 
 soa :: Stream s m Char => TypeParser s m
 soa = do
-  mname <- name
+  mname <- absName
   sep
-  rnam <- name
+  rnam <- absName
   sep
   serial <- int
   sep
@@ -117,13 +117,13 @@ rrsig = do
   sep
   keyTag <- int
   sep
-  signersName <- name
+  signersName <- absName
   sep
   RRSIG typeCovered algorithm labelCount originalTTL signatureExpiration signatureInception keyTag signersName <$> base64WithSep
 
 nsec :: Stream s m Char => TypeParser s m
 nsec = do
-  nextDomainName <- name
+  nextDomainName <- absName
   sep
   firstType <- recordType
   restTypes <- many (try (sep >> recordType))

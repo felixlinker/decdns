@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Parsing.Name
-  ( name
+  ( absName
+  , name
   , parseName
   , parseNameM ) where
 
