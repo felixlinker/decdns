@@ -8,12 +8,12 @@ import DNS.Record (RData (rttl), Type (DNSKEY, DS))
 import DNS.SEC.Crypto (AlgorithmType (RSASHA256), DigestType (SHA256))
 import DNS.ZoneFile (allData, fromRecordList)
 import Parsing.Data (recordTypeData)
-import Parsing.State (emptyState, sep)
+import Parsing.State (emptyState)
 import Parsing.ZoneFile (parseZoneFile)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
-import Text.Parsec (eof, runParserT)
+import Text.Parsec (runParserT)
 import Control.Monad (foldM)
 import Util.Bytes
 import Data.Maybe (fromMaybe)
@@ -88,7 +88,7 @@ propParsesMultilineDSBlob =
 parsesRecordType :: DNS.Record.Type -> String -> Property
 parsesRecordType expected input =
   counterexample input $
-      case runIdentity (runParserT (recordTypeData <* sep <* eof) emptyState "<quickcheck>" input) of
+      case runIdentity (runParserT recordTypeData emptyState "<quickcheck>" input) of
         Left err ->
           counterexample (show err) False
         Right actual ->
