@@ -21,12 +21,20 @@ tests :: TestTree
 tests =
   testGroup
     "Parsing.ZoneFile"
-    [ testCase "parses $TTL and applies it to records without explicit TTL" parsesTTLDirective
+    [ testCase "can parse a record for the root label" parsesRootRecord
+    , testCase "parses $TTL and applies it to records without explicit TTL" parsesTTLDirective
     , testCase "parses omitted owner when line starts with IN" parsesOmittedOwnerStartingWithClass
     , testCase "backtracks to explicit owner when owner is IN" parsesExplicitOwnerNamedIN
+    , testCase "parses multiline records followed by inline comments" parsesMultilineRecordWithInlineComment
     , testProperty "parses multiline DNSKEY base64 blobs" propParsesMultilineDNSKEYBlob
     , testProperty "parses multiline DS hex blobs" propParsesMultilineDSBlob
     ]
+
+parsesRootRecord :: Assertion
+parsesRootRecord = do
+  let zone = ". IN 1200 A 192.0.2.1\n"
+  rs <- either (fail . show) return =<< parseZoneFile "<test>" zone
+  length rs @?= 1
 
 parsesTTLDirective :: Assertion
 parsesTTLDirective = do
@@ -70,6 +78,18 @@ parsesExplicitOwnerNamedIN = do
   case zones of
     [z] -> length (allData z) @?= 2
     zs -> assertFailure ("expected 1 zone, got " ++ show (length zs))
+
+parsesMultilineRecordWithInlineComment :: Assertion
+parsesMultilineRecordWithInlineComment = do
+  let input = unlines
+        [ ". 1200 IN TXT ("
+        , "\"abc\""
+        , ") ; comment"
+        , ". 300 IN A 192.0.2.10"
+        ]
+
+  records <- either (fail . show) pure =<< parseZoneFile "<test>" input
+  length records @?= 2
 
 propParsesMultilineDNSKEYBlob :: Property
 propParsesMultilineDNSKEYBlob =
