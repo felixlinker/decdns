@@ -16,7 +16,9 @@ import qualified Data.List.NonEmpty as NE
 import Data.Word (Word8)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck
+import Test.Tasty.HUnit
 
+import qualified DNS.Name as N
 import DNS.Name (Name (Name), Named (Named), (<|))
 import DNS.Record
 import qualified DNS.RecordType as RT
@@ -30,7 +32,8 @@ tests :: TestTree
 tests =
   testGroup
     "DNS.ZoneFile"
-    [ testProperty "getting data set on an empty zone returns that data" propSetGetRoundTrip
+    [ testCase "getting a non-existent path returns Nothing" getEmptyIsNothing
+    , testProperty "getting data set on an empty zone returns that data" propSetGetRoundTrip
     , testProperty "pruning setting an empty array results in an empty tree" propPruningSetEmpty
     , testProperty "inserting two records is commutative" propInsertCommutative
     , testProperty "constructing a zone from its list of records preserves the zone" propAllDataFromListRoundtrip
@@ -39,6 +42,9 @@ tests =
 
 normalizeZone :: Zone String -> [StandardRecord]
 normalizeZone = sort . allData
+
+getEmptyIsNothing :: Assertion
+getEmptyIsNothing = get ("a" <| N.root) (emptyZone N.root :: Zone String) @?= Nothing
 
 propSetGetRoundTrip :: Property
 propSetGetRoundTrip =
