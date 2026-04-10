@@ -41,7 +41,7 @@ absName = rootName <|> nonRootName
   where
     nonRootName :: Stream s m Char => ParsecT s u m (Name String)
     nonRootName = do
-      ls <- endBy Parsing.Name.label dot
+      ls <- endBy1 Parsing.Name.label dot
       return $ Name $ NE.prependList ls $ NE.singleton ""
 
     rootName :: Stream s m Char => ParsecT s u m (Name String)
