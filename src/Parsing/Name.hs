@@ -37,7 +37,7 @@ label = do
 
 absName :: Stream s m Char => ParsecT s u m (Name String)
 absName = do
-  ls <- endBy1 Parsing.Name.label dot
+  ls <- endBy Parsing.Name.label dot
   return $ Name $ NE.prependList ls $ NE.singleton ""
 
 relName :: (Stream s m Char, OriginProvider u) => ParsecT s u m (Name String)

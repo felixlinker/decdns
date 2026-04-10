@@ -96,7 +96,7 @@ whiteSpace = do
 comment :: Stream s m Char => Parser s m ()
 comment = do
   _ <- char ';'
-  void $ manyTill anyChar (try eol)
+  void $ manyTill anyChar (lookAhead eol)
 
 sepOne :: Stream s m Char => Bool -> Parser s m ()
 sepOne acceptNl =
