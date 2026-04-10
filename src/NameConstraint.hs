@@ -58,7 +58,7 @@ compileWildcards (Zone (Name n) r) = Zone (Name (NE.map Exactly n)) (go r)
     mapLabel exist "*" = Wildcard exist
     mapLabel _ x   = Exactly x
 
-    go :: T.Node String RData -> T.Node (LabelConstraint String) RData
+    go :: T.Node String [RData] -> T.Node (LabelConstraint String) [RData]
     go n_@(T.Node _ ch) = n_ { T.children = M.map go $ M.mapKeys (mapLabel (existIn n_)) ch }
 
 match :: Name String -> ConstrainedName -> Maybe (Name String)

@@ -36,16 +36,16 @@ import Data.Bifunctor (Bifunctor(bimap))
 
 data AZone a b = Zone
   { zoneName :: Name a
-  , root :: T.Node a b }
+  , root :: T.Node a [b] }
   deriving Eq
 
 instance Functor (AZone a) where
-  fmap f (Zone n r) = Zone n (fmap f r)
+  fmap f (Zone n r) = Zone n (fmap (fmap f) r)
 
 zshow :: forall a b s. ([a] -> b -> St.State s String) -> s -> AZone a b -> [String]
 zshow printf initSt (Zone _ r) = St.evalState (go [] r) initSt
   where
-    go  :: [a] -> T.Node a b -> St.State s [String]
+    go  :: [a] -> T.Node a [b] -> St.State s [String]
     go nameAcc (T.Node d cs) = do
       showD <- mapM (printf nameAcc) d
       showCs <- concat <$> mapM (\(l, n) -> go (l:nameAcc) n) (M.toAscList cs)
@@ -75,7 +75,7 @@ fromRecordList rList =
     toZones :: AZone a (Record a) -> [Zone a]
     toZones (Zone _ rn) = go rn []
       where
-        go :: T.Node a (Record a) -> [Zone a] -> [Zone a]
+        go :: T.Node a [Record a] -> [Zone a] -> [Zone a]
         go (T.Node rs cs) acc =
           let rec = foldr go acc cs
           in  maybe rec (:rec) (fromList rs)
@@ -122,7 +122,7 @@ mergeZones (Zone org1 t1) (Zone org2 t2) = case pathInZone org1 org2 of
 insert :: (Label a, Ord a) => AZone a b -> Named a b -> AZone a b
 insert (Zone norg zroot) (Named n d) = case pathInZone norg n of
   Path norg' zp rp -> Zone norg'
-    $ T.insert rp d
+    $ T.insert rp [d]
     $ T.insertNode zp zroot T.emptyNode
 
 fromList :: (Label a, Ord a) => [Named a b] -> Maybe (AZone a b)
@@ -138,8 +138,8 @@ set nam is z@(Zone org r) = case pathInZone org nam of
   Path _ [] p -> Zone org (T.adjust setF p r)
   _ -> z
   where
-    setF :: [a] -> T.Node a b -> T.Node a b
-    setF [] n = n { T.items = is }
+    setF :: [a] -> T.Node a [b] -> T.Node a [b]
+    setF [] n = n { T.item = is }
     setF (h:t) n@(T.Node _ cs) = n { T.children = M.insert h (T.leafAt t is) cs }
 
 prune :: AZone a b -> AZone a b
@@ -148,7 +148,7 @@ prune z@(Zone _ r) = z { DNS.ZoneFile.root = T.prune r }
 allData :: AZone a b -> [Named a b]
 allData (Zone orig ns) = go orig ns
   where
-    go :: Name a -> T.Node a b -> [Named a b]
+    go :: Name a -> T.Node a [b] -> [Named a b]
     go n (T.Node d ch) =
       let base = map (Named n) d
           rec = concatMap (uncurry (\l -> go (l <| n))) (M.toAscList ch)
@@ -159,7 +159,7 @@ noMatching (Named n d) (Zone org z) = case pathInZone org n of
   Path _ [] p -> go p z
   _ -> False
   where
-    go :: Ord a => [a] -> T.Node a RData -> Bool
+    go :: Ord a => [a] -> T.Node a [RData] -> Bool
     go [] (T.Node is _) = all ((/= rtype d) . rtype) is
     go (h:t) (T.Node _ cs) = maybe True (go t) (M.lookup h cs)
 

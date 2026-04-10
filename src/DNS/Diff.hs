@@ -70,15 +70,15 @@ hasChanges n (Zone org ns) = case pathInZone (exactly org) n of
   Path _ [] p -> go p ns
   _ -> False
   where
-    go :: (Label a, Ord a) => [LabelConstraint a] -> T.Node a (Diff RData) -> Bool
+    go :: (Label a, Ord a) => [LabelConstraint a] -> T.Node a [Diff RData] -> Bool
     go [] (T.Node is _) = not $ null is
     go [Wildcard ls] node@(T.Node _ cs) =
           -- Either there is a wildcard label with changes
           rec lwildcard [] node
           -- Or there is a label matched by the wildcard with changes
-      ||  any (\(l, T.items -> is) -> not (null is) && notElem l ls) (M.toList cs)
+      ||  any (\(l, T.item -> is) -> not (null is) && notElem l ls) (M.toList cs)
     go (Wildcard _ : _) _ = undefined  -- Cannot have wildcard within a name
     go (Exactly l : t) node = rec l t node
 
-    rec :: (Label a, Ord a) => a -> [LabelConstraint a] -> T.Node a (Diff RData) -> Bool
+    rec :: (Label a, Ord a) => a -> [LabelConstraint a] -> T.Node a [Diff RData] -> Bool
     rec l r (T.Node _ cs) = maybe False (go r) (M.lookup l cs)

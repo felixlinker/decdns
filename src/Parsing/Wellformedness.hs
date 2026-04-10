@@ -39,7 +39,7 @@ wellformed (Zone org r@(Tr.Node apexData rcs)) =
     noSOA :: Bool
     noSOA = all (\rd -> toType (rtype rd) /= T.SOA) apexData
 
-    checkZoneCuts :: Name String -> Tr.Node String RData -> Maybe StandardRecord
+    checkZoneCuts :: Name String -> Tr.Node String [RData] -> Maybe StandardRecord
     checkZoneCuts n (Tr.Node rs cs) = maybe rec recCheck (getZoneCut n rs)
       where
         rec :: Maybe StandardRecord
@@ -66,7 +66,7 @@ isAllowedBelowZoneCut CNAMECut _ = False
 isAllowedBelowZoneCut (NSCut delegN) (Named n rd) =
   n `isSubDomain` delegN && any ($ rd) [isType T.A, isType T.AAAA]
 
-wildcardRestrictions :: String -> Tr.Node String RData -> Bool
+wildcardRestrictions :: String -> Tr.Node String [RData] -> Bool
 wildcardRestrictions label (Tr.Node rs cs)
   | label == "*" && M.null cs = any (\rd -> toType (rtype rd) `elem` [T.DNAME, T.NS]) rs
   | otherwise = any (uncurry wildcardRestrictions) (M.toList cs)
