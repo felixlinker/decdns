@@ -93,7 +93,7 @@ main = do
       mapM_ print parsed
     _ -> fail "unknown command"
   where
-    toZone :: [Named ConstrainedLabel b] -> Maybe (AZone String b)
+    toZone :: [Named ConstrainedLabel b] -> Maybe (AZone String [] b)
     toZone = fromList . map (mapLabels show)
 
     popArg :: [String] -> IO (String, [String])

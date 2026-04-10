@@ -44,7 +44,7 @@ item :: Diff a -> a
 item (Diff (Left a)) = a
 item (Diff (Right a)) = a
 
-type ZoneDiff a = AZone a (Diff RData)
+type ZoneDiff a = AZone a [] (Diff RData)
 
 diff :: (Label a, Ord a) => Zone a -> Zone a -> ZoneDiff a
 diff (fmap deleted -> Zone oldOrg oldRs) (fmap added -> Zone newOrg newRs) =

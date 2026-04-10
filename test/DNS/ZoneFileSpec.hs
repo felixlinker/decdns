@@ -44,7 +44,7 @@ tests =
 normalizeZone :: Zone String -> [StandardRecord]
 normalizeZone = sort . allData
 
-zoneFromList :: (Label a, Ord a) => [Named a b] -> IO (AZone a b)
+zoneFromList :: (Label a, Ord a) => [Named a b] -> IO (AZone a [] b)
 zoneFromList = maybe (fail "could not create zone") return . fromList
 
 getEmptyIsNothing :: Assertion
