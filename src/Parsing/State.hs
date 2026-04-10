@@ -14,6 +14,7 @@ module Parsing.State
   , tryOrState
   , comment
   , endOfEntry
+  , whiteSpace
   , skipSep
   , skipSepNewLine
   , sep ) where
@@ -25,6 +26,7 @@ import qualified Control.Lens as L
 import DNS.Name
 import DNS.Record
 import Parsing.Tokens
+import Control.Applicative (asum)
 
 type Parser s m = ParsecT s ParserState m
 
@@ -86,10 +88,10 @@ close = do
   unless p (fail "parentheses closed but not opened")
   setLensState parens False
 
-hspace' :: Stream s m Char => Bool -> Parser s m ()
-hspace' acceptNl = do
+whiteSpace :: Stream s m Char => Parser s m ()
+whiteSpace = do
   inParens <- lensState parens
-  if acceptNl || inParens then eol <|> hspace else hspace
+  if inParens then eol <|> hspace else hspace
 
 comment :: Stream s m Char => Parser s m ()
 comment = do
@@ -97,7 +99,11 @@ comment = do
   void $ manyTill anyChar (try eol)
 
 sepOne :: Stream s m Char => Bool -> Parser s m ()
-sepOne acceptNl = open <|> close <|> comment <|> hspace' acceptNl
+sepOne acceptNl =
+  asum $ addEolP [open, close, comment, whiteSpace]
+  where
+    addEolP :: Stream s m Char => [Parser s m ()] -> [Parser s m ()]
+    addEolP = if acceptNl then (eol:) else id
 
 skipSep :: Stream s m Char => Parser s m ()
 skipSep = skipMany (sepOne False)

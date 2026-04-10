@@ -36,7 +36,7 @@ hexdec = return . BS.pack . go
     hexPair hi lo = fromIntegral (16 * digitToInt (toUpper hi) + digitToInt (toUpper lo))
 
 blobWithSep :: Stream s m Char => Parser s m String -> Parser s m String
-blobWithSep chunk = concat <$> sepEndBy1 chunk sep
+blobWithSep chunk = concat <$> sepEndBy1 chunk (many whiteSpace)
 
 base64 :: Stream s m Char => ParsecT s u m BS.ByteString
 base64 = b64dec =<< base64s
