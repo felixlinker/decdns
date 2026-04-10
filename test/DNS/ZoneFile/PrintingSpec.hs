@@ -3,13 +3,11 @@ module DNS.ZoneFile.PrintingSpec
   ) where
 
 import Data.Functor.Identity (runIdentity)
-import Data.List (sort)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck
 
-import DNS.Record (StandardRecord)
 import qualified DNS.ZoneFileSpec as ZS
-import DNS.ZoneFile (Zone, allData, fromRecordList)
+import DNS.ZoneFile (fromRecordList)
 import Parsing.ZoneFile (parseZoneFile)
 
 tests :: TestTree
