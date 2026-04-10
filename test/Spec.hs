@@ -10,6 +10,7 @@ import qualified DNS.NameSpec as NameSpec
 import qualified DNS.DiffSpec as DiffSpec
 import qualified DNS.ZoneFileSpec as DNSZoneFileSpec
 import qualified DNS.ZoneFile.PrintingSpec as ZoneFilePrintingSpec
+import qualified Parsing.WellformednessSpec as ParsingWellformednessSpec
 import qualified Parsing.ZoneFileSpec as ParsingZoneFileSpec
 import qualified Util.ListSpec as ListSpec
 import qualified Util.TreeSpec as TreeSpec
@@ -28,6 +29,7 @@ main =
       , NameSpec.tests
       , DiffSpec.tests
       , DNSZoneFileSpec.tests
+      , ParsingWellformednessSpec.tests
       , ParsingZoneFileSpec.tests
       , ZoneFilePrintingSpec.tests
       , ListSpec.tests
