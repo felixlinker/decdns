@@ -5,13 +5,14 @@ module Parsing.Name
   , parseName
   , parseNameM ) where
 
+import Data.Functor (($>))
 import Control.Monad (MonadPlus (mzero), when)
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (isJust)
 import Text.Parsec
 import Text.Parsec.Char as Char
 
-import DNS.Name (Name(..))
+import DNS.Name (Name(..), root)
 import Parsing.Tokens
 import Parsing.State (OriginProvider (getOrigin))
 import Data.Char (toLower)
@@ -36,9 +37,15 @@ label = do
   return $ map toLower $ p0 : p1 ++ p2
 
 absName :: Stream s m Char => ParsecT s u m (Name String)
-absName = do
-  ls <- endBy Parsing.Name.label dot
-  return $ Name $ NE.prependList ls $ NE.singleton ""
+absName = rootName <|> nonRootName
+  where
+    nonRootName :: Stream s m Char => ParsecT s u m (Name String)
+    nonRootName = do
+      ls <- endBy Parsing.Name.label dot
+      return $ Name $ NE.prependList ls $ NE.singleton ""
+
+    rootName :: Stream s m Char => ParsecT s u m (Name String)
+    rootName = dot $> root
 
 relName :: (Stream s m Char, OriginProvider u) => ParsecT s u m (Name String)
 relName = do
