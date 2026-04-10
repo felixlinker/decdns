@@ -20,6 +20,7 @@ origin = do
   _ <- string "$ORIGIN"
   sep
   org <- name
+  endOfEntry
   writeState parsedZone org
   return org
 
@@ -29,6 +30,7 @@ setTTL = do
   _ <- string "$TTL"
   sep
   t <- int
+  endOfEntry
   writeState lastTTL t
 
 record :: Stream s m Char => Parser s m StandardRecord
@@ -47,7 +49,7 @@ catTtlType = do
   t <- tryOrState int lastTTL
   skipSep
   ty <- recordTypeData
-  sep
+  endOfEntry
   return $ Named n (RData c t ty)
 
 nameCatTtlType :: Stream s m Char => Parser s m (Record String)
@@ -60,7 +62,7 @@ nameCatTtlType = do
   t <- tryOrState int lastTTL
   skipSep
   ty <- recordTypeData
-  sep
+  endOfEntry
   return $ Named n (RData c t ty)
 
 nameTtlCatType :: Stream s m Char => Parser s m (Record String)
@@ -73,18 +75,16 @@ nameTtlCatType = do
   c <- tryOrState category lastCat
   skipSep
   ty <- recordTypeData
-  sep
+  endOfEntry
   return $ Named n (RData c t ty)
 
 line :: Stream s m Char => Parser s m (Maybe StandardRecord)
 line = do
   skipSepNewLine -- to skip leading comments and new lines
-  r <- asum $ map try
-      [ origin $> Nothing
-      , setTTL $> Nothing
-      , Just <$> record ]
-  endOfEntry
-  return r
+  asum $ map try
+    [ origin $> Nothing
+    , setTTL $> Nothing
+    , Just <$> record ]
 
 zoneFile :: Stream s m Char => Parser s m [StandardRecord]
 zoneFile = catMaybes <$> many line

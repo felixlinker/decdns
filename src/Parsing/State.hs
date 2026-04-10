@@ -110,6 +110,7 @@ sep = skipMany1 (sepOne False)
 
 endOfEntry :: Stream s m Char => Parser s m ()
 endOfEntry = do
-  skipSepNewLine
+  skipSep
+  eol
   inParens <- lensState parens
   guard (not inParens)
