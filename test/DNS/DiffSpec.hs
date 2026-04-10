@@ -35,7 +35,7 @@ unchangedIsEmpty = do
       z = singleton (Named n (mkData "192.0.2.10"))
       dz = diff z z
   isEmpty dz @?= True
-  get n dz @?= Nothing
+  get n dz @?= Just []
 
 preservesNonRootOrigin :: Assertion
 preservesNonRootOrigin = do
