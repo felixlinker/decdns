@@ -2,11 +2,20 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE TupleSections #-}
 module Resolvable.Prolog
+  -- TODO: Enforce usage of termView or exported constructors by hiding constructors of Term
   ( Term(..)
+  , TermView(..)
+  , toView
+  , fromView
   , equiv
   , emptyList
+  , tList
+  , list
+  , listWithTail
+  , collectList
+  , collectListWithTail
   , walk
-  , renamePred
+  , renameFunctor
   , subterm
   , Rule(..)
   , mapRule
@@ -16,6 +25,7 @@ module Resolvable.Prolog
   , typeAtom
   , dataAtom
   , (Resolvable.Prolog.\=)
+  , (\+)
   , nameWithSynthesis
   , nameTerm
   , showKnowledgeBase ) where
@@ -30,84 +40,167 @@ import qualified Data.List.NonEmpty as NE
 import Data.Char (toLower, toUpper)
 import Data.Semigroup (Semigroup(..), sconcat)
 import Util.Fresh (Fresh, fresh)
-import Data.Maybe (maybeToList)
 import Util.List (zipWithStrict)
+import Data.Tuple (swap)
+import Data.Bifunctor (Bifunctor(bimap))
 
-data Term = TOp String [Term]
+caretSym :: String
+caretSym = "^"
+
+listSym :: String
+listSym = "."
+
+neqSym :: String
+neqSym = "\\="
+
+negSym :: String
+negSym = "\\+"
+
+infixFunctors :: [String]
+infixFunctors =
+  [ caretSym
+  , neqSym
+  , negSym ]
+
+data Term = TFunctor String [Term]
+          | TEmptyList
           | TVar String
           | TWildcard
           | TAtomQuoted String
           | TAtom String
-          | TList [Term] (Maybe Term)
           | TString String
-          | TPred String [Term]
   deriving (Eq, Ord)
 
+data TermView = TVList TermView TermView
+              | TVNeq TermView TermView
+              | TVFunctor String [ TermView ]
+              | TVEmptyList
+              | TVVar String
+              | TVWildcard
+              | TVAtomQuoted String
+              | TVAtom String
+              | TVString String
+
+toView :: Term -> TermView
+toView (TFunctor n args)
+  | n == listSym = case map toView args of
+    [ a, b ] -> TVList a b
+    _ -> undefined
+  | n == neqSym = case map toView args of
+    [ a, b ] -> TVNeq a b
+    _ -> undefined
+  | otherwise = TVFunctor n (map toView args)
+toView TEmptyList = TVEmptyList
+toView (TVar v) = TVVar v
+toView TWildcard = TVWildcard
+toView (TAtomQuoted n) = TVAtomQuoted n
+toView (TAtom n) = TVAtom n
+toView (TString s) = TVString s
+
+fromView :: TermView -> Term
+fromView (TVList a b) = TFunctor listSym [ fromView a, fromView b ]
+fromView (TVNeq a b) = TFunctor neqSym [ fromView a, fromView b ]
+fromView (TVFunctor n args) = TFunctor n (map fromView args)
+fromView TVEmptyList = TEmptyList
+fromView (TVVar v) = TVar v
+fromView TVWildcard = TWildcard
+fromView (TVAtomQuoted n) = TAtomQuoted n
+fromView (TVAtom n) = TAtom n
+fromView (TVString s) = TString s
+
+tBin :: String -> Term -> Term -> Term
+tBin n a b = TFunctor n [ a, b ]
+
+tList :: Term -> Term -> Term
+tList = tBin listSym
+
 emptyList :: Term
-emptyList = TList [] Nothing
+emptyList = TEmptyList
+
+list :: [Term] -> Term
+list [] = TEmptyList
+list (x:xs) = TFunctor listSym [ x, list xs ]
+
+listWithTail :: [Term] -> Term -> Term
+listWithTail xs t = go xs
+  where
+    go :: [Term] -> Term
+    go [] = t
+    go (a:as) = TFunctor listSym [ a, go as ]
+
+collectListWithTail :: Term -> ([Term], Maybe Term)
+collectListWithTail = swap . bimap (fmap fromView) (fmap fromView) . rec . toView
+  where
+    rec :: TermView -> (Maybe TermView, [TermView])
+    rec (TVList a b) = (a:) <$> rec b
+    rec TVEmptyList = (Nothing, [])
+    rec t = (Just t, [])
+
+collectList :: Term -> [Term]
+collectList = fst . collectListWithTail
 
 equiv :: Term -> Term -> Bool
-equiv (TOp a argsa) (TOp b argsb) = a == b && maybe False and (zipWithStrict equiv argsa argsb)
+equiv (TFunctor a argsa) (TFunctor b argsb) = a == b && maybe False and (zipWithStrict equiv argsa argsb)
+equiv TEmptyList TEmptyList = True
 equiv (TVar a) (TVar b) = a == b
 equiv TWildcard _ = True
 equiv _ TWildcard = True
 equiv (TAtomQuoted a) (TAtomQuoted b) = a == b
 equiv (TAtom a) (TAtom b) = a == b
-equiv (TList as mta) (TList bs mtb) = maybe False and (zipWithStrict equiv as bs) && tailEqual mta mtb
-  where
-    tailEqual :: Maybe Term -> Maybe Term -> Bool
-    tailEqual Nothing Nothing = True
-    tailEqual (Just ta) (Just tb) = equiv ta tb
-    tailEqual _ _ = False
+  -- where
+  --   tailEqual :: Maybe Term -> Maybe Term -> Bool
+  --   tailEqual Nothing Nothing = True
+  --   tailEqual (Just ta) (Just tb) = equiv ta tb
+  --   tailEqual _ _ = False
 equiv (TString a) (TString b) = a == b
-equiv (TPred a argsa) (TPred b argsb)
-  | a == b = maybe False and (zipWithStrict equiv argsa argsb)
-  | otherwise = False
 equiv _ _ = False
 
 instance Show Term where
-  show (TOp "^" [ a, b ]) = show a ++ "^" ++ show b
-  show (TOp op (map show -> args)) = op ++ "(" ++ intercalate ", " args ++ ")"
+  show t@(TFunctor op args)
+    | op `elem` infixFunctors =
+      case args of
+        [ a ] -> op ++ " " ++ show a
+        [ a, b ] -> show a ++ " " ++ op ++ " " ++ show b
+        _ -> undefined
+    | op == listSym =
+      let (l, tl) = collectListWithTail t
+      in "[" ++ intercalate ", " (map show l) ++ maybe "" (\x -> " | " ++ show x) tl ++ "]"
+    | otherwise = op ++ "(" ++ intercalate ", " (map show args) ++ ")"
+  show TEmptyList = "[]"
   show (TVar "") = undefined
   show (TVar (h:t)) = toUpper h : t
   show TWildcard = "_"
   show (TAtom "") = undefined
   show (TAtom (h:t)) = toLower h : t
   show (TAtomQuoted a) =  "'" ++ a ++ "'"
-  show (TList hs t) =
-    "[" ++ intercalate ", " (map show hs) ++ maybe "" (\x -> " | " ++ show x) t ++ "]"
   show (TString s) = show s
-  show (TPred "\\=" (map show -> [ a, b ])) = a ++ " \\= " ++ b
-  show (TPred h (map show -> args)) = h ++ "(" ++ intercalate ", " args ++ ")"
 
 walk :: Semigroup a => (Term -> a) -> Term -> a
-walk f t@(TOp _ args) = sconcat (f t NE.:| map (walk f) args)
+walk f t@(TFunctor _ args) = sconcat (f t NE.:| map (walk f) args)
+walk f TEmptyList = f TEmptyList
 walk f t@(TVar _) = f t
 walk f TWildcard = f TWildcard
 walk f t@(TAtomQuoted _) = f t
 walk f t@(TAtom _) = f t
-walk f t@(TList hs tl) = sconcat (f t NE.:| map (walk f) (hs ++ maybeToList tl))
 walk f t@(TString _) = f t
-walk f t@(TPred _ args) = sconcat (f t NE.:| map (walk f) args)
 
 replace :: (Term -> Term) -> Term -> Term
 replace f t = rec (f t)
   where
-    rec (TOp op ts) = TOp op (map (replace f) ts)
+    rec (TFunctor op ts) = TFunctor op (map (replace f) ts)
+    rec u@TEmptyList = u
     rec u@(TVar _) = u
     rec u@TWildcard = u
     rec u@(TAtomQuoted _) = u
     rec u@(TAtom _) = u
-    rec (TList ts tl) = TList (map (replace f) ts) tl
     rec u@(TString _) = u
-    rec (TPred p ts) = TPred p (map (replace f) ts)
 
-renamePred :: String -> String -> Term -> Term
-renamePred from to = replace go
+renameFunctor :: String -> String -> Term -> Term
+renameFunctor from to = replace go
   where
     go :: Term -> Term
-    go t@(TPred n args)
-      | n == from = TPred to args
+    go t@(TFunctor n args)
+      | n == from = TFunctor to args
       | otherwise = t
     go t = t
 
@@ -128,7 +221,7 @@ subterm :: Term -> Term -> Bool
 subterm t1 t2 = toBool $ walk (\t -> Or (t == t1)) t2
 
 (^) :: Term -> Term -> Term
-(^) a b = TOp "^" [ a, b ]
+(^) = tBin caretSym
 
 dnsWildcard :: Term
 dnsWildcard = TAtom "'*'"
@@ -143,16 +236,19 @@ dataAtom :: Type -> Term
 dataAtom = TString . showData
 
 (\=) :: Term -> Term -> Term
-(\=) a b = TPred "\\=" [ a, b ]
+(\=) = tBin neqSym
+
+(\+) :: Term -> Term
+(\+) t1 = TFunctor negSym [t1]
 
 nameWithSynthesis :: ConstrainedName -> Fresh (Term, [(Term, Term)])
 nameWithSynthesis (Name (l NE.:| ls)) = case l of
   Wildcard [] -> do
-    return (TList (reverse (TWildcard : exactlyNatoms ls)) (Just TWildcard), [])
+    return (listWithTail (reverse (TWildcard : exactlyNatoms ls)) TWildcard, [])
   Wildcard cs -> do
     h <- TVar <$> fresh "H"
-    return (TList (reverse (h : exactlyNatoms ls)) (Just TWildcard), neqs h cs)
-  _ -> return (TList (reverse (exactlyNatoms (l:ls))) Nothing, [])
+    return (listWithTail (reverse (h : exactlyNatoms ls)) TWildcard, neqs h cs)
+  _ -> return (list (reverse (exactlyNatoms (l:ls))), [])
   where
     neqs :: Term -> [String] -> [(Term, Term)]
     neqs var = map ((var,) . TAtom)
@@ -164,7 +260,7 @@ nameWithSynthesis (Name (l NE.:| ls)) = case l of
     exactlyNatoms (Exactly c : t) = TAtom c : exactlyNatoms t
 
 nameTerm :: Name String -> Term
-nameTerm (Name (NE.toList -> ls)) = TList (reverse $ map TAtom $ filter (not . null) ls) Nothing
+nameTerm (Name (NE.toList -> ls)) = list (reverse $ map TAtom $ filter (not . null) ls)
 
 data Rule a = Rule
   { rannotation :: a
@@ -191,5 +287,5 @@ showKnowledgeBase kb =
   in unlines $ map show $ concat factsFirst
   where
     headName :: Rule a -> String
-    headName (Rule _ (TPred n _) _) = n
+    headName (Rule _ (TFunctor n _) _) = n
     headName _ = undefined

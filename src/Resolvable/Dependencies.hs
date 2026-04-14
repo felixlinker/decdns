@@ -43,13 +43,15 @@ fromAtom (TAtom s) = Just s
 fromAtom _ = Nothing
 
 fromNameTerm :: Term -> Maybe (Name String)
-fromNameTerm (TList l _) = do
-  l' <- mapM fromAtom l
-  return $ Name $ NE.reverse $ "" NE.:| l'
-fromNameTerm _ = Nothing
+fromNameTerm t = case toView t of
+  TVList _ _ -> do
+    let l = collectList t
+    l' <- mapM fromAtom l
+    return $ Name $ NE.reverse $ "" NE.:| l'
+  _ -> Nothing
 
 fromResolves :: Term -> Maybe (ResolvableAt ConstrainedName)
-fromResolves (TPred "resolves" [ ns, _, n, _ ]) = do
+fromResolves (TFunctor "resolves" [ ns, _, n, _ ]) = do
   ns' <- fromNameTerm ns
   n' <- exactly <$> fromNameTerm n
   return $ ResolvableAt (Named ns' n')
@@ -102,8 +104,8 @@ computeResolvable rootServers rsM = do
     return $ CQuery (apply u query) (constraints u)
   where
     solveQuery :: ConstrainedUnifier -> Term -> [Rule a] -> [(ConstrainedUnifier, [Term])]
-    solveQuery u (TPred "\\=" [ a, b ]) _ = maybe [] (return . (,[])) (addConstraint a b u)
-    solveQuery u q@(TPred pname _) rs
+    solveQuery u (TFunctor "\\=" [ a, b ]) _ = maybe [] (return . (,[])) (addConstraint a b u)
+    solveQuery u q@(TFunctor pname _) rs
       | pname `elem` ["resolves", "resolvable"] = mapMaybe (deriveIf u q) rs
     solveQuery _ _ _ = error "unsupported predicate"
 
@@ -117,7 +119,7 @@ computeResolvable rootServers rsM = do
       where
         trace' :: [Term]
         trace' = case q of
-          TPred "resolves" _ -> q:trace
+          TFunctor "resolves" _ -> q:trace
           _ -> trace
 
         solveConjunct :: Term -> [ConstrainedUnifier] -> [ConstrainedUnifier]

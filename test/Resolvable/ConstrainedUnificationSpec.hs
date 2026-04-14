@@ -55,9 +55,9 @@ rejectsConstraintViolation =
 
 rejectsChainedViolation :: Assertion
 rejectsChainedViolation =
-  expectJust "expected constraint to be added" (addConstraint (TVar "X") (TOp "f" [TVar "Y"]) identity) $ \u1 ->
+  expectJust "expected constraint to be added" (addConstraint (TVar "X") (TFunctor "f" [TVar "Y"]) identity) $ \u1 ->
     expectJust "expected unifier after binding Y" (extendUnifier (TVar "Y") (TAtom "a") u1) $ \u2 ->
-      case extendUnifier (TVar "X") (TOp "f" [TAtom "a"]) u2 of
+      case extendUnifier (TVar "X") (TFunctor "f" [TAtom "a"]) u2 of
         Nothing -> pure ()
         Just _ -> assertFailure "expected constraint violation after chaining"
 

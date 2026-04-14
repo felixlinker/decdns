@@ -45,17 +45,13 @@ isRenaming (Unifier (M.elems -> ts)) = all isVar ts && not (hasDuplicates ts)
     insertP True = Nothing     -- Abort if found
 
 apply :: Unifier -> Term -> Term
-apply u (TOp op (map (apply u) -> args)) = TOp op args
+apply u (TFunctor op (map (apply u) -> args)) = TFunctor op args
+apply _ TEmptyList = TEmptyList
 apply (Unifier m) v@(TVar _) = fromMaybe v (M.lookup v m)
 apply _ TWildcard = TWildcard
 apply _ t@(TAtomQuoted _) = t
 apply _ t@(TAtom _) = t
-apply u (TList (map (apply u) -> ts) t) = case fmap (apply u) t of
-  Nothing -> TList ts Nothing
-  Just (TList ts' t') -> TList (ts ++ ts') t'
-  t' -> TList ts t'
 apply _ t@(TString _) = t
-apply u (TPred n (map (apply u) -> ts)) = TPred n ts
 
 unify :: Term -> Term -> Maybe Unifier
 unify t1 t2 = extendUnifier t1 t2 identity
@@ -90,10 +86,12 @@ extendUnifier from to u@(Unifier m) = unif (apply u from) (apply u to)
     unif _ TWildcard = Just u
     unif v@(TVar _) t = unifVar v t
     unif t v@(TVar _) = unifVar v t
-    unif (TOp op1 args1) (TOp op2 args2)
+    unif (TFunctor op1 args1) (TFunctor op2 args2)
       | op1 == op2 = unifList args1 args2
       | otherwise  = Nothing
-    unif (TOp _ _) _ = Nothing
+    unif (TFunctor _ _) _ = Nothing
+    unif TEmptyList TEmptyList = Just u
+    unif TEmptyList _ = Nothing
     unif (TAtomQuoted a) (TAtomQuoted b)
       | a == b    = Just u
       | otherwise = Nothing
@@ -102,32 +100,7 @@ extendUnifier from to u@(Unifier m) = unif (apply u from) (apply u to)
       | a == b    = Just u
       | otherwise = Nothing
     unif (TAtom _) _ = Nothing
-    unif (TList hs1 t1) (TList hs2 t2) = do
-      unifTList hs1 hs2 t1 t2 u
-      where
-        unifTList :: [Term] -> [Term] -> Maybe Term -> Maybe Term -> Unifier -> Maybe Unifier
-        unifTList []        []        Nothing Nothing u' = Just u'
-        unifTList []        (_:_)     Nothing _ _ = Nothing
-        unifTList (_:_)     []        _ Nothing _ = Nothing
-        unifTList []        hs2'      (Just v@(TVar _)) t2' u'
-          | null hs2' = extendUnifier v (fromMaybe emptyList t2') u'
-          | otherwise = extendUnifier v (TList hs2' t2') u'
-        unifTList hs1'      []        t1' (Just v@(TVar _)) u'
-          | null hs1' = extendUnifier v (fromMaybe emptyList t1') u'
-          | otherwise = extendUnifier v (TList hs1' t1') u'
-        unifTList []        _         (Just TWildcard) _ u' = Just u'
-        unifTList _         []        _ (Just TWildcard) u' = Just u'
-        -- Do not support any other terms in tails other than variable and wildcard
-        unifTList []        _         (Just _) _ _ = Nothing
-        unifTList _         []        _ (Just _) _ = Nothing
-        unifTList (h1:hs1') (h2:hs2') t1' t2' u' =
-          extendUnifier h1 h2 u' >>= unifTList hs1' hs2' t1' t2'
-    unif (TList _ _) _ = Nothing
     unif (TString a) (TString b)
       | a == b    = Just u
       | otherwise = Nothing
     unif (TString _) _ = Nothing
-    unif (TPred h1 args1) (TPred h2 args2)
-      | h1 == h2 = unifList args1 args2
-      | otherwise = Nothing
-    unif (TPred _ _) _ = Nothing

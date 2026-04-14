@@ -8,6 +8,10 @@ import Util.Fresh (runFresh, fresh)
 names :: Gen String
 names = elements (runFresh $ mapM (const $ fresh "v") ([0..4] :: [Int]))
 
+-- Also generate lists but not other functors
+functors :: Gen String
+functors = oneof [ return ".", names ]
+
 genTermNoWildcard :: Gen Term
 genTermNoWildcard = do
   n <- chooseInt (0, 6)
@@ -22,14 +26,7 @@ genTermNoWildcard = do
                         ]
       | otherwise =
         let rec = go (n - 1)
-        in  frequency
-            [ (4, go 0)
-            , (2, TOp <$> names <*> genList rec)
-            , (2, TPred <$> names <*> genList rec)
-            , (2, TList <$> genList rec <*> genTail) ]
-
-    genTail :: Gen (Maybe Term)
-    genTail = oneof [ pure Nothing, Just . TVar <$> names ]
+        in  oneof [ go 0, TFunctor <$> functors <*> genList rec ]
 
     genList :: Gen Term -> Gen [Term]
     genList g = do

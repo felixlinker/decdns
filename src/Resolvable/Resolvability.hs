@@ -23,7 +23,7 @@ data RComp = RComp
   deriving (Eq, Ord)
 
 resolves :: Term -> Term -> Term -> Term -> Term
-resolves ns t n r = TPred "resolves" [ ns, t, n, r ]
+resolves ns t n r = TFunctor "resolves" [ ns, t, n, r ]
 
 resolvableBase :: Name String -> ConstrainedRecord -> Fresh (Rule RComp)
 resolvableBase ns r@(Named n (RData _ _ ty)) = do
@@ -32,9 +32,13 @@ resolvableBase ns r@(Named n (RData _ _ ty)) = do
   return (Rule cannot (resolves (nameTerm ns) (typeAtom ty) n' (dataAtom ty)) neqs)
 
 captureListTail :: Term -> Term -> Term
-captureListTail t (TList pref Nothing) = TList pref (Just t)
-captureListTail _ (TList _ (Just _)) = undefined
-captureListTail _ _ = undefined
+captureListTail captureWith t = case toView t of
+  v@(TVList _ _) -> rec v
+  _ -> t
+  where
+    rec :: TermView -> Term
+    rec (TVList a b) = tList (fromView a) (rec b)
+    rec _ = captureWith
 
 resolvableStep :: [Name String] -> Name String -> ConstrainedRecord -> Fresh [Rule RComp]
 resolvableStep (map nameTerm -> rootServers) ns r@(Named n (rtype -> NS (nameTerm -> delegatedNs))) = sequence $ do
@@ -69,12 +73,12 @@ resolvableStep (map nameTerm -> rootServers) ns r@(Named n (rtype -> DNAME (name
     res <- TVar <$> fresh "R"
     return Rule { rannotation = RComp ns r
                 , rhead = resolves (nameTerm ns) q n' res
-                , rbody = [ t \= TList [] Nothing
+                , rbody = [ t \= TEmptyList
                           , resolves rootServer q (captureListTail t dname) res ] }
 resolvableStep _ _ (Named _ (rtype -> _)) = return []
 
 presolvable :: Term -> Term -> Term -> Term
-presolvable s q n = TPred "resolvable" [ s, q, n ]
+presolvable s q n = TFunctor "resolvable" [ s, q, n ]
 
 resolvable :: Fresh (Rule ())
 resolvable = do
@@ -85,7 +89,7 @@ resolvable = do
 
 allResolvable :: Rule ()
 allResolvable =
-  Rule () (TPred "all_resolvable" [ q, rns, ns ]) [ bagof n (presolvable rns q n) ns ]
+  Rule () (TFunctor "all_resolvable" [ q, rns, ns ]) [ bagof n (presolvable rns q n) ns ]
   where
     q = TVar "Q"
     rns = TVar "RS"
@@ -93,7 +97,7 @@ allResolvable =
     n = TVar "Name"
 
     bagof :: Term -> Term -> Term -> Term
-    bagof a b c = TPred "bagof" [ a, b, c ]
+    bagof a b c = TFunctor "bagof" [ a, b, c ]
 
 fromZoneFile :: [Name String] -> Name String -> [ConstrainedRecord] -> Fresh [Rule RComp]
 fromZoneFile rootServers ns rs = concat <$> mapM recordToRules rs

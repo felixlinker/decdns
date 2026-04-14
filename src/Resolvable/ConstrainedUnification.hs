@@ -58,31 +58,27 @@ mergeUnifiers keep (CUnifier (U.Unifier m) neqs) =
 simplify :: [(Term, Term)] -> [(Term, Term)]
 simplify = concatMap (uncurry simplifyNeq)
 
+-- TODO: This pattern-matching as it creates no warnings or compilation errors
+-- when the implementation of Term changes. This should be changed.
 simplifyNeq :: Term -> Term -> [(Term, Term)]
 simplifyNeq a b = case (a, b) of
   (TVar _, _) -> [(a, b)]
   (_, TVar _) -> [(a, b)]
   (TWildcard, _) -> [(a, b)] -- preserve contradiction
   (_, TWildcard) -> [(a, b)] -- preserve contradiction
-  (TOp opa argsa, TOp opb argsb)
+  (TFunctor opa argsa, TFunctor opb argsb)
     | opa == opb -> maybe [] rec (zipStrict argsa argsb)
     | otherwise -> []
+  (TEmptyList, TEmptyList) -> [(a, b)] -- preserve contradiction
   (TAtomQuoted ata, TAtomQuoted atb)
     | ata /= atb -> []
     | otherwise -> [(a, b)]
   (TAtom ata, TAtom atb)
     | ata /= atb -> []
     | otherwise -> [(a, b)]
-  (TList [] Nothing, TList (_:_) _) -> []
-  (TList (_:_) _, TList [] Nothing) -> []
-  -- TODO: Implement more reasoning on lists
-  (TList _ _, TList _ _) -> [(a, b)]
   (TString stra, TString strb)
     | stra /= strb -> []
     | otherwise -> [(a, b)]
-  (TPred pa argsa, TPred pb argsb)
-    | pa == pb -> maybe [] rec (zipStrict argsa argsb)
-    | otherwise -> []
   _ -> []
   where
     rec :: [(Term, Term)] -> [(Term, Term)]
