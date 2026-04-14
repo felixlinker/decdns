@@ -1,6 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module Util.TreeSpec (tests) where
 
+import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Test.Tasty (TestTree, testGroup)
@@ -67,12 +68,12 @@ prop_pruneEmptyTreeIsNull =
 prop_mergePartionedIdentity :: Property
 prop_mergePartionedIdentity =
   forAll genTree $ \tree ->
-    toCanon (uncurry T.merge (T.partition (const even) tree)) === toCanon tree
+    toCanon (uncurry T.merge (T.partition (const $ L.partition even) tree)) === toCanon tree
 
 prop_mergeCorrectness :: Property
 prop_mergeCorrectness =
   forAll genTree $ \tree ->
-    let (top, bot) = T.partition (const even) tree
+    let (top, bot) = T.partition (const $ L.partition even) tree
     in property $ all (all even) top && not (any (any even) bot)
 
 nullDetectsEmptyAndNonEmptyNodes :: Assertion

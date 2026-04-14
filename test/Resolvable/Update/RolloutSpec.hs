@@ -6,6 +6,7 @@ import Test.Tasty.QuickCheck
 
 import DNS.Diff (diff)
 import DNS.Record (StandardRecord)
+import qualified DNS.RRSet as RRSet
 import DNS.ZoneFile (Zone, allData, insert, zoneName)
 import qualified DNS.ZoneFileSpec as ZS
 import Resolvable.Update.Rollout (rollout)
@@ -22,14 +23,14 @@ tests =
 propImmediateTxtAdd :: ZS.ArbZone -> Property
 propImmediateTxtAdd (ZS.ArbZone z _) =
   forAll (freshTxtFor z) $ \txt ->
-    let z' = insert z txt
+    let z' = insert z (fmap RRSet.singleton txt)
         diffs = M.singleton (zoneName z) (diff z z')
     in rollout diffs PO.empty PO.empty === [diffs]
 
 propImmediateTxtDelete :: ZS.ArbZone -> Property
 propImmediateTxtDelete (ZS.ArbZone z _) =
   forAll (freshTxtFor z) $ \txt ->
-    let zWithTxt = insert z txt
+    let zWithTxt = insert z (fmap RRSet.singleton txt)
         diffs = M.singleton (zoneName zWithTxt) (diff zWithTxt z)
     in rollout diffs PO.empty PO.empty === [diffs]
 

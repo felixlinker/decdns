@@ -25,6 +25,7 @@ library
       DNS.Name
       DNS.Record
       DNS.RecordType
+      DNS.RRSet
       DNS.SEC.Crypto
       DNS.ZoneFile
       DNS.ZoneFile.Printing

@@ -13,6 +13,7 @@ import qualified Data.Map as M
 
 import DNS.Name as N
 import DNS.Record
+import qualified DNS.RRSet as RRSet
 import DNS.ZoneFile
 
 import qualified Util.Tree as T
@@ -44,14 +45,15 @@ item :: Diff a -> a
 item (Diff (Left a)) = a
 item (Diff (Right a)) = a
 
-type ZoneDiff a = AZone a [] (Diff RData)
+type ZoneDiff a = AZone a RRSet.RTypedSet (Diff RData)
+type RDataSetDiff = RRSet.RTypedSet (Diff RData)
 
 diff :: (Label a, Ord a) => Zone a -> Zone a -> ZoneDiff a
 diff (fmap deleted -> Zone oldOrg oldRs) (fmap added -> Zone newOrg newRs) =
   let Path zOrg oldP newP = pathInZone oldOrg newOrg
       oldRs' = T.prepend oldP oldRs
       newRs' = T.prepend newP newRs
-  in prune $ Zone zOrg $ T.mapItems nubEither $ T.merge oldRs' newRs'
+  in prune $ Zone zOrg $ T.mapItems (RRSet.modify (M.map nubEither)) $ T.merge oldRs' newRs'
   where
     nubEither :: Eq a => [Diff a] -> [Diff a]
     nubEither es = filter (deither ((`all` es) . rightNeq) ((`all` es) . leftNeq)) es
@@ -70,7 +72,7 @@ hasChanges n (Zone org ns) = case pathInZone (exactly org) n of
   Path _ [] p -> go p ns
   _ -> False
   where
-    go :: (Label a, Ord a) => [LabelConstraint a] -> T.Node a [Diff RData] -> Bool
+    go :: (Label a, Ord a) => [LabelConstraint a] -> T.Node a RDataSetDiff -> Bool
     go [] (T.Node is _) = not $ null is
     go [Wildcard ls] node@(T.Node _ cs) =
           -- Either there is a wildcard label with changes
@@ -80,5 +82,5 @@ hasChanges n (Zone org ns) = case pathInZone (exactly org) n of
     go (Wildcard _ : _) _ = undefined  -- Cannot have wildcard within a name
     go (Exactly l : t) node = rec l t node
 
-    rec :: (Label a, Ord a) => a -> [LabelConstraint a] -> T.Node a [Diff RData] -> Bool
+    rec :: (Label a, Ord a) => a -> [LabelConstraint a] -> T.Node a RDataSetDiff -> Bool
     rec l r (T.Node _ cs) = maybe False (go r) (M.lookup l cs)

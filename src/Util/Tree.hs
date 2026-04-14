@@ -16,7 +16,6 @@ module Util.Tree
   , merge
   , partition ) where
 
-import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
 
@@ -103,11 +102,11 @@ insert p v = adjust insF p
     insF [] n@(Node is _) = n { item = is <> v }
     insF (h:t) n@(Node _ cs) = n { children = M.insert h (leafAt t v) cs }
 
-partition :: forall k v. ([k] -> v -> Bool) -> Node k [v] -> (Node k [v], Node k [v])
+partition :: forall k v. ([k] -> v -> (v, v)) -> Node k v -> (Node k v, Node k v)
 partition p = go []
   where
-    go :: [k] -> Node k [v] -> (Node k [v], Node k [v])
-    go path (Node vs cs) =
-      let (top, bot) = L.partition (p path) vs
+    go :: [k] -> Node k v -> (Node k v, Node k v)
+    go path (Node v cs) =
+      let (top, bot) = p path v
           rec = M.mapWithKey (go . (:path)) cs
       in (Node top (M.map fst rec), Node bot (M.map snd rec))

@@ -1,6 +1,8 @@
 module PrologCompiler (main) where
 
 import DNS.ZoneFile (fromList, AZone)
+import DNS.Record (RData)
+import qualified DNS.RRSet as RRSet
 import DNS.Diff
 import NameConstraint (ConstrainedLabel, toStandardRecord)
 import Resolvable.Prolog
@@ -93,8 +95,8 @@ main = do
       mapM_ print parsed
     _ -> fail "unknown command"
   where
-    toZone :: [Named ConstrainedLabel b] -> Maybe (AZone String [] b)
-    toZone = fromList . map (mapLabels show)
+    toZone :: [Named ConstrainedLabel RData] -> Maybe (AZone String RRSet.RTypedSet RData)
+    toZone = fromList . map (fmap RRSet.singleton . mapLabels show)
 
     popArg :: [String] -> IO (String, [String])
     popArg = maybe (fail "too few arguments") return . uncons

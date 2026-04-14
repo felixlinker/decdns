@@ -3,10 +3,14 @@ module DNS.DiffSpec (tests) where
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, (@?=), testCase)
 
+import qualified Data.Map as M
+
 import DNS.Diff
 import DNS.Name (Named (..), (<|), root)
 import DNS.NameSpec (mkName)
 import DNS.Record
+import qualified DNS.RecordType as T
+import qualified DNS.RRSet as RRSet
 import DNS.ZoneFile (emptyZone, get, insert, isEmpty, zoneName, singleton)
 import DNS.ZoneFileSpec (zoneFromList)
 import NameConstraint (LabelConstraint (..), exactly)
@@ -28,7 +32,7 @@ reportsAddsAndDeletes = do
       oldZ = singleton (Named n (mkData "192.0.2.1"))
       newZ = singleton (Named n (mkData "192.0.2.2"))
   let dz = diff oldZ newZ
-  (get n dz == Just [deleted (mkData "192.0.2.1"), added (mkData "192.0.2.2")]) @?= True
+  (RRSet.apply (M.lookup T.A) =<< get n dz) @?= Just [deleted (mkRData "192.0.2.1"), added (mkRData "192.0.2.2")]
 
 unchangedIsEmpty :: Assertion
 unchangedIsEmpty = do
@@ -36,7 +40,7 @@ unchangedIsEmpty = do
       z = singleton (Named n (mkData "192.0.2.10"))
       dz = diff z z
   isEmpty dz @?= True
-  get n dz @?= Just []
+  get n dz @?= Just RRSet.empty
 
 preservesNonRootOrigin :: Assertion
 preservesNonRootOrigin = do
@@ -67,5 +71,8 @@ wildcardChangeDetection = do
       wildcard = Wildcard ["foo"] <| exactly (mkName ["example", "com", ""])
   hasChanges wildcard dz @?= True
 
-mkData :: String -> RData
-mkData ip = RData IN 300 (A ip)
+mkRData :: String -> RData
+mkRData = RData IN 300 . A
+
+mkData :: String -> RRSet.RDataSet
+mkData = RRSet.singleton . mkRData

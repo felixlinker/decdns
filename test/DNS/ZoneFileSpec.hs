@@ -8,6 +8,7 @@ module DNS.ZoneFileSpec
   , genName
   , genAbsoluteName
   , normalizeZone
+  , named
   , zoneFromList
   ) where
 
@@ -22,6 +23,7 @@ import Test.Tasty.HUnit
 import qualified DNS.Name as N
 import DNS.Name (Name (Name), Named (Named), (<|), Label)
 import DNS.Record
+import qualified DNS.RRSet as RRSet
 import qualified DNS.RecordType as RT
 import DNS.SEC.Crypto
 import DNS.ZoneFile
@@ -44,7 +46,10 @@ tests =
 normalizeZone :: Zone String -> [StandardRecord]
 normalizeZone = sort . allData
 
-zoneFromList :: (Label a, Ord a) => [Named a b] -> IO (AZone a [] b)
+named :: Name a -> RData -> Named a RRSet.RDataSet
+named a = Named a . RRSet.singleton
+
+zoneFromList :: (Label a, Ord a) => [Named a RRSet.RDataSet] -> IO (AZone a RRSet.RTypedSet RData)
 zoneFromList = maybe (fail "could not create zone") return . fromList
 
 getEmptyIsNothing :: Assertion
@@ -61,7 +66,7 @@ propPruningSetEmpty :: Property
 propPruningSetEmpty =
   forAll genAbsoluteName $ \org ->
     forAll (listOf1 $ genSubDomain org) $ \ns ->
-      isEmpty $ prune (foldr (`set` []) (emptyZone org) ns)
+      isEmpty $ prune (foldr (`set` (RRSet.empty :: RRSet.RDataSet)) (emptyZone org) ns)
 
 propInsertCommutative :: Property
 propInsertCommutative =
@@ -70,7 +75,7 @@ propInsertCommutative =
       normalizeZone (mkZone r1 r2) === normalizeZone (mkZone r2 r1)
   where
     mkZone :: StandardRecord -> StandardRecord -> Zone String
-    mkZone r1 = insert (singleton r1)
+    mkZone r1 = insert (singleton (fmap RRSet.singleton r1)) . fmap RRSet.singleton
 
 propAllDataFromListRoundtrip :: Property
 propAllDataFromListRoundtrip =
@@ -130,8 +135,8 @@ genTTL = elements [100, 200]
 genZone :: Gen (Zone String)
 genZone = do
   org <- genAbsoluteName
-  soa <- genSOARecord org
-  recs <- listOf (genRecord org)
+  soa <- fmap RRSet.singleton <$> genSOARecord org
+  recs <- map (fmap RRSet.singleton) <$> listOf (genRecord org)
   return $ foldl insert (emptyZone org) (soa : recs)
 
 genAbsRecord :: Gen StandardRecord

@@ -30,6 +30,7 @@ import qualified Control.Monad.Trans.State as St
 
 import DNS.Name as N
 import DNS.Record
+import qualified DNS.RRSet as RRSet
 import qualified DNS.RecordType as Ty
 import qualified Util.Tree as T
 import Data.Bifunctor (Bifunctor(bimap))
@@ -57,13 +58,13 @@ instance (Show (Name a), Traversable t, Show b) => Show (AZone a t b) where
     where
       printf ls d = return $ maybe "@" (show . Name) (NE.nonEmpty ls) ++ " " ++ show d
 
-type Zone a = AZone a [] RData
+type Zone a = AZone a RRSet.RTypedSet RData
 
 emptyZone :: Monoid (t b) => Name a -> AZone a t b
 emptyZone org = Zone org T.emptyNode
 
-singleton :: Applicative t => Named a b -> AZone a t b
-singleton (Named n d) = Zone n (T.leaf (pure d))
+singleton :: Named a (t b) -> AZone a t b
+singleton (Named n d) = Zone n (T.leaf d)
 
 isEmpty :: Foldable t => AZone a t b -> Bool
 isEmpty (Zone _ r) = T.null r
@@ -79,10 +80,10 @@ fromRecordList rList =
         go :: T.Node a [Record a] -> [Zone a] -> [Zone a]
         go (T.Node rs cs) acc =
           let rec = foldr go acc cs
-          in  maybe rec (:rec) (fromList rs)
+          in  maybe rec (:rec) (fromList (map (fmap RRSet.singleton) rs))
 
-    namedRec :: Record a -> Named a (Record a)
-    namedRec r@(Named n _) = Named n r
+    namedRec :: Record a -> Named a [Record a]
+    namedRec r@(Named n _) = Named n [r]
 
     insertRecord :: Record a -> AZone a [] (Record a) -> AZone a [] (Record a)
     insertRecord r@(Named n _) z@(Zone org rn) = z { root = T.adjust (const (T.mapItems (r:))) p rn }
@@ -120,13 +121,13 @@ mergeZones (Zone org1 t1) (Zone org2 t2) = case pathInZone org1 org2 of
     $ T.insertNode p2 t2
     $ T.insertNode p1 t1 T.emptyNode
 
-insert :: (Label a, Ord a, Applicative t, Monoid (t b)) => AZone a t b -> Named a b -> AZone a t b
+insert :: (Label a, Ord a, Monoid (t b)) => AZone a t b -> Named a (t b) -> AZone a t b
 insert (Zone norg zroot) (Named n d) = case pathInZone norg n of
   Path norg' zp rp -> Zone norg'
-    $ T.insert rp (pure d)
+    $ T.insert rp d
     $ T.insertNode zp zroot T.emptyNode
 
-fromList :: (Label a, Ord a, Applicative t, Monoid (t b)) => [Named a b] -> Maybe (AZone a t b)
+fromList :: (Label a, Ord a, Monoid (t b)) => [Named a (t b)] -> Maybe (AZone a t b)
 fromList = fmap (uncurry (foldl insert . singleton)) . L.uncons
 
 get :: (Label a, Ord a) => Name a -> AZone a t b -> Maybe (t b)
@@ -143,8 +144,8 @@ set nam is z@(Zone org r) = case pathInZone org nam of
     setF [] n = n { T.item = is }
     setF (h:t) n@(T.Node _ cs) = n { T.children = M.insert h (T.leafAt t is) cs }
 
-prune :: Foldable t => AZone a t b -> AZone a t b
-prune z@(Zone _ r) = z { DNS.ZoneFile.root = T.prune r }
+prune :: AZone a RRSet.RTypedSet b -> AZone a RRSet.RTypedSet b
+prune z@(Zone _ r) = z { DNS.ZoneFile.root = T.prune (fmap RRSet.prune r) }
 
 allData :: Foldable t => AZone a t b -> [Named a b]
 allData (Zone orig ns) = go orig ns
@@ -160,9 +161,9 @@ noMatching (Named n d) (Zone org z) = case pathInZone org n of
   Path _ [] p -> go p z
   _ -> False
   where
-    go :: Ord a => [a] -> T.Node a [RData] -> Bool
+    go :: Ord a => [a] -> T.Node a RRSet.RDataSet -> Bool
     go [] (T.Node is _) = all ((/= rtype d) . rtype) is
     go (h:t) (T.Node _ cs) = maybe True (go t) (M.lookup h cs)
 
-partition :: (Name a -> b -> Bool) -> AZone a [] b -> (AZone a [] b, AZone a [] b)
-partition p (Zone org r) = bimap (Zone org) (Zone org) (T.partition (p . (`prependLabels` org)) r)
+partition :: (Name a -> b -> Bool) -> AZone a RRSet.RTypedSet b -> (AZone a RRSet.RTypedSet b, AZone a RRSet.RTypedSet b)
+partition p (Zone org r) = bimap (Zone org) (Zone org) (T.partition (RRSet.partition . p . (`prependLabels` org)) r)
