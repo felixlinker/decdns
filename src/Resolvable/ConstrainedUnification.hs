@@ -58,29 +58,30 @@ mergeUnifiers keep (CUnifier (U.Unifier m) neqs) =
 simplify :: [(Term, Term)] -> [(Term, Term)]
 simplify = concatMap (uncurry simplifyNeq)
 
--- TODO: This pattern-matching as it creates no warnings or compilation errors
--- when the implementation of Term changes. This should be changed.
 simplifyNeq :: Term -> Term -> [(Term, Term)]
-simplifyNeq a b = case (a, b) of
-  (TVar _, _) -> [(a, b)]
-  (_, TVar _) -> [(a, b)]
-  (TWildcard, _) -> [(a, b)] -- preserve contradiction
-  (_, TWildcard) -> [(a, b)] -- preserve contradiction
-  (TFunctor opa argsa, TFunctor opb argsb)
-    | opa == opb -> maybe [] rec (zipStrict argsa argsb)
-    | otherwise -> []
-  (TEmptyList, TEmptyList) -> [(a, b)] -- preserve contradiction
-  (TAtomQuoted ata, TAtomQuoted atb)
-    | ata /= atb -> []
-    | otherwise -> [(a, b)]
-  (TAtom ata, TAtom atb)
-    | ata /= atb -> []
-    | otherwise -> [(a, b)]
-  (TString stra, TString strb)
-    | stra /= strb -> []
-    | otherwise -> [(a, b)]
-  _ -> []
+simplifyNeq a b = case a of
+  TVar _ -> preserve
+  TWildcard -> preserve
+  TFunctor na argsa -> case b of
+    TVar _ -> preserve
+    TWildcard -> preserve
+    TFunctor nb argsb
+      | na == nb -> maybe [] rec (zipStrict argsa argsb)
+    _ -> []
+  TEmptyList -> dropWhenStrictEq TEmptyList
+  a'@(TAtomQuoted _) -> dropWhenStrictEq a'
+  a'@(TAtom _) -> dropWhenStrictEq a'
+  a'@(TString _) -> dropWhenStrictEq a'
   where
+    preserve :: [(Term, Term)]
+    preserve = [(a, b)]
+
+    dropWhenStrictEq :: Term -> [(Term, Term)]
+    dropWhenStrictEq a' = case b of
+      TVar _ -> preserve
+      TWildcard -> preserve
+      b' -> if a' == b' then preserve else []
+
     rec :: [(Term, Term)] -> [(Term, Term)]
     rec [] = [(a, b)]  -- preserve contradiction
     rec zipped = concatMap (uncurry simplifyNeq) zipped
