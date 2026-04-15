@@ -115,11 +115,11 @@ rrsig = do
   sep
   signatureInception <- int
   sep
-  keyTag <- int
+  tag <- int
   sep
   signersName <- absName
   sep
-  RRSIG typeCovered algorithm labelCount originalTTL signatureExpiration signatureInception keyTag signersName <$> base64WithSep
+  RRSIG typeCovered algorithm labelCount originalTTL signatureExpiration signatureInception tag signersName <$> base64WithSep
 
 nsec :: Stream s m Char => TypeParser s m
 nsec = do
@@ -131,13 +131,13 @@ nsec = do
 
 ds :: Stream s m Char => TypeParser s m
 ds = do
-  keyTag <- int
+  tag <- int
   sep
   algorithm <- algorithmType
   sep
   digestType <- digestTypeCode
   sep
-  DS keyTag algorithm digestType <$> hexWithSep
+  DS tag algorithm digestType <$> hexWithSep
 
 algorithmType :: Stream s m Char => Parser s m AlgorithmType
 algorithmType =

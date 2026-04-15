@@ -1,11 +1,17 @@
+{-# LANGUAGE ViewPatterns #-}
 module DNS.SEC.Keys
   ( DNSKeyFlag(..)
   , dnsKeyFlagsToInt
   , dnsKeyFlagToInt
   , knownDNSKeyFlagsMask
-  , dnsKeyFlagsFromInt ) where
+  , dnsKeyFlagsFromInt
+  , keyTag ) where
 
-import Data.Bits ((.|.), (.&.), complement)
+import Data.Bits ((.|.), (.&.), complement, shiftR, shiftL)
+import Data.Word (Word8, Word16)
+import DNS.SEC.Crypto (AlgorithmType, algorithmToInt)
+import qualified Data.ByteString as BS
+import Data.List (intersperse)
 
 data DNSKeyFlag = ZoneKey | Other | SecureEntryPoint
   deriving (Eq, Ord)
@@ -30,3 +36,21 @@ dnsKeyFlagsFromInt flags =
     ]
   where
     otherDNSKeyFlagsMask = dnsKeyFlagToInt Other .|. complement knownDNSKeyFlagsMask
+
+keyTag :: [DNSKeyFlag] -> AlgorithmType -> BS.ByteString -> Word16
+keyTag (dnsKeyFlagsToInt -> flags) (algorithmToInt -> alg) key = sum asDoubleOctets
+  where
+    flagsProtoAlg :: [Word8]
+    flagsProtoAlg =
+      [ fromIntegral (shiftR flags 8)
+      , fromIntegral flags
+      , 3 -- Protocol
+      , fromIntegral alg ]
+
+    wireFormat :: BS.ByteString
+    wireFormat = foldr BS.cons key flagsProtoAlg
+
+    -- Alternatingly, shift Word8 left by 8 to make them the high 8 bits of a
+    -- Word16
+    asDoubleOctets :: [Word16]
+    asDoubleOctets = zipWith (shiftL . fromIntegral) (BS.unpack wireFormat) (intersperse 0 (repeat 8))

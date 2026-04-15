@@ -9,7 +9,8 @@ module DNS.Record
   , Record
   , record
   , NamedRecord
-  , StandardRecord ) where
+  , StandardRecord
+  , dnskeyKeyTag ) where
 
 import qualified Data.ByteString as BS
 
@@ -18,6 +19,7 @@ import qualified DNS.RecordType as T
 import DNS.SEC.Crypto
 import DNS.SEC.Keys
 import Util.Bytes
+import Data.Word (Word16)
 
 data Type =
     CNAME (Name String)
@@ -66,7 +68,7 @@ showData (MX p n) = unwords [show p, show n]
 showData (SOA a b c d e f g) = unwords [show a, show b, show c, show d, show e, show f, show g]
 showData (DNSKEY flags algorithm publicKey) =
   unwords [show (dnsKeyFlagsToInt flags), "3", show algorithm, toB64 publicKey]
-showData (RRSIG typeCovered algorithm labelCount originalTTL signatureExpiration signatureInception keyTag signersName signature) =
+showData (RRSIG typeCovered algorithm labelCount originalTTL signatureExpiration signatureInception tag signersName signature) =
   unwords
     [ show typeCovered
     , show algorithm
@@ -74,14 +76,14 @@ showData (RRSIG typeCovered algorithm labelCount originalTTL signatureExpiration
     , show originalTTL
     , show signatureExpiration
     , show signatureInception
-    , show keyTag
+    , show tag
     , show signersName
     , toB64 signature
     ]
 showData (NSEC nextDomainName typeBitMaps) =
   unwords (show nextDomainName : map show typeBitMaps)
-showData (DS keyTag algorithm digestType digest) =
-  unwords [show keyTag, show algorithm, show digestType, toHex digest]
+showData (DS tag algorithm digestType digest) =
+  unwords [show tag, show algorithm, show digestType, toHex digest]
 
 instance Show Type where
   show t = show (toType t) ++ " " ++ showData t
@@ -118,3 +120,7 @@ record = Named
 
 instance Show RData where
   show (RData c ttl t) = show ttl ++ " " ++ show c ++ " " ++ show t
+
+dnskeyKeyTag :: Type -> Word16
+dnskeyKeyTag (DNSKEY fs alg bs) = keyTag fs alg bs
+dnskeyKeyTag _ = 0x00
