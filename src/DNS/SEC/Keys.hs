@@ -8,7 +8,7 @@ module DNS.SEC.Keys
   , keyTag ) where
 
 import Data.Bits ((.|.), (.&.), complement, shiftR, shiftL)
-import Data.Word (Word8, Word16)
+import Data.Word (Word8, Word16, Word32)
 import DNS.SEC.Crypto (AlgorithmType, algorithmToInt)
 import qualified Data.ByteString as BS
 import Data.List (intersperse)
@@ -38,7 +38,11 @@ dnsKeyFlagsFromInt flags =
     otherDNSKeyFlagsMask = dnsKeyFlagToInt Other .|. complement knownDNSKeyFlagsMask
 
 keyTag :: [DNSKeyFlag] -> AlgorithmType -> BS.ByteString -> Word16
-keyTag (dnsKeyFlagsToInt -> flags) (algorithmToInt -> alg) key = sum asDoubleOctets
+keyTag (dnsKeyFlagsToInt -> flags) (algorithmToInt -> alg) key =
+  let i32 = foldr ((+) . fromIntegral) (0 :: Word32) asDoubleOctets
+      lower = fromIntegral i32 :: Word16
+      upper = fromIntegral (i32 `shiftR` 16) :: Word16
+  in  lower + upper
   where
     flagsProtoAlg :: [Word8]
     flagsProtoAlg =
