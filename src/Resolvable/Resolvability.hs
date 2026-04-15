@@ -24,7 +24,7 @@ resolvableBase :: Name String -> ConstrainedRecord -> Fresh (Rule RComp)
 resolvableBase ns r@(Named n (RData _ _ ty)) = do
   (n', map (uncurry (\=)) -> neqs) <- nameWithSynthesis n
   let cannot = RComp ns r
-  return (Rule cannot (resolves (nameTerm ns) (typeAtom ty) n' (dataAtom ty) (ad 0)) neqs)
+  return (Rule cannot (resolves (nameTerm ns) (typeAtom ty) n' (dataFunctor ty) (ad 0)) neqs)
 
 captureListTail :: Term -> Term -> Term
 captureListTail captureWith t = case toView t of

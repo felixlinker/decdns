@@ -23,7 +23,7 @@ module Resolvable.Prolog
   , dnsWildcard
   , ttypeAtom
   , typeAtom
-  , dataAtom
+  , dataFunctor
   , (Resolvable.Prolog.\=)
   , (\+)
   , resolves
@@ -46,6 +46,10 @@ import Data.Semigroup (Semigroup(..), sconcat)
 import Util.Fresh (Fresh, fresh)
 import Util.List (zipWithStrict)
 import Data.Tuple (swap)
+import DNS.SEC.Crypto
+import DNS.SEC.Keys
+import Util.Bytes (toB64)
+import qualified Data.ByteString as BS
 
 caretSym :: String
 caretSym = "^"
@@ -271,10 +275,33 @@ ttypeAtom :: T.Type -> Term
 ttypeAtom = TAtom . map toLower . show
 
 typeAtom :: Type -> Term
-typeAtom = TAtom . map toLower . show . toType
+typeAtom = ttypeAtom . toType
 
-dataAtom :: Type -> Term
-dataAtom = TString . showData
+algAtom :: AlgorithmType -> Term
+algAtom = TInt . algorithmToInt
+
+b64Atom :: BS.ByteString -> Term
+b64Atom = TString . toB64
+
+digAtom :: DigestType -> Term
+digAtom = TInt . digestToInt
+
+dataF :: [Term] -> Term
+dataF = TFunctor dataSym
+
+dataFunctor :: Type -> Term
+dataFunctor (A s) = dataF [ TString s ]
+dataFunctor (CNAME n) = dataF [ nameTerm n ]
+dataFunctor (DNAME n) = dataF [ nameTerm n ]
+dataFunctor (NS n) = dataF [ nameTerm n ]
+dataFunctor (AAAA s) = dataF [ TString s ]
+dataFunctor (TXT s) = dataF [ TString s ]
+dataFunctor (MX p n) = dataF [ TInt p, nameTerm n ]
+dataFunctor (SOA mn rn s rf rt e m) = dataF [ nameTerm mn, nameTerm rn, TInt s, TInt rf, TInt rt, TInt e, TInt m ]
+dataFunctor r@(DNSKEY fs alg k) = dataF [ TInt (dnsKeyFlagsToInt fs), algAtom alg, b64Atom k, TInt (fromIntegral $ dnskeyKeyTag r) ]
+dataFunctor (RRSIG ty alg ls ottl sigExp sigInc tag sigName sig) = dataF [ ttypeAtom ty, algAtom alg, TInt ls, TInt ottl, TInt sigExp, TInt sigInc, TInt tag, nameTerm sigName, b64Atom sig ]
+dataFunctor (NSEC nextN covered) = dataF [ nameTerm nextN, list (map ttypeAtom covered) ]
+dataFunctor (DS tag alg digT dig) = dataF [ TInt tag, algAtom alg, digAtom digT, b64Atom dig ]
 
 (\=) :: Term -> Term -> Term
 (\=) = tBin neqSym

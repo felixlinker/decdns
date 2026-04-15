@@ -4,6 +4,7 @@ module DNS.SEC.Crypto
   , algorithmFromInt
   , algorithmFromMnemonic
   , DigestType(..)
+  , digestToInt
   , digestFromInt
   ) where
 

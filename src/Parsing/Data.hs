@@ -15,6 +15,7 @@ import Parsing.Bytes
 import DNS.Record
 import qualified DNS.RecordType as T
 import DNS.SEC.Crypto
+import DNS.SEC.Keys
 import Parsing.Name
 import Parsing.Tokens
 
