@@ -28,7 +28,6 @@ module Resolvable.Prolog
   , (\+)
   , resolves
   , resolvable
-  , pdata
   , ad
   , nameWithSynthesis
   , nameTerm
@@ -69,11 +68,35 @@ resolvesSym = "resolves"
 resolvableSym :: String
 resolvableSym = "resolvable"
 
-dataSym :: String
-dataSym = "data"
-
 adSym :: String
 adSym = "ad"
+
+ipSym :: String
+ipSym = "ip"
+
+nameSym :: String
+nameSym = "name"
+
+textSym :: String
+textSym = "text"
+
+mxSym :: String
+mxSym = "mx"
+
+soaSym :: String
+soaSym = "soa"
+
+keySym :: String
+keySym = "key"
+
+sigSym :: String
+sigSym = "sig"
+
+nsecSym :: String
+nsecSym = "nsec"
+
+pkRefSym :: String
+pkRefSym = "pkref"
 
 infixFunctors :: [String]
 infixFunctors =
@@ -95,7 +118,15 @@ data TermView = TVList Term Term
               | TVNeq Term Term
               | TVResolves Term Term Term Term Term
               | TVResolvable Term Term Term
-              | TVData [Term]
+              | TVIP Term
+              | TVName Term
+              | TVText Term
+              | TVMX Term Term
+              | TVSOA Term Term Term Term Term Term Term
+              | TVKey Term Term Term Term
+              | TVSig Term Term Term Term Term Term Term Term Term
+              | TVNSEC Term Term
+              | TVPKRef Term Term Term Term
               | TVAd Bool
               | TVFunctor String [ Term ]
               | TVEmptyList
@@ -120,7 +151,33 @@ toView (TFunctor n args)
   | n == resolvableSym = case args of
     [ ns, qtype, qname ] -> TVResolvable ns qtype qname
     _ -> undefined
-  | n == dataSym = TVData args
+  | n == ipSym = case args of
+    [ a ] -> TVIP a
+    _ -> undefined
+  | n == nameSym = case args of
+    [ a ] -> TVName a
+    _ -> undefined
+  | n == textSym = case args of
+    [ a ] -> TVText a
+    _ -> undefined
+  | n == mxSym = case args of
+    [ a, b ] -> TVMX a b
+    _ -> undefined
+  | n == soaSym = case args of
+    [ a, b, c, d, e, f, g ] -> TVSOA a b c d e f g
+    _ -> undefined
+  | n == keySym = case args of
+    [ a, b, c, d ] -> TVKey a b c d
+    _ -> undefined
+  | n == sigSym = case args of
+    [ a, b, c, d, e, f, g, h, i ] -> TVSig a b c d e f g h i
+    _ -> undefined
+  | n == nsecSym = case args of
+    [ a, b ] -> TVNSEC a b
+    _ -> undefined
+  | n == pkRefSym = case args of
+    [ a, b, c, d ] -> TVPKRef a b c d
+    _ -> undefined
   | n == adSym = case map toView args of
     [ TVInt 0 ] -> TVAd False
     [ TVInt 1 ] -> TVAd True
@@ -137,10 +194,18 @@ toView (TInt i) = TVInt i
 fromView :: TermView -> Term
 fromView (TVList a b) = TFunctor listSym [ a, b ]
 fromView (TVNeq a b) = TFunctor neqSym [ a, b ]
-fromView (TVResolves ns qtype qname d adb) = TFunctor resolvesSym [ ns, qtype, qname, d, adb ]
-fromView (TVResolvable ns qtype qname) = TFunctor resolvableSym [ ns, qtype, qname ]
-fromView (TVData vs) = pdata vs
-fromView (TVAd b) = TFunctor adSym [TInt (fromEnum b)]
+fromView (TVResolves ns qtype qname d adb) = resolves ns qtype qname d adb
+fromView (TVResolvable ns qtype qname) = resolvable ns qtype qname
+fromView (TVIP a) = ipData a
+fromView (TVName a) = nameData a
+fromView (TVText a) = textData a
+fromView (TVMX a b) = mxData a b
+fromView (TVSOA a b c d e f g) = soaData a b c d e f g
+fromView (TVKey a b c d) = keyData a b c d
+fromView (TVSig a b c d e f g h i) = sigData a b c d e f g h i
+fromView (TVNSEC a b) = nsecData a b
+fromView (TVPKRef a b c d) = pkRefData a b c d
+fromView (TVAd b) = ad (fromEnum b)
 fromView (TVFunctor n args) = TFunctor n args
 fromView TVEmptyList = TEmptyList
 fromView (TVVar v) = TVar v
@@ -286,22 +351,46 @@ b64Atom = TString . toB64
 digAtom :: DigestType -> Term
 digAtom = TInt . digestToInt
 
-dataF :: [Term] -> Term
-dataF = TFunctor dataSym
+ipData :: Term -> Term
+ipData a = TFunctor ipSym [ a ]
+
+nameData :: Term -> Term
+nameData a = TFunctor nameSym [ a ]
+
+textData :: Term -> Term
+textData a = TFunctor textSym [ a ]
+
+mxData :: Term -> Term -> Term
+mxData a b = TFunctor mxSym [ a, b ]
+
+soaData :: Term -> Term -> Term -> Term -> Term -> Term -> Term -> Term
+soaData a b c d e f g = TFunctor soaSym [ a, b, c, d, e, f, g ]
+
+keyData :: Term -> Term -> Term -> Term -> Term
+keyData a b c d = TFunctor keySym [ a, b, c, d ]
+
+sigData :: Term -> Term -> Term -> Term -> Term -> Term -> Term -> Term -> Term -> Term
+sigData a b c d e f g h i = TFunctor sigSym [ a, b, c, d, e, f, g, h, i ]
+
+nsecData :: Term -> Term -> Term
+nsecData a b = TFunctor nsecSym [ a, b ]
+
+pkRefData :: Term -> Term -> Term -> Term -> Term
+pkRefData a b c d = TFunctor pkRefSym [ a, b, c, d ]
 
 dataFunctor :: Type -> Term
-dataFunctor (A s) = dataF [ TString s ]
-dataFunctor (CNAME n) = dataF [ nameTerm n ]
-dataFunctor (DNAME n) = dataF [ nameTerm n ]
-dataFunctor (NS n) = dataF [ nameTerm n ]
-dataFunctor (AAAA s) = dataF [ TString s ]
-dataFunctor (TXT s) = dataF [ TString s ]
-dataFunctor (MX p n) = dataF [ TInt p, nameTerm n ]
-dataFunctor (SOA mn rn s rf rt e m) = dataF [ nameTerm mn, nameTerm rn, TInt s, TInt rf, TInt rt, TInt e, TInt m ]
-dataFunctor r@(DNSKEY fs alg k) = dataF [ TInt (dnsKeyFlagsToInt fs), algAtom alg, b64Atom k, TInt (fromIntegral $ dnskeyKeyTag r) ]
-dataFunctor (RRSIG ty alg ls ottl sigExp sigInc tag sigName sig) = dataF [ ttypeAtom ty, algAtom alg, TInt ls, TInt ottl, TInt sigExp, TInt sigInc, TInt tag, nameTerm sigName, b64Atom sig ]
-dataFunctor (NSEC nextN covered) = dataF [ nameTerm nextN, list (map ttypeAtom covered) ]
-dataFunctor (DS tag alg digT dig) = dataF [ TInt tag, algAtom alg, digAtom digT, b64Atom dig ]
+dataFunctor (A s) = ipData (TString s)
+dataFunctor (CNAME n) = nameData (nameTerm n)
+dataFunctor (DNAME n) = nameData (nameTerm n)
+dataFunctor (NS n) = nameData (nameTerm n)
+dataFunctor (AAAA s) = ipData (TString s)
+dataFunctor (TXT s) = textData (TString s)
+dataFunctor (MX p n) = mxData (TInt p) (nameTerm n)
+dataFunctor (SOA mn rn s rf rt e m) = soaData (nameTerm mn) (nameTerm rn) (TInt s) (TInt rf) (TInt rt) (TInt e) (TInt m)
+dataFunctor r@(DNSKEY fs alg k) = keyData (TInt (dnsKeyFlagsToInt fs)) (algAtom alg) (b64Atom k) (TInt (fromIntegral $ dnskeyKeyTag r))
+dataFunctor (RRSIG ty alg ls ottl sigExp sigInc tag sigName sig) = sigData (ttypeAtom ty) (algAtom alg) (TInt ls) (TInt ottl) (TInt sigExp) (TInt sigInc) (TInt tag) (nameTerm sigName) (b64Atom sig)
+dataFunctor (NSEC nextN covered) = nsecData (nameTerm nextN) (list (map ttypeAtom covered))
+dataFunctor (DS tag alg digT dig) = pkRefData (TInt tag) (algAtom alg) (digAtom digT) (b64Atom dig)
 
 (\=) :: Term -> Term -> Term
 (\=) = tBin neqSym
@@ -314,9 +403,6 @@ resolves ns qtype qname d adb = TFunctor resolvesSym [ ns, qtype, qname, d, adb 
 
 resolvable :: Term -> Term -> Term -> Term
 resolvable ns qtype qname = TFunctor resolvableSym [ ns, qtype, qname ]
-
-pdata :: [Term] -> Term
-pdata = TFunctor dataSym
 
 ad :: Int -> Term
 ad = TFunctor adSym . (:[]) . TInt
