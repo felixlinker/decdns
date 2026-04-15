@@ -1,9 +1,7 @@
 module Parsing
   ( parseName
   , parseNameM
-  , parseZoneFile
-  , module Parsing.Command ) where
+  , parseZoneFile ) where
 
-import Parsing.Command
 import Parsing.Name
 import Parsing.ZoneFile

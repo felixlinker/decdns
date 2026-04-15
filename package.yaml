@@ -39,16 +39,6 @@ library:
   source-dirs: src
 
 executables:
-  dns-regressor-interactive:
-    main:                Interactive.hs
-    source-dirs:         app
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    - -main-is Interactive
-    dependencies:
-    - dns-regressor
   dns-regressor-prolog:
     main:                PrologCompiler.hs
     source-dirs:         app

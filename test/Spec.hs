@@ -16,7 +16,6 @@ import qualified Parsing.ZoneFileSpec as ParsingZoneFileSpec
 import qualified Util.ListSpec as ListSpec
 import qualified Util.TreeSpec as TreeSpec
 import qualified Util.FreshSpec as FreshSpec
-import qualified NonDetSpec
 
 main :: IO ()
 main =
@@ -37,5 +36,4 @@ main =
       , ListSpec.tests
       , TreeSpec.tests
       , FreshSpec.tests
-      , NonDetSpec.tests
       ]
