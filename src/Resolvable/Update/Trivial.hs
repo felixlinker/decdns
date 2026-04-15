@@ -12,7 +12,6 @@ import Resolvable.Prolog
 import qualified Resolvable.Unification as U
 import qualified Resolvable.ConstrainedUnification as C
 
-import Resolvable.Resolvability (presolvable)
 import Data.Maybe (isJust)
 import NameConstraint (ConstrainedRecord)
 import Util.Fresh
@@ -38,7 +37,7 @@ partitionTrivial old new fqs = do
     cResolvable :: ConstrainedRecord -> Fresh (Term, C.Neqs)
     cResolvable (Named cn d) = do
       (n, S.fromList -> neqs) <- nameWithSynthesis cn
-      return (presolvable TWildcard (typeAtom (rtype d)) n, neqs)
+      return (resolvable TWildcard (typeAtom (rtype d)) n, neqs)
 
     isTrivial :: [(Term, C.Neqs)] -> [(Term, C.Neqs)] -> ConstrainedQuery -> Bool
     isTrivial old' new' q = any (uncurry (matchesQuery q)) old' && not (any (uncurry (matchesQuery q)) new')

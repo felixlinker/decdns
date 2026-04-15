@@ -1,11 +1,9 @@
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Resolvability
   ( RComp(..)
-  , resolves
   , fromZoneFile
   , NameServersConfig
   , compileConfig
-  , presolvable
   , plResolvable ) where
 
 import NameConstraint
@@ -22,14 +20,11 @@ data RComp = RComp
   , fromRecord :: ConstrainedRecord }
   deriving (Eq, Ord)
 
-resolves :: Term -> Term -> Term -> Term -> Term
-resolves ns t n r = TFunctor "resolves" [ ns, t, n, r ]
-
 resolvableBase :: Name String -> ConstrainedRecord -> Fresh (Rule RComp)
 resolvableBase ns r@(Named n (RData _ _ ty)) = do
   (n', map (uncurry (\=)) -> neqs) <- nameWithSynthesis n
   let cannot = RComp ns r
-  return (Rule cannot (resolves (nameTerm ns) (typeAtom ty) n' (dataAtom ty)) neqs)
+  return (Rule cannot (resolves (nameTerm ns) (typeAtom ty) n' (dataAtom ty) (ad 0)) neqs)
 
 captureListTail :: Term -> Term -> Term
 captureListTail captureWith t = case toView t of
@@ -37,7 +32,7 @@ captureListTail captureWith t = case toView t of
   _ -> t
   where
     rec :: TermView -> Term
-    rec (TVList a b) = tList (fromView a) (rec b)
+    rec (TVList a b) = tList a (rec (toView b))
     rec _ = captureWith
 
 resolvableStep :: [Name String] -> Name String -> ConstrainedRecord -> Fresh [Rule RComp]
@@ -51,9 +46,9 @@ resolvableStep (map nameTerm -> rootServers) ns r@(Named n (rtype -> NS (nameTer
     q <- TVar <$> fresh "Q"
     res <- TVar <$> fresh "R"
     return Rule { rannotation = RComp ns r
-                , rhead = resolves (nameTerm ns) q n' res
-                , rbody = [ resolves delegatedNs q n' res
-                          , resolves rootServer glueType delegatedNs TWildcard ] }
+                , rhead = resolves (nameTerm ns) q n' res (ad 0)
+                , rbody = [ resolves delegatedNs q n' res (ad 0)
+                          , resolves rootServer glueType delegatedNs TWildcard (ad 0) ] }
 resolvableStep (map nameTerm -> rootServers) ns r@(Named n (rtype -> CNAME (nameTerm -> cname))) = sequence $ do
   rootServer <- rootServers
   return $ do
@@ -61,8 +56,8 @@ resolvableStep (map nameTerm -> rootServers) ns r@(Named n (rtype -> CNAME (name
     q <- TVar <$> fresh "Q"
     res <- TVar <$> fresh "R"
     return Rule { rannotation = RComp ns r
-                , rhead = resolves (nameTerm ns) q n' res
-                , rbody = neqs ++ [ resolves rootServer q cname res ] }
+                , rhead = resolves (nameTerm ns) q n' res (ad 0)
+                , rbody = neqs ++ [ resolves rootServer q cname res (ad 0) ] }
 resolvableStep (map nameTerm -> rootServers) ns r@(Named n (rtype -> DNAME (nameTerm -> dname))) = sequence $ do
   rootServer <- rootServers
   return $ do -- Enter Fresh monad
@@ -72,24 +67,21 @@ resolvableStep (map nameTerm -> rootServers) ns r@(Named n (rtype -> DNAME (name
     q <- TVar <$> fresh "Q"
     res <- TVar <$> fresh "R"
     return Rule { rannotation = RComp ns r
-                , rhead = resolves (nameTerm ns) q n' res
+                , rhead = resolves (nameTerm ns) q n' res (ad 0)
                 , rbody = [ t \= TEmptyList
-                          , resolves rootServer q (captureListTail t dname) res ] }
+                          , resolves rootServer q (captureListTail t dname) res (ad 0) ] }
 resolvableStep _ _ (Named _ (rtype -> _)) = return []
 
-presolvable :: Term -> Term -> Term -> Term
-presolvable s q n = TFunctor "resolvable" [ s, q, n ]
-
-resolvable :: Fresh (Rule ())
-resolvable = do
+resolvableR :: Fresh (Rule ())
+resolvableR = do
   s <- TVar <$> fresh "S"
   q <- TVar <$> fresh "Q"
   n <- TVar <$> fresh "N"
-  return $ Rule () (presolvable s q n) [ resolves s q n TWildcard ]
+  return $ Rule () (resolvable s q n) [ resolves s q n TWildcard (ad 0) ]
 
 allResolvable :: Rule ()
 allResolvable =
-  Rule () (TFunctor "all_resolvable" [ q, rns, ns ]) [ bagof n (presolvable rns q n) ns ]
+  Rule () (TFunctor "all_resolvable" [ q, rns, ns ]) [ bagof n (resolvable rns q n) ns ]
   where
     q = TVar "Q"
     rns = TVar "RS"
@@ -112,5 +104,5 @@ compileConfig rootServers = (concat <$>) . mapM (uncurry (fromZoneFile rootServe
 
 plResolvable :: [Rule RComp] -> Fresh [Rule ()]
 plResolvable compiled = do
-  res <- resolvable
+  res <- resolvableR
   return $ allResolvable : res : map void compiled

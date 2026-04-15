@@ -51,7 +51,7 @@ fromNameTerm t = case toView t of
   _ -> Nothing
 
 fromResolves :: Term -> Maybe (ResolvableAt ConstrainedName)
-fromResolves (TFunctor "resolves" [ ns, _, n, _ ]) = do
+fromResolves (toView -> TVResolves ns _ n _ _) = do
   ns' <- fromNameTerm ns
   n' <- exactly <$> fromNameTerm n
   return $ ResolvableAt (Named ns' n')
@@ -99,15 +99,16 @@ computeResolvable rootServers rsM = do
   qname <- TVar <$> fresh "QN"
   return $ do
     rootServer <- nameTerm <$> rootServers
-    let query = presolvable rootServer qtyp qname
+    let query = resolvable rootServer qtyp qname
     u <- rec [] identity query rs
     return $ CQuery (apply u query) (constraints u)
   where
     solveQuery :: ConstrainedUnifier -> Term -> [Rule a] -> [(ConstrainedUnifier, [Term])]
-    solveQuery u (TFunctor "\\=" [ a, b ]) _ = maybe [] (return . (,[])) (addConstraint a b u)
-    solveQuery u q@(TFunctor pname _) rs
-      | pname `elem` ["resolves", "resolvable"] = mapMaybe (deriveIf u q) rs
-    solveQuery _ _ _ = error "unsupported predicate"
+    solveQuery u q rs = case toView q of
+      TVNeq a b -> maybe [] (return . (,[])) (addConstraint a b u)
+      TVResolves {} -> mapMaybe (deriveIf u q) rs
+      TVResolvable {} -> mapMaybe (deriveIf u q) rs
+      _ -> error "unsupported predicate"
 
     rec :: [Term] -> ConstrainedUnifier -> Term -> [Rule a] -> [ConstrainedUnifier]
     rec trace u q rs
@@ -118,8 +119,8 @@ computeResolvable rootServers rsM = do
         foldr solveConjunct [u'] conj
       where
         trace' :: [Term]
-        trace' = case q of
-          TFunctor "resolves" _ -> q:trace
+        trace' = case toView q of
+          TVResolves {} -> q:trace
           _ -> trace
 
         solveConjunct :: Term -> [ConstrainedUnifier] -> [ConstrainedUnifier]

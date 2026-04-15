@@ -16,8 +16,8 @@ regression = Rule () (TFunctor "regression" [ ns, q, n ]) [ resolves_old, (\+) r
     q = TVar "Q"
     n = TVar "N"
 
-    resolves_old = renameFunctor "resolves" "resolves_old" $ resolves ns q n TWildcard
-    resolves_new = renameFunctor "resolves" "resolves_new" $ resolves ns q n TWildcard
+    resolves_old = renameFunctor "resolves" "resolves_old" $ resolves ns q n TWildcard (ad 0)
+    resolves_new = renameFunctor "resolves" "resolves_new" $ resolves ns q n TWildcard (ad 0)
 
 compileConfigs :: Fresh [Rule a] -> Fresh [Rule a] -> Fresh [Rule a]
 compileConfigs old new = do
@@ -29,7 +29,7 @@ compileConfigs old new = do
     renameFunctorInRule = mapRule . renameFunctor resolvesName
 
     resolvesName :: String
-    resolvesName = case resolves TWildcard TWildcard TWildcard TWildcard of
+    resolvesName = case resolves TWildcard TWildcard TWildcard TWildcard TWildcard of
       TFunctor n _ -> n
       _ -> undefined
 

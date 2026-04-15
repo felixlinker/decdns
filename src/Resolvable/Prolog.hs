@@ -26,6 +26,10 @@ module Resolvable.Prolog
   , dataAtom
   , (Resolvable.Prolog.\=)
   , (\+)
+  , resolves
+  , resolvable
+  , pdata
+  , ad
   , nameWithSynthesis
   , nameTerm
   , showKnowledgeBase ) where
@@ -42,7 +46,6 @@ import Data.Semigroup (Semigroup(..), sconcat)
 import Util.Fresh (Fresh, fresh)
 import Util.List (zipWithStrict)
 import Data.Tuple (swap)
-import Data.Bifunctor (Bifunctor(bimap))
 
 caretSym :: String
 caretSym = "^"
@@ -55,6 +58,18 @@ neqSym = "\\="
 
 negSym :: String
 negSym = "\\+"
+
+resolvesSym :: String
+resolvesSym = "resolves"
+
+resolvableSym :: String
+resolvableSym = "resolvable"
+
+dataSym :: String
+dataSym = "data"
+
+adSym :: String
+adSym = "ad"
 
 infixFunctors :: [String]
 infixFunctors =
@@ -69,44 +84,67 @@ data Term = TFunctor String [Term]
           | TAtomQuoted String
           | TAtom String
           | TString String
+          | TInt Int
   deriving (Eq, Ord)
 
-data TermView = TVList TermView TermView
-              | TVNeq TermView TermView
-              | TVFunctor String [ TermView ]
+data TermView = TVList Term Term
+              | TVNeq Term Term
+              | TVResolves Term Term Term Term Term
+              | TVResolvable Term Term Term
+              | TVData [Term]
+              | TVAd Bool
+              | TVFunctor String [ Term ]
               | TVEmptyList
               | TVVar String
               | TVWildcard
               | TVAtomQuoted String
               | TVAtom String
               | TVString String
+              | TVInt Int
 
 toView :: Term -> TermView
 toView (TFunctor n args)
-  | n == listSym = case map toView args of
+  | n == listSym = case args of
     [ a, b ] -> TVList a b
     _ -> undefined
-  | n == neqSym = case map toView args of
+  | n == neqSym = case args of
     [ a, b ] -> TVNeq a b
     _ -> undefined
-  | otherwise = TVFunctor n (map toView args)
+  | n == resolvesSym = case args of
+    [ ns, qtype, qname, d, adb ] -> TVResolves ns qtype qname d adb
+    _ -> undefined
+  | n == resolvableSym = case args of
+    [ ns, qtype, qname ] -> TVResolvable ns qtype qname
+    _ -> undefined
+  | n == dataSym = TVData args
+  | n == adSym = case map toView args of
+    [ TVInt 0 ] -> TVAd False
+    [ TVInt 1 ] -> TVAd True
+    _ -> undefined
+  | otherwise = TVFunctor n args
 toView TEmptyList = TVEmptyList
 toView (TVar v) = TVVar v
 toView TWildcard = TVWildcard
 toView (TAtomQuoted n) = TVAtomQuoted n
 toView (TAtom n) = TVAtom n
 toView (TString s) = TVString s
+toView (TInt i) = TVInt i
 
 fromView :: TermView -> Term
-fromView (TVList a b) = TFunctor listSym [ fromView a, fromView b ]
-fromView (TVNeq a b) = TFunctor neqSym [ fromView a, fromView b ]
-fromView (TVFunctor n args) = TFunctor n (map fromView args)
+fromView (TVList a b) = TFunctor listSym [ a, b ]
+fromView (TVNeq a b) = TFunctor neqSym [ a, b ]
+fromView (TVResolves ns qtype qname d adb) = TFunctor resolvesSym [ ns, qtype, qname, d, adb ]
+fromView (TVResolvable ns qtype qname) = TFunctor resolvableSym [ ns, qtype, qname ]
+fromView (TVData vs) = pdata vs
+fromView (TVAd b) = TFunctor adSym [TInt (fromEnum b)]
+fromView (TVFunctor n args) = TFunctor n args
 fromView TVEmptyList = TEmptyList
 fromView (TVVar v) = TVar v
 fromView TVWildcard = TWildcard
 fromView (TVAtomQuoted n) = TAtomQuoted n
 fromView (TVAtom n) = TAtom n
 fromView (TVString s) = TString s
+fromView (TVInt i) = TInt i
 
 tBin :: String -> Term -> Term -> Term
 tBin n a b = TFunctor n [ a, b ]
@@ -129,12 +167,12 @@ listWithTail xs t = go xs
     go (a:as) = TFunctor listSym [ a, go as ]
 
 collectListWithTail :: Term -> ([Term], Maybe Term)
-collectListWithTail = swap . bimap (fmap fromView) (fmap fromView) . rec . toView
+collectListWithTail = swap . rec . toView
   where
-    rec :: TermView -> (Maybe TermView, [TermView])
-    rec (TVList a b) = (a:) <$> rec b
+    rec :: TermView -> (Maybe Term, [Term])
+    rec (TVList a b) = (a:) <$> rec (toView b)
     rec TVEmptyList = (Nothing, [])
-    rec t = (Just t, [])
+    rec t = (Just (fromView t), [])
 
 collectList :: Term -> [Term]
 collectList = fst . collectListWithTail
@@ -174,6 +212,7 @@ instance Show Term where
   show (TAtom (h:t)) = toLower h : t
   show (TAtomQuoted a) =  "'" ++ a ++ "'"
   show (TString s) = show s
+  show (TInt i) = show i
 
 walk :: Semigroup a => (Term -> a) -> Term -> a
 walk f t@(TFunctor _ args) = sconcat (f t NE.:| map (walk f) args)
@@ -183,6 +222,7 @@ walk f TWildcard = f TWildcard
 walk f t@(TAtomQuoted _) = f t
 walk f t@(TAtom _) = f t
 walk f t@(TString _) = f t
+walk f t@(TInt _) = f t
 
 replace :: (Term -> Term) -> Term -> Term
 replace f t = rec (f t)
@@ -194,6 +234,7 @@ replace f t = rec (f t)
     rec u@(TAtomQuoted _) = u
     rec u@(TAtom _) = u
     rec u@(TString _) = u
+    rec u@(TInt _) = u
 
 renameFunctor :: String -> String -> Term -> Term
 renameFunctor from to = replace go
@@ -240,6 +281,18 @@ dataAtom = TString . showData
 
 (\+) :: Term -> Term
 (\+) t1 = TFunctor negSym [t1]
+
+resolves :: Term -> Term -> Term -> Term -> Term -> Term
+resolves ns qtype qname d adb = TFunctor resolvesSym [ ns, qtype, qname, d, adb ]
+
+resolvable :: Term -> Term -> Term -> Term
+resolvable ns qtype qname = TFunctor resolvableSym [ ns, qtype, qname ]
+
+pdata :: [Term] -> Term
+pdata = TFunctor dataSym
+
+ad :: Int -> Term
+ad = TFunctor adSym . (:[]) . TInt
 
 nameWithSynthesis :: ConstrainedName -> Fresh (Term, [(Term, Term)])
 nameWithSynthesis (Name (l NE.:| ls)) = case l of

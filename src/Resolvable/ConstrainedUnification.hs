@@ -72,6 +72,7 @@ simplifyNeq a b = case a of
   a'@(TAtomQuoted _) -> dropWhenStrictEq a'
   a'@(TAtom _) -> dropWhenStrictEq a'
   a'@(TString _) -> dropWhenStrictEq a'
+  a'@(TInt _) -> dropWhenStrictEq a'
   where
     preserve :: [(Term, Term)]
     preserve = [(a, b)]

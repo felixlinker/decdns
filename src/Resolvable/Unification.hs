@@ -52,6 +52,7 @@ apply _ TWildcard = TWildcard
 apply _ t@(TAtomQuoted _) = t
 apply _ t@(TAtom _) = t
 apply _ t@(TString _) = t
+apply _ t@(TInt _) = t
 
 unify :: Term -> Term -> Maybe Unifier
 unify t1 t2 = extendUnifier t1 t2 identity
@@ -104,3 +105,7 @@ extendUnifier from to u@(Unifier m) = unif (apply u from) (apply u to)
       | a == b    = Just u
       | otherwise = Nothing
     unif (TString _) _ = Nothing
+    unif (TInt a) (TInt b)
+      | a == b = Just u
+      | otherwise = Nothing
+    unif (TInt _) _ = Nothing
