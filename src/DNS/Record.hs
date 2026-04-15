@@ -2,7 +2,6 @@
 module DNS.Record
   ( Cat(..)
   , DNSKeyFlag(..)
-  , dnsKeyFlagsFromInt
   , Type(..)
   , showData
   , toType
@@ -13,15 +12,12 @@ module DNS.Record
   , StandardRecord ) where
 
 import qualified Data.ByteString as BS
-import Data.Bits ((.|.), (.&.), complement)
 
 import DNS.Name
 import qualified DNS.RecordType as T
 import DNS.SEC.Crypto
+import DNS.SEC.Keys
 import Util.Bytes
-
-data DNSKeyFlag = ZoneKey | Other | SecureEntryPoint
-  deriving (Eq, Ord)
 
 data Type =
     CNAME (Name String)
@@ -122,24 +118,3 @@ record = Named
 
 instance Show RData where
   show (RData c ttl t) = show ttl ++ " " ++ show c ++ " " ++ show t
-
-dnsKeyFlagsToInt :: [DNSKeyFlag] -> Int
-dnsKeyFlagsToInt = foldr ((.|.) . dnsKeyFlagToInt) 0
-
-dnsKeyFlagToInt :: DNSKeyFlag -> Int
-dnsKeyFlagToInt ZoneKey = 256
-dnsKeyFlagToInt Other = 128
-dnsKeyFlagToInt SecureEntryPoint = 1
-
-knownDNSKeyFlagsMask :: Int
-knownDNSKeyFlagsMask = dnsKeyFlagsToInt [ZoneKey, Other, SecureEntryPoint]
-
-dnsKeyFlagsFromInt :: Int -> [DNSKeyFlag]
-dnsKeyFlagsFromInt flags =
-  concat
-    [ [ZoneKey | flags .&. dnsKeyFlagToInt ZoneKey /= 0]
-    , [SecureEntryPoint | flags .&. dnsKeyFlagToInt SecureEntryPoint /= 0]
-    , [Other | flags .&. otherDNSKeyFlagsMask /= 0]
-    ]
-  where
-    otherDNSKeyFlagsMask = dnsKeyFlagToInt Other .|. complement knownDNSKeyFlagsMask

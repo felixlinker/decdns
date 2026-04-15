@@ -27,6 +27,7 @@ library
       DNS.RecordType
       DNS.RRSet
       DNS.SEC.Crypto
+      DNS.SEC.Keys
       DNS.ZoneFile
       DNS.ZoneFile.Printing
       NameConstraint

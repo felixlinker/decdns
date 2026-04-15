@@ -1,5 +1,6 @@
 module DNS.SEC.Crypto
   ( AlgorithmType(..)
+  , algorithmToInt
   , algorithmFromInt
   , algorithmFromMnemonic
   , DigestType(..)
