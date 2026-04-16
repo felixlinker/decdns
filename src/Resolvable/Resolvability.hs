@@ -90,7 +90,7 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM
       -- Spec say that ls may also be greater than owner name of signed records,
       -- but this can only happen due to synthesis, which we have not performed
       -- yet. Thus, we simply check equality.
-      guard (ls == nlength n)
+      guard (ls + 1 == nlength n)  -- +1 because labels field does not count root
       rootServer <- rootServers
       return $ do
         t <- TVar <$> fresh "T"
