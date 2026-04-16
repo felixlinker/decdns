@@ -16,7 +16,7 @@ import qualified DNS.RecordType as T
 import DNS.ZoneFile
 
 import Util.Fresh (Fresh, fresh)
-import Control.Monad (void)
+import Control.Monad (void, guard)
 
 captureListTail :: Term -> Term -> Term
 captureListTail captureWith t = case toView t of
@@ -41,6 +41,9 @@ resolvableBase ns s@(Named n rds@((RData _ _ ty) NE.:| _)) = do
 resolvableStep :: [Name String] -> Name String -> ConstrainedRRSet -> Fresh [Rule RComp]
 resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM (go . rtype) (NE.toList rs)
   where
+    rannot :: RComp
+    rannot = RComp ns s
+
     go :: Type -> Fresh [Rule RComp]
     go (NS (nameTerm -> delegatedNs)) = sequence $ do
       rootServer <- rootServers
@@ -48,10 +51,10 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM
       return $ do
         t <- TVar <$> fresh "T"
         -- Do not expect wildcard neq constraints on NS records
-        (captureListTail t -> n', _) <- nameWithSynthesis n
+        let (captureListTail t -> n') = nameWithoutSynthesis n
         q <- TVar <$> fresh "Q"
         res <- TVar <$> fresh "R"
-        return Rule { rannotation = RComp ns s
+        return Rule { rannotation = rannot
                     , rhead = resolves (nameTerm ns) q n' res (ad 0)
                     , rbody = [ resolves delegatedNs q n' res (ad 0)
                               , resolves rootServer glueType delegatedNs TWildcard (ad 0) ] }
@@ -61,24 +64,56 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM
         (n', map (uncurry (\=)) -> neqs) <- nameWithSynthesis n
         q <- TVar <$> fresh "Q"
         res <- TVar <$> fresh "R"
-        return Rule { rannotation = RComp ns s
+        return Rule { rannotation = rannot
                     , rhead = resolves (nameTerm ns) q n' res (ad 0)
                     , rbody = neqs ++ [ resolves rootServer q cname res (ad 0) ] }
     go (DNAME (nameTerm -> dname)) = sequence $ do
       rootServer <- rootServers
       return $ do
-        -- Do not expect wildcard neq constraints on CNAME records
         t <- TVar <$> fresh "T"
-        (captureListTail t -> n', _) <- nameWithSynthesis n
+        -- Do not expect wildcard neq constraints on CNAME records
+        let (captureListTail t -> n') = nameWithoutSynthesis n
         q <- TVar <$> fresh "Q"
         res <- TVar <$> fresh "R"
-        return Rule { rannotation = RComp ns s
+        return Rule { rannotation = rannot
                     , rhead = resolves (nameTerm ns) q n' res (ad 0)
                     , rbody = [ t \= TEmptyList
                               , resolves rootServer q (captureListTail t dname) res (ad 0) ] }
-    go (RRSIG {}) = undefined
-    go (DS {}) = undefined
-    go (DNSKEY {}) = undefined
+    -- TODO: I think I will need to branch on `cov` to cover authenticating
+    -- DNSKEY records; those require a corresponding DS record additionally
+    -- TODO: Check that sigName is the name of the zone containing the record;
+    -- does that mean there ex. a corresponding SOA record? Could be, but seems
+    -- technically wrong as there could be intermediate SOA records. It could be
+    -- that this will be implicitly addressed by the ad(1) resolution of the
+    -- DNSKEY record.
+    go (RRSIG (ttypeAtom -> cov) (algAtom -> alg) ls (TInt -> ottl) _ _ (TInt -> tag) (nameTerm -> sigName) (b64Atom -> sig)) = sequence $ do
+      -- Spec say that ls may also be greater than owner name of signed records,
+      -- but this can only happen due to synthesis, which we have not performed
+      -- yet. Thus, we simply check equality.
+      guard (ls == nlength n)
+      rootServer <- rootServers
+      return $ do
+        t <- TVar <$> fresh "T"
+        (captureListTail t -> n', map (uncurry (\=)) -> neqs) <- nameWithSynthesis n
+        d0 <- TVar <$> fresh "D"
+        -- TODO: Maybe make SOA query (ad 1)
+        let soaQ = resolves (nameTerm ns) (ttypeAtom T.SOA) sigName TWildcard (ad 0)
+        let ad0Q = resolves (nameTerm ns) cov n' d0 (ad 0)
+        let ad1Q = resolves (nameTerm ns) cov n' d0 (ad 1)
+        d1 <- TVar <$> fresh "D"
+        let keyQ = resolves rootServer (ttypeAtom T.DNSKEY) sigName d1 (ad 1)
+        k <- TVar <$> fresh "K"
+        f <- TVar <$> fresh "F"
+        let keyF = keyData f alg k tag
+        let valid = rrsigValid n' cov ottl d0 (TInt ls) sig k
+        return Rule { rannotation = rannot
+                    , rhead = ad1Q
+                    , rbody = [ soaQ
+                              , ad0Q
+                              , keyQ
+                              , f =< TInt 256
+                              , member keyF d1
+                              , valid ] ++ neqs }
     -- Ignore below, but pattern-match so compiler generates warnings on future
     -- extensions
     go (A {}) = return []
@@ -87,6 +122,8 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM
     go (MX {}) = return []
     go (SOA {}) = return []
     go (NSEC {}) = return []
+    go (DS {}) = return []
+    go (DNSKEY {}) = return []
 
 resolvableR :: Fresh (Rule ())
 resolvableR = do

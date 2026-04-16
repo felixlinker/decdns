@@ -5,6 +5,7 @@ module DNS.Name
   , Name(..)
   , Named(..)
   , root
+  , nlength
   , (<|)
   , prependLabels
   , mapLabels
@@ -32,6 +33,9 @@ newtype Name a = Name { labels :: NE.NonEmpty a }
 
 root :: Label a => Name a
 root = Name (NE.singleton lempty)
+
+nlength :: Name a -> Int
+nlength = NE.length . labels
 
 (<|) :: a -> Name a -> Name a
 (<|) l (Name ls) = Name (l NE.<| ls)

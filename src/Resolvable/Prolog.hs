@@ -14,6 +14,7 @@ module Resolvable.Prolog
   , listWithTail
   , collectList
   , collectListWithTail
+  , member
   , walk
   , renameFunctor
   , subterm
@@ -23,13 +24,19 @@ module Resolvable.Prolog
   , dnsWildcard
   , ttypeAtom
   , typeAtom
+  , b64Atom
+  , algAtom
+  , keyData
   , dataFunctor
-  , (Resolvable.Prolog.\=)
+  , (\=)
+  , (=<)
   , (\+)
   , resolves
   , resolvable
   , ad
+  , rrsigValid
   , nameWithSynthesis
+  , nameWithoutSynthesis
   , nameTerm
   , showKnowledgeBase ) where
 
@@ -56,8 +63,14 @@ caretSym = "^"
 listSym :: String
 listSym = "."
 
+memberSym :: String
+memberSym = "member"
+
 neqSym :: String
 neqSym = "\\="
+
+leqSym :: String
+leqSym = "=<"
 
 negSym :: String
 negSym = "\\+"
@@ -98,10 +111,14 @@ nsecSym = "nsec"
 pkRefSym :: String
 pkRefSym = "pkref"
 
+rrsigValidSym :: String
+rrsigValidSym = "rrsigValid"
+
 infixFunctors :: [String]
 infixFunctors =
   [ caretSym
   , neqSym
+  , leqSym
   , negSym ]
 
 data Term = TFunctor String [Term]
@@ -115,9 +132,12 @@ data Term = TFunctor String [Term]
   deriving (Eq, Ord)
 
 data TermView = TVList Term Term
+              | TVMember Term Term
               | TVNeq Term Term
+              | TVLeq Term Term
               | TVResolves Term Term Term Term Term
               | TVResolvable Term Term Term
+              | TVRRSIGValid Term Term Term Term Term Term Term
               | TVIP Term
               | TVName Term
               | TVText Term
@@ -142,14 +162,23 @@ toView (TFunctor n args)
   | n == listSym = case args of
     [ a, b ] -> TVList a b
     _ -> undefined
+  | n == memberSym = case args of
+    [ a, b ] -> TVMember a b
+    _ -> undefined
   | n == neqSym = case args of
     [ a, b ] -> TVNeq a b
+    _ -> undefined
+  | n == leqSym = case args of
+    [ a, b ] -> TVLeq a b
     _ -> undefined
   | n == resolvesSym = case args of
     [ ns, qtype, qname, d, adb ] -> TVResolves ns qtype qname d adb
     _ -> undefined
   | n == resolvableSym = case args of
     [ ns, qtype, qname ] -> TVResolvable ns qtype qname
+    _ -> undefined
+  | n == rrsigValidSym = case args of
+    [ nam, typeCovered, orgTTL, rrset, ls, sig, key ] -> TVRRSIGValid nam typeCovered orgTTL rrset ls sig key
     _ -> undefined
   | n == ipSym = case args of
     [ a ] -> TVIP a
@@ -193,9 +222,12 @@ toView (TInt i) = TVInt i
 
 fromView :: TermView -> Term
 fromView (TVList a b) = TFunctor listSym [ a, b ]
-fromView (TVNeq a b) = TFunctor neqSym [ a, b ]
+fromView (TVMember a b) = member a b
+fromView (TVNeq a b) = a \= b
+fromView (TVLeq a b) = a =< b
 fromView (TVResolves ns qtype qname d adb) = resolves ns qtype qname d adb
 fromView (TVResolvable ns qtype qname) = resolvable ns qtype qname
+fromView (TVRRSIGValid nam typeCovered orgTTL rrset ls sig key) = rrsigValid nam typeCovered orgTTL rrset ls sig key
 fromView (TVIP a) = ipData a
 fromView (TVName a) = nameData a
 fromView (TVText a) = textData a
@@ -246,6 +278,9 @@ collectListWithTail = swap . rec . toView
 
 collectList :: Term -> [Term]
 collectList = fst . collectListWithTail
+
+member :: Term -> Term -> Term
+member a b = TFunctor memberSym [ a, b ]
 
 equiv :: Term -> Term -> Bool
 equiv (TFunctor a argsa) (TFunctor b argsb) = a == b && maybe False and (zipWithStrict equiv argsa argsb)
@@ -396,6 +431,9 @@ dataFunctor (DS tag alg digT dig) = pkRefData (TInt tag) (algAtom alg) (digAtom 
 (\=) :: Term -> Term -> Term
 (\=) = tBin neqSym
 
+(=<) :: Term -> Term -> Term
+(=<) = tBin leqSym
+
 (\+) :: Term -> Term
 (\+) t1 = TFunctor negSym [t1]
 
@@ -407,6 +445,9 @@ resolvable ns qtype qname = TFunctor resolvableSym [ ns, qtype, qname ]
 
 ad :: Int -> Term
 ad = TFunctor adSym . (:[]) . TInt
+
+rrsigValid :: Term -> Term -> Term -> Term -> Term -> Term -> Term-> Term
+rrsigValid nam typeCovered origTTL rrset ls sig key  = TFunctor rrsigValidSym [ nam, typeCovered, origTTL, rrset, ls, sig, key ]
 
 nameWithSynthesis :: ConstrainedName -> Fresh (Term, [(Term, Term)])
 nameWithSynthesis (Name (l NE.:| ls)) = case l of
@@ -428,6 +469,9 @@ nameWithSynthesis (Name (l NE.:| ls)) = case l of
 
 nameTerm :: Name String -> Term
 nameTerm (Name (NE.toList -> ls)) = list (reverse $ map TAtom $ filter (not . null) ls)
+
+nameWithoutSynthesis :: ConstrainedName -> Term
+nameWithoutSynthesis = nameTerm . toName
 
 data Rule a = Rule
   { rannotation :: a
