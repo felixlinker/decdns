@@ -1,21 +1,40 @@
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Update.Rollout
-  ( Rollout
+  ( NSDiffs
+  , diffServers
+  , Rollout
   , rollout ) where
 
 import qualified Data.Map as M
+import qualified Data.Map.Merge.Lazy as MM
 import qualified Data.Set as S
 
 import DNS.Diff
 import DNS.Name
 import Resolvable.Dependencies
+import Resolvable.Resolvability
 import DNS.ZoneFile
 import NameConstraint
 import qualified Util.PartialOrder as PO
 import Util.Func
 import Data.Bifunctor (Bifunctor(bimap))
+import Data.Maybe (fromMaybe)
 
 type NSDiffs = M.Map (Name String) (ZoneDiff String)
+
+diffServers :: NameServersConfig -> NameServersConfig -> NSDiffs
+diffServers old new = MM.merge
+  (MM.mapMissing (\_ -> fmap deleted))
+  (MM.mapMissing (\_ -> fmap added))
+  (MM.zipWithMatched (const diff))
+  (M.fromList $ map (fmap toSingleZone) old)
+  (M.fromList $ map (fmap toSingleZone) new)
+  where
+    def :: Zone String
+    def = emptyZone DNS.Name.root
+
+    toSingleZone :: [Zone ConstrainedLabel] -> Zone String
+    toSingleZone = foldr (mergeZones . fromMaybe def . fromList . map (mapLabels show) . allData) def
 
 updateDeps :: NSDiffs -> Dependencies ConstrainedName -> Dependencies ConstrainedName
 updateDeps diffs ds = PO.filterLefts changed (PO.filterRights changed ds)

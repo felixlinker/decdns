@@ -19,6 +19,8 @@ module DNS.ZoneFile
   , set
   , prune
   , allData
+  , allRRSets
+  , allRecords
   , mergeZones
   , noMatching
   , partition ) where
@@ -145,16 +147,22 @@ set nam is z@(Zone org r) = case pathInZone org nam of
     setF (h:t) n@(T.Node _ cs) = n { T.children = M.insert h (T.leafAt t is) cs }
 
 prune :: AZone a RRSet.RTypedSet b -> AZone a RRSet.RTypedSet b
-prune z@(Zone _ r) = z { DNS.ZoneFile.root = T.prune (fmap RRSet.prune r) }
+prune z@(Zone _ r) = z { DNS.ZoneFile.root = T.prune r }
 
-allData :: Foldable t => AZone a t b -> [Named a b]
+allData :: Foldable t => AZone a t b -> [Named a (t b)]
 allData (Zone orig ns) = go orig ns
   where
-    go :: Foldable t => Name a -> T.Node a (t b) -> [Named a b]
+    go :: Foldable t => Name a -> T.Node a (t b) -> [Named a (t b)]
     go n (T.Node d ch) =
-      let base = map (Named n) (toList d)
+      let base = Named n d
           rec = concatMap (uncurry (\l -> go (l <| n))) (M.toAscList ch)
-      in base ++ rec
+      in base : rec
+
+allRRSets :: Zone a -> [RRSet.RRSet a]
+allRRSets = concatMap (\(Named n typed) -> Named n <$> RRSet.apply M.elems typed) . allData
+
+allRecords :: Zone a -> [Record a]
+allRecords = concatMap (NE.toList . RRSet.toRecords) . allRRSets
 
 noMatching :: (Label a, Ord a) => NamedRecord a -> Zone a -> Bool
 noMatching (Named n d) (Zone org z) = case pathInZone org n of

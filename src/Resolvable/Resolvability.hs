@@ -6,25 +6,17 @@ module Resolvable.Resolvability
   , compileConfig
   , plResolvable ) where
 
+import qualified Data.List.NonEmpty as NE
+
 import NameConstraint
 import Resolvable.Prolog as Pl
 import DNS.Name
 import DNS.Record
 import qualified DNS.RecordType as T
+import DNS.ZoneFile
 
 import Util.Fresh (Fresh, fresh)
 import Control.Monad (void)
-
-data RComp = RComp
-  { fromNS :: Name String
-  , fromRecord :: ConstrainedRecord }
-  deriving (Eq, Ord)
-
-resolvableBase :: Name String -> ConstrainedRecord -> Fresh (Rule RComp)
-resolvableBase ns r@(Named n (RData _ _ ty)) = do
-  (n', map (uncurry (\=)) -> neqs) <- nameWithSynthesis n
-  let cannot = RComp ns r
-  return (Rule cannot (resolves (nameTerm ns) (typeAtom ty) n' (dataFunctor ty) (ad 0)) neqs)
 
 captureListTail :: Term -> Term -> Term
 captureListTail captureWith t = case toView t of
@@ -35,42 +27,66 @@ captureListTail captureWith t = case toView t of
     rec (TVList a b) = tList a (rec (toView b))
     rec _ = captureWith
 
-resolvableStep :: [Name String] -> Name String -> ConstrainedRecord -> Fresh [Rule RComp]
-resolvableStep (map nameTerm -> rootServers) ns r@(Named n (rtype -> NS (nameTerm -> delegatedNs))) = sequence $ do
-  rootServer <- rootServers
-  glueType <- ttypeAtom <$> [T.A, T.AAAA]
-  return $ do
-    t <- TVar <$> fresh "T"
-    -- Do not expect wildcard neq constraints on NS records
-    (captureListTail t -> n', _) <- nameWithSynthesis n
-    q <- TVar <$> fresh "Q"
-    res <- TVar <$> fresh "R"
-    return Rule { rannotation = RComp ns r
-                , rhead = resolves (nameTerm ns) q n' res (ad 0)
-                , rbody = [ resolves delegatedNs q n' res (ad 0)
-                          , resolves rootServer glueType delegatedNs TWildcard (ad 0) ] }
-resolvableStep (map nameTerm -> rootServers) ns r@(Named n (rtype -> CNAME (nameTerm -> cname))) = sequence $ do
-  rootServer <- rootServers
-  return $ do
+data RComp = RComp
+  { fromNS :: Name String
+  , fromRecord :: ConstrainedRRSet }
+  deriving (Eq, Ord)
+
+resolvableBase :: Name String -> ConstrainedRRSet -> Fresh (Rule RComp)
+resolvableBase ns s@(Named n rds@((RData _ _ ty) NE.:| _)) = do
     (n', map (uncurry (\=)) -> neqs) <- nameWithSynthesis n
-    q <- TVar <$> fresh "Q"
-    res <- TVar <$> fresh "R"
-    return Rule { rannotation = RComp ns r
-                , rhead = resolves (nameTerm ns) q n' res (ad 0)
-                , rbody = neqs ++ [ resolves rootServer q cname res (ad 0) ] }
-resolvableStep (map nameTerm -> rootServers) ns r@(Named n (rtype -> DNAME (nameTerm -> dname))) = sequence $ do
-  rootServer <- rootServers
-  return $ do -- Enter Fresh monad
-    -- Do not expect wildcard neq constraints on CNAME records
-    t <- TVar <$> fresh "T"
-    (captureListTail t -> n', _) <- nameWithSynthesis n
-    q <- TVar <$> fresh "Q"
-    res <- TVar <$> fresh "R"
-    return Rule { rannotation = RComp ns r
-                , rhead = resolves (nameTerm ns) q n' res (ad 0)
-                , rbody = [ t \= TEmptyList
-                          , resolves rootServer q (captureListTail t dname) res (ad 0) ] }
-resolvableStep _ _ (Named _ (rtype -> _)) = return []
+    let annot = RComp ns s
+    return (Rule annot (resolves (nameTerm ns) (typeAtom ty) n' (list $ NE.map (dataFunctor . rtype) rds) (ad 0)) neqs)
+
+resolvableStep :: [Name String] -> Name String -> ConstrainedRRSet -> Fresh [Rule RComp]
+resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM (go . rtype) (NE.toList rs)
+  where
+    go :: Type -> Fresh [Rule RComp]
+    go (NS (nameTerm -> delegatedNs)) = sequence $ do
+      rootServer <- rootServers
+      glueType <- ttypeAtom <$> [T.A, T.AAAA]
+      return $ do
+        t <- TVar <$> fresh "T"
+        -- Do not expect wildcard neq constraints on NS records
+        (captureListTail t -> n', _) <- nameWithSynthesis n
+        q <- TVar <$> fresh "Q"
+        res <- TVar <$> fresh "R"
+        return Rule { rannotation = RComp ns s
+                    , rhead = resolves (nameTerm ns) q n' res (ad 0)
+                    , rbody = [ resolves delegatedNs q n' res (ad 0)
+                              , resolves rootServer glueType delegatedNs TWildcard (ad 0) ] }
+    go (CNAME (nameTerm -> cname)) = sequence $ do
+      rootServer <- rootServers
+      return $ do
+        (n', map (uncurry (\=)) -> neqs) <- nameWithSynthesis n
+        q <- TVar <$> fresh "Q"
+        res <- TVar <$> fresh "R"
+        return Rule { rannotation = RComp ns s
+                    , rhead = resolves (nameTerm ns) q n' res (ad 0)
+                    , rbody = neqs ++ [ resolves rootServer q cname res (ad 0) ] }
+    go (DNAME (nameTerm -> dname)) = sequence $ do
+      rootServer <- rootServers
+      return $ do
+        -- Do not expect wildcard neq constraints on CNAME records
+        t <- TVar <$> fresh "T"
+        (captureListTail t -> n', _) <- nameWithSynthesis n
+        q <- TVar <$> fresh "Q"
+        res <- TVar <$> fresh "R"
+        return Rule { rannotation = RComp ns s
+                    , rhead = resolves (nameTerm ns) q n' res (ad 0)
+                    , rbody = [ t \= TEmptyList
+                              , resolves rootServer q (captureListTail t dname) res (ad 0) ] }
+    go (RRSIG {}) = undefined
+    go (DS {}) = undefined
+    go (DNSKEY {}) = undefined
+    -- Ignore below, but pattern-match so compiler generates warnings on future
+    -- extensions
+    go (A {}) = return []
+    go (AAAA {}) = return []
+    go (TXT {}) = return []
+    go (MX {}) = return []
+    go (SOA {}) = return []
+    go (NSEC {}) = return []
 
 resolvableR :: Fresh (Rule ())
 resolvableR = do
@@ -91,13 +107,16 @@ allResolvable =
     bagof :: Term -> Term -> Term -> Term
     bagof a b c = TFunctor "bagof" [ a, b, c ]
 
-fromZoneFile :: [Name String] -> Name String -> [ConstrainedRecord] -> Fresh [Rule RComp]
-fromZoneFile rootServers ns rs = concat <$> mapM recordToRules rs
+fromZoneFile :: [Name String] -> Name String -> [Zone ConstrainedLabel] -> Fresh [Rule RComp]
+fromZoneFile rootServers ns rs = concat <$> mapM zoneToRules rs
   where
-    recordToRules :: ConstrainedRecord -> Fresh [Rule RComp]
-    recordToRules r = (:) <$> resolvableBase ns r <*> resolvableStep rootServers ns r
+    zoneToRules :: Zone ConstrainedLabel -> Fresh [Rule RComp]
+    zoneToRules z = concat <$> mapM rrsetToRules (allRRSets z)
 
-type NameServersConfig = [(Name String, [ConstrainedRecord])]
+    rrsetToRules :: ConstrainedRRSet -> Fresh [Rule RComp]
+    rrsetToRules r = (:) <$> resolvableBase ns r <*> resolvableStep rootServers ns r
+
+type NameServersConfig = [(Name String, [Zone ConstrainedLabel])]
 
 compileConfig :: [Name String] -> NameServersConfig -> Fresh [Rule RComp]
 compileConfig rootServers = (concat <$>) . mapM (uncurry (fromZoneFile rootServers))

@@ -224,9 +224,10 @@ tList = tBin listSym
 emptyList :: Term
 emptyList = TEmptyList
 
-list :: [Term] -> Term
-list [] = TEmptyList
-list (x:xs) = TFunctor listSym [ x, list xs ]
+list :: Foldable t =>  t Term -> Term
+list ts
+  | null ts = TEmptyList
+  | otherwise = foldr (\x acc -> TFunctor listSym [ x, acc ]) TEmptyList ts
 
 listWithTail :: [Term] -> Term -> Term
 listWithTail xs t = go xs

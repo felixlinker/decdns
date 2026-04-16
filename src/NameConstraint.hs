@@ -5,6 +5,7 @@ module NameConstraint
   , ConstrainedLabel
   , ConstrainedName
   , ConstrainedRecord
+  , ConstrainedRRSet
   , toStandardRecord
   , toName
   , exactly
@@ -29,13 +30,14 @@ instance Label a => Label (LabelConstraint a) where
   lwildcard = Wildcard []
   lempty = Exactly lempty
 
-instance Show (LabelConstraint String) where
+instance Show ConstrainedLabel where
   show (Wildcard _) = "*"
   show (Exactly l) = l
 
 type ConstrainedLabel = LabelConstraint String
 type ConstrainedName = Name ConstrainedLabel
 type ConstrainedRecord = Record ConstrainedLabel
+type ConstrainedRRSet = RRSet ConstrainedLabel
 
 toStandardRecord :: ConstrainedRecord -> StandardRecord
 toStandardRecord (Named n d) = Named (toName n) d
@@ -52,14 +54,14 @@ toName (Name cs) = Name (NE.map show cs)
 existIn :: T.Node String v -> [String]
 existIn = filter (/= "*") . M.keys . T.children
 
-compileWildcards :: Zone String -> Zone (LabelConstraint String)
+compileWildcards :: Zone String -> Zone ConstrainedLabel
 compileWildcards (Zone (Name n) r) = Zone (Name (NE.map Exactly n)) (go r)
   where
-    mapLabel :: [String] -> String -> LabelConstraint String
+    mapLabel :: [String] -> String -> ConstrainedLabel
     mapLabel exist "*" = Wildcard exist
     mapLabel _ x   = Exactly x
 
-    go :: T.Node String RDataSet -> T.Node (LabelConstraint String) RDataSet
+    go :: T.Node String RDataSet -> T.Node ConstrainedLabel RDataSet
     go n_@(T.Node _ ch) = n_ { T.children = M.map go $ M.mapKeys (mapLabel (existIn n_)) ch }
 
 match :: Name String -> ConstrainedName -> Maybe (Name String)
@@ -68,7 +70,7 @@ match (Name (NE.reverse -> ls)) (Name (NE.reverse -> cs)) = do
   n <- NE.nonEmpty (reverse matched)
   return $ Name n
   where
-    match' :: NE.NonEmpty String -> NE.NonEmpty (LabelConstraint String) -> Maybe [String]
+    match' :: NE.NonEmpty String -> NE.NonEmpty ConstrainedLabel -> Maybe [String]
     match' (a NE.:| as) ((Exactly c) NE.:| ncs)
       | a == c = (a:) <$> rec as ncs
       | otherwise = Nothing
@@ -77,7 +79,7 @@ match (Name (NE.reverse -> ls)) (Name (NE.reverse -> cs)) = do
       | a == "*" = (a:) <$> rec as ncs
       | otherwise = Nothing
 
-    rec :: [String] -> [LabelConstraint String] -> Maybe [String]
+    rec :: [String] -> [ConstrainedLabel] -> Maybe [String]
     rec [] [] = Just []
     rec _ [] = Just []
     rec [] _ = Nothing

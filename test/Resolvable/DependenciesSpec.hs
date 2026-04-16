@@ -4,9 +4,10 @@ import qualified Data.Set as S
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertBool, testCase)
 
-import DNS.Name (Named (Named))
+import DNS.Name (Named (Named), root)
 import DNS.NameSpec (mkName)
-import DNS.Record (Cat (IN), RData (RData), Type (A, NS), record)
+import DNS.Record (Cat (IN), RData (RData), Type (..), record)
+import DNS.ZoneFile (fromRecordList)
 import NameConstraint (exactly)
 import Resolvable.Dependencies (ResolvableAt (ResolvableAt), fromRules)
 import Resolvable.Resolvability (compileConfig)
@@ -30,13 +31,15 @@ rootDelegationDependsOnDelegatedResolution = do
       delegatedName = mkName ["www", "example", "com", ""]
       ttl = 300
 
-      rootRecords =
-        [ record (exactly delegatedDomain) (RData IN ttl (NS delegatedNs))
+      rootRecords = fromRecordList
+        [ record (exactly delegatedDomain) (RData IN ttl (SOA root root 0 0 0 0 0))
+        , record (exactly delegatedDomain) (RData IN ttl (NS delegatedNs))
         , record (exactly delegatedNs) (RData IN ttl (A "192.0.2.1"))
         ]
 
-      delegatedRecords =
-        [ record (exactly delegatedName) (RData IN ttl (A "198.51.100.10"))
+      delegatedRecords = fromRecordList
+        [ record (exactly delegatedName) (RData IN ttl (SOA root root 0 0 0 0 0))
+        , record (exactly delegatedName) (RData IN ttl (A "198.51.100.10"))
         ]
 
       compiled =

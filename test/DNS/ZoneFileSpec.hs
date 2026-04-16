@@ -44,7 +44,7 @@ tests =
     ]
 
 normalizeZone :: Zone String -> [StandardRecord]
-normalizeZone = sort . allData
+normalizeZone = sort . allRecords
 
 named :: Name a -> RData -> Named a RRSet.RDataSet
 named a = Named a . RRSet.singleton
@@ -80,7 +80,7 @@ propInsertCommutative =
 propAllDataFromListRoundtrip :: Property
 propAllDataFromListRoundtrip =
   forAll genZone $ \z ->
-    forAll (shuffle (allData z)) $ \rs ->
+    forAll (shuffle (allRecords z)) $ \rs ->
       maybe
       (counterexample "could not construct zone" (property False))
       ((normalizeZone z ===) . normalizeZone . fst)

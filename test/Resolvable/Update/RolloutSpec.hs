@@ -7,7 +7,7 @@ import Test.Tasty.QuickCheck
 import DNS.Diff (diff)
 import DNS.Record (StandardRecord)
 import qualified DNS.RRSet as RRSet
-import DNS.ZoneFile (Zone, allData, insert, zoneName)
+import DNS.ZoneFile (Zone, allRecords, insert, zoneName)
 import qualified DNS.ZoneFileSpec as ZS
 import Resolvable.Update.Rollout (rollout)
 import qualified Util.PartialOrder as PO
@@ -36,4 +36,4 @@ propImmediateTxtDelete (ZS.ArbZone z _) =
 
 freshTxtFor :: Zone String -> Gen StandardRecord
 freshTxtFor z =
-  ZS.genTXTRecord (zoneName z) `suchThat` (`notElem` allData z)
+  ZS.genTXTRecord (zoneName z) `suchThat` (`notElem` allRecords z)

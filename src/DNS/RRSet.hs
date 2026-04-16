@@ -3,15 +3,16 @@ module DNS.RRSet
   , empty
   , apply
   , modify
-  , prune
+  , modifyL
   , partition
   , RDataSet
   , insert
   , singleton
   , RRSet
-  , StdRRSet ) where
+  , StdRRSet
+  , toRecords ) where
 
-import qualified Data.List as L
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
 
@@ -19,9 +20,10 @@ import DNS.Name
 import DNS.Record
 import qualified DNS.RecordType as T
 import Data.Bifunctor (Bifunctor(bimap))
+import Data.Functor.Identity (Identity(runIdentity))
 
 newtype RTypedSet a = RDS
-  { rds :: M.Map T.Type [a] }
+  { rds :: M.Map T.Type (NE.NonEmpty a) }
   deriving (Eq, Ord)
 
 instance Show a => Show (RTypedSet a) where
@@ -45,26 +47,32 @@ instance Ord a => Semigroup (RTypedSet a) where
 instance Ord a => Monoid (RTypedSet a) where
   mempty = RDS M.empty
 
-apply :: (M.Map T.Type [a] -> b) -> RTypedSet a -> b
+apply :: (M.Map T.Type (NE.NonEmpty a) -> b) -> RTypedSet a -> b
 apply f (RDS m) = f m
 
-modify :: (M.Map T.Type [a] -> M.Map T.Type [b]) -> RTypedSet a -> RTypedSet b
+modify :: (M.Map T.Type (NE.NonEmpty a) -> M.Map T.Type (NE.NonEmpty b)) -> RTypedSet a -> RTypedSet b
 modify f = RDS . apply f
 
-prune :: RTypedSet a -> RTypedSet a
-prune = modify (M.filter (not . null))
+toNE :: M.Map T.Type [a] -> M.Map T.Type (NE.NonEmpty a)
+toNE = runIdentity . M.traverseMaybeWithKey (const $ return . NE.nonEmpty) . M.filter (not . null)
+
+modifyL :: (M.Map T.Type (NE.NonEmpty a) -> M.Map T.Type [b]) -> RTypedSet a -> RTypedSet b
+modifyL f rd = RDS $ toNE $ apply f rd
 
 partition :: (a -> Bool) -> RTypedSet a -> (RTypedSet a, RTypedSet a)
 partition p rd =
-  let ps = apply (M.map $ L.partition p) rd
-  in bimap (prune . RDS) (prune . RDS) (fmap fst ps, fmap snd ps)
+  let ps = apply (M.map $ NE.partition p) rd
+  in bimap (RDS . toNE) (RDS . toNE) (fmap fst ps, fmap snd ps)
 
 type RDataSet = RTypedSet RData
-type RRSet a = Named a RDataSet
-type StdRRSet = Named String RDataSet
+type RRSet a = Named a (NE.NonEmpty RData)
+type StdRRSet = RRSet String
 
 insert :: RData -> RDataSet -> RDataSet
-insert rd = RDS . M.alter (Just . maybe [rd] (rd:)) (toType $ rtype rd) . rds
+insert rd = RDS . M.alter (Just . maybe (NE.singleton rd) (rd NE.<|)) (toType $ rtype rd) . rds
 
 singleton :: RData -> RDataSet
-singleton rd = RDS $ M.singleton (toType $ rtype rd) [rd]
+singleton rd = RDS $ M.singleton (toType $ rtype rd) (NE.singleton rd)
+
+toRecords :: RRSet a -> NE.NonEmpty (Record a)
+toRecords (Named n sets) = Named n <$> sets

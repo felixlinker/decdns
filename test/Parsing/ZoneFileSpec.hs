@@ -6,7 +6,7 @@ import Data.Functor.Identity (runIdentity)
 import DNS.Name (Named (name, value))
 import DNS.Record (RData (rttl), Type (DNSKEY, DS))
 import DNS.SEC.Crypto (AlgorithmType (RSASHA256), DigestType (SHA256))
-import DNS.ZoneFile (allData, fromRecordList)
+import DNS.ZoneFile (allRecords, fromRecordList)
 import Parsing.Data (recordTypeData)
 import Parsing.State (emptyState)
 import Parsing.ZoneFile (parseZoneFile)
@@ -61,7 +61,7 @@ parsesOmittedOwnerStartingWithClass = do
   zones <- either (fail . show) fromRecordList <$> parseZoneFile "<test>" input
   case zones of
     [z] -> do
-      let recs = allData z
+      let recs = allRecords z
       length recs @?= 3
       name (recs !! 1) @?= name (recs !! 2)
     zs -> assertFailure ("expected 1 zone, got " ++ show (length zs))
@@ -76,7 +76,7 @@ parsesExplicitOwnerNamedIN = do
 
   zones <- either (fail . show) fromRecordList <$> parseZoneFile "<test>" input
   case zones of
-    [z] -> length (allData z) @?= 2
+    [z] -> length (allRecords z) @?= 2
     zs -> assertFailure ("expected 1 zone, got " ++ show (length zs))
 
 parsesMultilineRecordWithInlineComment :: Assertion

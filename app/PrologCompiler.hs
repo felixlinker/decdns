@@ -1,14 +1,12 @@
 module PrologCompiler (main) where
 
-import DNS.ZoneFile (fromList, AZone)
-import DNS.Record (RData)
-import qualified DNS.RRSet as RRSet
+import DNS.ZoneFile (allRecords)
 import DNS.Diff
-import NameConstraint (ConstrainedLabel, toStandardRecord)
+import NameConstraint (toStandardRecord)
 import Resolvable.Prolog
 import Resolvable.Resolvability
 import Resolvable.Update.Resolvability
-import Resolvable.Update.Rollout (Rollout, rollout)
+import Resolvable.Update.Rollout (diffServers, Rollout, rollout)
 import Resolvable.Dependencies ( computeResolvable, fromRules )
 import Util.Fresh (runFresh)
 
@@ -16,12 +14,10 @@ import System.Environment (getArgs)
 import Util
 import Data.List (uncons)
 import qualified Data.Map as M
-import qualified Data.Map.Merge.Lazy as MM
 import Resolvable.Update.Dependencies (computeRegressions)
 import Resolvable.Update.Trivial (partitionTrivial)
 import Control.Monad (unless)
-import DNS.Name (mapLabels, Named, Name)
-import Data.Maybe (mapMaybe)
+import DNS.Name (Name)
 
 indent :: String -> String
 indent s = if null s then "" else "  " ++ s
@@ -53,12 +49,7 @@ main = do
       (old, new) <- sepBy "--" args
       oldRecs <- mapM parseZoneFileZones old
       newRecs <- mapM parseZoneFileZones new
-      let nsDiff = MM.merge
-            (MM.mapMissing (\_ -> fmap deleted))
-            (MM.mapMissing (\_ -> fmap added))
-            (MM.zipWithMatched (const diff))
-            (M.fromList $ mapMaybe (traverse toZone) oldRecs)
-            (M.fromList $ mapMaybe (traverse toZone) newRecs)
+      let nsDiff = diffServers oldRecs newRecs
       mapM_ (\(ns, d) -> print ns >> print d) (M.toList nsDiff)
     "regressions" -> do
       (sroots, args') <- sepBy "--" args
@@ -68,17 +59,12 @@ main = do
       newRecs <- mapM parseZoneFileZones new
       let oldRecsC = compileConfig roots oldRecs
       let newRecsC = compileConfig roots newRecs
-      let (trivial, nonTrivial) = runFresh $ partitionTrivial (concatMap snd oldRecs) (concatMap snd newRecs) $ computeRegressions roots (plResolvable =<< oldRecsC) (plResolvable =<< newRecsC)
+      let (trivial, nonTrivial) = runFresh $ partitionTrivial (concatMap (concatMap allRecords . snd) oldRecs) (concatMap (concatMap allRecords . snd) newRecs) $ computeRegressions roots (plResolvable =<< oldRecsC) (plResolvable =<< newRecsC)
       mapM_ print nonTrivial
       unless (null trivial) $ do
         putStrLn "\n% The following regressions may be inteded as all records that directly answer the query have been deleted."
         mapM_ print trivial
-      let nsDiff = MM.merge
-            (MM.mapMissing (\_ -> fmap deleted))
-            (MM.mapMissing (\_ -> fmap added))
-            (MM.zipWithMatched (const diff))
-            (M.fromList $ mapMaybe (traverse toZone) oldRecs)
-            (M.fromList $ mapMaybe (traverse toZone) newRecs)
+      let nsDiff = diffServers oldRecs newRecs
       let oldDeps = runFresh $ fromRules <$> oldRecsC
       let newDeps = runFresh $ fromRules <$> newRecsC
       let rolloutSeq = rollout nsDiff oldDeps newDeps
@@ -91,12 +77,10 @@ main = do
       compiled <- runFresh . compileConfig rootServers <$> mapM parseZoneFileZones zones
       print $ fromRules compiled
     "parse-only" -> do
-      parsed <- concatMap (map toStandardRecord . snd) <$> mapM parseZoneFileZones args
+      parsed <- concatMap (map toStandardRecord . concatMap allRecords . snd) <$> mapM parseZoneFileZones args
       mapM_ print parsed
     _ -> fail "unknown command"
   where
-    toZone :: [Named ConstrainedLabel RData] -> Maybe (AZone String RRSet.RTypedSet RData)
-    toZone = fromList . map (fmap RRSet.singleton . mapLabels show)
 
     popArg :: [String] -> IO (String, [String])
     popArg = maybe (fail "too few arguments") return . uncons

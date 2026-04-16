@@ -4,6 +4,7 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, (@?=), testCase)
 
 import qualified Data.Map as M
+import qualified Data.List.NonEmpty as NE
 
 import DNS.Diff
 import DNS.Name (Named (..), (<|), root)
@@ -32,7 +33,7 @@ reportsAddsAndDeletes = do
       oldZ = singleton (Named n (mkData "192.0.2.1"))
       newZ = singleton (Named n (mkData "192.0.2.2"))
   let dz = diff oldZ newZ
-  (RRSet.apply (M.lookup T.A) =<< get n dz) @?= Just [deleted (mkRData "192.0.2.1"), added (mkRData "192.0.2.2")]
+  (RRSet.apply (M.lookup T.A) =<< get n dz) @?= Just (NE.fromList [deleted (mkRData "192.0.2.1"), added (mkRData "192.0.2.2")])
 
 unchangedIsEmpty :: Assertion
 unchangedIsEmpty = do

@@ -10,6 +10,7 @@ module DNS.Diff
   , hasChanges ) where
 
 import qualified Data.Map as M
+import qualified Data.List.NonEmpty as NE
 
 import DNS.Name as N
 import DNS.Record
@@ -53,10 +54,10 @@ diff (fmap deleted -> Zone oldOrg oldRs) (fmap added -> Zone newOrg newRs) =
   let Path zOrg oldP newP = pathInZone oldOrg newOrg
       oldRs' = T.prepend oldP oldRs
       newRs' = T.prepend newP newRs
-  in prune $ Zone zOrg $ T.mapItems (RRSet.modify (M.map nubEither)) $ T.merge oldRs' newRs'
+  in prune $ Zone zOrg $ T.mapItems (RRSet.modifyL (M.map nubEither)) $ T.merge oldRs' newRs'
   where
-    nubEither :: Eq a => [Diff a] -> [Diff a]
-    nubEither es = filter (deither ((`all` es) . rightNeq) ((`all` es) . leftNeq)) es
+    nubEither :: Eq a => NE.NonEmpty (Diff a) -> [Diff a]
+    nubEither es = NE.filter (deither ((`all` es) . rightNeq) ((`all` es) . leftNeq)) es
 
     leftNeq :: Eq a => a -> Diff a -> Bool
     leftNeq x = deither (/= x) true
