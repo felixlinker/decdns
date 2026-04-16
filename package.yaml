@@ -23,6 +23,7 @@ dependencies:
 - lens
 - bytestring
 - base64-bytestring
+- cryptohash-sha256
 
 ghc-options:
 - -Wall

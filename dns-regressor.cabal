@@ -68,6 +68,7 @@ library
     , base64-bytestring
     , bytestring
     , containers
+    , cryptohash-sha256
     , lens
     , parsec
     , transformers
@@ -88,6 +89,7 @@ executable dns-regressor-prolog
     , base64-bytestring
     , bytestring
     , containers
+    , cryptohash-sha256
     , dns-regressor
     , lens
     , parsec
@@ -126,6 +128,7 @@ test-suite dns-regressor-test
     , base64-bytestring
     , bytestring
     , containers
+    , cryptohash-sha256
     , dns-regressor
     , lens
     , parsec

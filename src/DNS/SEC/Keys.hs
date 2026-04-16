@@ -5,13 +5,20 @@ module DNS.SEC.Keys
   , dnsKeyFlagToInt
   , knownDNSKeyFlagsMask
   , dnsKeyFlagsFromInt
-  , keyTag ) where
+  , nameWireFormat
+  , keyTag
+  , keyDigest ) where
 
 import Data.Bits ((.|.), (.&.), complement, shiftR, shiftL)
-import Data.Word (Word8, Word16, Word32)
-import DNS.SEC.Crypto (AlgorithmType, algorithmToInt)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as CBS
 import Data.List (intersperse)
+import Data.Word (Word8, Word16, Word32)
+import qualified Crypto.Hash.SHA256 as S256
+
+import DNS.SEC.Crypto
+import DNS.Name (Name(..))
+import Data.Char (toLower)
 
 data DNSKeyFlag = ZoneKey | Other | SecureEntryPoint
   deriving (Eq, Ord)
@@ -37,12 +44,8 @@ dnsKeyFlagsFromInt flags =
   where
     otherDNSKeyFlagsMask = dnsKeyFlagToInt Other .|. complement knownDNSKeyFlagsMask
 
-keyTag :: [DNSKeyFlag] -> AlgorithmType -> BS.ByteString -> Word16
-keyTag (dnsKeyFlagsToInt -> flags) (algorithmToInt -> alg) key =
-  let i32 = foldr ((+) . fromIntegral) (0 :: Word32) asDoubleOctets
-      lower = fromIntegral i32 :: Word16
-      upper = fromIntegral (i32 `shiftR` 16) :: Word16
-  in  lower + upper
+dnsKeyWireFormat :: [DNSKeyFlag] -> AlgorithmType -> BS.ByteString -> BS.ByteString
+dnsKeyWireFormat (dnsKeyFlagsToInt -> flags) (algorithmToInt -> alg) key = foldr BS.cons key flagsProtoAlg
   where
     flagsProtoAlg :: [Word8]
     flagsProtoAlg =
@@ -51,10 +54,33 @@ keyTag (dnsKeyFlagsToInt -> flags) (algorithmToInt -> alg) key =
       , 3 -- Protocol
       , fromIntegral alg ]
 
+keyTag :: [DNSKeyFlag] -> AlgorithmType -> BS.ByteString -> Word16
+keyTag flags alg key =
+  let i32 = foldr ((+) . fromIntegral) (0 :: Word32) asDoubleOctets
+      lower = fromIntegral i32 :: Word16
+      upper = fromIntegral (i32 `shiftR` 16) :: Word16
+  in  lower + upper
+  where
     wireFormat :: BS.ByteString
-    wireFormat = foldr BS.cons key flagsProtoAlg
+    wireFormat = dnsKeyWireFormat flags alg key
 
     -- Alternatingly, shift Word8 left by 8 to make them the high 8 bits of a
     -- Word16
     asDoubleOctets :: [Word16]
     asDoubleOctets = zipWith (shiftL . fromIntegral) (BS.unpack wireFormat) (intersperse 0 (repeat 8))
+
+nameWireFormat :: Name String -> BS.ByteString
+nameWireFormat (Name ls) = foldr ((<>) . encodeLabel) BS.empty ls
+  where
+    encodeLabel :: String -> BS.ByteString
+    encodeLabel (CBS.pack -> label) = BS.cons (fromIntegral (CBS.length label)) label
+
+keyDigest :: DigestType -> Name String -> [DNSKeyFlag] -> AlgorithmType -> BS.ByteString -> BS.ByteString
+keyDigest SHA256 ownerName flags alg key = S256.hash $ canonicalName <> wireFormat
+  where
+    wireFormat :: BS.ByteString
+    wireFormat = dnsKeyWireFormat flags alg key
+
+    canonicalName :: BS.ByteString
+    canonicalName = nameWireFormat (fmap (map toLower) ownerName)
+keyDigest _ _ _ _ _ = undefined
