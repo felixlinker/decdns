@@ -86,6 +86,7 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM
     -- technically wrong as there could be intermediate SOA records. It could be
     -- that this will be implicitly addressed by the ad(1) resolution of the
     -- DNSKEY record.
+    -- TODO: Verify that DNSKEY is at zone apex
     go (RRSIG (ttypeAtom -> cov) (algAtom -> alg) ls (TInt -> ottl) _ _ (TInt -> tag) (nameTerm -> sigName) (b64Atom -> sig)) = sequence $ do
       -- Spec say that ls may also be greater than owner name of signed records,
       -- but this can only happen due to synthesis, which we have not performed
@@ -96,8 +97,6 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM
         t <- TVar <$> fresh "T"
         (captureListTail t -> n', map (uncurry (\=)) -> neqs) <- nameWithSynthesis n
         d0 <- TVar <$> fresh "D"
-        -- TODO: Maybe make SOA query (ad 1)
-        let soaQ = resolves (nameTerm ns) (ttypeAtom T.SOA) sigName TWildcard (ad 0)
         let ad0Q = resolves (nameTerm ns) cov n' d0 (ad 0)
         let ad1Q = resolves (nameTerm ns) cov n' d0 (ad 1)
         d1 <- TVar <$> fresh "D"
@@ -108,8 +107,7 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM
         let valid = rrsigValid n' cov ottl d0 (TInt ls) sig k
         return Rule { rannotation = rannot
                     , rhead = ad1Q
-                    , rbody = [ soaQ
-                              , ad0Q
+                    , rbody = [ ad0Q
                               , keyQ
                               , f =< TInt 256
                               , member keyF d1
