@@ -32,11 +32,14 @@ data RComp = RComp
   , fromRecord :: ConstrainedRRSet }
   deriving (Eq, Ord)
 
-resolvableBase :: Name String -> ConstrainedRRSet -> Fresh (Rule RComp)
-resolvableBase ns s@(Named n rds@((RData _ _ ty) NE.:| _)) = do
+resolvableBase :: [Name String] -> Name String -> ConstrainedRRSet -> Fresh (Rule RComp)
+resolvableBase rootServers ns s@(Named n rds@((RData _ _ ty) NE.:| _)) = do
     (n', map (uncurry (\=)) -> neqs) <- nameWithSynthesis n
     let annot = RComp ns s
-    return (Rule annot (resolves (nameTerm ns) (typeAtom ty) n' (list $ NE.map (dataFunctor . rtype) rds) (ad 0)) neqs)
+        -- TODO: Refine so that only root keys are trusted
+        -- Set the ad bit of DNSKEY entries stored at root servers to 1
+        adb = fromEnum (toType ty == T.DNSKEY && ns `elem` rootServers)
+    return (Rule annot (resolves (nameTerm ns) (typeAtom ty) n' (list $ NE.map (dataFunctor . rtype) rds) (ad adb)) neqs)
 
 resolvableStep :: [Name String] -> Name String -> ConstrainedRRSet -> Fresh [Rule RComp]
 resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM (go . rtype) (NE.toList rs)
@@ -68,6 +71,7 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM
                     , rhead = resolves (nameTerm ns) q n' res (ad 0)
                     , rbody = neqs ++ [ resolves rootServer q cname res (ad 0) ] }
     go (DNAME (nameTerm -> dname)) = sequence $ do
+      -- TODO: Instantiate rootServer over predicate instead of generated one rule per server
       rootServer <- rootServers
       return $ do
         t <- TVar <$> fresh "T"
@@ -87,29 +91,40 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM
     -- that this will be implicitly addressed by the ad(1) resolution of the
     -- DNSKEY record.
     -- TODO: Verify that DNSKEY is at zone apex
-    go (RRSIG (ttypeAtom -> cov) (algAtom -> alg) ls (TInt -> ottl) _ _ (TInt -> tag) (nameTerm -> sigName) (b64Atom -> sig)) = sequence $ do
+    go (RRSIG cov (algAtom -> alg) ls (TInt -> ottl) _ _ (TInt -> tag) (nameTerm -> sigName) (b64Atom -> sig)) = sequence $ do
       -- Spec say that ls may also be greater than owner name of signed records,
       -- but this can only happen due to synthesis, which we have not performed
       -- yet. Thus, we simply check equality.
       guard (ls + 1 == nlength n)  -- +1 because labels field does not count root
       rootServer <- rootServers
       return $ do
+        let covT = ttypeAtom cov
         t <- TVar <$> fresh "T"
         (captureListTail t -> n', map (uncurry (\=)) -> neqs) <- nameWithSynthesis n
         d0 <- TVar <$> fresh "D"
-        let ad0Q = resolves (nameTerm ns) cov n' d0 (ad 0)
-        let ad1Q = resolves (nameTerm ns) cov n' d0 (ad 1)
+        let ad0Q = resolves (nameTerm ns) covT n' d0 (ad 0)
+        let ad1Q = resolves (nameTerm ns) covT n' d0 (ad 1)
         d1 <- TVar <$> fresh "D"
-        let keyQ = resolves rootServer (ttypeAtom T.DNSKEY) sigName d1 (ad 1)
         k <- TVar <$> fresh "K"
-        f <- TVar <$> fresh "F"
-        let keyF = keyData f alg k tag
-        let valid = rrsigValid n' cov ottl d0 (TInt ls) sig k
+        flags <- TVar <$> fresh "F"
+        let keyF = keyData flags alg k tag
+        let valid = rrsigValid n' covT ottl d0 (TInt ls) sig k
+        keyQs <- if cov == T.DNSKEY
+            then do
+              d2 <- TVar <$> fresh "D"
+              let keyQ = resolves rootServer (ttypeAtom T.DNSKEY) sigName d1 (ad 0)
+              let dsQ = resolves rootServer (ttypeAtom T.DS) sigName d2 (ad 1)
+              digT <- TVar <$> fresh "DIGT"
+              dig <- TVar <$> fresh "DIG"
+              let pkRef = pkRefData tag alg digT dig
+              let digValid = digestValid digT sigName flags alg k dig
+              return  [ keyQ, dsQ, member pkRef d2, digValid ]
+            else return [ resolves rootServer (ttypeAtom T.DNSKEY) sigName d1 (ad 1) ]
         return Rule { rannotation = rannot
                     , rhead = ad1Q
                     , rbody = [ ad0Q
-                              , keyQ
-                              , f =< TInt 256
+                              ] ++ keyQs ++
+                              [ flags =< TInt 256
                               , member keyF d1
                               , valid ] ++ neqs }
     -- Ignore below, but pattern-match so compiler generates warnings on future
@@ -149,7 +164,7 @@ fromZoneFile rootServers ns rs = concat <$> mapM zoneToRules rs
     zoneToRules z = concat <$> mapM rrsetToRules (allRRSets z)
 
     rrsetToRules :: ConstrainedRRSet -> Fresh [Rule RComp]
-    rrsetToRules r = (:) <$> resolvableBase ns r <*> resolvableStep rootServers ns r
+    rrsetToRules r = (:) <$> resolvableBase rootServers ns r <*> resolvableStep rootServers ns r
 
 type NameServersConfig = [(Name String, [Zone ConstrainedLabel])]
 

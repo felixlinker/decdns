@@ -27,6 +27,7 @@ module Resolvable.Prolog
   , b64Atom
   , algAtom
   , keyData
+  , pkRefData
   , dataFunctor
   , (\=)
   , (=<)
@@ -35,6 +36,7 @@ module Resolvable.Prolog
   , resolvable
   , ad
   , rrsigValid
+  , digestValid
   , nameWithSynthesis
   , nameWithoutSynthesis
   , nameTerm
@@ -113,6 +115,9 @@ pkRefSym = "pkref"
 
 rrsigValidSym :: String
 rrsigValidSym = "rrsigValid"
+
+digestValidSym :: String
+digestValidSym = "digestValid"
 
 infixFunctors :: [String]
 infixFunctors =
@@ -448,6 +453,10 @@ ad = TFunctor adSym . (:[]) . TInt
 
 rrsigValid :: Term -> Term -> Term -> Term -> Term -> Term -> Term-> Term
 rrsigValid nam typeCovered origTTL rrset ls sig key  = TFunctor rrsigValidSym [ nam, typeCovered, origTTL, rrset, ls, sig, key ]
+
+-- TODO: Create term view
+digestValid :: Term -> Term -> Term -> Term -> Term -> Term -> Term
+digestValid typ nam flags alg key dig = TFunctor digestValidSym [ typ, nam, flags, alg, key, dig ]
 
 nameWithSynthesis :: ConstrainedName -> Fresh (Term, [(Term, Term)])
 nameWithSynthesis (Name (l NE.:| ls)) = case l of
