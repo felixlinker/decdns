@@ -57,19 +57,21 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM
         let (captureListTail t -> n') = nameWithoutSynthesis n
         q <- TVar <$> fresh "Q"
         res <- TVar <$> fresh "R"
+        adb <- TVar <$> fresh "AD"
         return Rule { rannotation = rannot
-                    , rhead = resolves (nameTerm ns) q n' res (ad 0)
-                    , rbody = [ resolves delegatedNs q n' res (ad 0)
-                              , resolves rootServer glueType delegatedNs TWildcard (ad 0) ] }
+                    , rhead = resolves (nameTerm ns) q n' res adb
+                    , rbody = [ resolves delegatedNs q n' res adb
+                              , resolves rootServer glueType delegatedNs TWildcard TWildcard ] }
     go (CNAME (nameTerm -> cname)) = sequence $ do
       rootServer <- rootServers
       return $ do
         (n', map (uncurry (\=)) -> neqs) <- nameWithSynthesis n
         q <- TVar <$> fresh "Q"
         res <- TVar <$> fresh "R"
+        adb <- TVar <$> fresh "AD"
         return Rule { rannotation = rannot
-                    , rhead = resolves (nameTerm ns) q n' res (ad 0)
-                    , rbody = neqs ++ [ resolves rootServer q cname res (ad 0) ] }
+                    , rhead = resolves (nameTerm ns) q n' res adb
+                    , rbody = neqs ++ [ resolves rootServer q cname res adb ] }
     go (DNAME (nameTerm -> dname)) = sequence $ do
       -- TODO: Instantiate rootServer over predicate instead of generated one rule per server
       rootServer <- rootServers
@@ -79,10 +81,11 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM
         let (captureListTail t -> n') = nameWithoutSynthesis n
         q <- TVar <$> fresh "Q"
         res <- TVar <$> fresh "R"
+        adb <- TVar <$> fresh "AD"
         return Rule { rannotation = rannot
-                    , rhead = resolves (nameTerm ns) q n' res (ad 0)
+                    , rhead = resolves (nameTerm ns) q n' res adb
                     , rbody = [ t \= TEmptyList
-                              , resolves rootServer q (captureListTail t dname) res (ad 0) ] }
+                              , resolves rootServer q (captureListTail t dname) res adb ] }
     -- TODO: I think I will need to branch on `cov` to cover authenticating
     -- DNSKEY records; those require a corresponding DS record additionally
     -- TODO: Check that sigName is the name of the zone containing the record;
