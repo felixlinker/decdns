@@ -18,6 +18,17 @@ import DNS.ZoneFile
 import Util.Fresh (Fresh, fresh)
 import Control.Monad (void, guard)
 
+injectLast :: Term -> Term -> Term
+injectLast newLast t = case toView t of
+  v@(TVList _ _ ) -> rec v
+  _ -> t
+  where
+    rec :: TermView -> Term
+    rec TVEmptyList = tList newLast emptyList
+    rec (TVList a b) = tList a (rec (toView b))
+    -- x cannot be a list
+    rec x = tList newLast (fromView x)
+
 captureListTail :: Term -> Term -> Term
 captureListTail captureWith t = case toView t of
   v@(TVList _ _) -> rec v
@@ -76,16 +87,17 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM
       -- TODO: Instantiate rootServer over predicate instead of generated one rule per server
       rootServer <- rootServers
       return $ do
+        l <- TVar <$> fresh "L"
         t <- TVar <$> fresh "T"
-        -- Do not expect wildcard neq constraints on CNAME records
-        let (captureListTail t -> n') = nameWithoutSynthesis n
+        let rewrite = injectLast l . captureListTail t
+        -- Do not expect wildcard neq constraints on DNAME records
+        let (rewrite -> n') = nameWithoutSynthesis n
         q <- TVar <$> fresh "Q"
         res <- TVar <$> fresh "R"
         adb <- TVar <$> fresh "AD"
         return Rule { rannotation = rannot
                     , rhead = resolves (nameTerm ns) q n' res adb
-                    , rbody = [ t \= TEmptyList
-                              , resolves rootServer q (captureListTail t dname) res adb ] }
+                    , rbody = [ resolves rootServer q (rewrite dname) res adb ] }
     -- TODO: I think I will need to branch on `cov` to cover authenticating
     -- DNSKEY records; those require a corresponding DS record additionally
     -- TODO: Check that sigName is the name of the zone containing the record;
