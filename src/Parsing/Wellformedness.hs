@@ -10,6 +10,7 @@ import qualified Data.List.NonEmpty as NE
 import DNS.Name
 import DNS.ZoneFile
 import qualified DNS.RRSet as RRSet
+import DNS.Record
 import qualified DNS.RecordType as T
 import qualified Util.Tree as Tr
 
@@ -25,6 +26,7 @@ wellformed :: Zone String -> Maybe String
 wellformed (Zone org r@(Tr.Node apexData rcs)) =
   asum  [ guard wildcardOrigin $> "zone origin has wildcard"
         , guard noSOA $> "zone misses SOA record"
+        , guard wrongKeyFlags $> "DNSKEY flags miss zone key bit"
         , guard (M.member T.CNAME (RRSet.rds apexData)) $> "no CNAME at APEX"
         , guard (checkZoneCuts org (Tr.Node (RRSet.modify (M.delete T.NS) apexData) rcs)) $> "illegal record at or below zone cut"
         , guard (wildcardRestrictions orgLabel r) $> "DNAME or NS wildcard record" ]
@@ -37,6 +39,13 @@ wellformed (Zone org r@(Tr.Node apexData rcs)) =
 
     noSOA :: Bool
     noSOA = M.notMember T.SOA (RRSet.rds apexData)
+
+    wrongKeyFlags :: Bool
+    wrongKeyFlags = any (any (checkFlag . rtype)) r
+      where
+        checkFlag :: Type -> Bool
+        checkFlag (DNSKEY fs _ _) = ZoneKey `notElem` fs
+        checkFlag _ = False
 
     checkZoneCuts :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
     checkZoneCuts n (Tr.Node rs cs) = maybe rec recCheck (getZoneCut rs)

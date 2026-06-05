@@ -128,7 +128,6 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM
                     , rbody = [ ad0Q
                               ] ++ keyQs ++
                               [ member keyF d1
-                              , flags =< TInt 256
                               , valid ] ++ neqs }
     -- Ignore below, but pattern-match so compiler generates warnings on future
     -- extensions
