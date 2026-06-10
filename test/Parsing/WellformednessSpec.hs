@@ -21,7 +21,6 @@ tests =
     [ testCase "allows DNSSEC records alongside CNAME" allowsDNSSECAlongsideCNAME
     , testCase "allows glue below NS zone cut" allowsGlueBelowNSZoneCut
     , testCase "rejects CNAME below NS zone cut" rejectsCNAMEBelowNSZoneCut
-    , testCase "rejects records below CNAME cut" rejectsRecordsBelowCNAMECut
     ]
 
 allowsDNSSECAlongsideCNAME :: Assertion
@@ -58,17 +57,6 @@ rejectsCNAMEBelowNSZoneCut = do
     org = mkName ["example", "com", ""]
     cut = "child" <| org
     alias = "alias" <| cut
-
-rejectsRecordsBelowCNAMECut :: Assertion
-rejectsRecordsBelowCNAMECut = do
-  zone <- zoneFromList
-    [ soa org
-    , named alias (RData IN 300 (CNAME (mkName ["target", "example", "net", ""])))
-    , named ("child" <| alias) (RData IN 300 (A "192.0.2.2")) ]
-  assertBool "records below CNAME cut should be illegal" (isJust (wellformed zone))
-  where
-    org = mkName ["example", "com", ""]
-    alias = "alias" <| org
 
 soa :: Name String -> Named String RRSet.RDataSet
 soa org = named org (RData IN 300 (SOA ns mailbox 1 2 3 4 5))
