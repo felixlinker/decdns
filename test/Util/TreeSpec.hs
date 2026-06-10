@@ -8,6 +8,8 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, (@?=), testCase)
 import Test.Tasty.QuickCheck
 
+import DNS.Name ((<|))
+import DNS.NameSpec (mkName)
 import qualified Util.Tree as T
 
 tests :: TestTree
@@ -27,6 +29,8 @@ tests =
     , testCase "insertNode replaces existing subtree at path" replacesSubtree
     , testProperty "insert is commutative" prop_insertCommutativeDistinctPaths
     , testCase "merge keeps values from both trees" mergesValues
+    , testCase "allNamed supplies the name of every node" allNamedSuppliesNames
+    , testCase "allNamed rejects a predicate failure below the root" allNamedRejectsFailure
     ]
 
 genTree :: Gen (T.Node String [Int])
@@ -111,3 +115,20 @@ mergesValues = do
       right = T.insert ["a"] [2 :: Int] T.emptyNode
       merged = T.merge left right
   S.fromList <$> T.get ["a"] merged @?= Just (S.fromList [1, 2])
+
+allNamedSuppliesNames :: Assertion
+allNamedSuppliesNames =
+  T.allNamed (==) org tree @?= True
+  where
+    org = mkName ["example", "com", ""]
+    tree = T.Node org (M.fromList
+      [ ("www", T.leaf ("www" <| org))
+      , ("child", T.Node ("child" <| org) (M.singleton "ns" (T.leaf ("ns" <| ("child" <| org)))))
+      ])
+
+allNamedRejectsFailure :: Assertion
+allNamedRejectsFailure =
+  T.allNamed (==) org tree @?= False
+  where
+    org = mkName ["example", "com", ""]
+    tree = T.Node org (M.singleton "www" (T.leaf org))
