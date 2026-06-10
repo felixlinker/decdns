@@ -69,10 +69,9 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM
         q <- TVar <$> fresh "Q"
         res <- TVar <$> fresh "R"
         adb <- TVar <$> fresh "AD"
-        return Rule { rannotation = rannot
-                    , rhead = resolves (nameTerm ns) q n' res adb
-                    , rbody = [ resolves delegatedNs q n' res adb
-                              , resolves rootServer glueType delegatedNs TWildcard TWildcard ] }
+        return $ Rule rannot (resolves (nameTerm ns) q n' res adb)
+          [ resolves delegatedNs q n' res adb
+          , resolves rootServer glueType delegatedNs TWildcard TWildcard ]
     go (CNAME (nameTerm -> cname)) = sequence $ do
       rootServer <- rootServers
       return $ do
@@ -80,9 +79,8 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM
         q <- TVar <$> fresh "Q"
         res <- TVar <$> fresh "R"
         adb <- TVar <$> fresh "AD"
-        return Rule { rannotation = rannot
-                    , rhead = resolves (nameTerm ns) q n' res adb
-                    , rbody = neqs ++ [ resolves rootServer q cname res adb ] }
+        return $ Rule rannot (resolves (nameTerm ns) q n' res adb)
+          (neqs ++ [ resolves rootServer q cname res adb ])
     go (DNAME (nameTerm -> dname)) = sequence $ do
       -- TODO: Instantiate rootServer over predicate instead of generated one rule per server
       rootServer <- rootServers
@@ -95,9 +93,8 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM
         q <- TVar <$> fresh "Q"
         res <- TVar <$> fresh "R"
         adb <- TVar <$> fresh "AD"
-        return Rule { rannotation = rannot
-                    , rhead = resolves (nameTerm ns) q n' res adb
-                    , rbody = [ resolves rootServer q (rewrite dname) res adb ] }
+        return $ Rule rannot (resolves (nameTerm ns) q n' res adb)
+          [ resolves rootServer q (rewrite dname) res adb ]
     -- TODO: I think I will need to branch on `cov` to cover authenticating
     -- DNSKEY records; those require a corresponding DS record additionally
     -- TODO: Check that sigName is the name of the zone containing the record;
@@ -135,12 +132,11 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) = concat <$> mapM
               let digValid = digestValid digT sigName flags alg k dig
               return  [ keyQ, dsQ, member pkRef d2, digValid ]
             else return [ resolves rootServer (ttypeAtom T.DNSKEY) sigName d1 (ad 1) ]
-        return Rule { rannotation = rannot
-                    , rhead = ad1Q
-                    , rbody = [ ad0Q
-                              ] ++ keyQs ++
-                              [ member keyF d1
-                              , valid ] ++ neqs }
+        return $ Rule rannot ad1Q
+          ( [ ad0Q
+            ] ++ keyQs ++
+            [ member keyF d1
+            , valid ] ++ neqs)
     -- Ignore below, but pattern-match so compiler generates warnings on future
     -- extensions
     go (A {}) = return []
