@@ -1,9 +1,7 @@
 module Parsing.Wellformedness
   ( wellformed ) where
 
-import Data.Functor (($>))
 import Control.Applicative (asum)
-import Control.Monad (guard)
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
 
@@ -14,22 +12,26 @@ import DNS.Record
 import qualified DNS.RecordType as T
 import qualified Util.Tree as Tr
 
-data ZoneCut = CNAMECut | NSCut
+expect :: Bool -> String -> Maybe String
+expect p err = if p then Nothing else Just err
 
-getZoneCut :: RRSet.RDataSet -> Maybe ZoneCut
-getZoneCut rs
-  | hasType T.CNAME rs = Just CNAMECut
-  | hasType T.NS rs = Just NSCut
-  | otherwise = Nothing
+expectNot :: Bool -> String -> Maybe String
+expectNot p err = if p then Just err else Nothing
 
+(==>) :: Bool -> Bool -> Bool
+(==>) p q = not p || q
+
+-- TODO: Check RRSIG signer names; in particular, check NS and SOA record signer names
 wellformed :: Zone String -> Maybe String
 wellformed (Zone org r@(Tr.Node apexData rcs)) =
-  asum  [ guard wildcardOrigin $> "zone origin has wildcard"
-        , guard noSOA $> "zone misses SOA record"
-        , guard wrongKeyFlags $> "DNSKEY flags miss zone key bit"
-        , guard (M.member T.CNAME (RRSet.rds apexData)) $> "no CNAME at APEX"
-        , guard (checkZoneCuts org (Tr.Node (RRSet.modify (M.delete T.NS) apexData) rcs)) $> "illegal record at or below zone cut"
-        , guard (wildcardRestrictions orgLabel r) $> "DNAME or NS wildcard record" ]
+  asum  [ expectNot wildcardOrigin "zone origin has wildcard"
+        , expect hasSOA "zone misses SOA record"
+        , expect dnskeyFlags "DNSKEY flags miss zone key bit"
+        , expect (checkCNAME org r) "CNAME record accompanied by records other than NSEC or RRSIG"
+        -- Ignore records at apex. Other records next to NSes are legal there.
+        , expect (checkZoneCuts org (Tr.Node RRSet.empty rcs)) "illegal record at or below zone cut"
+        , expect (singletonTypes r) "more than one DNAME or CNAME record at owner name"
+        , expect (wildcardRestrictions orgLabel r) "DNAME or NS wildcard record" ]
   where
     orgLabel :: String
     orgLabel = NE.head $ labels org
@@ -37,25 +39,35 @@ wellformed (Zone org r@(Tr.Node apexData rcs)) =
     wildcardOrigin :: Bool
     wildcardOrigin = "*" == orgLabel
 
-    noSOA :: Bool
-    noSOA = M.notMember T.SOA (RRSet.rds apexData)
+    hasSOA :: Bool
+    hasSOA = M.member T.SOA (RRSet.rds apexData)
 
-    wrongKeyFlags :: Bool
-    wrongKeyFlags = any (any (checkFlag . rtype)) r
+    dnskeyFlags :: Bool
+    dnskeyFlags = all (all (checkFlag . rtype)) r
       where
         checkFlag :: Type -> Bool
-        checkFlag (DNSKEY fs _ _) = ZoneKey `notElem` fs
-        checkFlag _ = False
+        checkFlag (DNSKEY fs _ _) = ZoneKey `elem` fs
+        checkFlag _ = True
 
-    checkZoneCuts :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
-    checkZoneCuts n (Tr.Node rs cs) = maybe rec recCheck (getZoneCut rs)
+    -- See: https://datatracker.ietf.org/doc/html/rfc4034#section-3; third paragraph
+    -- This also covers that a CNAME must not be at zone apex (apex will have SOA record).
+    checkCNAME :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
+    checkCNAME n (Tr.Node rs cs) = checkData && and (M.mapWithKey (\k -> checkCNAME (k <| n)) cs)
       where
-        rec :: Bool
-        rec = or $ M.mapWithKey (\k -> checkZoneCuts (k <| n)) cs
+        checkData :: Bool
+        checkData = hasType T.CNAME rs ==> typesAllIn rs [T.CNAME, T.NSEC, T.RRSIG]
 
-        recCheck :: ZoneCut -> Bool
-        recCheck cut = not (typesAllowedAtCut cut rs)
-            || not (all (typesAllowedBelowCut cut) (Tr.Node RRSet.empty cs))
+    -- TODO: Can have records below CNAME
+    checkZoneCuts :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
+    checkZoneCuts n (Tr.Node rs cs) = if hasType T.NS rs
+        then typesAllIn rs [T.NS, T.DS, T.NSEC, T.RRSIG] && all (`typesAllIn` [T.A, T.AAAA]) (Tr.Node RRSet.empty cs)
+        else and $ M.mapWithKey (\k -> checkZoneCuts (k <| n)) cs
+
+    singletonTypes :: Tr.Node String RRSet.RDataSet -> Bool
+    singletonTypes = all (\rs -> checkOne T.CNAME rs && checkOne T.DNAME rs)
+      where
+        checkOne :: T.Type -> RRSet.RDataSet -> Bool
+        checkOne t = maybe True (null . NE.tail) . M.lookup t . RRSet.rds
 
 hasType :: T.Type -> RRSet.RDataSet -> Bool
 hasType t = M.member t . RRSet.rds
@@ -63,18 +75,7 @@ hasType t = M.member t . RRSet.rds
 typesAllIn :: RRSet.RTypedSet a -> [T.Type] -> Bool
 typesAllIn rd = RRSet.apply M.null . foldr (RRSet.modify . M.delete) rd
 
-typesAllowedAtCut :: ZoneCut -> RRSet.RDataSet -> Bool
-typesAllowedAtCut cut rd = typesAllIn rd (cutRecord cut : [T.DS, T.NSEC, T.RRSIG])
-
-cutRecord :: ZoneCut -> T.Type
-cutRecord CNAMECut = T.CNAME
-cutRecord NSCut = T.NS
-
-typesAllowedBelowCut :: ZoneCut -> RRSet.RDataSet -> Bool
-typesAllowedBelowCut CNAMECut rd = RRSet.apply M.null rd
-typesAllowedBelowCut NSCut rd = typesAllIn rd [T.A, T.AAAA]
-
 wildcardRestrictions :: String -> Tr.Node String RRSet.RDataSet -> Bool
 wildcardRestrictions label (Tr.Node rs cs)
-  | label == "*" && M.null cs = any (`M.member` RRSet.rds rs) [T.DNAME, T.NS]
-  | otherwise = any (uncurry wildcardRestrictions) (M.toList cs)
+  | label == "*" && M.null cs = all (`M.notMember` RRSet.rds rs) [T.DNAME, T.NS]
+  | otherwise = all (uncurry wildcardRestrictions) (M.toList cs)
