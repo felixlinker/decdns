@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 module Parsing.Wellformedness
   ( wellformed ) where
 
@@ -21,7 +22,6 @@ expectNot p err = if p then Just err else Nothing
 (==>) :: Bool -> Bool -> Bool
 (==>) p q = not p || q
 
--- TODO: Check RRSIG signer names; in particular, check NS and SOA record signer names
 wellformed :: Zone String -> Maybe String
 wellformed (Zone org r@(Tr.Node apexData rcs)) =
   asum  [ expectNot wildcardOrigin "zone origin has wildcard"
@@ -31,7 +31,8 @@ wellformed (Zone org r@(Tr.Node apexData rcs)) =
         -- Ignore records at apex. Other records next to NSes are legal there.
         , expect (checkZoneCuts org (Tr.Node RRSet.empty rcs)) "illegal record at or below zone cut"
         , expect (singletonTypes r) "more than one DNAME or CNAME record at owner name"
-        , expect (wildcardRestrictions orgLabel r) "DNAME or NS wildcard record" ]
+        , expect (wildcardRestrictions orgLabel r) "DNAME or NS wildcard record"
+        , expect (rrsigSignerName org r) "RRSIG has illegal signer name" ]
   where
     orgLabel :: String
     orgLabel = NE.head $ labels org
@@ -52,10 +53,10 @@ wellformed (Zone org r@(Tr.Node apexData rcs)) =
     -- See: https://datatracker.ietf.org/doc/html/rfc4034#section-3; third paragraph
     -- This also covers that a CNAME must not be at zone apex (apex will have SOA record).
     checkCNAME :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
-    checkCNAME n (Tr.Node rs cs) = checkData && and (M.mapWithKey (\k -> checkCNAME (k <| n)) cs)
+    checkCNAME = Tr.allNamed (const checkData)
       where
-        checkData :: Bool
-        checkData = hasType T.CNAME rs ==> typesAllIn rs [T.CNAME, T.NSEC, T.RRSIG]
+        checkData :: RRSet.RDataSet -> Bool
+        checkData rs = hasType T.CNAME rs ==> typesAllIn rs [T.CNAME, T.NSEC, T.RRSIG]
 
     -- TODO: Can have records below CNAME
     checkZoneCuts :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
@@ -67,7 +68,10 @@ wellformed (Zone org r@(Tr.Node apexData rcs)) =
     singletonTypes = all (\rs -> checkOne T.CNAME rs && checkOne T.DNAME rs)
       where
         checkOne :: T.Type -> RRSet.RDataSet -> Bool
-        checkOne t = maybe True (null . NE.tail) . M.lookup t . RRSet.rds
+        checkOne t = maybe True (null . NE.tail) . getType t
+
+getType :: T.Type -> RRSet.RDataSet -> Maybe (NE.NonEmpty RData)
+getType t = M.lookup t . RRSet.rds
 
 hasType :: T.Type -> RRSet.RDataSet -> Bool
 hasType t = M.member t . RRSet.rds
@@ -79,3 +83,18 @@ wildcardRestrictions :: String -> Tr.Node String RRSet.RDataSet -> Bool
 wildcardRestrictions label (Tr.Node rs cs)
   | label == "*" && M.null cs = all (`M.notMember` RRSet.rds rs) [T.DNAME, T.NS]
   | otherwise = all (uncurry wildcardRestrictions) (M.toList cs)
+
+rrsigSignerName :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
+rrsigSignerName = Tr.allNamed checkData
+  where
+    checkData :: Name String -> RRSet.RDataSet -> Bool
+    checkData owner rs = all checkRRSIG $ maybe [] NE.toList (getType T.RRSIG rs)
+      where
+        checkRRSIG :: RData -> Bool
+        checkRRSIG (rtype -> sig@(RRSIG {})) =
+          let signer = _signersName sig
+          in case _typeCovered sig of
+            T.SOA -> signer == owner
+            T.DNSKEY -> signer == owner
+            _ -> isSubDomain owner signer
+        checkRRSIG _ = True

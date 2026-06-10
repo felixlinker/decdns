@@ -14,10 +14,12 @@ module Util.Tree
   , mapItems
   , fmerge
   , merge
-  , partition ) where
+  , partition
+  , allNamed ) where
 
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
+import DNS.Name
 
 import Util.Func
 
@@ -110,3 +112,6 @@ partition p = go []
       let (top, bot) = p path v
           rec = M.mapWithKey (go . (:path)) cs
       in (Node top (M.map fst rec), Node bot (M.map snd rec))
+
+allNamed :: (Name a -> v -> Bool) -> Name a -> Node a v -> Bool
+allNamed f owner (Node d cs) = f owner d && and (M.mapWithKey (\k -> allNamed f (k <| owner)) cs)
