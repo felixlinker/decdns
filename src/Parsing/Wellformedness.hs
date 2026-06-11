@@ -108,7 +108,8 @@ rrsigLabelCount = Tr.allNamed checkData
     checkData owner = all checkRRSIG
       where
         checkRRSIG :: RData -> Bool
-        checkRRSIG (rtype -> sig@(RRSIG {})) = length owner == _labels sig
+        -- length - 1 to exclude root label
+        checkRRSIG (rtype -> sig@(RRSIG {})) = labelCount owner == _labels sig
         checkRRSIG _ = True
 
 noDNSKEY :: Tr.Node String RRSet.RDataSet -> Bool

@@ -5,7 +5,7 @@ module DNS.Name
   , Name(..)
   , Named(..)
   , root
-  , nlength
+  , labelCount
   , (<|)
   , prependLabels
   , mapLabels
@@ -34,8 +34,14 @@ newtype Name a = Name { labels :: NE.NonEmpty a }
 root :: Label a => Name a
 root = Name (NE.singleton lempty)
 
-nlength :: Name a -> Int
-nlength = NE.length . labels
+-- See: https://datatracker.ietf.org/doc/html/rfc4034#section-3.1.3
+labelCount :: (Eq a, Label a) => Name a -> Int
+labelCount (Name ls) = length (NE.filter countLabel ls)
+  where
+    countLabel l
+      | l == lempty = False
+      | l == lwildcard = False
+      | otherwise = True
 
 (<|) :: a -> Name a -> Name a
 (<|) l (Name ls) = Name (l NE.<| ls)

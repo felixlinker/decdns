@@ -4,7 +4,7 @@ import qualified Data.ByteString as BS
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit
 
-import DNS.Name (Name, Named, (<|))
+import DNS.Name (Name, Named, (<|), labelCount)
 import DNS.Record
 import qualified DNS.RRSet as RRSet
 import qualified DNS.RecordType as T
@@ -39,7 +39,7 @@ allowsDNSSECAlongsideCNAME = do
   zone <- zoneFromList
     [ soa org
     , named alias (RData IN 300 (CNAME (mkName ["target", "example", "net", ""])))
-    , named alias (RData IN 300 (RRSIG T.CNAME RSASHA256 (length alias) 300 1 0 1 org (BS.pack [1, 2, 3]))) ]
+    , named alias (RData IN 300 (RRSIG T.CNAME RSASHA256 (labelCount alias) 300 1 0 1 org (BS.pack [1, 2, 3]))) ]
   wellformed zone @?= Nothing
   where
     org = mkName ["example", "com", ""]
@@ -149,7 +149,7 @@ allowsAncestorSigner = do
   zone <- zoneFromList
     [ soa org
     , named owner (RData IN 300 (A "192.0.2.1"))
-    , named owner (rrsig T.A (length owner) org) ]
+    , named owner (rrsig T.A (labelCount owner) org) ]
   wellformed zone @?= Nothing
   where
     org = mkName ["example", "com", ""]
@@ -160,7 +160,7 @@ rejectsSignerBelowOwner = do
   zone <- zoneFromList
     [ soa org
     , named owner (RData IN 300 (A "192.0.2.1"))
-    , named owner (rrsig T.A (length owner) ("signer" <| owner)) ]
+    , named owner (rrsig T.A (labelCount owner) ("signer" <| owner)) ]
   wellformed zone @?= Just "RRSIG has illegal signer name"
   where
     org = mkName ["example", "com", ""]
@@ -174,7 +174,7 @@ requiresSOASignerAtOwner = do
   wellformed invalid @?= Just "RRSIG has illegal signer name"
   where
     org = mkName ["example", "com", ""]
-    orgLs = length org
+    orgLs = labelCount org
     parent = mkName ["com", ""]
 
 requiresDNSKEYSignerAtOwner :: Assertion
@@ -187,7 +187,7 @@ requiresDNSKEYSignerAtOwner = do
   wellformed invalid @?= Just "RRSIG has illegal signer name"
   where
     org = mkName ["example", "com", ""]
-    orgLs = length org
+    orgLs = labelCount org
     owner = "key" <| org
 
 dnskey :: [DNSKeyFlag] -> RData
