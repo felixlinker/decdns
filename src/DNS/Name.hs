@@ -46,6 +46,9 @@ prependLabels ls (Name ls') = Name (NE.prependList ls ls')
 instance Functor Name where
   fmap f (Name ls) = Name (fmap f ls)
 
+instance Foldable Name where
+  foldr f acc (Name ls) = foldr f acc ls
+
 instance Show (Name String) where
   show (Name ls) =
     let l = NE.last ls

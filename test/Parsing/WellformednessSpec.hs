@@ -39,7 +39,7 @@ allowsDNSSECAlongsideCNAME = do
   zone <- zoneFromList
     [ soa org
     , named alias (RData IN 300 (CNAME (mkName ["target", "example", "net", ""])))
-    , named alias (RData IN 300 (RRSIG T.CNAME RSASHA256 3 300 1 0 1 org (BS.pack [1, 2, 3]))) ]
+    , named alias (RData IN 300 (RRSIG T.CNAME RSASHA256 (length alias) 300 1 0 1 org (BS.pack [1, 2, 3]))) ]
   wellformed zone @?= Nothing
   where
     org = mkName ["example", "com", ""]
@@ -149,7 +149,7 @@ allowsAncestorSigner = do
   zone <- zoneFromList
     [ soa org
     , named owner (RData IN 300 (A "192.0.2.1"))
-    , named owner (rrsig T.A org) ]
+    , named owner (rrsig T.A (length owner) org) ]
   wellformed zone @?= Nothing
   where
     org = mkName ["example", "com", ""]
@@ -160,7 +160,7 @@ rejectsSignerBelowOwner = do
   zone <- zoneFromList
     [ soa org
     , named owner (RData IN 300 (A "192.0.2.1"))
-    , named owner (rrsig T.A ("signer" <| owner)) ]
+    , named owner (rrsig T.A (length owner) ("signer" <| owner)) ]
   wellformed zone @?= Just "RRSIG has illegal signer name"
   where
     org = mkName ["example", "com", ""]
@@ -168,32 +168,34 @@ rejectsSignerBelowOwner = do
 
 requiresSOASignerAtOwner :: Assertion
 requiresSOASignerAtOwner = do
-  valid <- zoneFromList [soa org, named org (rrsig T.SOA org)]
-  invalid <- zoneFromList [soa org, named org (rrsig T.SOA parent)]
+  valid <- zoneFromList [soa org, named org (rrsig T.SOA orgLs org)]
+  invalid <- zoneFromList [soa org, named org (rrsig T.SOA orgLs parent)]
   wellformed valid @?= Nothing
   wellformed invalid @?= Just "RRSIG has illegal signer name"
   where
     org = mkName ["example", "com", ""]
+    orgLs = length org
     parent = mkName ["com", ""]
 
 requiresDNSKEYSignerAtOwner :: Assertion
 requiresDNSKEYSignerAtOwner = do
   valid <- zoneFromList
-    [ soa org, named owner (dnskey [ZoneKey]), named owner (rrsig T.DNSKEY owner) ]
+    [ soa org, named org (dnskey [ZoneKey]), named org (rrsig T.DNSKEY orgLs org) ]
   invalid <- zoneFromList
-    [ soa org, named owner (dnskey [ZoneKey]), named owner (rrsig T.DNSKEY org) ]
+    [ soa org, named org (dnskey [ZoneKey]), named org (rrsig T.DNSKEY orgLs owner) ]
   wellformed valid @?= Nothing
   wellformed invalid @?= Just "RRSIG has illegal signer name"
   where
     org = mkName ["example", "com", ""]
+    orgLs = length org
     owner = "key" <| org
 
 dnskey :: [DNSKeyFlag] -> RData
 dnskey flags = RData IN 300 (DNSKEY flags RSASHA256 (BS.pack [1, 2, 3]))
 
-rrsig :: T.Type -> Name String -> RData
-rrsig covered signer =
-  RData IN 300 (RRSIG covered RSASHA256 3 300 1 0 1 signer (BS.pack [1, 2, 3]))
+rrsig :: T.Type -> Int -> Name String -> RData
+rrsig covered ls signer =
+  RData IN 300 (RRSIG covered RSASHA256 ls 300 1 0 1 signer (BS.pack [1, 2, 3]))
 
 soa :: Name String -> Named String RRSet.RDataSet
 soa org = named org (RData IN 300 (SOA ns mailbox 1 2 3 4 5))

@@ -6,7 +6,7 @@ import Control.Applicative (asum)
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
 
-import DNS.Name
+import DNS.Name as N
 import DNS.ZoneFile
 import qualified DNS.RRSet as RRSet
 import DNS.Record
@@ -32,7 +32,9 @@ wellformed (Zone org r@(Tr.Node apexData rcs)) =
         , expect (checkZoneCuts org (Tr.Node RRSet.empty rcs)) "illegal record at or below zone cut"
         , expect (singletonTypes r) "more than one DNAME or CNAME record at owner name"
         , expect (wildcardRestrictions orgLabel r) "DNAME or NS wildcard record"
-        , expect (rrsigSignerName org r) "RRSIG has illegal signer name" ]
+        , expect (rrsigSignerName org r) "RRSIG has illegal signer name"
+        , expect (rrsigLabelCount org r) "RRSIG has illegal label count"
+        , expect (noDNSKEY (Tr.Node RRSet.empty rcs)) "DNSKEY with non-apex owner name" ]
   where
     orgLabel :: String
     orgLabel = NE.head $ labels org
@@ -98,3 +100,19 @@ rrsigSignerName = Tr.allNamed checkData
             T.DNSKEY -> signer == owner
             _ -> isSubDomain owner signer
         checkRRSIG _ = True
+
+rrsigLabelCount :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
+rrsigLabelCount = Tr.allNamed checkData
+  where
+    checkData :: Name String -> RRSet.RDataSet -> Bool
+    checkData owner = all checkRRSIG
+      where
+        checkRRSIG :: RData -> Bool
+        checkRRSIG (rtype -> sig@(RRSIG {})) = length owner == _labels sig
+        checkRRSIG _ = True
+
+noDNSKEY :: Tr.Node String RRSet.RDataSet -> Bool
+noDNSKEY = Tr.allNamed checkData N.root  -- Use N.root because implementation ignores name
+  where
+    checkData :: Name String -> RRSet.RDataSet -> Bool
+    checkData _ = not . hasType T.DNSKEY
