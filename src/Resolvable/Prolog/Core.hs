@@ -21,6 +21,7 @@ module Resolvable.Prolog.Core
   , renameFunctor
   , subterm
   , Rule(..)
+  , fact
   , mapRule
   , (Resolvable.Prolog.Core.^)
 
@@ -243,6 +244,9 @@ instance Functor Rule where
 instance Show (Rule a) where
   show (Rule _ h []) = show h ++ "."
   show (Rule _ h b) = show h ++ " :- " ++ intercalate ", " (map show b) ++ "."
+
+fact :: a -> Term -> Rule a
+fact ann h = Rule ann h []
 
 mapRule :: (Term -> Term) -> Rule a -> Rule a
 mapRule f (Rule a h b) = Rule a (f h) (map f b)

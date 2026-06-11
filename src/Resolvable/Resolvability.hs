@@ -17,8 +17,9 @@ import DNS.Record
 import qualified DNS.RecordType as T
 import DNS.ZoneFile
 
-import Util.Fresh (Fresh, fresh)
-import Control.Monad (void, guard)
+import Util.Fresh (Fresh)
+import Control.Monad (void)
+import DNS.SEC.Keys (keyTag)
 
 injectLast :: Term -> Term -> Term
 injectLast newLast t = case toView t of
@@ -45,16 +46,27 @@ data RComp = RComp
   , fromRecord :: ConstrainedRRSet }
   deriving (Eq, Ord)
 
-resolvableBase :: [Name String] -> Name String -> ConstrainedRRSet -> Fresh (Rule RComp)
+resolvableBase :: [Name String] -> Name String -> ConstrainedRRSet -> Fresh [Rule RComp]
 resolvableBase rootServers ns s@(Named n rds@((RData _ _ ty) NE.:| _)) = do
     (n', cs) <- L.nameWithSynthesis n
-    let annot = RComp ns s
-        -- TODO: Refine so that only root keys are trusted
-        -- Set the ad bit of DNSKEY entries stored at root servers to 1
-        adb = fromEnum (toType ty == T.DNSKEY && ns `elem` rootServers)
-    return (Rule annot
-      (L.resolves (L.nameTerm ns) (L.typeTerm ty) n' (L.rrsetTerm rds) (L.ad adb))
-      cs)
+    -- TODO: Refine so that only root keys are trusted
+    -- Set the ad bit of DNSKEY entries stored at root servers to 1
+    let isDNSKEY = toType ty == T.DNSKEY
+    let adb = L.ad $ fromEnum (isDNSKEY && ns `elem` rootServers)
+    let keytagFacts = if isDNSKEY
+        then map (keyTagFact . rtype) (NE.toList rds)
+        else []
+    return  ( Rule rann
+        (L.resolves (L.nameTerm ns) (L.typeTerm ty) n' (L.rrsetTerm rds) adb)
+        cs
+            : keytagFacts)
+    where
+      rann :: RComp
+      rann = RComp ns s
+
+      keyTagFact :: Type -> Rule RComp
+      keyTagFact d@(DNSKEY a b c) = fact rann (L.keyTag (L.dataTerm d) (TInt $ fromEnum (keyTag a b c)))
+      keyTagFact _ = undefined
 
 one :: Functor f => f a -> f [a]
 one = fmap return
@@ -184,7 +196,7 @@ fromZoneFile rootServers ns rs = concat <$> mapM zoneToRules rs
     zoneToRules z = concat <$> mapM rrsetToRules (allRRSets z)
 
     rrsetToRules :: ConstrainedRRSet -> Fresh [Rule RComp]
-    rrsetToRules r = (:) <$> resolvableBase rootServers ns r <*> resolvableStep rootServers ns r
+    rrsetToRules r = (++) <$> resolvableBase rootServers ns r <*> resolvableStep rootServers ns r
 
 type NameServersConfig = [(Name String, [Zone ConstrainedLabel])]
 
