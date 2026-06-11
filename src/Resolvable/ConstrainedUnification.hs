@@ -11,7 +11,7 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 
 import qualified Resolvable.Unification as U
-import Resolvable.Prolog
+import Resolvable.Prolog.Core
 import Control.Monad (guard)
 import Data.List (intercalate)
 import Data.Bifunctor (Bifunctor(bimap))

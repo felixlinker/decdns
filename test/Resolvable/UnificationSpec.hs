@@ -5,7 +5,7 @@ import Test.Tasty.HUnit (Assertion, assertFailure, testCase, (@?=))
 import Test.Tasty.QuickCheck
 import qualified Data.Map.Strict as M
 
-import Resolvable.Prolog
+import Resolvable.Prolog.Core
 import Resolvable.Unification (Unifier(..), apply, unify, unifies)
 import Resolvable.Util (genTermNoWildcard)
 

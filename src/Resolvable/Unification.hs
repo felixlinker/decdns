@@ -14,7 +14,7 @@ import qualified Data.Set as S
 import Data.List (intercalate)
 import Data.Maybe (fromMaybe, isJust, isNothing)
 
-import Resolvable.Prolog
+import Resolvable.Prolog.Core
 import Util.List (zipWithStrict)
 
 newtype Unifier = Unifier (M.Map Term Term)

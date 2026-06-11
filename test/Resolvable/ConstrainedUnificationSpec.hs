@@ -6,7 +6,7 @@ import Test.Tasty.QuickCheck
 import qualified Data.Set as S
 import Data.List (foldl')
 
-import Resolvable.Prolog (Term(..))
+import Resolvable.Prolog.Core (Term(..))
 import Resolvable.ConstrainedUnification
   ( ConstrainedUnifier(..)
   , addConstraint

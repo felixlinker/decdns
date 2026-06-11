@@ -17,7 +17,9 @@ import Data.Maybe (mapMaybe, fromMaybe)
 import NameConstraint
 import DNS.Name
 import Util.Fresh
-import Resolvable.Prolog
+import Resolvable.Prolog.Core
+import Resolvable.Prolog.TermView
+import qualified Resolvable.Prolog.Library as Lib
 import Resolvable.Resolvability
 import Resolvable.ConstrainedUnification
 import Resolvable.Unification (equivModuloRenaming)
@@ -92,14 +94,17 @@ deriveIf u q (Rule _ h b) = do
   u' <- extendUnifier q h u
   return (u', b)
 
+-- TODO: Refactor return type so that it returns rules. Resolvable queries are
+-- rules with an empty body, i.e., facts, and non-empty bodies indicate missing
+-- knowledge.
 computeResolvable :: [Name String] -> Fresh [Rule a] -> Fresh [ConstrainedQuery]
 computeResolvable rootServers rsM = do
   rs <- rsM
   qtyp <- TVar <$> fresh "QT"
   qname <- TVar <$> fresh "QN"
   return $ do
-    rootServer <- nameTerm <$> rootServers
-    let query = resolvable rootServer qtyp qname
+    rootServer <- Lib.nameTerm <$> rootServers
+    let query = Lib.resolvable rootServer qtyp qname
     u <- rec [] identity query rs
     return $ CQuery (apply u query) (constraints u)
   where

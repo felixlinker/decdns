@@ -7,7 +7,7 @@ import qualified Data.Set as S
 
 import DNS.Name
 import Resolvable.Dependencies
-import Resolvable.Prolog
+import Resolvable.Prolog.Core
 import Util.Fresh
 import qualified Resolvable.ConstrainedUnification as CU
 import qualified Resolvable.Unification as U

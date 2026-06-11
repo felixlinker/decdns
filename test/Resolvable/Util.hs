@@ -2,7 +2,7 @@ module Resolvable.Util
   ( genTermNoWildcard ) where
 
 import Test.Tasty.QuickCheck
-import Resolvable.Prolog (Term(..))
+import Resolvable.Prolog.Core (Term(..))
 import Util.Fresh (runFresh, fresh)
 
 names :: Gen String

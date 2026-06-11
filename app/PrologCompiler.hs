@@ -3,7 +3,7 @@ module PrologCompiler (main) where
 import DNS.ZoneFile (allRecords)
 import DNS.Diff
 import NameConstraint (toStandardRecord)
-import Resolvable.Prolog
+import Resolvable.Prolog.Core
 import Resolvable.Resolvability
 import Resolvable.Update.Resolvability
 import Resolvable.Update.Rollout (diffServers, Rollout, rollout)

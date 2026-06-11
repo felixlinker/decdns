@@ -41,7 +41,10 @@ library
       Parsing.ZoneFile
       Resolvable.ConstrainedUnification
       Resolvable.Dependencies
-      Resolvable.Prolog
+      Resolvable.Prolog.Core
+      Resolvable.Prolog.Library
+      Resolvable.Prolog.Symbols
+      Resolvable.Prolog.TermView
       Resolvable.Resolvability
       Resolvable.Unification
       Resolvable.Update.Dependencies
