@@ -44,8 +44,11 @@ updateDeps diffs ds = PO.filterLefts changed (PO.filterRights changed ds)
 
 type Rollout = [NSDiffs]
 
-rollout :: NSDiffs -> Dependencies ConstrainedName -> Dependencies ConstrainedName -> Rollout
-rollout diffs old = rollout' id diffs (PO.transitiveClosure $ PO.invert old) . PO.transitiveClosure
+rollout :: NSDiffs -> Dependencies ConstrainedName -> Dependencies ConstrainedName -> Maybe Rollout
+rollout diffs old new = do
+  old' <- PO.transitiveClosure $ PO.invert old
+  new' <- PO.transitiveClosure new
+  return $ rollout' id diffs old' new'
 -- Invert @old@ so that we only delete what no one depends on
 
 rollout' :: (Rollout -> Rollout) -> NSDiffs -> Dependencies ConstrainedName -> Dependencies ConstrainedName -> Rollout

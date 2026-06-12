@@ -6,6 +6,7 @@ module Util.PartialOrder
   , toAscList
   , fromList
   , rel
+  , minima
   , transitiveClosure
   , invert
   , insert
@@ -16,7 +17,9 @@ module Util.PartialOrder
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe (fromMaybe)
+import Data.List (partition)
 
+-- po maps a key to all elements that are smaller than the key
 newtype PartialOrder a = PartialOrder { po :: M.Map a (S.Set a) }
 
 empty :: PartialOrder a
@@ -34,23 +37,29 @@ fromList = foldr (uncurry insert . fmap S.singleton) empty
 rel :: Ord a => a -> PartialOrder a -> S.Set a
 rel a = fromMaybe S.empty . M.lookup a . po
 
-transitiveClosure :: forall a. Ord a => PartialOrder a -> PartialOrder a
-transitiveClosure (PartialOrder d) = PartialOrder $ uncurry go (M.toList <$> M.partition null d)
-  where
-    go :: M.Map a (S.Set a) -> [(a, S.Set a)] -> M.Map a (S.Set a)
-    go acc els
-      | null els = acc
-      | otherwise = uncurry go (foldr (uncurry . foldf) (acc, []) els)
+minima :: PartialOrder a -> [a]
+minima = map fst . filter (S.null . snd) . M.toList . po
 
-    foldf :: (a, S.Set a) -> M.Map a (S.Set a) -> [(a, S.Set a)] -> (M.Map a (S.Set a), [(a, S.Set a)])
-    foldf el@(k, vs) closure acc
-      | all closed vs =
-        let vs' = foldr (\v s -> maybe s (<> s) (M.lookup v closure)) vs vs
-        in (M.insert k vs' closure, acc)
-      | otherwise = (closure, el:acc)
+transitiveClosure :: forall a. Ord a => PartialOrder a -> Maybe (PartialOrder a)
+transitiveClosure (PartialOrder d) =
+  let (mins, recArg) = M.partition S.null d
+  in PartialOrder <$> rec (M.toList recArg) mins
+  where
+    rec :: [(a, S.Set a)] -> M.Map a (S.Set a) -> Maybe (M.Map a (S.Set a))
+    rec [] acc = Just acc
+    rec ls acc =
+      let (ready, recArg) = partition (all closed . snd) ls
+      in if null ready
+        then Nothing
+        else rec recArg (foldr foldf acc ready)
       where
         closed :: a -> Bool
-        closed a = M.member a closure || not (M.member a d)
+        closed a = M.member a acc || not (M.member a d)
+
+    foldf :: (a, S.Set a) -> M.Map a (S.Set a) -> M.Map a (S.Set a)
+    foldf (k, vs) acc =
+      let vs' = foldr (\v s -> maybe s (<> s) (M.lookup v acc)) vs vs
+      in M.insert k vs' acc
 
 invert :: Ord a => PartialOrder a -> PartialOrder a
 invert (PartialOrder m) = foldr (uncurry foldF) empty (M.toList m)

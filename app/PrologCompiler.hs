@@ -69,8 +69,10 @@ main = do
       let newDeps = runFresh $ fromRules <$> newRecsC
       let rolloutSeq = rollout nsDiff oldDeps newDeps
       unless (null rolloutSeq) $ do
-        putStrLn "\n% You can roll out updates as follow."
-        mapM_ putStrLn (showRollOut rolloutSeq)
+        putStrLn $ maybe
+          "Update introduces resolution cycle"
+          (unlines . ("\n% You can roll out updates as follow.":) . showRollOut)
+          rolloutSeq
     "dependencies" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
