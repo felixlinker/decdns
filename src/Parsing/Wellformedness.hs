@@ -36,7 +36,7 @@ wellformed (Zone org r@(Tr.Node apexData rcs)) =
         -- Ignore records at apex. Other records next to NSes are legal there.
         , expect (checkZoneCuts org (Tr.Node RRSet.empty rcs)) "illegal record at or below zone cut"
         , expect (singletonTypes r) "more than one DNAME or CNAME record at owner name"
-        , expect (wildcardRestrictions orgLabel r) "DNAME or NS wildcard record"
+        , expect (wildcardRestrictions orgLabel r) "DNAME, DS or NS wildcard record"
         , expect (rrsigSignerName org r) "RRSIG has illegal signer name"
         , expect (rrsigLabelCount org r) "RRSIG has illegal label count"
         , expect (noDNSKEY (Tr.Node RRSet.empty rcs)) "DNSKEY with non-apex owner name" ]
@@ -85,7 +85,7 @@ typesAllIn rd = RRSet.apply M.null . foldr (RRSet.modify . M.delete) rd
 
 wildcardRestrictions :: String -> Tr.Node String RRSet.RDataSet -> Bool
 wildcardRestrictions label (Tr.Node rs cs)
-  | label == "*" && M.null cs = all (`M.notMember` RRSet.rds rs) [T.DNAME, T.NS]
+  | label == "*" && M.null cs = all (`M.notMember` RRSet.rds rs) [T.DNAME, T.DS, T.NS]
   | otherwise = all (uncurry wildcardRestrictions) (M.toList cs)
 
 rrsigSignerName :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
