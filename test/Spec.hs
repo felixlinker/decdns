@@ -14,6 +14,7 @@ import qualified DNS.ZoneFile.PrintingSpec as ZoneFilePrintingSpec
 import qualified Parsing.WellformednessSpec as ParsingWellformednessSpec
 import qualified Parsing.ZoneFileSpec as ParsingZoneFileSpec
 import qualified Util.ListSpec as ListSpec
+import qualified Util.PartialOrderSpec as PartialOrderSpec
 import qualified Util.TreeSpec as TreeSpec
 import qualified Util.FreshSpec as FreshSpec
 
@@ -34,6 +35,7 @@ main =
       , ParsingZoneFileSpec.tests
       , ZoneFilePrintingSpec.tests
       , ListSpec.tests
+      , PartialOrderSpec.tests
       , TreeSpec.tests
       , FreshSpec.tests
       ]
