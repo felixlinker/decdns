@@ -25,9 +25,14 @@ expectNot p err = if p then Just err else Nothing
 wellformed :: Zone String -> Maybe String
 wellformed (Zone org r@(Tr.Node apexData rcs)) =
   asum  [ expectNot wildcardOrigin "zone origin has wildcard"
-        , expect hasSOA "zone misses SOA record"
+        , expect (hasType T.SOA apexData) "zone misses SOA record"
+        -- See: https://datatracker.ietf.org/doc/html/rfc4035#section-2.4
+        , expectNot (hasType T.DS apexData) "DS record at zone apex"
         , expect dnskeyFlags "DNSKEY flags miss zone key bit"
         , expect (checkCNAME org r) "CNAME record accompanied by records other than NSEC or RRSIG"
+        -- TODO: Below check is too restrictive. A name server serving this zone
+        -- may be the delegated name server, in which case there may be records
+        -- at or below the NS record.
         -- Ignore records at apex. Other records next to NSes are legal there.
         , expect (checkZoneCuts org (Tr.Node RRSet.empty rcs)) "illegal record at or below zone cut"
         , expect (singletonTypes r) "more than one DNAME or CNAME record at owner name"
@@ -41,9 +46,6 @@ wellformed (Zone org r@(Tr.Node apexData rcs)) =
 
     wildcardOrigin :: Bool
     wildcardOrigin = "*" == orgLabel
-
-    hasSOA :: Bool
-    hasSOA = M.member T.SOA (RRSet.rds apexData)
 
     dnskeyFlags :: Bool
     dnskeyFlags = all (all (checkFlag . rtype)) r
@@ -98,6 +100,7 @@ rrsigSignerName = Tr.allNamed checkData
           in case _typeCovered sig of
             T.SOA -> signer == owner
             T.DNSKEY -> signer == owner
+            T.DS -> signer /= owner &&  isSubDomain owner signer
             _ -> isSubDomain owner signer
         checkRRSIG _ = True
 

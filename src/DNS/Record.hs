@@ -68,11 +68,11 @@ showData (MX p n) = unwords [show p, show n]
 showData (SOA a b c d e f g) = unwords [show a, show b, show c, show d, show e, show f, show g]
 showData (DNSKEY flags algorithm publicKey) =
   unwords [show (dnsKeyFlagsToInt flags), "3", show algorithm, toB64 publicKey]
-showData (RRSIG typeCovered algorithm labelCount originalTTL signatureExpiration signatureInception tag signersName signature) =
+showData (RRSIG typeCovered algorithm lc originalTTL signatureExpiration signatureInception tag signersName signature) =
   unwords
     [ show typeCovered
     , show algorithm
-    , show labelCount
+    , show lc
     , show originalTTL
     , show signatureExpiration
     , show signatureInception
