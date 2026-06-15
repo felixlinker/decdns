@@ -52,6 +52,7 @@ resolvableBase rootServers ns s@(Named n rds@((RData _ _ ty) NE.:| _)) = do
     -- TODO: Refine so that only root keys are trusted
     -- Set the ad bit of DNSKEY entries stored at root servers to 1
     let isDNSKEY = toType ty == T.DNSKEY
+    -- TODO: At least also emit for 0
     let adb = L.ad $ fromEnum (isDNSKEY && ns `elem` rootServers)
     let keytagFacts = if isDNSKEY
         then map (keyTagFact . rtype) (NE.toList rds)
@@ -71,12 +72,12 @@ resolvableBase rootServers ns s@(Named n rds@((RData _ _ ty) NE.:| _)) = do
 one :: Functor f => f a -> f [a]
 one = fmap return
 
-foreach :: (Monad m, Traversable t) => (a -> m [b]) -> t a -> m [b]
-foreach f = fmap concat . mapM f
+foreach :: (Monad m, Traversable t) => t a -> (a -> m [b]) -> m [b]
+foreach t f = concat <$> mapM f t
 
 resolvableStep :: [Name String] -> Name String -> ConstrainedRRSet -> Fresh [Rule RComp]
 resolvableStep (map L.nameTerm -> rootServers) ns s@(Named n rs) =
-  foreach (\r -> foreach (`go` rtype r) rootServers) (NE.toList rs)
+  foreach (NE.toList rs) (\r -> foreach rootServers (`go` rtype r))
   where
     rannot :: RComp
     rannot = RComp ns s
@@ -95,13 +96,19 @@ resolvableStep (map L.nameTerm -> rootServers) ns s@(Named n rs) =
               (\glueType ->
                 Rule rannot (L.resolves nameServer t n' d (L.ad 0))
                   [ L.resolves delegatedNs t n' d (L.ad 0)
-                  , L.resolves rootServer glueType delegatedNs TWildcard TWildcard ])
+                  , L.resolves rootServer glueType delegatedNs TWildcard (L.ad 0) ])
               [L.aType, L.aaaaType]
-        , one $ do  -- Authenticated
-            (nTail, d) <- freshVars2 ("N", "D")
+        , one $ do  -- Authenticated not-DS
+            (nTail, t, d) <- freshVars3 ("N", "T", "D")
             let (captureListTail nTail -> n') = L.nameWithoutSynthesis n
-            return $ Rule rannot (L.resolves nameServer nTail n' d (L.ad 1))
-              [ L.resolves delegatedNs nTail n' d (L.ad 1) ] ]
+            return $ Rule rannot (L.resolves nameServer t n' d (L.ad 1))
+              [ t \= L.dsType
+              , L.resolves delegatedNs t n' d (L.ad 1) ]
+        , one $ do  -- Authenticated DS
+            (l, nTail, d) <- freshVars3 ("L", "N", "D")
+            let (injectLast l . captureListTail nTail -> n') = L.nameWithoutSynthesis n
+            return $ Rule rannot (L.resolves nameServer L.dsType n' d (L.ad 1))
+              [ L.resolves delegatedNs L.dsType n' d (L.ad 1) ] ]
       CNAME (L.nameTerm -> cname) -> sequence
         [ do  -- Unauthenticated
           (n', cs) <- L.nameWithSynthesis n
@@ -112,7 +119,8 @@ resolvableStep (map L.nameTerm -> rootServers) ns s@(Named n rs) =
           (n', cs) <- L.nameWithSynthesis n
           (t, d) <- freshVars2 ("T", "D")
           return $ Rule rannot (L.resolves nameServer t n' d (L.ad 1))
-            (cs ++  [ L.resolves nameServer L.cnameType (L.nameWithoutSynthesis n) (list [L.dataTerm r]) (L.ad 1)
+            (cs ++  [ t \= L.cnameType
+                          , L.resolves nameServer L.cnameType (L.nameWithoutSynthesis n) (list [L.dataTerm r]) (L.ad 1)
                           , L.resolves rootServer t cname d (L.ad 1) ]) ]
       DNAME (L.nameTerm -> dname) -> sequence
         [ do  -- Unauthenticated
@@ -155,9 +163,9 @@ resolvableStep (map L.nameTerm -> rootServers) ns s@(Named n rs) =
             (d, d_KEY, k, f) <- freshVars4 ("D", "D_KEY", "K", "F")
             dnskey <- L.dnskey f <$> freshVar "A" <*> return k
             return $ Rule rannot
-              (L.resolves nameServer L.dnskeyType n' d (L.ad 1))
+              (L.resolves nameServer (L.ttypeTerm cov) n' d (L.ad 1))
               (cs ++  [ L.resolves nameServer (L.ttypeTerm cov) n' d (L.ad 0)
-                            , L.resolves rootServer L.dnskeyType sigName d_KEY (L.ad 1)
+                            , L.resolves nameServer L.dnskeyType sigName d_KEY (L.ad 1)
                             , member dnskey d
                             , L.keyTag dnskey tag
                             , L.rrsigValid n' (L.ttypeTerm cov) ottl d ls sig k ])
