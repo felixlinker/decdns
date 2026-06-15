@@ -4,6 +4,7 @@ import qualified Data.ByteString as BS
 import Data.Functor.Identity (runIdentity)
 
 import DNS.Name (Named (name, value))
+import DNS.NameSpec (mkName)
 import DNS.Record (RData (rttl), Type (DNSKEY, DS))
 import DNS.SEC.Crypto (AlgorithmType (RSASHA256), DigestType (SHA256))
 import DNS.ZoneFile (allRecords, fromRecordList)
@@ -22,6 +23,7 @@ tests =
   testGroup
     "Parsing.ZoneFile"
     [ testCase "can parse a record for the root label" parsesRootRecord
+    , testCase "can parse a wildcard owner name" parsesWildcardOwner
     , testCase "parses $TTL and applies it to records without explicit TTL" parsesTTLDirective
     , testCase "parses omitted owner when line starts with IN" parsesOmittedOwnerStartingWithClass
     , testCase "backtracks to explicit owner when owner is IN" parsesExplicitOwnerNamedIN
@@ -35,6 +37,12 @@ parsesRootRecord = do
   let zone = ". IN 1200 A 192.0.2.1\n"
   rs <- either (fail . show) return =<< parseZoneFile "<test>" zone
   length rs @?= 1
+
+parsesWildcardOwner :: Assertion
+parsesWildcardOwner = do
+  let zone = "*.example.com. IN 1200 A 192.0.2.1\n"
+  records <- either (fail . show) return =<< parseZoneFile "<test>" zone
+  map name records @?= [mkName ["*", "example", "com", ""]]
 
 parsesTTLDirective :: Assertion
 parsesTTLDirective = do
