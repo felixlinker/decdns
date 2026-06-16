@@ -1,5 +1,4 @@
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TupleSections #-}
 module Resolvable.Update.Rollout
   ( NSDiffs
   , diffServers
@@ -47,10 +46,9 @@ type Rollout = [NSDiffs]
 
 rollout :: NSDiffs -> RecordDependencies -> RecordDependencies -> Maybe Rollout
 rollout diffs old new = do
-  old' <- PO.transitiveClosure old
-  new' <- PO.transitiveClosure $ PO.invert new
+  old' <- PO.transitiveClosure $ PO.invert old
+  new' <- PO.transitiveClosure new
   return $ rollout' id diffs old' new'
--- Invert @old@ so that we only delete what no one depends on
 
 rollout' :: (Rollout -> Rollout) -> NSDiffs -> RecordDependencies -> RecordDependencies -> Rollout
 rollout' acc (dropEmpty . M.map prune -> diffs) (updateDeps diffs -> old) (updateDeps diffs -> new)
