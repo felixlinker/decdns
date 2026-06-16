@@ -14,7 +14,7 @@ import qualified DNS.RecordType as T
 import qualified DNS.RRSet as RRSet
 import DNS.ZoneFile (emptyZone, get, insert, isEmpty, zoneName, singleton)
 import DNS.ZoneFileSpec (zoneFromList)
-import NameConstraint (LabelConstraint (..), exactly)
+import NameConstraint (LabelConstraint (..), compileWildcards, exactly)
 
 tests :: TestTree
 tests =
@@ -49,8 +49,8 @@ preservesNonRootOrigin = do
       n = "www" <| org
       oldZ = insert (emptyZone org) (Named n (mkData "192.0.2.1"))
       newZ = insert (emptyZone org) (Named n (mkData "192.0.2.2"))
-      dz = diff oldZ newZ
-  zoneName dz @?= org
+      dz = diff (compileWildcards oldZ) (compileWildcards newZ)
+  zoneName dz @?= exactly org
   hasChanges (exactly n) dz @?= True
 
 exactChangeDetection :: Assertion
@@ -58,7 +58,7 @@ exactChangeDetection = do
   let n = mkName ["db", "example", "com", ""]
       oldZ = emptyZone root
       newZ = singleton (Named n (mkData "198.51.100.1"))
-  let dz = diff oldZ newZ
+  let dz = diff (compileWildcards oldZ) (compileWildcards newZ)
   hasChanges (exactly n) dz @?= True
   hasChanges (exactly (mkName ["other", "example", "com", ""])) dz @?= False
 
@@ -68,7 +68,7 @@ wildcardChangeDetection = do
       bar = mkName ["bar", "example", "com", ""]
       oldZ = emptyZone root
   newZ <- zoneFromList [Named foo (mkData "203.0.113.1"), Named bar (mkData "203.0.113.2")]
-  let dz = diff oldZ newZ
+  let dz = diff (compileWildcards oldZ) (compileWildcards newZ)
       wildcard = Wildcard ["foo"] <| exactly (mkName ["example", "com", ""])
   hasChanges wildcard dz @?= True
 
