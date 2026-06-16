@@ -47,12 +47,9 @@ tests =
     , testCase "remove deletes an element and all references to it" $
         PO.toAscList (PO.remove 'b' (relations [("", 'a'), ("a", 'b'), ("ab", 'c')]))
           @?= [(S.empty, 'a'), (S.singleton 'a', 'c')]
-    , testCase "filterLefts filters only left elements" $
-        PO.toAscList (PO.filterLefts (/= 'b') (relations [("", 'a'), ("a", 'b'), ("ab", 'c')]))
-          @?= [(S.empty, 'a'), (S.singleton 'a', 'b'), (S.singleton 'a', 'c')]
-    , testCase "filterRights filters only right elements" $
-        PO.toAscList (PO.filterRights (/= 'b') (relations [("", 'a'), ("a", 'b'), ("ab", 'c')]))
-          @?= [(S.empty, 'a'), (S.fromList "ab", 'c')]
+    , testCase "filter" $
+        (PO.toAscList . PO.filter (/= 'b') <$> PO.transitiveClosure (relations [("", 'a'), ("a", 'b'), ("ab", 'c')]))
+          @?= Just [(S.empty, 'a'), (S.singleton 'a', 'c')]
     ]
 
 acyclicOrder :: PO.PartialOrder Char

@@ -14,8 +14,7 @@ module Util.PartialOrder
   , invert
   , insert
   , remove
-  , filterLefts
-  , filterRights ) where
+  , Util.PartialOrder.filter ) where
 
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -49,7 +48,7 @@ rel :: Ord a => a -> PartialOrder a -> S.Set a
 rel a = fromMaybe S.empty . M.lookup a . toSmaller
 
 minima :: Ord a => PartialOrder a -> S.Set a
-minima = S.fromAscList . map fst . filter (S.null . snd) . M.toAscList . toSmaller
+minima = S.fromAscList . map fst . Prelude.filter (S.null . snd) . M.toAscList . toSmaller
 
 transitiveClosure :: forall a. Ord a => PartialOrder a -> Maybe (PartialOrder a)
 transitiveClosure (PartialOrder d) =
@@ -84,8 +83,5 @@ insert vs k (PartialOrder m) = PartialOrder (M.alter (Just . maybe vs (vs <>)) k
 remove :: Ord a => a -> PartialOrder a -> PartialOrder a
 remove key (PartialOrder m) = PartialOrder $ M.map (S.delete key) $ M.delete key m
 
-filterLefts :: (a -> Bool) -> PartialOrder a -> PartialOrder a
-filterLefts p = PartialOrder . M.map (S.filter p) . toSmaller
-
-filterRights :: (a -> Bool) -> PartialOrder a -> PartialOrder a
-filterRights p = PartialOrder . M.filterWithKey (\k _ -> p k) . toSmaller
+filter :: (a -> Bool) -> PartialOrder a -> PartialOrder a
+filter p = PartialOrder . M.map (S.filter p) . M.filterWithKey (\k _ -> p k) . toSmaller
