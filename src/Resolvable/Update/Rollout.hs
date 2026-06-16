@@ -1,4 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TupleSections #-}
 module Resolvable.Update.Rollout
   ( NSDiffs
   , diffServers
@@ -20,11 +21,12 @@ import qualified Util.PartialOrder as PO
 import Util.Func
 import Data.Bifunctor (Bifunctor(bimap))
 import Data.Maybe (fromMaybe)
+import DNS.RRSet (RTypedSet(rds))
 
-canRollout :: Dependencies -> Name String -> Name String -> Bool
-canRollout (PO.toList -> deps) ns n = all (\(sml, lrg) -> S.null sml || not (matches lrg ns n)) deps
+canRollout :: RecordDependencies -> Name String -> ConstrainedName -> Bool
+canRollout deps ns n = S.null $ PO.smaller deps $ ResolvableAt (ns, n)
 
-type NSDiffs = M.Map (Name String) (ZoneDiff String)
+type NSDiffs = M.Map (Name String) (ZoneDiff ConstrainedLabel)
 
 diffServers :: NameServersConfig -> NameServersConfig -> NSDiffs
 diffServers old new = MM.merge
@@ -34,36 +36,34 @@ diffServers old new = MM.merge
   (M.fromList $ map (fmap toSingleZone) old)
   (M.fromList $ map (fmap toSingleZone) new)
   where
-    def :: Zone String
+    def :: Zone ConstrainedLabel
     def = emptyZone DNS.Name.root
 
-    toSingleZone :: [Zone ConstrainedLabel] -> Zone String
-    toSingleZone = foldr (mergeZones . fromMaybe def . fromList . map (mapLabels show) . allData) def
+    toSingleZone :: [Zone ConstrainedLabel] -> Zone ConstrainedLabel
+    toSingleZone = foldr (mergeZones . fromMaybe def . fromList . allData) def
 
-updateDeps :: NSDiffs -> Dependencies -> Dependencies
-updateDeps diffs = id
-  -- ds = PO.filterLefts changed (PO.filterRights changed ds)
-  -- where
-  --   changed :: Dependency -> Bool
-  --   -- (ResolvableAt (Named s q)) -- old arg
-  --   changed _ = maybe False (hasChanges q) $ M.lookup s diffs
+updateDeps :: NSDiffs -> RecordDependencies -> RecordDependencies
+updateDeps diffs = PO.filter changed
+  where
+    changed :: ResolvableAt -> Bool
+    changed (ResolvableAt (ns, qn)) = maybe False (hasChanges qn) (M.lookup ns diffs)
 
 type Rollout = [NSDiffs]
 
-rollout :: NSDiffs -> Dependencies -> Dependencies -> Maybe Rollout
+rollout :: NSDiffs -> RecordDependencies -> RecordDependencies -> Maybe Rollout
 rollout diffs old new = do
   old' <- PO.transitiveClosure $ PO.invert old
   new' <- PO.transitiveClosure new
   return $ rollout' id diffs old' new'
 -- Invert @old@ so that we only delete what no one depends on
 
-rollout' :: (Rollout -> Rollout) -> NSDiffs -> Dependencies -> Dependencies -> Rollout
-rollout' acc diffs (updateDeps diffs -> old) (updateDeps diffs -> new)
+rollout' :: (Rollout -> Rollout) -> NSDiffs -> RecordDependencies -> RecordDependencies -> Rollout
+rollout' acc (M.map prune -> diffs) (updateDeps diffs -> old) (updateDeps diffs -> new)
   | M.null diffs = acc []
-  | otherwise = let (changes, next) = partitionDiffs diffs
+  | otherwise = let (M.map prune -> changes, next) = partitionDiffs diffs
                 in  if null changes
                     -- TODO: Gracefully fail should no rollout be possible
-                    then error $ "no changes - rolled out so far: " ++ show (acc []) ++ "; remaining: " ++ show (map (fmap allData) $ M.toList next)
+                    then error "no changes"
                     else rollout' (acc . (changes :)) next old new
   where
     partitionDiffs :: NSDiffs -> (NSDiffs, NSDiffs)
@@ -74,5 +74,5 @@ rollout' acc diffs (updateDeps diffs -> old) (updateDeps diffs -> new)
     dropEmpty :: NSDiffs -> NSDiffs
     dropEmpty = M.filter (not . isEmpty)
 
-    partitionDiff :: Name String -> ZoneDiff String -> (ZoneDiff String, ZoneDiff String)
-    partitionDiff ns = bimap prune prune . partition (\n _ -> canRollout new ns n && canRollout old ns n)
+    partitionDiff :: Name String -> ZoneDiff ConstrainedLabel -> (ZoneDiff ConstrainedLabel, ZoneDiff ConstrainedLabel)
+    partitionDiff ns = partition (\n _ -> canRollout new ns n && canRollout old ns n)

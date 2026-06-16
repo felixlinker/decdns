@@ -46,7 +46,7 @@ data RComp = RComp
   , fromRecord :: ConstrainedRRSet }
   deriving (Eq, Ord)
 
-resolvableBase :: [Name String] -> Name String -> ConstrainedRRSet -> Fresh [Rule RComp]
+resolvableBase :: [Name String] -> Name String -> ConstrainedRRSet -> Fresh [Rule (Maybe RComp)]
 resolvableBase rootServers ns s@(Named n rds@((RData _ _ ty) NE.:| _)) = do
     (n', cs) <- L.nameWithSynthesis n
     -- TODO: Refine so that only root keys are trusted
@@ -62,10 +62,10 @@ resolvableBase rootServers ns s@(Named n rds@((RData _ _ ty) NE.:| _)) = do
         cs
             : keytagFacts)
     where
-      rann :: RComp
-      rann = RComp ns s
+      rann :: Maybe RComp
+      rann = Just (RComp ns s)
 
-      keyTagFact :: Type -> Rule RComp
+      keyTagFact :: Type -> Rule (Maybe RComp)
       keyTagFact d@(DNSKEY a b c) = fact rann (L.keyTag (L.dataTerm d) (TInt $ fromEnum (keyTag a b c)))
       keyTagFact _ = undefined
 
@@ -75,17 +75,17 @@ one = fmap return
 foreach :: (Monad m, Traversable t) => t a -> (a -> m [b]) -> m [b]
 foreach t f = concat <$> mapM f t
 
-resolvableStep :: [Name String] -> Name String -> ConstrainedRRSet -> Fresh [Rule RComp]
+resolvableStep :: [Name String] -> Name String -> ConstrainedRRSet -> Fresh [Rule (Maybe RComp)]
 resolvableStep (map L.nameTerm -> rootServers) ns s@(Named n rs) =
   foreach (NE.toList rs) (\r -> foreach rootServers (`go` rtype r))
   where
-    rannot :: RComp
-    rannot = RComp ns s
+    rannot :: Maybe RComp
+    rannot = Just $ RComp ns s
 
     nameServer :: Term
     nameServer = L.nameTerm ns
 
-    go :: Term -> Type -> Fresh [Rule RComp]
+    go :: Term -> Type -> Fresh [Rule (Maybe RComp)]
     go rootServer r = case r of
       NS (L.nameTerm -> delegatedNs) -> concat <$> sequence
         [ do  -- Unauthenticated
@@ -178,16 +178,16 @@ resolvableStep (map L.nameTerm -> rootServers) ns s@(Named n rs) =
       DS {} -> return []
       DNSKEY {} -> return []
 
-resolvableR :: Fresh (Rule ())
+resolvableR :: Fresh (Rule (Maybe RComp))
 resolvableR = do
   s <- freshVar "S"
   q <- freshVar "Q"
   n <- freshVar "N"
-  return $ Rule () (L.resolvable s q n) [ L.resolves s q n TWildcard (L.ad 0) ]
+  return $ Rule Nothing (L.resolvable s q n) [ L.resolves s q n TWildcard (L.ad 0) ]
 
-allResolvable :: Rule ()
+allResolvable :: Rule (Maybe RComp)
 allResolvable =
-  Rule () (TFunctor "all_resolvable" [ q, rns, ns ]) [ bagof n (L.resolvable rns q n) ns ]
+  Rule Nothing (TFunctor "all_resolvable" [ q, rns, ns ]) [ bagof n (L.resolvable rns q n) ns ]
   where
     q = TVar "Q"
     rns = TVar "RS"
@@ -197,21 +197,21 @@ allResolvable =
     bagof :: Term -> Term -> Term -> Term
     bagof a b c = TFunctor "bagof" [ a, b, c ]
 
-fromZoneFile :: [Name String] -> Name String -> [Zone ConstrainedLabel] -> Fresh [Rule RComp]
+fromZoneFile :: [Name String] -> Name String -> [Zone ConstrainedLabel] -> Fresh [Rule (Maybe RComp)]
 fromZoneFile rootServers ns rs = concat <$> mapM zoneToRules rs
   where
-    zoneToRules :: Zone ConstrainedLabel -> Fresh [Rule RComp]
+    zoneToRules :: Zone ConstrainedLabel -> Fresh [Rule (Maybe RComp)]
     zoneToRules z = concat <$> mapM rrsetToRules (allRRSets z)
 
-    rrsetToRules :: ConstrainedRRSet -> Fresh [Rule RComp]
+    rrsetToRules :: ConstrainedRRSet -> Fresh [Rule (Maybe RComp)]
     rrsetToRules r = (++) <$> resolvableBase rootServers ns r <*> resolvableStep rootServers ns r
 
 type NameServersConfig = [(Name String, [Zone ConstrainedLabel])]
 
-compileConfig :: [Name String] -> NameServersConfig -> Fresh [Rule RComp]
+compileConfig :: [Name String] -> NameServersConfig -> Fresh [Rule (Maybe RComp)]
 compileConfig rootServers = (concat <$>) . mapM (uncurry (fromZoneFile rootServers))
 
-plResolvable :: [Rule RComp] -> Fresh [Rule ()]
+plResolvable :: [Rule (Maybe RComp)] -> Fresh [Rule (Maybe RComp)]
 plResolvable compiled = do
   res <- resolvableR
-  return $ allResolvable : res : map void compiled
+  return $ allResolvable : res : compiled

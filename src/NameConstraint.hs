@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module NameConstraint
   ( LabelConstraint(..)
+  , matches
   , ConstrainedLabel
   , ConstrainedName
   , ConstrainedRecord
@@ -29,6 +30,12 @@ data LabelConstraint a = Wildcard [a] | Exactly a
 instance Label a => Label (LabelConstraint a) where
   lwildcard = Wildcard []
   lempty = Exactly lempty
+
+matches :: Ord a => LabelConstraint a -> LabelConstraint a -> Bool
+matches (Exactly l1) (Exactly l2) = l1 == l2
+matches (Wildcard ls) (Exactly l) = l `notElem` ls
+matches (Exactly l) (Wildcard ls) = l `notElem` ls
+matches (Wildcard _) (Wildcard _) = True
 
 instance Show ConstrainedLabel where
   show (Wildcard _) = "*"

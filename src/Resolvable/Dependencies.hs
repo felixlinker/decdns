@@ -1,9 +1,11 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
 module Resolvable.Dependencies
-  ( Dependency
+  ( ResolvableAt(..)
+  , Resolves(..)
   , matches
-  , Dependencies
+  , RecordDependencies
+  , RuleDependencies
   , ConstrainedQuery(..)
   , fromRules
   , computeResolvable ) where
@@ -20,15 +22,36 @@ import qualified Resolvable.ConstrainedUnification as CU
 import qualified Util.PartialOrder as PO
 import Data.List (uncons, partition)
 import Control.Arrow (Arrow(first))
+import Resolvable.Resolvability (RComp (RComp))
+import NameConstraint (ConstrainedName)
 
-newtype Dependency = Dependency (Term, Term, Term, Term)
+class FromRule t where
+  fromRule :: Rule (Maybe RComp) -> Maybe t
+
+newtype ResolvableAt = ResolvableAt (Name String, ConstrainedName)
   deriving (Eq, Ord)
 
-instance Show Dependency where
-  show (Dependency trip) = show trip
+instance FromRule ResolvableAt where
+  fromRule = fmap fromAnnot . rannotation
 
-matches :: Dependency -> Name String -> Name String -> Bool
-matches (Dependency (nsT, nT, _, _)) ns n = unifies (list [nsT, nT]) (list [nameTerm ns, nameTerm n])
+fromAnnot :: RComp -> ResolvableAt
+fromAnnot (RComp ns (name -> owner)) = ResolvableAt (ns, owner)
+
+newtype Resolves = Resolves (Term, Term, Term, Term)
+  deriving (Eq, Ord)
+
+instance Show Resolves where
+  show (Resolves trip) = show trip
+
+fromTerm :: Term -> Maybe Resolves
+fromTerm (toView -> TVResolves ns t n _ auth) = Just $ Resolves (canon ns, canon t, canon n, auth)
+fromTerm _ = Nothing
+
+instance FromRule Resolves where
+  fromRule = fromTerm . rhead
+
+matches :: Resolves -> Name String -> Name String -> Bool
+matches (Resolves (nsT, nT, _, _)) ns n = unifies (list [nsT, nT]) (list [nameTerm ns, nameTerm n])
 
 canon :: Term -> Term
 canon = replace aux
@@ -37,32 +60,27 @@ canon = replace aux
     aux (TVar _) = TWildcard
     aux t = t
 
-fromResolves :: Term -> Maybe Dependency
-fromResolves (toView -> TVResolves ns t n _ auth) = Just $ Dependency (canon ns, canon t, canon n, auth)
-fromResolves _ = Nothing
+type RecordDependencies = PO.PartialOrder ResolvableAt
 
-fromRule :: Rule a -> Maybe Dependency
-fromRule (Rule _ h _) = fromResolves h
+type RuleDependencies = PO.PartialOrder Resolves
 
-type Dependencies = PO.PartialOrder Dependency
-
-instance Show Dependencies where
+instance Show RuleDependencies where
   show po = unlines (map (\(l, r) -> show l ++ " < " ++ show r) (PO.toFlatList po))
 
-match :: Rule a -> Rule b -> Maybe (Dependency, Dependency)
-match (Rule _ h@(toView -> TVResolves {}) b) r@(Rule _ h'@(toView -> TVResolves {}) _) = do
+match :: FromRule a => Rule (Maybe RComp) -> Rule (Maybe RComp) -> Maybe (a, a)
+match rs@(Rule _ (toView -> TVResolves {}) b) rl@(Rule _ h'@(toView -> TVResolves {}) _) = do
   (u, _) <- uncons $ mapMaybe (`unify` h') b
   -- Check whether there are any inequalities that prevent unification immediately
-  _ <- CU.applyRule (CU.fromUnifier u) r
-  larger <- fromResolves h
-  smaller <- fromResolves h'
+  _ <- CU.applyRule (CU.fromUnifier u) rl
+  larger <- fromRule rl
+  smaller <- fromRule rs
   return (smaller, larger)
 match _ _ = Nothing
 
-fromRules :: [Rule a] -> Dependencies
+fromRules :: (FromRule a, Ord a) => [Rule (Maybe RComp)] -> PO.PartialOrder a
 fromRules rs = go rs PO.empty
   where
-    go :: [Rule a] -> Dependencies -> Dependencies
+    go :: (FromRule a, Ord a) => [Rule (Maybe RComp)] -> PO.PartialOrder a -> PO.PartialOrder a
     go [] acc = acc
     go (r:rrec) acc =
       let els = mapMaybe (match r) rs
@@ -98,18 +116,15 @@ solveBody rs (Rule _ h b) = map (\u -> CQuery (CU.apply u h) (CU.constraints u))
       _ -> rec choices recArg
 
 -- TODO: Use Except monad transformer
-computeResolvable :: [Rule a] -> Maybe [ConstrainedQuery]
+computeResolvable :: [Rule (Maybe RComp)] -> Maybe [ConstrainedQuery]
 computeResolvable (filter (isResolves . rhead) -> rs) = do
   ord <- PO.transitiveClosure $ fromRules rs
   return $ rec ord rs []
   where
-    rec :: Dependencies -> [Rule a] -> [ConstrainedQuery] -> [ConstrainedQuery]
+    rec :: RuleDependencies -> [Rule (Maybe RComp)] -> [ConstrainedQuery] -> [ConstrainedQuery]
     rec _ [] acc = acc
     rec ord toSolve acc =
-      let (mins, recArg) = partition minimal toSolve
+      let (mins, recArg) = partition (maybe False (PO.minimal ord) . fromRule) toSolve
       in  if null mins
             then error "non-termination"
             else rec (foldr (maybe id PO.remove . fromRule) ord mins) recArg (concatMap (solveBody acc) mins ++ acc)
-      where
-        minimal :: Rule a -> Bool
-        minimal r = maybe False (S.null . (`PO.rel` ord)) (fromRule r)

@@ -8,8 +8,9 @@ module Util.PartialOrder
   , toFlatList
   , toAscList
   , fromList
-  , rel
+  , smaller
   , minima
+  , minimal
   , transitiveClosure
   , invert
   , insert
@@ -44,11 +45,14 @@ toAscList = map swap . M.toAscList . toSmaller
 fromList :: Ord a => [(a, a)] -> PartialOrder a
 fromList = foldr (uncurry insert . first S.singleton) empty
 
-rel :: Ord a => a -> PartialOrder a -> S.Set a
-rel a = fromMaybe S.empty . M.lookup a . toSmaller
+smaller :: Ord a => PartialOrder a -> a -> S.Set a
+smaller po a = fromMaybe S.empty $ M.lookup a (toSmaller po)
 
 minima :: Ord a => PartialOrder a -> S.Set a
 minima = S.fromAscList . map fst . Prelude.filter (S.null . snd) . M.toAscList . toSmaller
+
+minimal :: Ord a => PartialOrder a -> a -> Bool
+minimal po = S.null . smaller po
 
 transitiveClosure :: forall a. Ord a => PartialOrder a -> Maybe (PartialOrder a)
 transitiveClosure (PartialOrder d) =

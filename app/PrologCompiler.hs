@@ -2,12 +2,12 @@ module PrologCompiler (main) where
 
 import DNS.ZoneFile (allRecords)
 import DNS.Diff
-import NameConstraint (toStandardRecord)
+import NameConstraint (toStandardRecord, ConstrainedLabel)
 import Resolvable.Prolog.Core
 import Resolvable.Resolvability
 import Resolvable.Update.Resolvability
 import Resolvable.Update.Rollout (diffServers, Rollout, rollout)
-import Resolvable.Dependencies ( computeResolvable, fromRules )
+import Resolvable.Dependencies ( computeResolvable, fromRules, RuleDependencies )
 import Util.Fresh (runFresh)
 import qualified Util.PartialOrder as PO
 
@@ -78,7 +78,7 @@ main = do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
       compiled <- runFresh . compileConfig rootServers <$> mapM parseZoneFileZones zones
-      let deps = fromRules compiled
+      let deps = fromRules compiled :: RuleDependencies
       when (isNothing $ PO.transitiveClosure deps)
         (putStrLn "% Dependencies cyclic")
       print deps
@@ -87,7 +87,6 @@ main = do
       mapM_ print parsed
     _ -> fail "unknown command"
   where
-
     popArg :: [String] -> IO (String, [String])
     popArg = maybe (fail "too few arguments") return . uncons
 
@@ -96,7 +95,7 @@ main = do
       (i, ds) <- zip [(1 :: Int)..] r
       ("step " ++ show i) : M.foldrWithKey (\ns d -> (showNSDiffs ns d ++)) [] ds
 
-    showNSDiffs :: Name String -> ZoneDiff String -> [String]
+    showNSDiffs :: Name String -> ZoneDiff ConstrainedLabel -> [String]
     showNSDiffs ns d =
         map indent
       $ ("on server " ++ show ns ++ " roll out:")

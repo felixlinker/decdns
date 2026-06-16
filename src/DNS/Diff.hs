@@ -68,20 +68,15 @@ diff (fmap deleted -> Zone oldOrg oldRs) (fmap added -> Zone newOrg newRs) =
     true :: a -> Bool
     true = const True
 
-hasChanges :: (Label a, Ord a) => Name (LabelConstraint a) -> ZoneDiff a -> Bool
-hasChanges n (Zone org ns) = case pathInZone (exactly org) n of
+hasChanges :: (Label a, Ord a) => Name (LabelConstraint a) -> ZoneDiff (LabelConstraint a) -> Bool
+hasChanges n (Zone org ns) = case pathInZone org n of
   Path _ [] p -> go p ns
   _ -> False
   where
-    go :: (Label a, Ord a) => [LabelConstraint a] -> T.Node a RDataSetDiff -> Bool
+    go :: (Label a, Ord a) => [LabelConstraint a] -> T.Node (LabelConstraint a) RDataSetDiff -> Bool
     go [] (T.Node is _) = not $ null is
-    go [Wildcard ls] node@(T.Node _ cs) =
-          -- Either there is a wildcard label with changes
-          rec lwildcard [] node
-          -- Or there is a label matched by the wildcard with changes
-      ||  any (\(l, T.item -> is) -> not (null is) && notElem l ls) (M.toList cs)
-    go (Wildcard _ : _) _ = undefined  -- Cannot have wildcard within a name
-    go (Exactly l : t) node = rec l t node
+    go [l@(Wildcard _)] (T.Node _ cs) = any (matches l) (M.keysSet cs)
+    go (l : t) node = rec l t node
 
-    rec :: (Label a, Ord a) => a -> [LabelConstraint a] -> T.Node a RDataSetDiff -> Bool
+    rec :: (Label a, Ord a) => LabelConstraint a -> [LabelConstraint a] -> T.Node (LabelConstraint a) RDataSetDiff -> Bool
     rec l r (T.Node _ cs) = maybe False (go r) (M.lookup l cs)

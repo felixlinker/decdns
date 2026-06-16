@@ -11,8 +11,9 @@ import Util.Fresh
 import qualified Resolvable.ConstrainedUnification as CU
 import qualified Resolvable.Unification as U
 import Data.Bifunctor (Bifunctor(bimap))
+import Resolvable.Resolvability (RComp)
 
-computeRegressions :: Fresh [Rule a] -> Fresh [Rule a] -> Fresh [ConstrainedQuery]
+computeRegressions :: Fresh [Rule (Maybe RComp)] -> Fresh [Rule (Maybe RComp)] -> Fresh [ConstrainedQuery]
 computeRegressions oldf newf = do
   (old, new) <- ((,) . computeResolvable <$> oldf) <*> (computeResolvable <$> newf)
   return $ do  -- Enter list monad

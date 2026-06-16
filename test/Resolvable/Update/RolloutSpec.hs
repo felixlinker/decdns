@@ -20,19 +20,19 @@ tests =
       -- , testProperty "removing one TXT record can be rolled out immediately" propImmediateTxtDelete
     ]
 
-propImmediateTxtAdd :: ZS.ArbZone -> Property
-propImmediateTxtAdd (ZS.ArbZone z _) =
-  forAll (freshTxtFor z) $ \txt ->
-    let z' = insert z (fmap RRSet.singleton txt)
-        diffs = M.singleton (zoneName z) (diff z z')
-    in rollout diffs PO.empty PO.empty === Just [diffs]
+-- propImmediateTxtAdd :: ZS.ArbZone -> Property
+-- propImmediateTxtAdd (ZS.ArbZone z _) =
+--   forAll (freshTxtFor z) $ \txt ->
+--     let z' = insert z (fmap RRSet.singleton txt)
+--         diffs = M.singleton (zoneName z) (diff z z')
+--     in rollout diffs PO.empty PO.empty === Just [diffs]
 
-propImmediateTxtDelete :: ZS.ArbZone -> Property
-propImmediateTxtDelete (ZS.ArbZone z _) =
-  forAll (freshTxtFor z) $ \txt ->
-    let zWithTxt = insert z (fmap RRSet.singleton txt)
-        diffs = M.singleton (zoneName zWithTxt) (diff zWithTxt z)
-    in rollout diffs PO.empty PO.empty === Just [diffs]
+-- propImmediateTxtDelete :: ZS.ArbZone -> Property
+-- propImmediateTxtDelete (ZS.ArbZone z _) =
+--   forAll (freshTxtFor z) $ \txt ->
+--     let zWithTxt = insert z (fmap RRSet.singleton txt)
+--         diffs = M.singleton (zoneName zWithTxt) (diff zWithTxt z)
+--     in rollout diffs PO.empty PO.empty === Just [diffs]
 
 freshTxtFor :: Zone String -> Gen StandardRecord
 freshTxtFor z =

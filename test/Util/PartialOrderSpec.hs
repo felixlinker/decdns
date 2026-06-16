@@ -19,10 +19,10 @@ tests =
     , testCase "fromList combines pairs with the same right element" $
         PO.toAscList (PO.fromList [('a', 'b'), ('c', 'b'), ('a', 'd')])
           @?= [(S.fromList "ac", 'b'), (S.singleton 'a', 'd')]
-    , testCase "rel returns known relations and defaults to empty" $ do
+    , testCase "smaller returns known relations and defaults to empty" $ do
         let order = relations [("ac", 'b')]
-        PO.rel 'b' order @?= S.fromList "ac"
-        PO.rel 'x' order @?= S.empty
+        PO.smaller order 'b' @?= S.fromList "ac"
+        PO.smaller order 'x' @?= S.empty
     , testCase "minima returns present elements with no smaller elements" $
         PO.minima (relations [("b", 'c'), ("", 'a'), ("a", 'b')]) @?= S.fromList "a"
     , testCase "transitiveClosure adds all transitively smaller elements" $
