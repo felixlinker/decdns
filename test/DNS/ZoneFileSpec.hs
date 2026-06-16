@@ -39,6 +39,8 @@ tests =
     , testProperty "getting data set on an empty zone returns that data" propSetGetRoundTrip
     , testProperty "pruning setting an empty array results in an empty tree" propPruningSetEmpty
     , testProperty "inserting two records is commutative" propInsertCommutative
+    , testCase "merging two zones keeps records from both zones" mergeZonesKeepsBothZones
+    , testProperty "merging two zones is commutative" propMergeZonesCommutative
     , testProperty "constructing a zone from its list of records preserves the zone" propAllDataFromListRoundtrip
     , testProperty "path computation can be inverted" propPathComputation
     ]
@@ -76,6 +78,24 @@ propInsertCommutative =
   where
     mkZone :: StandardRecord -> StandardRecord -> Zone String
     mkZone r1 = insert (singleton (fmap RRSet.singleton r1)) . fmap RRSet.singleton
+
+propMergeZonesCommutative :: Property
+propMergeZonesCommutative =
+  forAll genZone $ \z1 ->
+    forAll genZone $ \z2 ->
+      normalizeZone (mergeZones z1 z2) === normalizeZone (mergeZones z2 z1)
+
+mergeZonesKeepsBothZones :: Assertion
+mergeZonesKeepsBothZones = do
+  let parent = "b" <| N.root
+      child = "a" <| parent
+      parentData = RData IN 100 (TXT "parent")
+      childData = RData IN 200 (TXT "child")
+      parentRecord = Named parent parentData
+      childRecord = Named child childData
+  parentZone <- zoneFromList [named parent parentData]
+  childZone <- zoneFromList [named child childData]
+  normalizeZone (mergeZones parentZone childZone) @?= sort [parentRecord, childRecord]
 
 propAllDataFromListRoundtrip :: Property
 propAllDataFromListRoundtrip =

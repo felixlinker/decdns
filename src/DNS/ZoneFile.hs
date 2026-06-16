@@ -120,8 +120,7 @@ pathInZone (Name (NE.reverse -> (orgr NE.:| org))) (Name (NE.reverse -> (nr NE.:
 mergeZones :: (Label a, Ord a) => Zone a -> Zone a -> Zone a
 mergeZones (Zone org1 t1) (Zone org2 t2) = case pathInZone org1 org2 of
   Path org1' p1 p2 -> Zone org1'
-    $ T.insertNode p2 t2
-    $ T.insertNode p1 t1 T.emptyNode
+    $ T.merge (T.prepend p1 t1) (T.prepend p2 t2)
 
 insert :: (Label a, Ord a, Monoid (t b)) => AZone a t b -> Named a (t b) -> AZone a t b
 insert (Zone norg zroot) (Named n d) = case pathInZone norg n of
