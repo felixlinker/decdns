@@ -18,6 +18,7 @@ import qualified DNS.RecordType as T
 import DNS.ZoneFile
 
 import Util.Fresh (Fresh)
+import Util.Monad
 import DNS.SEC.Keys (keyTag)
 
 injectLast :: Term -> Term -> Term
@@ -68,15 +69,9 @@ resolvableBase rootServers ns s@(Named n rds@((RData _ _ ty) NE.:| _)) = do
       keyTagFact d@(DNSKEY a b c) = fact rann (L.keyTag (L.dataTerm d) (TInt $ fromEnum (keyTag a b c)))
       keyTagFact _ = undefined
 
-one :: Functor f => f a -> f [a]
-one = fmap return
-
-foreach :: (Monad m, Traversable t) => t a -> (a -> m [b]) -> m [b]
-foreach t f = concat <$> mapM f t
-
 resolvableStep :: [Name String] -> Name String -> ConstrainedRRSet -> Fresh [Rule (Maybe RComp)]
 resolvableStep (map L.nameTerm -> rootServers) ns s@(Named n rs) =
-  foreach (NE.toList rs) (\r -> foreach rootServers (`go` rtype r))
+  foreachM (NE.toList rs) (\r -> foreachM rootServers (`go` rtype r))
   where
     rannot :: Maybe RComp
     rannot = Just $ RComp ns s

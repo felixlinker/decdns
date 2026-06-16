@@ -57,6 +57,7 @@ library
       Util.Fresh
       Util.Func
       Util.List
+      Util.Monad
       Util.PartialOrder
       Util.Tree
   other-modules:

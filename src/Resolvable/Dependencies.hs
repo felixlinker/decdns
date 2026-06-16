@@ -11,7 +11,7 @@ module Resolvable.Dependencies
   , computeResolvable ) where
 
 import qualified Data.Set as S
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, maybeToList)
 
 import Resolvable.Prolog.Core
 import Resolvable.Prolog.TermView
@@ -95,8 +95,8 @@ toRule (CQuery q (S.toList -> neqs)) = Rule () q (map (uncurry (\=)) neqs)
 instance Show ConstrainedQuery where
   show = show . toRule
 
-extendAndMerge :: CU.ConstrainedUnifier -> Term -> ConstrainedQuery -> Maybe CU.ConstrainedUnifier
-extendAndMerge cu t (CQuery t' neqs) = do
+extendAndMerge :: Term -> ConstrainedQuery -> CU.ConstrainedUnifier -> Maybe CU.ConstrainedUnifier
+extendAndMerge t (CQuery t' neqs) cu = do
   cu' <- CU.extendUnifier t t' cu
   foldr ((=<<) . uncurry CU.addConstraint) (Just cu') neqs
 
@@ -107,13 +107,16 @@ solveBody rs (Rule _ h b) = map (\u -> CQuery (CU.apply u h) (CU.constraints u))
     rec choices [] = choices
     rec choices (t:recArg) = case toView t of
       TVNeq t1 t2 -> rec (mapMaybe (CU.addConstraint t1 t2) choices) recArg
-      TVResolves {} ->
-        let unified = concatMap (\u -> mapMaybe (extendAndMerge u t) rs) choices
-        in rec unified recArg
-      -- TODO:
-      TVMember {} -> rec choices recArg
+      TVResolves {} -> rec (extendChoicesWith (extendAndMerge t) rs) recArg
+      TVMember x l -> maybe
+        (error "variable list for non-deterministic choice")
+        (extendChoicesWith (CU.extendUnifier x))
+        (collectList l)
       -- This drops unsupported predicates, implicitly assuming that they are true
       _ -> rec choices recArg
+      where
+        extendChoicesWith :: (a -> CU.ConstrainedUnifier -> Maybe CU.ConstrainedUnifier) -> [a] -> [CU.ConstrainedUnifier]
+        extendChoicesWith f as = concatMap (\u -> mapMaybe (`f` u) as) choices
 
 -- TODO: Use Except monad transformer
 computeResolvable :: [Rule (Maybe RComp)] -> Maybe [ConstrainedQuery]

@@ -39,6 +39,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Char (toLower, toUpper)
 import Data.Semigroup (Semigroup(..), sconcat)
 import Data.Tuple (swap)
+import Data.Maybe (isNothing)
 
 infixFunctors :: [String]
 infixFunctors =
@@ -123,8 +124,11 @@ collectListWithTail = swap . rec
     rec TEmptyList = (Nothing, [])
     rec t = (Just t, [])
 
-collectList :: Term -> [Term]
-collectList = fst . collectListWithTail
+collectList :: Term -> Maybe [Term]
+collectList t =
+  let (l, mt) = collectListWithTail t
+  -- Enforce that tail is empty
+  in if isNothing mt then Just l else Nothing
 
 listWithTail :: [Term] -> Term -> Term
 listWithTail xs t = go xs
