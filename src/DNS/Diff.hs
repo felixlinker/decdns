@@ -75,7 +75,7 @@ hasChanges n (Zone org ns) = case pathInZone org n of
   where
     go :: (Label a, Ord a) => [LabelConstraint a] -> T.Node (LabelConstraint a) RDataSetDiff -> Bool
     go [] (T.Node is _) = not $ null is
-    go [l@(Wildcard _)] (T.Node _ cs) = any (matches l) (M.keysSet cs)
+    go [l] (T.Node _ cs) = any (matches l) (M.keysSet cs)
     go (l : t) node = rec l t node
 
     rec :: (Label a, Ord a) => LabelConstraint a -> [LabelConstraint a] -> T.Node (LabelConstraint a) RDataSetDiff -> Bool
