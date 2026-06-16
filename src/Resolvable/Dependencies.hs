@@ -68,10 +68,10 @@ instance Show RuleDependencies where
   show po = unlines (map (\(l, r) -> show l ++ " < " ++ show r) (PO.toFlatList po))
 
 match :: FromRule a => Rule (Maybe RComp) -> Rule (Maybe RComp) -> Maybe (a, a)
-match rs@(Rule _ (toView -> TVResolves {}) b) rl@(Rule _ h'@(toView -> TVResolves {}) _) = do
+match rl@(Rule _ (toView -> TVResolves {}) b) rs@(Rule _ h'@(toView -> TVResolves {}) _) = do
   (u, _) <- uncons $ mapMaybe (`unify` h') b
   -- Check whether there are any inequalities that prevent unification immediately
-  _ <- CU.applyRule (CU.fromUnifier u) rl
+  _ <- CU.applyRule (CU.fromUnifier u) rs
   larger <- fromRule rl
   smaller <- fromRule rs
   return (smaller, larger)
