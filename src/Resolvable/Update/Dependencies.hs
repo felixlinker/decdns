@@ -2,7 +2,7 @@
 module Resolvable.Update.Dependencies
   ( computeRegressions ) where
 
-import Data.Maybe (fromMaybe, isNothing, mapMaybe, maybeToList)
+import Data.Maybe (fromMaybe, isNothing, mapMaybe)
 import qualified Data.Set as S
 
 import Resolvable.Dependencies
@@ -12,13 +12,15 @@ import qualified Resolvable.ConstrainedUnification as CU
 import qualified Resolvable.Unification as U
 import Data.Bifunctor (Bifunctor(bimap))
 import Resolvable.Resolvability (RComp)
+import Util.Monad (abortOnError)
 
 computeRegressions :: Fresh [Rule (Maybe RComp)] -> Fresh [Rule (Maybe RComp)] -> Fresh [ConstrainedQuery]
 computeRegressions oldf newf = do
   (old, new) <- ((,) . computeResolvable <$> oldf) <*> (computeResolvable <$> newf)
   return $ do  -- Enter list monad
-      q <- fromMaybe [] old
-      new' <- maybeToList new
+      old' <- abortOnError old
+      q <- old'
+      new' <- abortOnError new
       let mappings = map (matchDelta q) new'
       if all isNothing mappings
         then [q]

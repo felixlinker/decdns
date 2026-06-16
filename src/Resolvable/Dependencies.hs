@@ -11,7 +11,7 @@ module Resolvable.Dependencies
   , computeResolvable ) where
 
 import qualified Data.Set as S
-import Data.Maybe (mapMaybe, maybeToList)
+import Data.Maybe (mapMaybe)
 
 import Resolvable.Prolog.Core
 import Resolvable.Prolog.TermView
@@ -24,6 +24,9 @@ import Data.List (uncons, partition)
 import Control.Arrow (Arrow(first))
 import Resolvable.Resolvability (RComp (RComp))
 import NameConstraint (ConstrainedName)
+import Control.Monad.Trans.Except (Except, throwE)
+import Util.Monad (exceptMaybe)
+import Control.Monad (when)
 
 class FromRule t where
   fromRule :: Rule (Maybe RComp) -> Maybe t
@@ -100,18 +103,17 @@ extendAndMerge t (CQuery t' neqs) cu = do
   cu' <- CU.extendUnifier t t' cu
   foldr ((=<<) . uncurry CU.addConstraint) (Just cu') neqs
 
-solveBody :: [ConstrainedQuery] -> Rule a -> [ConstrainedQuery]
-solveBody rs (Rule _ h b) = map (\u -> CQuery (CU.apply u h) (CU.constraints u)) (rec [CU.identity] b)
+solveBody :: [ConstrainedQuery] -> Rule a -> Except String [ConstrainedQuery]
+solveBody rs (Rule _ h b) = map (\u -> CQuery (CU.apply u h) (CU.constraints u)) <$> rec [CU.identity] b
   where
-    rec :: [CU.ConstrainedUnifier] -> [Term] -> [CU.ConstrainedUnifier]
-    rec choices [] = choices
+    rec :: [CU.ConstrainedUnifier] -> [Term] -> Except String [CU.ConstrainedUnifier]
+    rec choices [] = return choices
     rec choices (t:recArg) = case toView t of
       TVNeq t1 t2 -> rec (mapMaybe (CU.addConstraint t1 t2) choices) recArg
       TVResolves {} -> rec (extendChoicesWith (extendAndMerge t) rs) recArg
-      TVMember x l -> maybe
-        (error "variable list for non-deterministic choice")
-        (extendChoicesWith (CU.extendUnifier x))
-        (collectList l)
+      TVMember x l -> do
+        l' <- exceptMaybe "variable list for non-deterministic choice" (collectList l)
+        return $ extendChoicesWith (CU.extendUnifier x) l'
       -- This drops unsupported predicates, implicitly assuming that they are true
       _ -> rec choices recArg
       where
@@ -119,15 +121,16 @@ solveBody rs (Rule _ h b) = map (\u -> CQuery (CU.apply u h) (CU.constraints u))
         extendChoicesWith f as = concatMap (\u -> mapMaybe (`f` u) as) choices
 
 -- TODO: Use Except monad transformer
-computeResolvable :: [Rule (Maybe RComp)] -> Maybe [ConstrainedQuery]
+computeResolvable :: [Rule (Maybe RComp)] -> Except String [ConstrainedQuery]
 computeResolvable (filter (isResolves . rhead) -> rs) = do
-  ord <- PO.transitiveClosure $ fromRules rs
-  return $ rec ord rs []
+  ord <- exceptMaybe "cyclic dependencies" $ PO.transitiveClosure $ fromRules rs
+  rec ord rs []
   where
-    rec :: RuleDependencies -> [Rule (Maybe RComp)] -> [ConstrainedQuery] -> [ConstrainedQuery]
-    rec _ [] acc = acc
+    rec :: RuleDependencies -> [Rule (Maybe RComp)] -> [ConstrainedQuery] -> Except String [ConstrainedQuery]
+    rec _ [] acc = return acc
     rec ord toSolve acc =
       let (mins, recArg) = partition (maybe False (PO.minimal ord) . fromRule) toSolve
-      in  if null mins
-            then error "non-termination"
-            else rec (foldr (maybe id PO.remove . fromRule) ord mins) recArg (concatMap (solveBody acc) mins ++ acc)
+      in do
+        when (null mins) (throwE "non-termination")
+        acc' <- concat <$> mapM (solveBody acc) mins
+        rec (foldr (maybe id PO.remove . fromRule) ord mins) recArg (acc' ++ acc)

@@ -9,6 +9,7 @@ import Resolvable.Update.Resolvability
 import Resolvable.Update.Rollout (diffServers, Rollout, rollout)
 import Resolvable.Dependencies ( computeResolvable, fromRules, RuleDependencies )
 import Util.Fresh (runFresh)
+import Util.Monad (handleError)
 import qualified Util.PartialOrder as PO
 
 import System.Environment (getArgs)
@@ -45,7 +46,7 @@ main = do
       rootServers <- parseNames roots
       cfg <- mapM parseZoneFileZones zones
       let compiled = runFresh $ plResolvable =<< compileConfig rootServers cfg
-      maybe (putStrLn "zone files cyclic") (mapM_ print) (computeResolvable compiled)
+      handleError (mapM_ print) (computeResolvable compiled)
     "diff" -> do
       (old, new) <- sepBy "--" args
       oldRecs <- mapM parseZoneFileZones old
