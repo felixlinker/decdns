@@ -2,51 +2,49 @@ module Resolvable.Update.RolloutSpec (tests) where
 
 import qualified Data.Map as M
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (Assertion, assertBool, testCase)
-import Test.Tasty.QuickCheck
+import Test.Tasty.HUnit (Assertion, assertBool, (@?=), testCase)
 
 import DNS.Diff (diff)
 import DNS.Name (Named (..), root, (<|))
-import DNS.Record (Cat (..), RData (..), StandardRecord, Type (..))
+import DNS.Record (Cat (..), RData (..), Type (..))
 import qualified DNS.RRSet as RRSet
-import DNS.ZoneFile (Zone, allRecords, insert, isEmpty, singleton, zoneName)
-import qualified DNS.ZoneFileSpec as ZS
+import DNS.ZoneFile (Zone, insert, isEmpty, singleton, zoneName)
 import NameConstraint (compileWildcards)
-import Resolvable.Update.Rollout (diffServers, rollout)
-import qualified Util.PartialOrder as PO
+import Resolvable.Dependencies (RecordDependencies, fromRules)
+import Resolvable.Resolvability (compileConfig)
+import Resolvable.Update.Rollout (rollout)
+import Util.Fresh (runFresh)
 
 tests :: TestTree
 tests =
   testGroup
     "Resolvable.Update.Rollout"
-    [ testCase "diffServers reports changes in non-root zones" reportsNonRootZoneDiff
-      --   testProperty "adding one TXT record can be rolled out immediately" propImmediateTxtAdd
-      -- , testProperty "removing one TXT record can be rolled out immediately" propImmediateTxtDelete
+    [ testCase "adding one TXT record with no dependencies rolls out immediately" immediateTxtAdd
+    , testCase "removing one TXT record with no dependencies rolls out immediately" immediateTxtDelete
     ]
 
-reportsNonRootZoneDiff :: Assertion
-reportsNonRootZoneDiff = do
-  let ns = "ns" <| ("example" <| root)
-      owner = "www" <| ("example" <| root)
-      zone = singleton (Named owner (RRSet.singleton (RData IN 300 (A "192.0.2.1"))))
-      diffs = diffServers [(ns, [compileWildcards zone])] []
-  assertBool "expected deletion diff for non-root zone" $
-    maybe False (not . isEmpty) (M.lookup ns diffs)
+immediateTxtAdd :: Assertion
+immediateTxtAdd = do
+  let org = "example" <| root
+      txt = Named ("www" <| org) (RData IN 300 (TXT "hello"))
+      z = singleton (Named org (RRSet.singleton (RData IN 300 (SOA org org 1 2 3 4 5))))
+      z' = insert z (fmap RRSet.singleton txt)
+      diffs = M.singleton (zoneName z) (diff (compileWildcards z) (compileWildcards z'))
+  assertBool "expected TXT add diff to be non-empty" $
+    maybe False (not . isEmpty) (M.lookup (zoneName z) diffs)
+  rollout diffs (dependencies z) (dependencies z') @?= Just [diffs]
 
--- propImmediateTxtAdd :: ZS.ArbZone -> Property
--- propImmediateTxtAdd (ZS.ArbZone z _) =
---   forAll (freshTxtFor z) $ \txt ->
---     let z' = insert z (fmap RRSet.singleton txt)
---         diffs = M.singleton (zoneName z) (diff z z')
---     in rollout diffs PO.empty PO.empty === Just [diffs]
+immediateTxtDelete :: Assertion
+immediateTxtDelete = do
+  let org = "example" <| root
+      txt = Named ("www" <| org) (RData IN 300 (TXT "hello"))
+      z = singleton (Named org (RRSet.singleton (RData IN 300 (SOA org org 1 2 3 4 5))))
+      zWithTxt = insert z (fmap RRSet.singleton txt)
+      diffs = M.singleton (zoneName zWithTxt) (diff (compileWildcards zWithTxt) (compileWildcards z))
+  assertBool "expected TXT delete diff to be non-empty" $
+    maybe False (not . isEmpty) (M.lookup (zoneName zWithTxt) diffs)
+  rollout diffs (dependencies zWithTxt) (dependencies z) @?= Just [diffs]
 
--- propImmediateTxtDelete :: ZS.ArbZone -> Property
--- propImmediateTxtDelete (ZS.ArbZone z _) =
---   forAll (freshTxtFor z) $ \txt ->
---     let zWithTxt = insert z (fmap RRSet.singleton txt)
---         diffs = M.singleton (zoneName zWithTxt) (diff zWithTxt z)
---     in rollout diffs PO.empty PO.empty === Just [diffs]
-
-freshTxtFor :: Zone String -> Gen StandardRecord
-freshTxtFor z =
-  ZS.genTXTRecord (zoneName z) `suchThat` (`notElem` allRecords z)
+dependencies :: Zone String -> RecordDependencies
+dependencies z =
+  runFresh $ fromRules <$> compileConfig [zoneName z] [(zoneName z, [compileWildcards z])]
