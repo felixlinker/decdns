@@ -18,7 +18,6 @@ import qualified DNS.RecordType as T
 import DNS.ZoneFile
 
 import Util.Fresh (Fresh)
-import Control.Monad (void)
 import DNS.SEC.Keys (keyTag)
 
 injectLast :: Term -> Term -> Term

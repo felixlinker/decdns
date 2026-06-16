@@ -7,7 +7,6 @@ import DNS.Name
 import Resolvable.Prolog.Core
 import qualified Resolvable.Prolog.Library as L
 import Resolvable.Resolvability
-import Control.Monad (void)
 import Util.Fresh (Fresh, runFresh)
 
 regression :: Rule (Maybe RComp)
