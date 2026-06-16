@@ -2,7 +2,9 @@ module Resolvable.ConstrainedUnification
   ( ConstrainedUnifier(..)
   , Neqs
   , identity
+  , fromUnifier
   , apply
+  , applyRule
   , addConstraint
   , extendUnifier
   , mergeUnifiers ) where
@@ -12,6 +14,7 @@ import qualified Data.Map as M
 
 import qualified Resolvable.Unification as U
 import Resolvable.Prolog.Core
+import Resolvable.Prolog.TermView
 import Control.Monad (guard)
 import Data.List (intercalate)
 import Data.Bifunctor (Bifunctor(bimap))
@@ -31,8 +34,24 @@ instance Show ConstrainedUnifier where
 identity :: ConstrainedUnifier
 identity = CUnifier U.identity S.empty
 
+fromUnifier :: U.Unifier -> ConstrainedUnifier
+fromUnifier = (`CUnifier` S.empty)
+
 apply :: ConstrainedUnifier -> Term -> Term
 apply (CUnifier u _) = U.apply u
+
+applyRule :: ConstrainedUnifier -> Rule a -> Maybe (Rule a, ConstrainedUnifier)
+applyRule cu (Rule ann h bs) = do
+  (bs', cu') <- foldr applyBody (Just ([], cu)) bs
+  return (Rule ann (apply cu' h) bs', cu')
+  where
+    applyBody :: Term -> Maybe ([Term], ConstrainedUnifier) -> Maybe ([Term], ConstrainedUnifier)
+    applyBody t acc = do
+      (bs', u) <- acc
+      (t', u') <- case toView t of
+            TVNeq a b -> (\u' -> (apply u' t, u')) <$> addConstraint a b u
+            _ -> Just (apply u t, u)
+      return (t':bs', u')
 
 addConstraint :: Term -> Term -> ConstrainedUnifier -> Maybe ConstrainedUnifier
 addConstraint a b (CUnifier u neqs) =

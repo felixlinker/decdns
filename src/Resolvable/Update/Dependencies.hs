@@ -2,10 +2,9 @@
 module Resolvable.Update.Dependencies
   ( computeRegressions ) where
 
-import Data.Maybe (fromMaybe, isNothing, mapMaybe)
+import Data.Maybe (fromMaybe, isNothing, mapMaybe, maybeToList)
 import qualified Data.Set as S
 
-import DNS.Name
 import Resolvable.Dependencies
 import Resolvable.Prolog.Core
 import Util.Fresh
@@ -13,19 +12,17 @@ import qualified Resolvable.ConstrainedUnification as CU
 import qualified Resolvable.Unification as U
 import Data.Bifunctor (Bifunctor(bimap))
 
-computeRegressions :: [Name String] -> Fresh [Rule a] -> Fresh [Rule a] -> Fresh [ConstrainedQuery]
-computeRegressions rootServers oldf newf = do
-  (old, new) <- (,) <$> c oldf <*> c newf
+computeRegressions :: Fresh [Rule a] -> Fresh [Rule a] -> Fresh [ConstrainedQuery]
+computeRegressions oldf newf = do
+  (old, new) <- ((,) . computeResolvable <$> oldf) <*> (computeResolvable <$> newf)
   return $ do  -- Enter list monad
-      q <- old
-      let mappings = map (matchDelta q) new
+      q <- fromMaybe [] old
+      new' <- maybeToList new
+      let mappings = map (matchDelta q) new'
       if all isNothing mappings
         then [q]
         else concatMap (fromMaybe []) mappings
   where
-    c :: Fresh [Rule a] -> Fresh [ConstrainedQuery]
-    c = computeResolvable rootServers
-
     biapply :: U.Unifier -> (Term, Term) -> (Term, Term)
     biapply u = bimap (U.apply u) (U.apply u)
 

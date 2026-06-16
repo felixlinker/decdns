@@ -9,6 +9,7 @@ import Resolvable.Update.Resolvability
 import Resolvable.Update.Rollout (diffServers, Rollout, rollout)
 import Resolvable.Dependencies ( computeResolvable, fromRules )
 import Util.Fresh (runFresh)
+import qualified Util.PartialOrder as PO
 
 import System.Environment (getArgs)
 import Util
@@ -16,8 +17,9 @@ import Data.List (uncons)
 import qualified Data.Map as M
 import Resolvable.Update.Dependencies (computeRegressions)
 import Resolvable.Update.Trivial (partitionTrivial)
-import Control.Monad (unless)
+import Control.Monad (unless, when)
 import DNS.Name (Name)
+import Data.Maybe (isNothing)
 
 indent :: String -> String
 indent s = if null s then "" else "  " ++ s
@@ -42,9 +44,8 @@ main = do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
       cfg <- mapM parseZoneFileZones zones
-      let compiled = plResolvable =<< compileConfig rootServers cfg
-      let us = runFresh $ computeResolvable rootServers compiled
-      mapM_ print us
+      let compiled = runFresh $ plResolvable =<< compileConfig rootServers cfg
+      maybe (putStrLn "zone files cyclic") (mapM_ print) (computeResolvable compiled)
     "diff" -> do
       (old, new) <- sepBy "--" args
       oldRecs <- mapM parseZoneFileZones old
@@ -59,7 +60,7 @@ main = do
       newRecs <- mapM parseZoneFileZones new
       let oldRecsC = compileConfig roots oldRecs
       let newRecsC = compileConfig roots newRecs
-      let (trivial, nonTrivial) = runFresh $ partitionTrivial (concatMap (concatMap allRecords . snd) oldRecs) (concatMap (concatMap allRecords . snd) newRecs) $ computeRegressions roots (plResolvable =<< oldRecsC) (plResolvable =<< newRecsC)
+      let (trivial, nonTrivial) = runFresh $ partitionTrivial (concatMap (concatMap allRecords . snd) oldRecs) (concatMap (concatMap allRecords . snd) newRecs) $ computeRegressions (plResolvable =<< oldRecsC) (plResolvable =<< newRecsC)
       mapM_ print nonTrivial
       unless (null trivial) $ do
         putStrLn "\n% The following regressions may be inteded as all records that directly answer the query have been deleted."
@@ -77,7 +78,10 @@ main = do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
       compiled <- runFresh . compileConfig rootServers <$> mapM parseZoneFileZones zones
-      print $ fromRules compiled
+      let deps = fromRules compiled
+      when (isNothing $ PO.transitiveClosure deps)
+        (putStrLn "% Dependencies cyclic")
+      print deps
     "parse-only" -> do
       parsed <- concatMap (map toStandardRecord . concatMap allRecords . snd) <$> mapM parseZoneFileZones args
       mapM_ print parsed

@@ -1,8 +1,11 @@
+{-# LANGUAGE ViewPatterns #-}
 module Resolvable.Prolog.TermView
   -- TODO: Enforce usage of termView or exported constructors by hiding constructors of Term
   ( TermView(..)
   , toView
-  , fromView ) where
+  , fromView
+  , isResolves
+  , isNeq ) where
 
 import Resolvable.Prolog.Symbols
 import Resolvable.Prolog.Core
@@ -88,3 +91,11 @@ fromView (TVAtomQuoted n) = TAtomQuoted n
 fromView (TVAtom n) = TAtom n
 fromView (TVString s) = TString s
 fromView (TVInt i) = TInt i
+
+isResolves :: Term -> Bool
+isResolves (toView -> TVResolves {}) = True
+isResolves _ = False
+
+isNeq :: Term -> Bool
+isNeq (toView -> TVNeq {}) = True
+isNeq _ = False

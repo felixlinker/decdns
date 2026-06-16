@@ -1,87 +1,75 @@
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleInstances #-}
 module Resolvable.Dependencies
-  ( ResolvableAt(..)
+  ( Dependency
+  , matches
   , Dependencies
   , ConstrainedQuery(..)
   , fromRules
   , computeResolvable ) where
 
-import Data.Functor (($>))
-import Control.Monad ((<=<), guard)
 import qualified Data.Set as S
-import qualified Data.List.NonEmpty as NE
-import Data.Maybe (mapMaybe, fromMaybe)
+import Data.Maybe (mapMaybe)
 
-import NameConstraint
-import DNS.Name
-import Util.Fresh
 import Resolvable.Prolog.Core
 import Resolvable.Prolog.TermView
-import qualified Resolvable.Prolog.Library as Lib
-import Resolvable.Resolvability
-import Resolvable.ConstrainedUnification
-import Resolvable.Unification (equivModuloRenaming)
+import Resolvable.Prolog.Library
+import Resolvable.Unification
+import DNS.Name
+import qualified Resolvable.ConstrainedUnification as CU
 import qualified Util.PartialOrder as PO
+import Data.List (uncons, partition)
+import Control.Arrow (Arrow(first))
 
-newtype ResolvableAt a = ResolvableAt
-  { rat :: Named String a }
+newtype Dependency = Dependency (Term, Term, Term, Term)
   deriving (Eq, Ord)
 
-instance Functor ResolvableAt where
-  fmap f (ResolvableAt nd) = ResolvableAt $ fmap f nd
+instance Show Dependency where
+  show (Dependency trip) = show trip
 
-instance Show a => Show (ResolvableAt a) where
-  show (rat -> Named q s) = show s ++ " @ " ++ show q
+matches :: Dependency -> Name String -> Name String -> Bool
+matches (Dependency (nsT, nT, _, _)) ns n = unifies (list [nsT, nT]) (list [nameTerm ns, nameTerm n])
 
-progressing :: ResolvableAt ConstrainedName -> ResolvableAt ConstrainedName -> Maybe (ResolvableAt ConstrainedName)
-progressing (rat -> Named ns r) k@(rat -> Named ns' r') =
-  -- TODO: isSubDomain might not behave correctly on wildcards
-  guard (not (isSubDomain r' r) || ns /= ns') $> k
+canon :: Term -> Term
+canon = replace aux
+  where
+    aux :: Term -> Term
+    aux (TVar _) = TWildcard
+    aux t = t
 
-fromAtom :: Term -> Maybe String
-fromAtom (TAtom s) = Just s
-fromAtom _ = Nothing
-
-fromNameTerm :: Term -> Maybe (Name String)
-fromNameTerm t = case toView t of
-  TVList _ _ -> do
-    let l = collectList t
-    l' <- mapM fromAtom l
-    return $ Name $ NE.reverse $ "" NE.:| l'
-  _ -> Nothing
-
-fromResolves :: Term -> Maybe (ResolvableAt ConstrainedName)
-fromResolves (toView -> TVResolves ns _ n _ _) = do
-  ns' <- fromNameTerm ns
-  n' <- exactly <$> fromNameTerm n
-  return $ ResolvableAt (Named ns' n')
+fromResolves :: Term -> Maybe Dependency
+fromResolves (toView -> TVResolves ns t n _ auth) = Just $ Dependency (canon ns, canon t, canon n, auth)
 fromResolves _ = Nothing
 
-type Dependencies a = PO.PartialOrder (ResolvableAt a)
+fromRule :: Rule a -> Maybe Dependency
+fromRule (Rule _ h _) = fromResolves h
 
-instance Show a => Show (Dependencies a) where
-  show (PO.toList -> items) = unlines $ map (uncurry showItem . fmap S.toList) items
-    where
-      showItem :: Show a => ResolvableAt a -> [ResolvableAt a] -> String
-      showItem r [] = "No dependencies: " ++ show r
-      showItem r ds = unlines ((show r ++ " depends on:") : map (("  " ++) . show) ds)
+type Dependencies = PO.PartialOrder Dependency
 
--- TODO: Handle wildcards and DNAME
-fromRules :: [Rule RComp] -> Dependencies ConstrainedName
+instance Show Dependencies where
+  show po = unlines (map (\(l, r) -> show l ++ " < " ++ show r) (PO.toFlatList po))
+
+match :: Rule a -> Rule b -> Maybe (Dependency, Dependency)
+match (Rule _ h@(toView -> TVResolves {}) b) r@(Rule _ h'@(toView -> TVResolves {}) _) = do
+  (u, _) <- uncons $ mapMaybe (`unify` h') b
+  -- Check whether there are any inequalities that prevent unification immediately
+  _ <- CU.applyRule (CU.fromUnifier u) r
+  larger <- fromResolves h
+  smaller <- fromResolves h'
+  return (smaller, larger)
+match _ _ = Nothing
+
+fromRules :: [Rule a] -> Dependencies
 fromRules rs = go rs PO.empty
   where
-    go :: [Rule RComp] -> Dependencies ConstrainedName -> Dependencies ConstrainedName
+    go :: [Rule a] -> Dependencies -> Dependencies
     go [] acc = acc
-    go (r:rrec) acc = fromMaybe acc $ do
-      h <- fromResolves $ rhead r
-      -- TODO: The guard is for dropping redundant NS records, but I think this is too general
-      let vs = S.fromList $ mapMaybe (progressing h <=< fromResolves) (rbody r)
-      return $ go rrec (PO.insert h vs acc)
+    go (r:rrec) acc =
+      let els = mapMaybe (match r) rs
+      in go rrec (foldr (uncurry PO.insert . first S.singleton) acc els)
 
--- TODO: Implement equality based on equivalence modulo renaming
-data ConstrainedQuery = CQuery Term Neqs
+-- TODO: Refactor
+data ConstrainedQuery = CQuery Term CU.Neqs
 
 toRule :: ConstrainedQuery -> Rule ()
 toRule (CQuery q (S.toList -> neqs)) = Rule () q (map (uncurry (\=)) neqs)
@@ -89,46 +77,39 @@ toRule (CQuery q (S.toList -> neqs)) = Rule () q (map (uncurry (\=)) neqs)
 instance Show ConstrainedQuery where
   show = show . toRule
 
-deriveIf :: ConstrainedUnifier -> Term -> Rule a -> Maybe (ConstrainedUnifier, [Term])
-deriveIf u q (Rule _ h b) = do
-  u' <- extendUnifier q h u
-  return (u', b)
+extendAndMerge :: CU.ConstrainedUnifier -> Term -> ConstrainedQuery -> Maybe CU.ConstrainedUnifier
+extendAndMerge cu t (CQuery t' neqs) = do
+  cu' <- CU.extendUnifier t t' cu
+  foldr ((=<<) . uncurry CU.addConstraint) (Just cu') neqs
 
--- TODO: Refactor return type so that it returns rules. Resolvable queries are
--- rules with an empty body, i.e., facts, and non-empty bodies indicate missing
--- knowledge.
-computeResolvable :: [Name String] -> Fresh [Rule a] -> Fresh [ConstrainedQuery]
-computeResolvable rootServers rsM = do
-  rs <- rsM
-  qtyp <- TVar <$> fresh "QT"
-  qname <- TVar <$> fresh "QN"
-  return $ do
-    rootServer <- Lib.nameTerm <$> rootServers
-    let query = Lib.resolvable rootServer qtyp qname
-    u <- rec [] identity query rs
-    return $ CQuery (apply u query) (constraints u)
+solveBody :: [ConstrainedQuery] -> Rule a -> [ConstrainedQuery]
+solveBody rs (Rule _ h b) = map (\u -> CQuery (CU.apply u h) (CU.constraints u)) (rec [CU.identity] b)
   where
-    solveQuery :: ConstrainedUnifier -> Term -> [Rule a] -> [(ConstrainedUnifier, [Term])]
-    solveQuery u q rs = case toView q of
-      TVNeq a b -> maybe [] (return . (,[])) (addConstraint a b u)
-      TVResolves {} -> mapMaybe (deriveIf u q) rs
-      TVResolvable {} -> mapMaybe (deriveIf u q) rs
-      _ -> error "unsupported predicate"
+    rec :: [CU.ConstrainedUnifier] -> [Term] -> [CU.ConstrainedUnifier]
+    rec choices [] = choices
+    rec choices (t:recArg) = case toView t of
+      TVNeq t1 t2 -> rec (mapMaybe (CU.addConstraint t1 t2) choices) recArg
+      TVResolves {} ->
+        let unified = concatMap (\u -> mapMaybe (extendAndMerge u t) rs) choices
+        in rec unified recArg
+      -- TODO:
+      TVMember {} -> rec choices recArg
+      -- This drops unsupported predicates, implicitly assuming that they are true
+      _ -> rec choices recArg
 
-    rec :: [Term] -> ConstrainedUnifier -> Term -> [Rule a] -> [ConstrainedUnifier]
-    rec trace u q rs
-      -- TODO: Check soundness of loop detection
-      | any (equivModuloRenaming q) trace = []
-      | otherwise = do
-        (u', conj) <- solveQuery u q rs
-        foldr solveConjunct [u'] conj
+-- TODO: Use Except monad transformer
+computeResolvable :: [Rule a] -> Maybe [ConstrainedQuery]
+computeResolvable (filter (isResolves . rhead) -> rs) = do
+  ord <- PO.transitiveClosure $ fromRules rs
+  return $ rec ord rs []
+  where
+    rec :: Dependencies -> [Rule a] -> [ConstrainedQuery] -> [ConstrainedQuery]
+    rec _ [] acc = acc
+    rec ord toSolve acc =
+      let (mins, recArg) = partition minimal toSolve
+      in  if null mins
+            then error "non-termination"
+            else rec (foldr (maybe id PO.remove . fromRule) ord mins) recArg (concatMap (solveBody acc) mins ++ acc)
       where
-        trace' :: [Term]
-        trace' = case toView q of
-          TVResolves {} -> q:trace
-          _ -> trace
-
-        solveConjunct :: Term -> [ConstrainedUnifier] -> [ConstrainedUnifier]
-        solveConjunct q' us = do
-          u'' <- us
-          rec trace' u'' q' rs
+        minimal :: Rule a -> Bool
+        minimal r = maybe False (S.null . (`PO.rel` ord)) (fromRule r)
