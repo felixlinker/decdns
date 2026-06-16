@@ -30,7 +30,7 @@ letDig :: Stream s m Char => ParsecT s u m Char
 letDig = letter <|> digit
 
 label :: Stream s m Char => ParsecT s u m String
-label = do
+label = string "*" <|> do
   p0 <- letter
   p1 <- many letDigHyp
   p2 <- many letDig
