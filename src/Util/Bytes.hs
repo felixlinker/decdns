@@ -23,8 +23,14 @@ build = LBS.toStrict . BBS.toLazyByteString
 class Serialize a where
   serialize :: a -> BS.ByteString
 
+instance Serialize () where
+  serialize _ = BS.empty
+
 instance Serialize IPv4 where
   serialize = word32 . fromIPv4w
+
+instance Serialize BS.ByteString where
+  serialize = id
 
 instance Serialize IPv6 where
   serialize addr =
