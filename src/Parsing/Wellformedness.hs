@@ -26,6 +26,7 @@ wellformed :: Zone String -> Maybe String
 wellformed (Zone org r@(Tr.Node apexData rcs)) =
   asum  [ expectNot wildcardOrigin "zone origin has wildcard"
         , expect (hasType T.SOA apexData) "zone misses SOA record"
+        , expectNot (any (hasType T.SOA) dataNoApex) "zone has non-apex SOA"
         -- See: https://datatracker.ietf.org/doc/html/rfc4035#section-2.4
         , expectNot (hasType T.DS apexData) "DS record at zone apex"
         , expect dnskeyFlags "DNSKEY flags miss zone key bit"
@@ -34,13 +35,16 @@ wellformed (Zone org r@(Tr.Node apexData rcs)) =
         -- may be the delegated name server, in which case there may be records
         -- at or below the NS record.
         -- Ignore records at apex. Other records next to NSes are legal there.
-        , expect (checkZoneCuts org (Tr.Node RRSet.empty rcs)) "illegal record at or below zone cut"
+        , expect (checkZoneCuts org dataNoApex) "illegal record at or below zone cut"
         , expect (singletonTypes r) "more than one DNAME or CNAME record at owner name"
         , expect (wildcardRestrictions orgLabel r) "DNAME, DS or NS wildcard record"
         , expect (rrsigSignerName org r) "RRSIG has illegal signer name"
         , expect (rrsigLabelCount org r) "RRSIG has illegal label count"
-        , expect (noDNSKEY (Tr.Node RRSet.empty rcs)) "DNSKEY with non-apex owner name" ]
+        , expect (noDNSKEY dataNoApex) "DNSKEY with non-apex owner name" ]
   where
+    dataNoApex :: Tr.Node String (RRSet.RTypedSet RData)
+    dataNoApex = Tr.Node RRSet.empty rcs
+
     orgLabel :: String
     orgLabel = NE.head $ labels org
 

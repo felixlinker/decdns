@@ -13,11 +13,14 @@ import Resolvable.Prolog.Core
 import Resolvable.Prolog.TermView
 import DNS.Name
 import DNS.Record
+import DNS.RRSet (dropType)
 import qualified DNS.RecordType as T
 import DNS.ZoneFile
 
 import Util.Fresh (Fresh)
 import Util.Monad
+import qualified Util.Tree as Tr
+import Util.Tree (Node(item))
 
 injectLast :: Term -> Term -> Term
 injectLast newLast t = case toView t of
@@ -175,11 +178,14 @@ allResolvable =
     bagof :: Term -> Term -> Term -> Term
     bagof a b c = TFunctor "bagof" [ a, b, c ]
 
+dropApexNSes :: Zone ConstrainedLabel -> Zone ConstrainedLabel
+dropApexNSes z@(Zone _ r@(Tr.Node apexData _)) = z { DNS.ZoneFile.root = r { item = dropType T.NS apexData } }
+
 fromZoneFile :: [Name String] -> Name String -> [Zone ConstrainedLabel] -> Fresh [Rule (Maybe RComp)]
 fromZoneFile rootServers ns rs = concat <$> mapM zoneToRules rs
   where
     zoneToRules :: Zone ConstrainedLabel -> Fresh [Rule (Maybe RComp)]
-    zoneToRules z = concat <$> mapM rrsetToRules (allRRSets z)
+    zoneToRules z = concat <$> mapM rrsetToRules (allRRSets (dropApexNSes z))
 
     rrsetToRules :: ConstrainedRRSet -> Fresh [Rule (Maybe RComp)]
     rrsetToRules r = (++) <$> resolvableBase rootServers ns r <*> resolvableStep rootServers ns r
