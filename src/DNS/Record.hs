@@ -3,6 +3,8 @@
 module DNS.Record
   ( Cat(..)
   , DNSKeyFlag(..)
+  , DNSKEYData(..)
+  , DSData(..)
   , RRSIGData(..)
   , canonicalRRSIGData
   , Type(..)
@@ -13,14 +15,13 @@ module DNS.Record
   , Record
   , record
   , StandardRecord
-  , canonicalRData
-  , dnskeyKeyTag ) where
+  , canonicalRData ) where
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as CBS
 import Data.Bits (setBit, zeroBits)
 import Data.List (groupBy, sort)
-import Data.Word (Word8, Word16)
+import Data.Word (Word8)
 import Data.IP (IPv4, IPv6)
 
 import DNS.Name
@@ -28,6 +29,43 @@ import qualified DNS.RecordType as T
 import DNS.SEC.Crypto
 import DNS.SEC.Keys
 import Util.Bytes
+
+data DNSKEYData = DNSKEYData
+  { _flags :: [DNSKeyFlag]
+  , _keyAlgorithm :: AlgorithmType
+  , _publicKey :: BS.ByteString
+  }
+  deriving (Eq, Ord)
+
+instance Show DNSKEYData where
+  show (DNSKEYData flags algorithm publicKey) =
+    unwords [show (dnsKeyFlagsToInt flags), "3", show algorithm, toB64 publicKey]
+
+instance Serialize DNSKEYData where
+  serialize (DNSKEYData flags algorithm publicKey) =
+    word16 (dnsKeyFlagsToInt flags)
+      <> word8 (3 :: Int)
+      <> word8 (algorithmToInt algorithm)
+      <> publicKey
+
+data DSData = DSData
+  { _keyTag :: Int
+  , _algorithm :: AlgorithmType
+  , _digestType :: DigestType
+  , _digest :: BS.ByteString
+  }
+  deriving (Eq, Ord)
+
+instance Show DSData where
+  show (DSData tag algorithm digestType digest) =
+    unwords [show tag, show algorithm, show digestType, toHex digest]
+
+instance Serialize DSData where
+  serialize (DSData tag algorithm digestType digest) =
+    word16 tag
+      <> word8 (algorithmToInt algorithm)
+      <> word8 (digestToInt digestType)
+      <> digest
 
 data RRSIGData a = RRSIGData
   { _typeCovered :: T.Type
@@ -86,16 +124,11 @@ data Type =
         , _retry :: Int
         , _expire :: Int
         , _minimum :: Int }
-  | DNSKEY  { _flags :: [DNSKeyFlag]
-            , _algorithm :: AlgorithmType
-            , _publicKey :: BS.ByteString }
+  | DNSKEY DNSKEYData
   | RRSIG (RRSIGData BS.ByteString)
-    | NSEC  { _nextDomainName :: Name String
-            , _typeBitMaps :: [T.Type] }
-    | DS  { _keyTag :: Int
-          , _algorithm :: AlgorithmType
-          , _digestType :: DigestType
-          , _digest :: BS.ByteString }
+  | NSEC  { _nextDomainName :: Name String
+          , _typeBitMaps :: [T.Type] }
+  | DS DSData
   deriving (Eq, Ord)
 
 showData :: Type -> String
@@ -107,13 +140,11 @@ showData (AAAA addr) = show addr
 showData (TXT addr) = addr
 showData (MX p n) = unwords [show p, show n]
 showData (SOA a b c d e f g) = unwords [show a, show b, show c, show d, show e, show f, show g]
-showData (DNSKEY flags algorithm publicKey) =
-  unwords [show (dnsKeyFlagsToInt flags), "3", show algorithm, toB64 publicKey]
+showData (DNSKEY keyData) = show keyData
 showData (RRSIG sigDat) = show sigDat
 showData (NSEC nextDomainName typeBitMaps) =
   unwords (show nextDomainName : map show typeBitMaps)
-showData (DS tag algorithm digestType digest) =
-  unwords [show tag, show algorithm, show digestType, toHex digest]
+showData (DS dsData) = show dsData
 
 canonicalType :: Type -> Type
 canonicalType (NS n) = NS $ canonicalName n
@@ -220,19 +251,11 @@ instance Serialize Type where
     serialize mname
       <> serialize rname
       <> foldMap word32 [serial, refresh, retry, expire, minimumTtl]
-  serialize (DNSKEY flags alg key) = dnsKeyWireFormat flags alg key
+  serialize (DNSKEY keyData) = serialize keyData
   serialize (RRSIG sig) = serialize sig
   serialize (NSEC nextDomainName typeBitMaps) =
     serialize nextDomainName <> nsecTypeBitMaps typeBitMaps
-  serialize (DS tag algorithm digestType digest) =
-    word16 tag
-      <> word8 (algorithmToInt algorithm)
-      <> word8 (digestToInt digestType)
-      <> digest
+  serialize (DS dsData) = serialize dsData
 
 canonicalRData :: RData -> RData
 canonicalRData d@(RData _ _ ty) = d { rtype = canonicalType ty }
-
-dnskeyKeyTag :: Type -> Word16
-dnskeyKeyTag (DNSKEY fs alg bs) = keyTag fs alg bs
-dnskeyKeyTag _ = 0x00

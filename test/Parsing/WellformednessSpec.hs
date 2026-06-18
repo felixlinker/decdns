@@ -191,7 +191,7 @@ requiresDNSKEYSignerAtOwner = do
     owner = "key" <| org
 
 dnskey :: [DNSKeyFlag] -> RData
-dnskey flags = RData IN 300 (DNSKEY flags RSASHA256 (BS.pack [1, 2, 3]))
+dnskey flags = RData IN 300 (DNSKEY (DNSKEYData flags RSASHA256 (BS.pack [1, 2, 3])))
 
 rrsig :: T.Type -> Int -> Name String -> RData
 rrsig covered ls signer =

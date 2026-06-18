@@ -8,7 +8,7 @@ import qualified Resolvable.DependenciesSpec as DependenciesSpec
 import qualified Resolvable.Update.RolloutSpec as RolloutSpec
 import qualified DNS.NameSpec as NameSpec
 import qualified DNS.RecordSpec as RecordSpec
-import qualified DNS.SEC.KeysSpec as KeysSpec
+import qualified DNS.SEC.VerificationSpec as VerificationSpec
 import qualified DNS.DiffSpec as DiffSpec
 import qualified DNS.ZoneFileSpec as DNSZoneFileSpec
 import qualified DNS.ZoneFile.PrintingSpec as ZoneFilePrintingSpec
@@ -30,7 +30,7 @@ main =
       , RolloutSpec.tests
       , NameSpec.tests
       , RecordSpec.tests
-      , KeysSpec.tests
+      , VerificationSpec.tests
       , DiffSpec.tests
       , DNSZoneFileSpec.tests
       , ParsingWellformednessSpec.tests

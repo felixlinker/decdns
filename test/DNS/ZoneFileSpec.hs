@@ -247,7 +247,7 @@ genDNSKEYRecord org = do
   flags <- genDNSKeyFlags
   algorithm <- genAlgorithm
   publicKey <- genBytes 1 64
-  return $ Named org (RData IN ttl (DNSKEY flags algorithm publicKey))
+  return $ Named org (RData IN ttl (DNSKEY (DNSKEYData flags algorithm publicKey)))
 
 genRRSIGRecord :: Name String -> Gen StandardRecord
 genRRSIGRecord org = do
@@ -282,7 +282,7 @@ genDSRecord org = do
   algorithm <- genAlgorithm
   digestType <- genDigestType
   digest <- genBytes 1 64
-  return $ Named ownerName (RData IN ttl (DS keyTag algorithm digestType digest))
+  return $ Named ownerName (RData IN ttl (DS (DSData keyTag algorithm digestType digest)))
 
 genIPv4 :: Gen IPv4
 genIPv4 = toIPv4w <$> chooseAny

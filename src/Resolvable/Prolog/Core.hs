@@ -369,10 +369,10 @@ dataTerm t = TFunctor (ttypeSym $ toType t) $ case t of
   TXT s -> [TAtomQuoted s]
   MX p n -> [TInt p, nameTerm n]
   SOA mn rn s rf rt e m -> [nameTerm mn, nameTerm rn, TInt s, TInt rf, TInt rt, TInt e, TInt m]
-  DNSKEY fs alg k -> [TInt (dnsKeyFlagsToInt fs), algTerm alg, b64Term k]
+  DNSKEY (DNSKEYData fs alg k) -> [TInt (dnsKeyFlagsToInt fs), algTerm alg, b64Term k]
   RRSIG (RRSIGData ty alg ls ottl sigExp sigInc tag sigName sig) -> [ttypeTerm ty, algTerm alg, TInt ls, TInt ottl, TInt sigExp, TInt sigInc, TInt tag, nameTerm sigName, b64Term sig]
   NSEC nextN covered -> [nameTerm nextN, list (map ttypeTerm covered)]
-  DS tag alg digT dig -> [TInt tag, algTerm alg, digestTerm digT, b64Term dig]
+  DS (DSData tag alg digT dig) -> [TInt tag, algTerm alg, digestTerm digT, b64Term dig]
 
 resolves :: Term -> Term -> Term -> Term -> Term -> Term
 resolves ns qtype qname d adb = TFunctor resolvesSym [ ns, qtype, qname, d, adb ]
@@ -386,9 +386,8 @@ ad = TFunctor adSym . (:[]) . TInt
 rrsigValid :: Term -> Term -> Term -> Term -> Term
 rrsigValid nam dat sig key  = TFunctor rrsigValidSym [ nam, dat, sig, key ]
 
--- TODO: Create term view
-digestValid :: Term -> Term -> Term -> Term -> Term -> Term -> Term
-digestValid typ nam flags alg key dig = TFunctor digestValidSym [ typ, nam, flags, alg, key, dig ]
+digestValid :: Term -> Term -> Term -> Term
+digestValid nam dsTerm dnskeyTerm = TFunctor digestValidSym [ nam, dsTerm, dnskeyTerm ]
 
 keyTag :: Term -> Term -> Term
 keyTag d tag = TFunctor keyTagSym [ d, tag ]

@@ -100,7 +100,7 @@ dnskey = do
   sep
   algorithm <- algorithmType
   sep
-  DNSKEY (dnsKeyFlagsFromInt flagValue) algorithm <$> base64WithSep
+  DNSKEY . DNSKEYData (dnsKeyFlagsFromInt flagValue) algorithm <$> base64WithSep
 
 rrsig :: Stream s m Char => TypeParser s m
 rrsig = do
@@ -138,7 +138,7 @@ ds = do
   sep
   digestType <- digestTypeCode
   sep
-  DS tag algorithm digestType <$> hexWithSep
+  DS . DSData tag algorithm digestType <$> hexWithSep
 
 algorithmType :: Stream s m Char => Parser s m AlgorithmType
 algorithmType =

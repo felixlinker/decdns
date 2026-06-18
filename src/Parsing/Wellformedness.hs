@@ -51,7 +51,7 @@ wellformed (Zone org r@(Tr.Node apexData rcs)) =
     dnskeyFlags = all (all (checkFlag . rtype)) r
       where
         checkFlag :: Type -> Bool
-        checkFlag (DNSKEY fs _ _) = ZoneKey `elem` fs
+        checkFlag (DNSKEY (DNSKEYData fs _ _)) = ZoneKey `elem` fs
         checkFlag _ = True
 
     -- See: https://datatracker.ietf.org/doc/html/rfc4034#section-3; third paragraph

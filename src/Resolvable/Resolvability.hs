@@ -18,7 +18,6 @@ import DNS.ZoneFile
 
 import Util.Fresh (Fresh)
 import Util.Monad
-import qualified DNS.SEC.Keys as Keys
 
 injectLast :: Term -> Term -> Term
 injectLast newLast t = case toView t of
@@ -53,20 +52,10 @@ resolvableBase rootServers ns s@(Named n rds@((RData _ _ ty) NE.:| _)) = do
     let isDNSKEY = toType ty == T.DNSKEY
     -- TODO: At least also emit for 0
     let adb = ad $ fromEnum (isDNSKEY && ns `elem` rootServers)
-    let keytagFacts = if isDNSKEY
-        then map (keyTagFact . rtype) (NE.toList rds)
-        else []
-    return  ( Rule rann
-        (resolves (nameTerm ns) (typeTerm ty) n' (rrsetTerm rds) adb)
-        cs
-            : keytagFacts)
+    return [Rule rann (resolves (nameTerm ns) (typeTerm ty) n' (rrsetTerm rds) adb) cs]
     where
       rann :: Maybe RComp
       rann = Just (RComp ns s)
-
-      keyTagFact :: Type -> Rule (Maybe RComp)
-      keyTagFact d@(DNSKEY a b c) = fact rann (keyTag (TComplex d) (TInt $ fromEnum (Keys.keyTag a b c)))
-      keyTagFact _ = undefined
 
 resolvableStep :: [Name String] -> Name String -> ConstrainedRRSet -> Fresh [Rule (Maybe RComp)]
 resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) =
@@ -136,30 +125,27 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) =
       -- technically wrong as there could be intermediate SOA records. It could be
       -- that this will be implicitly addressed by the ad(1) resolution of the
       -- DNSKEY record.
-      sig@(RRSIG (RRSIGData cov (algTerm -> alg) _ _ _ _ (TInt -> tag) (nameTerm -> sigName) _)) ->
+      sig@(RRSIG (RRSIGData cov _ _ _ _ _ _ (nameTerm -> sigName) _)) ->
         one $ case cov of
           T.DNSKEY -> do
             let n' = nameWithoutSynthesis n
-            (d, d_DS, k, f, t_DIG, k_DIG) <- freshVars6 ("D", "D_DS", "K", "F", "T_DIG", "K_DIG")
-            dnskeyTerm <- dnskey f <$> freshVar "A" <*> return k
+            (d, d_DS, k, kRef) <- freshVars4 ("D", "D_DS", "K", "K_REF")
             return $ Rule rannot
               (resolves nameServer dnskeyType n' d (ad 1))
               [ resolves nameServer dnskeyType n' d (ad 0)
                     , resolves rootServer dsType n' d_DS (ad 1)
-                    , member dnskeyTerm d
-                    , member (ds tag alg t_DIG k_DIG) d_DS
-                    , digestValid t_DIG n' f alg k k_DIG
+                    , member k d
+                    , member kRef d_DS
+                    , digestValid n' k kRef
                     , rrsigValid n' d (TComplex sig) k ]
           _ -> do
             (n', cs) <- nameWithSynthesis n
-            (d, d_KEY, k, f) <- freshVars4 ("D", "D_KEY", "K", "F")
-            dnskeyTerm <- dnskey f <$> freshVar "A" <*> return k
+            (d, d_KEY, k) <- freshVars3 ("D", "D_KEY", "K")
             return $ Rule rannot
               (resolves nameServer (ttypeTerm cov) n' d (ad 1))
               (cs ++  [ resolves nameServer (ttypeTerm cov) n' d (ad 0)
                             , resolves nameServer dnskeyType sigName d_KEY (ad 1)
-                            , member dnskeyTerm d
-                            , keyTag dnskeyTerm tag
+                            , member k d
                             , rrsigValid n' d (TComplex sig) k ])
       A {} -> return []
       AAAA {} -> return []

@@ -111,7 +111,7 @@ test-suite dns-regressor-test
       DNS.DiffSpec
       DNS.NameSpec
       DNS.RecordSpec
-      DNS.SEC.KeysSpec
+      DNS.SEC.VerificationSpec
       DNS.ZoneFile.PrintingSpec
       DNS.ZoneFileSpec
       Parsing.WellformednessSpec

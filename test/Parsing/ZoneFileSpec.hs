@@ -5,7 +5,12 @@ import Data.Functor.Identity (runIdentity)
 
 import DNS.Name (Named (name, value))
 import DNS.NameSpec (mkName)
-import DNS.Record (RData (rttl), Type (DNSKEY, DS))
+import DNS.Record
+  ( DNSKEYData (DNSKEYData)
+  , DSData (DSData)
+  , RData (rttl)
+  , Type (DNSKEY, DS)
+  )
 import DNS.SEC.Crypto (AlgorithmType (RSASHA256), DigestType (SHA256))
 import DNS.ZoneFile (allRecords, fromRecordList)
 import Parsing.Data (recordTypeData)
@@ -151,7 +156,7 @@ genBytes :: Gen BS.ByteString
 genBytes = BS.pack <$> listOf1 arbitrary
 
 dnskeyRec :: Gen Type
-dnskeyRec = DNSKEY [] RSASHA256 <$> genBytes
+dnskeyRec = DNSKEY . DNSKEYData [] RSASHA256 <$> genBytes
 
 dsRec :: Gen Type
-dsRec = DS 60485 RSASHA256 SHA256 <$> genBytes
+dsRec = DS . DSData 60485 RSASHA256 SHA256 <$> genBytes
