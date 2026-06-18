@@ -7,6 +7,7 @@ module Resolvable.Prolog.TermView
   , isResolves
   , isNeq ) where
 
+import DNS.Record (Type)
 import Resolvable.Prolog.Symbols
 import Resolvable.Prolog.Core
 
@@ -28,6 +29,7 @@ data TermView = TVList Term Term
               | TVAtom String
               | TVString String
               | TVInt Int
+              | TVComplex Type
 
 toView :: Term -> TermView
 toView (TFunctor n args)
@@ -70,6 +72,7 @@ toView (TAtomQuoted n) = TVAtomQuoted n
 toView (TAtom n) = TVAtom n
 toView (TString s) = TVString s
 toView (TInt i) = TVInt i
+toView (TComplex dat) = TVComplex dat
 
 fromView :: TermView -> Term
 fromView (TVList a b) = TFunctor listSym [ a, b ]
@@ -90,6 +93,7 @@ fromView (TVAtomQuoted n) = TAtomQuoted n
 fromView (TVAtom n) = TAtom n
 fromView (TVString s) = TString s
 fromView (TVInt i) = TInt i
+fromView (TVComplex dat) = TComplex dat
 
 isResolves :: Term -> Bool
 isResolves (toView -> TVResolves {}) = True

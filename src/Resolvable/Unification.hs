@@ -53,6 +53,7 @@ apply _ t@(TAtomQuoted _) = t
 apply _ t@(TAtom _) = t
 apply _ t@(TString _) = t
 apply _ t@(TInt _) = t
+apply _ t@(TComplex _) = t
 
 unify :: Term -> Term -> Maybe Unifier
 unify t1 t2 = extendUnifier t1 t2 identity
@@ -109,3 +110,7 @@ extendUnifier from to u@(Unifier m) = unif (apply u from) (apply u to)
       | a == b = Just u
       | otherwise = Nothing
     unif (TInt _) _ = Nothing
+    unif (TComplex d1) (TComplex d2)
+      | d1 == d2 = Just u
+      | otherwise = Nothing
+    unif (TComplex _) _ = Nothing

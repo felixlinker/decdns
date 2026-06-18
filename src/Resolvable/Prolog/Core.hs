@@ -91,6 +91,7 @@ data Term = TFunctor String [Term]
           | TAtom String
           | TString String
           | TInt Int
+          | TComplex Type
   deriving (Eq, Ord)
 
 freshVar :: String -> Fresh Term
@@ -211,6 +212,9 @@ instance Show Term where
   show (TAtomQuoted a) =  "'" ++ a ++ "'"
   show (TString s) = show s
   show (TInt i) = show i
+  -- "Flatten" data for compilation to Prolog. We only maintain TComplex for
+  -- reasoning purposes.
+  show (TComplex dat) = show $ dataTerm dat
 
 walk :: Semigroup a => (Term -> a) -> Term -> a
 walk f t@(TFunctor _ args) = sconcat (f t NE.:| map (walk f) args)
@@ -221,6 +225,7 @@ walk f t@(TAtomQuoted _) = f t
 walk f t@(TAtom _) = f t
 walk f t@(TString _) = f t
 walk f t@(TInt _) = f t
+walk f t@(TComplex _) = f t
 
 replace :: (Term -> Term) -> Term -> Term
 replace f t = rec (f t)
@@ -233,6 +238,7 @@ replace f t = rec (f t)
     rec u@(TAtom _) = u
     rec u@(TString _) = u
     rec u@(TInt _) = u
+    rec u@(TComplex _) = u
 
 renameFunctor :: String -> String -> Term -> Term
 renameFunctor from to = replace go
