@@ -12,11 +12,10 @@ import DNS.Name
 import DNS.Record
 import Util.Bytes
 import DNS.SEC.Crypto
-import DNS.RRSet
 import Data.Maybe (fromMaybe)
 
-verify :: StdRRSet -> RRSIGData BS.ByteString -> BS.ByteString -> Bool
-verify (canonicalRRSet -> rrset) (canonicalRRSIGData -> sig) key = fromMaybe False $
+verify :: Name String -> [Type] -> RRSIGData BS.ByteString -> BS.ByteString -> Bool
+verify (canonicalName -> owner) (map canonicalType -> rrset) (canonicalRRSIGData -> sig) key = fromMaybe False $
   case _signatureAlgorithm sig of
     ECDSAP256SHA256 -> do
       cSig <- ecdsaSig (_signature sig)
@@ -28,12 +27,15 @@ verify (canonicalRRSet -> rrset) (canonicalRRSIGData -> sig) key = fromMaybe Fal
     lc = _labels sig
 
     originalOwner :: Name String
-    originalOwner = case name rrset of
+    originalOwner = case owner of
       n@(Name ls) ->
         let lc' = labelCount n
         in  if lc' > lc then Name ("*" NE.:| NE.drop (lc' - lc) ls) else n
 
+    mkRecord :: Type -> StandardRecord
+    mkRecord = Named originalOwner . RData IN (_originalTTL sig)
+
     -- Set construction for sorting and deduplication
     serializedRRSet :: [BS.ByteString]
-    serializedRRSet = S.toAscList $ S.fromList $ NE.toList
-      $ fmap serialize $ toRecords $ Named originalOwner (value rrset)
+    serializedRRSet = S.toAscList $ S.fromList
+      $ map (serialize . mkRecord) rrset

@@ -65,7 +65,7 @@ resolvableBase rootServers ns s@(Named n rds@((RData _ _ ty) NE.:| _)) = do
       rann = Just (RComp ns s)
 
       keyTagFact :: Type -> Rule (Maybe RComp)
-      keyTagFact d@(DNSKEY a b c) = fact rann (keyTag (dataTerm d) (TInt $ fromEnum (Keys.keyTag a b c)))
+      keyTagFact d@(DNSKEY a b c) = fact rann (keyTag (TComplex d) (TInt $ fromEnum (Keys.keyTag a b c)))
       keyTagFact _ = undefined
 
 resolvableStep :: [Name String] -> Name String -> ConstrainedRRSet -> Fresh [Rule (Maybe RComp)]
@@ -136,7 +136,7 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) =
       -- technically wrong as there could be intermediate SOA records. It could be
       -- that this will be implicitly addressed by the ad(1) resolution of the
       -- DNSKEY record.
-      (RRSIG (RRSIGData cov (algTerm -> alg) (TInt -> ls) (TInt -> ottl) _ _ (TInt -> tag) (nameTerm -> sigName) (b64Term -> sig))) ->
+      sig@(RRSIG (RRSIGData cov (algTerm -> alg) _ _ _ _ (TInt -> tag) (nameTerm -> sigName) _)) ->
         one $ case cov of
           T.DNSKEY -> do
             let n' = nameWithoutSynthesis n
@@ -147,10 +147,9 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) =
               [ resolves nameServer dnskeyType n' d (ad 0)
                     , resolves rootServer dsType n' d_DS (ad 1)
                     , member dnskeyTerm d
-                    , keyTag dnskeyTerm tag
                     , member (ds tag alg t_DIG k_DIG) d_DS
                     , digestValid t_DIG n' f alg k k_DIG
-                    , rrsigValid n' dnskeyType ottl d ls sig k ]
+                    , rrsigValid n' d (TComplex sig) k ]
           _ -> do
             (n', cs) <- nameWithSynthesis n
             (d, d_KEY, k, f) <- freshVars4 ("D", "D_KEY", "K", "F")
@@ -161,7 +160,7 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) =
                             , resolves nameServer dnskeyType sigName d_KEY (ad 1)
                             , member dnskeyTerm d
                             , keyTag dnskeyTerm tag
-                            , rrsigValid n' (ttypeTerm cov) ottl d ls sig k ])
+                            , rrsigValid n' d (TComplex sig) k ])
       A {} -> return []
       AAAA {} -> return []
       TXT {} -> return []

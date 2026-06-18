@@ -6,6 +6,7 @@ module DNS.Record
   , RRSIGData(..)
   , canonicalRRSIGData
   , Type(..)
+  , canonicalType
   , showData
   , toType
   , RData(..)

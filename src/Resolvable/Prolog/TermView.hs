@@ -17,7 +17,7 @@ data TermView = TVList Term Term
               | TVLeq Term Term
               | TVResolves Term Term Term Term Term
               | TVResolvable Term Term Term
-              | TVRRSIGValid Term Term Term Term Term Term Term
+              | TVRRSIGValid Term Term Term Term
               | TVDigestValid Term Term Term Term Term Term
               | TVKeyTag Term Term
               | TVAd Bool
@@ -52,7 +52,7 @@ toView (TFunctor n args)
     [ ns, qtype, qname ] -> TVResolvable ns qtype qname
     _ -> undefined
   | n == rrsigValidSym = case args of
-    [ nam, typeCovered, orgTTL, rrset, ls, sig, key ] -> TVRRSIGValid nam typeCovered orgTTL rrset ls sig key
+    [ nam, dat, sig, key ] -> TVRRSIGValid nam dat sig key
     _ -> undefined
   | n == digestValidSym = case args of
     [ typ, nam, flags, alg, key, dig ] -> TVDigestValid typ nam flags alg key dig
@@ -81,7 +81,7 @@ fromView (TVNeq a b) = a \= b
 fromView (TVLeq a b) = a =< b
 fromView (TVResolves ns qtype qname d adb) = resolves ns qtype qname d adb
 fromView (TVResolvable ns qtype qname) = resolvable ns qtype qname
-fromView (TVRRSIGValid nam typeCovered orgTTL rrset ls sig key) = rrsigValid nam typeCovered orgTTL rrset ls sig key
+fromView (TVRRSIGValid nam dat sig key) = rrsigValid nam dat sig key
 fromView (TVDigestValid typ nam flags alg key dig) = digestValid typ nam flags alg key dig
 fromView (TVKeyTag key tag) = keyTag key tag
 fromView (TVAd b) = ad (fromEnum b)

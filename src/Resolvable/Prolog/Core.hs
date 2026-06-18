@@ -357,7 +357,7 @@ digestTerm :: DigestType -> Term
 digestTerm = TInt . digestToInt
 
 rrsetTerm :: (Foldable f, Functor f) => f RData -> Term
-rrsetTerm = list . fmap (dataTerm . rtype)
+rrsetTerm = list . fmap (TComplex . rtype)
 
 dataTerm :: Type -> Term
 dataTerm t = TFunctor (ttypeSym $ toType t) $ case t of
@@ -383,8 +383,8 @@ resolvable ns qtype qname = TFunctor resolvableSym [ ns, qtype, qname ]
 ad :: Int -> Term
 ad = TFunctor adSym . (:[]) . TInt
 
-rrsigValid :: Term -> Term -> Term -> Term -> Term -> Term -> Term-> Term
-rrsigValid nam typeCovered origTTL rrset ls sig key  = TFunctor rrsigValidSym [ nam, typeCovered, origTTL, rrset, ls, sig, key ]
+rrsigValid :: Term -> Term -> Term -> Term -> Term
+rrsigValid nam dat sig key  = TFunctor rrsigValidSym [ nam, dat, sig, key ]
 
 -- TODO: Create term view
 digestValid :: Term -> Term -> Term -> Term -> Term -> Term -> Term
