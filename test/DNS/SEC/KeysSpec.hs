@@ -3,7 +3,7 @@ module DNS.SEC.KeysSpec (tests) where
 
 import Data.Word (Word16)
 import DNS.Record (Type (DNSKEY), Record, record, Cat (IN), RData (RData, rtype))
-import DNS.SEC.Keys (keyTag, dnsKeyFlagsFromInt, keyDigest, nameWireFormat)
+import DNS.SEC.Keys (keyTag, dnsKeyFlagsFromInt, keyDigest)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit ((@?=), testCase)
 import DNS.SEC.Crypto (algorithmFromInt, AlgorithmType, DigestType (SHA256))
@@ -11,7 +11,7 @@ import Parsing.Bytes (base64)
 import qualified Data.ByteString as BS
 import Data.Maybe (fromMaybe)
 import Text.Parsec (runParser)
-import Util.Bytes (toHex)
+import Util.Bytes (toHex, Serialize(serialize))
 import DNS.NameSpec (mkName)
 import DNS.Name (Named(Named))
 
@@ -23,7 +23,7 @@ tests =
   testGroup
     "DNS.SEC.Keys"
     [ testCase "canonical name wire format encodes lowercase labels and root" $
-        nameWireFormat (mkName ["a", "com", ""]) @?= BS.pack [1, 97, 3, 99, 111, 109, 0]
+        serialize (mkName ["a", "com", ""]) @?= BS.pack [1, 97, 3, 99, 111, 109, 0]
     , testGroup "key tag" (zipWith (testKeyTag . show) [0 :: Int, 1..] dnskeyTestCases)
     , testGroup "key digest" (zipWith (testKeyDigest . show) [0 :: Int, 1..] (filter (not . null . thd) dnskeyTestCases)) ]
 

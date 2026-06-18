@@ -31,7 +31,6 @@ import Data.Maybe (fromMaybe)
 import DNS.ZoneFile.Printing (printZone)
 import Data.List (sort)
 import Data.IP (IPv4, toIPv4w, IPv6, toIPv6w)
-import Data.Word (Word32)
 
 tests :: TestTree
 tests =

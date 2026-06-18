@@ -1,24 +1,22 @@
-{-# LANGUAGE ViewPatterns #-}
 module DNS.SEC.Keys
   ( DNSKeyFlag(..)
   , dnsKeyFlagsToInt
   , dnsKeyFlagToInt
   , knownDNSKeyFlagsMask
   , dnsKeyFlagsFromInt
-  , nameWireFormat
+  , dnsKeyWireFormat
   , keyTag
   , keyDigest ) where
 
 import Data.Bits ((.|.), (.&.), complement, shiftR, shiftL)
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as CBS
 import Data.List (intersperse)
-import Data.Word (Word8, Word16, Word32)
+import Data.Word (Word16, Word32)
 import qualified Crypto.Hash.SHA256 as S256
 
 import DNS.SEC.Crypto
 import DNS.Name (Name(..))
-import Data.Char (toLower)
+import Util.Bytes (Serialize(serialize), word16, word8)
 
 data DNSKeyFlag = ZoneKey | Other | SecureEntryPoint
   deriving (Eq, Ord)
@@ -45,14 +43,10 @@ dnsKeyFlagsFromInt flags =
     otherDNSKeyFlagsMask = dnsKeyFlagToInt Other .|. complement knownDNSKeyFlagsMask
 
 dnsKeyWireFormat :: [DNSKeyFlag] -> AlgorithmType -> BS.ByteString -> BS.ByteString
-dnsKeyWireFormat (dnsKeyFlagsToInt -> flags) (algorithmToInt -> alg) key = foldr BS.cons key flagsProtoAlg
-  where
-    flagsProtoAlg :: [Word8]
-    flagsProtoAlg =
-      [ fromIntegral (shiftR flags 8)
-      , fromIntegral flags
-      , 3 -- Protocol
-      , fromIntegral alg ]
+dnsKeyWireFormat flags alg key =
+  foldr (<>) key  [ word16 (dnsKeyFlagsToInt flags)
+                  , word8 (3 :: Int) -- Protocol
+                  , word8 (algorithmToInt alg) ]
 
 keyTag :: [DNSKeyFlag] -> AlgorithmType -> BS.ByteString -> Word16
 keyTag flags alg key =
@@ -69,18 +63,9 @@ keyTag flags alg key =
     asDoubleOctets :: [Word16]
     asDoubleOctets = zipWith (shiftL . fromIntegral) (BS.unpack wireFormat) (intersperse 0 (repeat 8))
 
-nameWireFormat :: Name String -> BS.ByteString
-nameWireFormat (Name ls) = foldr ((<>) . encodeLabel) BS.empty ls
-  where
-    encodeLabel :: String -> BS.ByteString
-    encodeLabel (CBS.pack -> label) = BS.cons (fromIntegral (CBS.length label)) label
-
 keyDigest :: DigestType -> Name String -> [DNSKeyFlag] -> AlgorithmType -> BS.ByteString -> BS.ByteString
-keyDigest SHA256 ownerName flags alg key = S256.hash $ canonicalName <> wireFormat
+keyDigest SHA256 ownerName flags alg key = S256.hash $ serialize ownerName <> wireFormat
   where
     wireFormat :: BS.ByteString
     wireFormat = dnsKeyWireFormat flags alg key
-
-    canonicalName :: BS.ByteString
-    canonicalName = nameWireFormat (fmap (map toLower) ownerName)
 keyDigest _ _ _ _ _ = undefined

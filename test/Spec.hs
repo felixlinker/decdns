@@ -7,6 +7,7 @@ import qualified Resolvable.ConstrainedUnificationSpec as ConstrainedUnification
 import qualified Resolvable.DependenciesSpec as DependenciesSpec
 import qualified Resolvable.Update.RolloutSpec as RolloutSpec
 import qualified DNS.NameSpec as NameSpec
+import qualified DNS.RecordSpec as RecordSpec
 import qualified DNS.SEC.KeysSpec as KeysSpec
 import qualified DNS.DiffSpec as DiffSpec
 import qualified DNS.ZoneFileSpec as DNSZoneFileSpec
@@ -28,6 +29,7 @@ main =
       , DependenciesSpec.tests
       , RolloutSpec.tests
       , NameSpec.tests
+      , RecordSpec.tests
       , KeysSpec.tests
       , DiffSpec.tests
       , DNSZoneFileSpec.tests

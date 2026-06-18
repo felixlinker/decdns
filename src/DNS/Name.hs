@@ -17,9 +17,12 @@ module DNS.Name
 
 import Data.List (intercalate, isSuffixOf)
 import qualified Data.List.NonEmpty as NE
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as CBS
 import Data.Char (toLower)
 import Control.Monad (guard)
 import Data.Maybe (catMaybes)
+import Util.Bytes (Serialize(..), withLength)
 
 class Label a where
   lwildcard :: a
@@ -62,6 +65,9 @@ instance Show (Name String) where
         i = NE.init ls
     in  if l == "" then intercalate "." i ++ "." else intercalate "." (i ++ [l])
 
+instance Serialize (Name String) where
+  serialize = foldr ((<>) . withLength . CBS.pack) BS.empty . canonicalName
+
 data Named a b = Named
   { name :: Name a
   , value :: b }
@@ -72,6 +78,9 @@ instance Show a => Show (Named String a) where
 
 instance Functor (Named a) where
   fmap f (Named n d) = Named n (f d)
+
+instance Serialize a => Serialize (Named String a) where
+  serialize (Named n d) = serialize n <> serialize d
 
 mapLabels :: (a1 -> a2) -> Named a1 b -> Named a2 b
 mapLabels f (Named (Name ls) v) = Named (Name (NE.map f ls)) v

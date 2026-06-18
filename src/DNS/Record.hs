@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ViewPatterns #-}
 module DNS.Record
   ( Cat(..)
   , DNSKeyFlag(..)
@@ -14,6 +15,10 @@ module DNS.Record
   , dnskeyKeyTag ) where
 
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as CBS
+import Data.Bits (setBit, zeroBits)
+import Data.List (groupBy, sort)
+import Data.Word (Word8, Word16)
 import Data.IP (IPv4, IPv6)
 
 import DNS.Name
@@ -21,7 +26,6 @@ import qualified DNS.RecordType as T
 import DNS.SEC.Crypto
 import DNS.SEC.Keys
 import Util.Bytes
-import Data.Word (Word16)
 
 data Type =
     CNAME (Name String)
@@ -117,6 +121,9 @@ toType (DS {}) = T.DS
 data Cat = IN
   deriving (Eq, Ord, Show)
 
+instance Serialize Cat where
+  serialize IN = word16 (1 :: Int)
+
 data RData = RData
   { rcat  :: Cat
   , rttl  :: Int
@@ -132,6 +139,82 @@ record = Named
 
 instance Show RData where
   show (RData c ttl t) = show ttl ++ " " ++ show c ++ " " ++ show t
+
+instance Serialize RData where
+  serialize (RData c ttl t) =
+    serialize (toType t)
+      <> serialize c
+      <> word32 ttl
+      <> word16 (BS.length dat)
+      <> dat
+    where
+      dat = serialize t
+
+characterStrings :: String -> BS.ByteString
+characterStrings (CBS.pack -> txt) = foldMap withLength chunks
+  where
+    chunks :: [BS.ByteString]
+    chunks
+      | BS.null txt = [BS.empty]
+      | otherwise = chunk 255 txt
+
+nsecTypeBitMaps :: [T.Type] -> BS.ByteString
+nsecTypeBitMaps = foldMap encodeWindow
+    . groupBy sameWindow
+    . sort
+    . map T.typeToInt
+  where
+    sameWindow a b = a `div` 256 == b `div` 256
+
+encodeWindow :: [Int] -> BS.ByteString
+encodeWindow [] = BS.empty
+encodeWindow codes@(firstCode:_) =
+  BS.pack [fromIntegral window, fromIntegral (length bitmap)] <> BS.pack bitmap
+  where
+    window :: Int
+    window = firstCode `div` 256
+
+    bitmap :: [Word8]
+    bitmap = foldr (setTypeBit . (\c -> c - (window * 256))) [] codes
+
+    setTypeBit :: Int -> [Word8] -> [Word8]
+    setTypeBit position []
+      | position < 8 = [setBit zeroBits (7 - position)]
+      | otherwise = zeroBits : setTypeBit (position - 8) []
+    setTypeBit position (w:ws)
+      | position < 8 = setBit w (7 - position):ws
+      | otherwise = w : setTypeBit (position - 8) ws
+
+instance Serialize Type where
+  serialize (CNAME n) = serialize n
+  serialize (DNAME n) = serialize n
+  serialize (NS n) = serialize n
+  serialize (A addr) = serialize addr
+  serialize (AAAA addr) = serialize addr
+  serialize (TXT txt) = characterStrings txt
+  serialize (MX preference exchange) = word16 preference <> serialize exchange
+  serialize (SOA mname rname serial refresh retry expire minimumTtl) =
+    serialize mname
+      <> serialize rname
+      <> foldMap word32 [serial, refresh, retry, expire, minimumTtl]
+  serialize (DNSKEY flags alg key) = dnsKeyWireFormat flags alg key
+  serialize (RRSIG typeCovered algorithm lc originalTTL signatureExpiration signatureInception tag signersName signature) =
+    serialize typeCovered
+      <> word8 (algorithmToInt algorithm)
+      <> word8 lc
+      <> word32 originalTTL
+      <> word32 signatureExpiration
+      <> word32 signatureInception
+      <> word16 tag
+      <> serialize signersName
+      <> signature
+  serialize (NSEC nextDomainName typeBitMaps) =
+    serialize nextDomainName <> nsecTypeBitMaps typeBitMaps
+  serialize (DS tag algorithm digestType digest) =
+    word16 tag
+      <> word8 (algorithmToInt algorithm)
+      <> word8 (digestToInt digestType)
+      <> digest
 
 canonicalRData :: RData -> RData
 canonicalRData d@(RData _ _ ty) = d { rtype = canonicalType ty }
