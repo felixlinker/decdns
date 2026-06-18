@@ -120,7 +120,7 @@ rrsig = do
   sep
   signersName <- absName
   sep
-  RRSIG typeCovered algorithm labelCount originalTTL signatureExpiration signatureInception tag signersName <$> base64WithSep
+  RRSIG . RRSIGData typeCovered algorithm labelCount originalTTL signatureExpiration signatureInception tag signersName <$> base64WithSep
 
 nsec :: Stream s m Char => TypeParser s m
 nsec = do

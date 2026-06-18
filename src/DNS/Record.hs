@@ -3,11 +3,12 @@
 module DNS.Record
   ( Cat(..)
   , DNSKeyFlag(..)
+  , RRSIGData(..)
+  , canonicalRRSIGData
   , Type(..)
   , showData
   , toType
   , RData(..)
-  , serializeRRSIGRData
   , Record
   , record
   , StandardRecord
@@ -26,6 +27,47 @@ import qualified DNS.RecordType as T
 import DNS.SEC.Crypto
 import DNS.SEC.Keys
 import Util.Bytes
+
+data RRSIGData a = RRSIGData
+  { _typeCovered :: T.Type
+  , _signatureAlgorithm :: AlgorithmType
+  , _labels :: Int
+  , _originalTTL :: Int
+  , _signatureExpiration :: Int
+  , _signatureInception :: Int
+  , _verificationKeyTag :: Int
+  , _signersName :: Name String
+  , _signature :: a
+  }
+  deriving (Eq, Ord)
+
+instance Show (RRSIGData BS.ByteString) where
+  show (RRSIGData typeCovered algorithm lc originalTTL signatureExpiration signatureInception tag signersName signature) = unwords
+    [ show typeCovered
+    , show algorithm
+    , show lc
+    , show originalTTL
+    , show signatureExpiration
+    , show signatureInception
+    , show tag
+    , show signersName
+    , toB64 signature
+    ]
+
+instance Serialize a => Serialize (RRSIGData a) where
+  serialize (RRSIGData cov alg lc ttl sigExp sigNbf tag sigName sig) = serialize cov
+    <> word8 (algorithmToInt alg)
+    <> word8 lc
+    <> word32 ttl
+    <> word32 sigExp
+    <> word32 sigNbf
+    <> word16 tag
+    <> serialize sigName
+    <> serialize sig
+
+canonicalRRSIGData :: RRSIGData a -> RRSIGData a
+canonicalRRSIGData rrsig =
+  rrsig { _signersName = canonicalName (_signersName rrsig) }
 
 data Type =
     CNAME (Name String)
@@ -46,15 +88,7 @@ data Type =
   | DNSKEY  { _flags :: [DNSKeyFlag]
             , _algorithm :: AlgorithmType
             , _publicKey :: BS.ByteString }
-  | RRSIG { _typeCovered :: T.Type
-          , _algorithm :: AlgorithmType
-          , _labels :: Int
-          , _originalTTL :: Int
-          , _signatureExpiration :: Int
-          , _signatureInception :: Int
-          , _keyTag :: Int
-          , _signersName :: Name String
-          , _signature :: BS.ByteString }
+  | RRSIG (RRSIGData BS.ByteString)
     | NSEC  { _nextDomainName :: Name String
             , _typeBitMaps :: [T.Type] }
     | DS  { _keyTag :: Int
@@ -74,18 +108,7 @@ showData (MX p n) = unwords [show p, show n]
 showData (SOA a b c d e f g) = unwords [show a, show b, show c, show d, show e, show f, show g]
 showData (DNSKEY flags algorithm publicKey) =
   unwords [show (dnsKeyFlagsToInt flags), "3", show algorithm, toB64 publicKey]
-showData (RRSIG typeCovered algorithm lc originalTTL signatureExpiration signatureInception tag signersName signature) =
-  unwords
-    [ show typeCovered
-    , show algorithm
-    , show lc
-    , show originalTTL
-    , show signatureExpiration
-    , show signatureInception
-    , show tag
-    , show signersName
-    , toB64 signature
-    ]
+showData (RRSIG sigDat) = show sigDat
 showData (NSEC nextDomainName typeBitMaps) =
   unwords (show nextDomainName : map show typeBitMaps)
 showData (DS tag algorithm digestType digest) =
@@ -97,7 +120,7 @@ canonicalType (CNAME n) = CNAME $ canonicalName n
 canonicalType r@(SOA { _mname = mn, _rname = rn }) = r { _mname = canonicalName mn, _rname = canonicalName rn }
 canonicalType r@(MX _ n) = r { _exchange = canonicalName n }
 canonicalType (DNAME n) = DNAME $ canonicalName n
-canonicalType r@(RRSIG { _signersName = sn }) = r { _signersName = canonicalName sn }
+canonicalType (RRSIG sig) = RRSIG $ canonicalRRSIGData sig
 canonicalType r@(NSEC n _) = r { _nextDomainName = canonicalName n }
 canonicalType r = r
 
@@ -114,7 +137,7 @@ toType (TXT _) = T.TXT
 toType (MX {}) = T.MX
 toType (SOA {}) = T.SOA
 toType (DNSKEY {}) = T.DNSKEY
-toType (RRSIG {}) = T.RRSIG
+toType (RRSIG _) = T.RRSIG
 toType (NSEC {}) = T.NSEC
 toType (DS {}) = T.DS
 
@@ -184,17 +207,6 @@ encodeWindow codes@(firstCode:_) =
       | position < 8 = setBit w (7 - position):ws
       | otherwise = w : setTypeBit (position - 8) ws
 
-serializeRRSIGRData :: T.Type -> AlgorithmType -> Int -> Int -> Int -> Int -> Int -> Name String -> BS.ByteString
-serializeRRSIGRData cov alg lc ttl sigExp sigNbf tag sigName =
-  serialize cov
-    <> word8 (algorithmToInt alg)
-    <> word8 lc
-    <> word32 ttl
-    <> word32 sigExp
-    <> word32 sigNbf
-    <> word16 tag
-    <> serialize sigName
-
 instance Serialize Type where
   serialize (CNAME n) = serialize n
   serialize (DNAME n) = serialize n
@@ -208,8 +220,7 @@ instance Serialize Type where
       <> serialize rname
       <> foldMap word32 [serial, refresh, retry, expire, minimumTtl]
   serialize (DNSKEY flags alg key) = dnsKeyWireFormat flags alg key
-  serialize (RRSIG cov alg lc ttl sigExp sigNbf tag sigName sig) =
-    serializeRRSIGRData cov alg lc ttl sigExp sigNbf tag sigName <> sig
+  serialize (RRSIG sig) = serialize sig
   serialize (NSEC nextDomainName typeBitMaps) =
     serialize nextDomainName <> nsecTypeBitMaps typeBitMaps
   serialize (DS tag algorithm digestType digest) =

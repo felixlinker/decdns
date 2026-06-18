@@ -137,7 +137,7 @@ resolvableStep (map L.nameTerm -> rootServers) ns s@(Named n rs) =
       -- technically wrong as there could be intermediate SOA records. It could be
       -- that this will be implicitly addressed by the ad(1) resolution of the
       -- DNSKEY record.
-      (RRSIG cov (L.algTerm -> alg) (TInt -> ls) (TInt -> ottl) _ _ (TInt -> tag) (L.nameTerm -> sigName) (L.b64Term -> sig)) ->
+      (RRSIG (RRSIGData cov (L.algTerm -> alg) (TInt -> ls) (TInt -> ottl) _ _ (TInt -> tag) (L.nameTerm -> sigName) (L.b64Term -> sig))) ->
         one $ case cov of
           T.DNSKEY -> do
             let n' = L.nameWithoutSynthesis n

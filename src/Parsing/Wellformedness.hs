@@ -95,7 +95,7 @@ rrsigSignerName = Tr.allNamed checkData
     checkData owner rs = all checkRRSIG $ maybe [] NE.toList (getType T.RRSIG rs)
       where
         checkRRSIG :: RData -> Bool
-        checkRRSIG (rtype -> sig@(RRSIG {})) =
+        checkRRSIG (rtype -> RRSIG sig) =
           let signer = _signersName sig
           in case _typeCovered sig of
             T.SOA -> signer == owner
@@ -112,7 +112,7 @@ rrsigLabelCount = Tr.allNamed checkData
       where
         checkRRSIG :: RData -> Bool
         -- length - 1 to exclude root label
-        checkRRSIG (rtype -> sig@(RRSIG {})) = labelCount owner == _labels sig
+        checkRRSIG (rtype -> RRSIG sig) = labelCount owner == _labels sig
         checkRRSIG _ = True
 
 noDNSKEY :: Tr.Node String RRSet.RDataSet -> Bool

@@ -264,7 +264,7 @@ genRRSIGRecord org = do
   signature <- genBytes 1 96
   return $
     Named ownerName
-      (RData IN ttl (RRSIG typeCovered algorithm labelCount originalTTL signatureExpiration signatureInception keyTag signersName signature))
+      (RData IN ttl (RRSIG (RRSIGData typeCovered algorithm labelCount originalTTL signatureExpiration signatureInception keyTag signersName signature)))
 
 genNSECRecord :: Name String -> Gen StandardRecord
 genNSECRecord org = do

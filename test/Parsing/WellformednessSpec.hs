@@ -39,7 +39,7 @@ allowsDNSSECAlongsideCNAME = do
   zone <- zoneFromList
     [ soa org
     , named alias (RData IN 300 (CNAME (mkName ["target", "example", "net", ""])))
-    , named alias (RData IN 300 (RRSIG T.CNAME RSASHA256 (labelCount alias) 300 1 0 1 org (BS.pack [1, 2, 3]))) ]
+    , named alias (RData IN 300 (RRSIG (RRSIGData T.CNAME RSASHA256 (labelCount alias) 300 1 0 1 org (BS.pack [1, 2, 3])))) ]
   wellformed zone @?= Nothing
   where
     org = mkName ["example", "com", ""]
@@ -195,7 +195,7 @@ dnskey flags = RData IN 300 (DNSKEY flags RSASHA256 (BS.pack [1, 2, 3]))
 
 rrsig :: T.Type -> Int -> Name String -> RData
 rrsig covered ls signer =
-  RData IN 300 (RRSIG covered RSASHA256 ls 300 1 0 1 signer (BS.pack [1, 2, 3]))
+  RData IN 300 (RRSIG (RRSIGData covered RSASHA256 ls 300 1 0 1 signer (BS.pack [1, 2, 3])))
 
 soa :: Name String -> Named String RRSet.RDataSet
 soa org = named org (RData IN 300 (SOA ns mailbox 1 2 3 4 5))
