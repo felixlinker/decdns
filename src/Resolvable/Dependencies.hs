@@ -10,22 +10,26 @@ module Resolvable.Dependencies
   , fromRules
   , computeResolvable ) where
 
+import Control.Arrow (Arrow(first))
+import Control.Monad (when, (<=<))
+import qualified Data.ByteString as BS
 import qualified Data.Set as S
+import Data.List (uncons, partition)
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe (mapMaybe)
 
 import Resolvable.Prolog.Core
 import Resolvable.Prolog.TermView
 import Resolvable.Unification
 import DNS.Name
+import DNS.Record
 import qualified Resolvable.ConstrainedUnification as CU
 import qualified Util.PartialOrder as PO
-import Data.List (uncons, partition)
-import Control.Arrow (Arrow(first))
 import Resolvable.Resolvability (RComp (RComp))
 import NameConstraint (ConstrainedName)
 import Control.Monad.Trans.Except (Except, throwE)
 import Util.Monad (exceptMaybe)
-import Control.Monad (when)
+import DNS.SEC.Verification (verifySignature, verifyDigest)
 
 class FromRule t where
   fromRule :: Rule (Maybe RComp) -> Maybe t
@@ -102,6 +106,36 @@ extendAndMerge t (CQuery t' neqs) cu = do
   cu' <- CU.extendUnifier t t' cu
   foldr ((=<<) . uncurry CU.addConstraint) (Just cu') neqs
 
+asName :: Term -> Except String (Name String)
+asName t = do
+  ts <- exceptMaybe "name term is not a list" $ collectList t
+  ls <- exceptMaybe "label not ground" $ mapM asString ts
+  -- Add empty label was we do not represent it in Prolog
+  return $ Name (NE.reverse $ "" NE.:| ls)
+  where
+    asString :: Term -> Maybe String
+    asString (TString s) = Just s
+    asString _ = Nothing
+
+asType :: Term -> Except String Type
+asType (TComplex d) = return d
+asType _ = throwE "data not ground"
+
+asTypes :: Term -> Except String [Type]
+asTypes = mapM asType <=< exceptMaybe "data not ground" . collectList
+
+asDNSKEYData :: Type -> Except String DNSKEYData
+asDNSKEYData (DNSKEY dat) = return dat
+asDNSKEYData _ = throwE "data of wrong type"
+
+asDSData :: Type -> Except String DSData
+asDSData (DS dat) = return dat
+asDSData _ = throwE "data of wrong type"
+
+asRRSigData :: Type -> Except String (RRSIGData BS.ByteString)
+asRRSigData (RRSIG dat) = return dat
+asRRSigData _ = throwE "data of wrong type"
+
 solveBody :: [ConstrainedQuery] -> Rule a -> Except String [ConstrainedQuery]
 solveBody rs (Rule _ h b) = map (\u -> CQuery (CU.apply u h) (CU.constraints u)) <$> rec [CU.identity] b
   where
@@ -113,9 +147,23 @@ solveBody rs (Rule _ h b) = map (\u -> CQuery (CU.apply u h) (CU.constraints u))
       TVMember x l -> do
         l' <- exceptMaybe "variable list for non-deterministic choice" (collectList l)
         return $ extendChoicesWith (CU.extendUnifier x) l'
+      TVDigestValid n dsT dnskeyT -> do
+        n' <- asName n
+        dsDat <- asDSData =<< asType dsT
+        dnskeyDat <- asDNSKEYData =<< asType dnskeyT
+        check $ verifyDigest n' dsDat dnskeyDat
+      TVRRSIGValid n dat sig k -> do
+        n' <- asName n
+        rrset <- asTypes dat
+        sigDat <- asRRSigData =<< asType sig
+        DNSKEYData _ _ k' <- asDNSKEYData =<< asType k
+        check $ verifySignature n' rrset sigDat k'
       -- This drops unsupported predicates, implicitly assuming that they are true
       _ -> rec choices recArg
       where
+        check :: Bool -> Except String [CU.ConstrainedUnifier]
+        check p = if p then return choices else return []
+
         extendChoicesWith :: (a -> CU.ConstrainedUnifier -> Maybe CU.ConstrainedUnifier) -> [a] -> [CU.ConstrainedUnifier]
         extendChoicesWith f as = concatMap (\u -> mapMaybe (`f` u) as) choices
 
