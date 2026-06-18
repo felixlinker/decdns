@@ -23,9 +23,9 @@ dependencies:
 - lens
 - bytestring
 - base64-bytestring
-- cryptohash-sha256
 - iproute
 - crypton
+- memory
 
 ghc-options:
 - -Wall

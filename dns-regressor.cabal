@@ -72,10 +72,10 @@ library
     , base64-bytestring
     , bytestring
     , containers
-    , cryptohash-sha256
     , crypton
     , iproute
     , lens
+    , memory
     , parsec
     , transformers
   default-language: Haskell2010
@@ -95,11 +95,11 @@ executable dns-regressor-prolog
     , base64-bytestring
     , bytestring
     , containers
-    , cryptohash-sha256
     , crypton
     , dns-regressor
     , iproute
     , lens
+    , memory
     , parsec
     , transformers
   default-language: Haskell2010
@@ -138,11 +138,11 @@ test-suite dns-regressor-test
     , base64-bytestring
     , bytestring
     , containers
-    , cryptohash-sha256
     , crypton
     , dns-regressor
     , iproute
     , lens
+    , memory
     , parsec
     , tasty
     , tasty-hunit

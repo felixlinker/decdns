@@ -9,10 +9,12 @@ module DNS.SEC.Keys
   , keyDigest ) where
 
 import Data.Bits ((.|.), (.&.), complement, shiftR, shiftL)
+import qualified Data.ByteArray as BA
 import qualified Data.ByteString as BS
 import Data.List (intersperse)
 import Data.Word (Word16, Word32)
-import qualified Crypto.Hash.SHA256 as S256
+import Crypto.Hash (Digest, hash)
+import qualified Crypto.Hash.Algorithms as Hash
 
 import DNS.SEC.Crypto
 import DNS.Name (Name(..))
@@ -64,8 +66,11 @@ keyTag flags alg key =
     asDoubleOctets = zipWith (shiftL . fromIntegral) (BS.unpack wireFormat) (intersperse 0 (repeat 8))
 
 keyDigest :: DigestType -> Name String -> [DNSKeyFlag] -> AlgorithmType -> BS.ByteString -> BS.ByteString
-keyDigest SHA256 ownerName flags alg key = S256.hash $ serialize ownerName <> wireFormat
+keyDigest digType ownerName flags alg key = case digType of
+  SHA1    -> BA.convert (digest :: Digest Hash.SHA1)
+  SHA256  -> BA.convert (digest :: Digest Hash.SHA256)
+  SHA384  -> BA.convert (digest :: Digest Hash.SHA384)
+  _ -> undefined
   where
-    wireFormat :: BS.ByteString
-    wireFormat = dnsKeyWireFormat flags alg key
-keyDigest _ _ _ _ _ = undefined
+    digest :: Hash.HashAlgorithm a => Digest a
+    digest = hash $ serialize ownerName <> dnsKeyWireFormat flags alg key
