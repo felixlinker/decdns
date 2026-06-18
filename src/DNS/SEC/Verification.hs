@@ -21,6 +21,7 @@ import DNS.Record
 import Util.Bytes
 import DNS.SEC.Crypto
 import Data.Maybe (fromMaybe)
+import Data.Functor (void)
 
 verifySignature :: Name String -> [Type] -> RRSIGData BS.ByteString -> BS.ByteString -> Bool
 verifySignature (canonicalName -> owner) (map canonicalType -> rrset) (canonicalRRSIGData -> sig) key = fromMaybe False $
@@ -28,7 +29,7 @@ verifySignature (canonicalName -> owner) (map canonicalType -> rrset) (canonical
     ECDSAP256SHA256 -> do
       cSig <- ecdsaSig (_signature sig)
       cPk <- ecdsaPk key
-      return $ ECDSA.verify Hash.SHA256 cPk cSig (BS.concat (serialize sig : serializedRRSet))
+      return $ ECDSA.verify Hash.SHA256 cPk cSig (BS.concat (serialize (void sig) : serializedRRSet))
     _ -> Nothing
   where
     lc :: Int

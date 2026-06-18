@@ -80,6 +80,9 @@ data RRSIGData a = RRSIGData
   }
   deriving (Eq, Ord)
 
+instance Functor RRSIGData where
+  fmap f sig = sig { _signature = f (_signature sig) }
+
 instance Show (RRSIGData BS.ByteString) where
   show (RRSIGData typeCovered algorithm lc originalTTL signatureExpiration signatureInception tag signersName signature) = unwords
     [ show typeCovered
