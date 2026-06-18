@@ -19,5 +19,5 @@ exceptMaybe e = maybe (throwE e) return
 abortOnError :: MonadPlus m => Except e a -> m a
 abortOnError = either (const mzero) return . runExcept
 
-handleError :: (Show e) => (a -> IO ()) -> Except e a -> IO ()
-handleError hnd = either print hnd . runExcept
+handleError :: (a -> IO ()) -> Except String a -> IO ()
+handleError hnd = either putStrLn hnd . runExcept
