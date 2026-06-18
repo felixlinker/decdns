@@ -10,7 +10,6 @@ import DNS.Record
 import Resolvable.Dependencies
 import Resolvable.Prolog.Core
 import Resolvable.Prolog.TermView
-import qualified Resolvable.Prolog.Library as L
 import qualified Resolvable.Unification as U
 import qualified Resolvable.ConstrainedUnification as C
 
@@ -42,8 +41,8 @@ partitionTrivial old new fqs = do
 
     cResolvable :: ConstrainedRecord -> Fresh (Term, C.Neqs)
     cResolvable (Named cn d) = do
-      (n, S.fromList . map toConstraint -> neqs) <- L.nameWithSynthesis cn
-      return (L.resolvable TWildcard (L.typeTerm (rtype d)) n, neqs)
+      (n, S.fromList . map toConstraint -> neqs) <- nameWithSynthesis cn
+      return (resolvable TWildcard (typeTerm (rtype d)) n, neqs)
 
     isTrivial :: [(Term, C.Neqs)] -> [(Term, C.Neqs)] -> ConstrainedQuery -> Bool
     isTrivial old' new' q = any (uncurry (matchesQuery q)) old' && not (any (uncurry (matchesQuery q)) new')

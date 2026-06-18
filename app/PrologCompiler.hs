@@ -93,8 +93,8 @@ main = do
 
     showRollOut :: Rollout -> [String]
     showRollOut r = map ("% " ++) $ do
-      (i, ds) <- zip [(1 :: Int)..] r
-      ("step " ++ show i) : M.foldrWithKey (\ns d -> (showNSDiffs ns d ++)) [] ds
+      (i, diffs) <- zip [(1 :: Int)..] r
+      ("step " ++ show i) : M.foldrWithKey (\ns d -> (showNSDiffs ns d ++)) [] diffs
 
     showNSDiffs :: Name String -> ZoneDiff ConstrainedLabel -> [String]
     showNSDiffs ns d =

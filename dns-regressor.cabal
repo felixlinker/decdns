@@ -43,7 +43,6 @@ library
       Resolvable.ConstrainedUnification
       Resolvable.Dependencies
       Resolvable.Prolog.Core
-      Resolvable.Prolog.Library
       Resolvable.Prolog.Symbols
       Resolvable.Prolog.TermView
       Resolvable.Resolvability

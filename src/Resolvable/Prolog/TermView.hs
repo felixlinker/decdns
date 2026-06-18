@@ -9,7 +9,6 @@ module Resolvable.Prolog.TermView
 
 import Resolvable.Prolog.Symbols
 import Resolvable.Prolog.Core
-import qualified Resolvable.Prolog.Library as Lib
 
 data TermView = TVList Term Term
               | TVMember Term Term
@@ -77,12 +76,12 @@ fromView (TVList a b) = TFunctor listSym [ a, b ]
 fromView (TVMember a b) = member a b
 fromView (TVNeq a b) = a \= b
 fromView (TVLeq a b) = a =< b
-fromView (TVResolves ns qtype qname d adb) = Lib.resolves ns qtype qname d adb
-fromView (TVResolvable ns qtype qname) = Lib.resolvable ns qtype qname
-fromView (TVRRSIGValid nam typeCovered orgTTL rrset ls sig key) = Lib.rrsigValid nam typeCovered orgTTL rrset ls sig key
-fromView (TVDigestValid typ nam flags alg key dig) = Lib.digestValid typ nam flags alg key dig
-fromView (TVKeyTag key tag) = Lib.keyTag key tag
-fromView (TVAd b) = Lib.ad (fromEnum b)
+fromView (TVResolves ns qtype qname d adb) = resolves ns qtype qname d adb
+fromView (TVResolvable ns qtype qname) = resolvable ns qtype qname
+fromView (TVRRSIGValid nam typeCovered orgTTL rrset ls sig key) = rrsigValid nam typeCovered orgTTL rrset ls sig key
+fromView (TVDigestValid typ nam flags alg key dig) = digestValid typ nam flags alg key dig
+fromView (TVKeyTag key tag) = keyTag key tag
+fromView (TVAd b) = ad (fromEnum b)
 fromView (TVFunctor n args) = TFunctor n args
 fromView TVEmptyList = TEmptyList
 fromView (TVVar v) = TVar v

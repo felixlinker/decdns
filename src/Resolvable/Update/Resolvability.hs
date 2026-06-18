@@ -5,7 +5,6 @@ module Resolvable.Update.Resolvability
 
 import DNS.Name
 import Resolvable.Prolog.Core
-import qualified Resolvable.Prolog.Library as L
 import Resolvable.Resolvability
 import Util.Fresh (Fresh, runFresh)
 
@@ -16,8 +15,8 @@ regression = Rule Nothing (TFunctor "regression" [ ns, q, n ]) [ resolves_old, (
     q = TVar "Q"
     n = TVar "N"
 
-    resolves_old = renameFunctor "resolves" "resolves_old" $ L.resolves ns q n TWildcard (L.ad 0)
-    resolves_new = renameFunctor "resolves" "resolves_new" $ L.resolves ns q n TWildcard (L.ad 0)
+    resolves_old = renameFunctor "resolves" "resolves_old" $ resolves ns q n TWildcard (ad 0)
+    resolves_new = renameFunctor "resolves" "resolves_new" $ resolves ns q n TWildcard (ad 0)
 
 compileConfigs :: Fresh [Rule a] -> Fresh [Rule a] -> Fresh [Rule a]
 compileConfigs old new = do
@@ -29,7 +28,7 @@ compileConfigs old new = do
     renameFunctorInRule = mapRule . renameFunctor resolvesName
 
     resolvesName :: String
-    resolvesName = case L.resolves TWildcard TWildcard TWildcard TWildcard TWildcard of
+    resolvesName = case resolves TWildcard TWildcard TWildcard TWildcard TWildcard of
       TFunctor n _ -> n
       _ -> undefined
 

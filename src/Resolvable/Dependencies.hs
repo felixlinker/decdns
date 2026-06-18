@@ -15,7 +15,6 @@ import Data.Maybe (mapMaybe)
 
 import Resolvable.Prolog.Core
 import Resolvable.Prolog.TermView
-import Resolvable.Prolog.Library
 import Resolvable.Unification
 import DNS.Name
 import qualified Resolvable.ConstrainedUnification as CU
