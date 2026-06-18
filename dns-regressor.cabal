@@ -73,6 +73,7 @@ library
     , bytestring
     , containers
     , cryptohash-sha256
+    , iproute
     , lens
     , parsec
     , transformers
@@ -95,6 +96,7 @@ executable dns-regressor-prolog
     , containers
     , cryptohash-sha256
     , dns-regressor
+    , iproute
     , lens
     , parsec
     , transformers
@@ -135,6 +137,7 @@ test-suite dns-regressor-test
     , containers
     , cryptohash-sha256
     , dns-regressor
+    , iproute
     , lens
     , parsec
     , tasty

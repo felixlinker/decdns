@@ -14,6 +14,7 @@ module DNS.Record
   , dnskeyKeyTag ) where
 
 import qualified Data.ByteString as BS
+import Data.IP (IPv4, IPv6)
 
 import DNS.Name
 import qualified DNS.RecordType as T
@@ -26,8 +27,8 @@ data Type =
     CNAME (Name String)
   | DNAME (Name String)
   | NS (Name String)
-  | A String
-  | AAAA String
+  | A IPv4
+  | AAAA IPv6
   | TXT String
   | MX { _preference :: Int
         , _exchange :: Name String }
@@ -62,8 +63,8 @@ showData :: Type -> String
 showData (CNAME n) = show n
 showData (DNAME n) = show n
 showData (NS n) = show n
-showData (A addr) = addr
-showData (AAAA addr) = addr
+showData (A addr) = show addr
+showData (AAAA addr) = show addr
 showData (TXT addr) = addr
 showData (MX p n) = unwords [show p, show n]
 showData (SOA a b c d e f g) = unwords [show a, show b, show c, show d, show e, show f, show g]

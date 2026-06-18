@@ -50,7 +50,7 @@ allowsGlueBelowNSZoneCut = do
   zone <- zoneFromList
     [ soa org
     , named cut (RData IN 300 (NS glueName))
-    , named glueName (RData IN 300 (A "192.0.2.1")) ]
+    , named glueName (RData IN 300 (A $ read "192.0.2.1")) ]
   wellformed zone @?= Nothing
   where
     org = mkName ["example", "com", ""]
@@ -74,7 +74,7 @@ rejectsOtherRecordsAlongsideCNAME = do
   zone <- zoneFromList
     [ soa org
     , named alias (RData IN 300 (CNAME target))
-    , named alias (RData IN 300 (A "192.0.2.1")) ]
+    , named alias (RData IN 300 (A $ read "192.0.2.1")) ]
   isJust (wellformed zone) @?= True
   where
     org = mkName ["example", "com", ""]
@@ -148,7 +148,7 @@ allowsAncestorSigner :: Assertion
 allowsAncestorSigner = do
   zone <- zoneFromList
     [ soa org
-    , named owner (RData IN 300 (A "192.0.2.1"))
+    , named owner (RData IN 300 (A $ read "192.0.2.1"))
     , named owner (rrsig T.A (labelCount owner) org) ]
   wellformed zone @?= Nothing
   where
@@ -159,7 +159,7 @@ rejectsSignerBelowOwner :: Assertion
 rejectsSignerBelowOwner = do
   zone <- zoneFromList
     [ soa org
-    , named owner (RData IN 300 (A "192.0.2.1"))
+    , named owner (RData IN 300 (A $ read "192.0.2.1"))
     , named owner (rrsig T.A (labelCount owner) ("signer" <| owner)) ]
   isJust (wellformed zone) @?= True
   where

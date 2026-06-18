@@ -30,6 +30,8 @@ import DNS.ZoneFile
 import Data.Maybe (fromMaybe)
 import DNS.ZoneFile.Printing (printZone)
 import Data.List (sort)
+import Data.IP (IPv4, toIPv4w, IPv6, toIPv6w)
+import Data.Word (Word32)
 
 tests :: TestTree
 tests =
@@ -283,23 +285,11 @@ genDSRecord org = do
   digest <- genBytes 1 64
   return $ Named ownerName (RData IN ttl (DS keyTag algorithm digestType digest))
 
-genIPv4 :: Gen String
-genIPv4 = do
-  o1 <- chooseInt (0, 255)
-  o2 <- chooseInt (0, 255)
-  o3 <- chooseInt (0, 255)
-  o4 <- chooseInt (0, 255)
-  pure (show o1 ++ "." ++ show o2 ++ "." ++ show o3 ++ "." ++ show o4)
+genIPv4 :: Gen IPv4
+genIPv4 = toIPv4w <$> chooseAny
 
-genIPv6Like :: Gen String
-genIPv6Like = do
-  groups <- vectorOf 8 genHexGroup
-  pure (foldr1 (\a b -> a ++ ":" ++ b) groups)
-
-genHexGroup :: Gen String
-genHexGroup = do
-  n <- chooseInt (1, 4)
-  vectorOf n (elements (['0' .. '9'] ++ ['a' .. 'f']))
+genIPv6Like :: Gen IPv6
+genIPv6Like = toIPv6w <$> chooseAny
 
 genTxtAtom :: Gen String
 genTxtAtom =

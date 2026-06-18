@@ -94,8 +94,8 @@ rrsetTerm = list . fmap (dataTerm . rtype)
 
 dataTerm :: Type -> Term
 dataTerm t = TFunctor (ttypeSym $ toType t) $ case t of
-  A s -> [TAtomQuoted s]
-  AAAA s -> [TAtomQuoted s]
+  A s -> [TAtomQuoted $ show s]
+  AAAA s -> [TAtomQuoted $ show s]
   CNAME n -> [nameTerm n]
   DNAME n -> [nameTerm n]
   NS n -> [nameTerm n]

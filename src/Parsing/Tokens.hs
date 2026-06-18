@@ -5,9 +5,12 @@ module Parsing.Tokens
   , dot
   , colon
   , int
-  , category ) where
+  , category
+  , ipv4
+  , ipv6 ) where
 
 import Data.Functor (($>), void)
+import Data.IP (IPv4, IPv6)
 import Text.Parsec
 import Text.Parsec.Char as Char
 
@@ -33,3 +36,14 @@ int = do
 
 category :: Stream s m Char => ParsecT s u m Cat
 category = string "IN" $> IN
+
+ipv4 :: Stream s m Char => ParsecT s u m IPv4
+ipv4 = do
+  addr <- many1 (digit <|> dot)
+  maybe (fail "cannot parse IPv4") return (readMaybe addr)
+
+ipv6 :: Stream s m Char => ParsecT s u m IPv6
+ipv6 = do
+  addr <- many1 (hexDigit <|> colon)
+  maybe (fail "cannot parse IPv6") return (readMaybe addr)
+

@@ -24,6 +24,7 @@ dependencies:
 - bytestring
 - base64-bytestring
 - cryptohash-sha256
+- iproute
 
 ghc-options:
 - -Wall

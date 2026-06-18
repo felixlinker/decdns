@@ -64,10 +64,10 @@ ns :: Stream s m Char => TypeParser s m
 ns = NS <$> absName
 
 a :: Stream s m Char => TypeParser s m
-a = A <$> many1 (digit <|> dot)
+a = A <$> ipv4
 
 aaaa :: Stream s m Char => TypeParser s m
-aaaa = AAAA <$> many1 (hexDigit <|> colon)
+aaaa = AAAA <$> ipv6
 
 txt :: Stream s m Char => TypeParser s m
 txt = TXT <$> many1 (satisfy isPrint)

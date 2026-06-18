@@ -73,7 +73,7 @@ wildcardChangeDetection = do
   hasChanges wildcard dz @?= True
 
 mkRData :: String -> RData
-mkRData = RData IN 300 . A
+mkRData = RData IN 300 . A . read
 
 mkData :: String -> RRSet.RDataSet
 mkData = RRSet.singleton . mkRData
