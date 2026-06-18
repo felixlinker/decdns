@@ -10,6 +10,7 @@ module DNS.Record
   , record
   , NamedRecord
   , StandardRecord
+  , canonicalRRForm
   , dnskeyKeyTag ) where
 
 import qualified Data.ByteString as BS
@@ -85,6 +86,16 @@ showData (NSEC nextDomainName typeBitMaps) =
 showData (DS tag algorithm digestType digest) =
   unwords [show tag, show algorithm, show digestType, toHex digest]
 
+canonicalType :: Type -> Type
+canonicalType (NS n) = NS $ canonicalName n
+canonicalType (CNAME n) = CNAME $ canonicalName n
+canonicalType r@(SOA { _mname = mn, _rname = rn }) = r { _mname = canonicalName mn, _rname = canonicalName rn }
+canonicalType r@(MX _ n) = r { _exchange = canonicalName n }
+canonicalType (DNAME n) = DNAME $ canonicalName n
+canonicalType r@(RRSIG { _signersName = sn }) = r { _signersName = canonicalName sn }
+canonicalType r@(NSEC n _) = r { _nextDomainName = canonicalName n }
+canonicalType r = r
+
 instance Show Type where
   show t = show (toType t) ++ " " ++ showData t
 
@@ -120,6 +131,12 @@ record = Named
 
 instance Show RData where
   show (RData c ttl t) = show ttl ++ " " ++ show c ++ " " ++ show t
+
+canonicalRData :: RData -> RData
+canonicalRData d@(RData _ _ ty) = d { rtype = canonicalType ty }
+
+canonicalRRForm :: StandardRecord -> StandardRecord
+canonicalRRForm (Named n d) = Named (canonicalName n) (canonicalRData d)
 
 dnskeyKeyTag :: Type -> Word16
 dnskeyKeyTag (DNSKEY fs alg bs) = keyTag fs alg bs

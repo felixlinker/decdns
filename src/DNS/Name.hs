@@ -11,6 +11,7 @@ module DNS.Name
   , mapLabels
   , isSubDomain
   , intersection
+  , canonicalName
   , canonicalCompare
   , dnameRewrite ) where
 
@@ -88,12 +89,16 @@ intersection (Name (NE.reverse -> l1)) (Name (NE.reverse -> l2)) = do
       guard (a1 == a2)
       return a1
 
+-- https://datatracker.ietf.org/doc/html/rfc4034#section-6.2
+canonicalName :: Name String -> Name String
+canonicalName = fmap (map toLower)
+
 -- Order for NSEC records according to: https://datatracker.ietf.org/doc/html/rfc4034#section-6.1
 canonicalCompare :: Name String -> Name String -> Ordering
-canonicalCompare (Name ls1) (Name ls2) = cmp (rev ls1) (rev ls2)
+canonicalCompare (canonicalName -> Name ls1) (canonicalName -> Name ls2) = cmp (rev ls1) (rev ls2)
   where
     rev :: NE.NonEmpty String -> [String]
-    rev = map (map toLower) . reverse . NE.toList
+    rev = reverse . NE.toList
 
     cmp :: Ord a => [a] -> [a] -> Ordering
     cmp [] [] = EQ
