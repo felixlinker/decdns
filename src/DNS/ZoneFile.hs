@@ -163,7 +163,7 @@ allRRSets = concatMap (\(Named n typed) -> Named n <$> RRSet.apply M.elems typed
 allRecords :: Zone a -> [Record a]
 allRecords = concatMap (NE.toList . RRSet.toRecords) . allRRSets
 
-noMatching :: (Label a, Ord a) => NamedRecord a -> Zone a -> Bool
+noMatching :: (Label a, Ord a) => Record a -> Zone a -> Bool
 noMatching (Named n d) (Zone org z) = case pathInZone org n of
   Path _ [] p -> go p z
   _ -> False

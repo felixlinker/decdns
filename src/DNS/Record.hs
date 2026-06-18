@@ -7,11 +7,11 @@ module DNS.Record
   , showData
   , toType
   , RData(..)
+  , serializeRRSIGRData
   , Record
   , record
-  , NamedRecord
   , StandardRecord
-  , canonicalRRForm
+  , canonicalRData
   , dnskeyKeyTag ) where
 
 import qualified Data.ByteString as BS
@@ -131,8 +131,7 @@ data RData = RData
   deriving (Eq, Ord)
 
 type Record a = Named a RData
-type NamedRecord a = Record a
-type StandardRecord = NamedRecord String
+type StandardRecord = Record String
 
 record :: Name a -> RData -> Record a
 record = Named
@@ -185,6 +184,17 @@ encodeWindow codes@(firstCode:_) =
       | position < 8 = setBit w (7 - position):ws
       | otherwise = w : setTypeBit (position - 8) ws
 
+serializeRRSIGRData :: T.Type -> AlgorithmType -> Int -> Int -> Int -> Int -> Int -> Name String -> BS.ByteString
+serializeRRSIGRData cov alg lc ttl sigExp sigNbf tag sigName =
+  serialize cov
+    <> word8 (algorithmToInt alg)
+    <> word8 lc
+    <> word32 ttl
+    <> word32 sigExp
+    <> word32 sigNbf
+    <> word16 tag
+    <> serialize sigName
+
 instance Serialize Type where
   serialize (CNAME n) = serialize n
   serialize (DNAME n) = serialize n
@@ -198,16 +208,8 @@ instance Serialize Type where
       <> serialize rname
       <> foldMap word32 [serial, refresh, retry, expire, minimumTtl]
   serialize (DNSKEY flags alg key) = dnsKeyWireFormat flags alg key
-  serialize (RRSIG typeCovered algorithm lc originalTTL signatureExpiration signatureInception tag signersName signature) =
-    serialize typeCovered
-      <> word8 (algorithmToInt algorithm)
-      <> word8 lc
-      <> word32 originalTTL
-      <> word32 signatureExpiration
-      <> word32 signatureInception
-      <> word16 tag
-      <> serialize signersName
-      <> signature
+  serialize (RRSIG cov alg lc ttl sigExp sigNbf tag sigName sig) =
+    serializeRRSIGRData cov alg lc ttl sigExp sigNbf tag sigName <> sig
   serialize (NSEC nextDomainName typeBitMaps) =
     serialize nextDomainName <> nsecTypeBitMaps typeBitMaps
   serialize (DS tag algorithm digestType digest) =
@@ -218,9 +220,6 @@ instance Serialize Type where
 
 canonicalRData :: RData -> RData
 canonicalRData d@(RData _ _ ty) = d { rtype = canonicalType ty }
-
-canonicalRRForm :: StandardRecord -> StandardRecord
-canonicalRRForm (Named n d) = Named (canonicalName n) (canonicalRData d)
 
 dnskeyKeyTag :: Type -> Word16
 dnskeyKeyTag (DNSKEY fs alg bs) = keyTag fs alg bs

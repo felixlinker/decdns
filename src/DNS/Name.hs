@@ -66,7 +66,7 @@ instance Show (Name String) where
     in  if l == "" then intercalate "." i ++ "." else intercalate "." (i ++ [l])
 
 instance Serialize (Name String) where
-  serialize = foldr ((<>) . withLength . CBS.pack) BS.empty . canonicalName
+  serialize = foldr ((<>) . withLength . CBS.pack) BS.empty
 
 data Named a b = Named
   { name :: Name a

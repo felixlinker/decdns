@@ -3,10 +3,18 @@ module DNS.SEC.Crypto
   , algorithmToInt
   , algorithmFromInt
   , algorithmFromMnemonic
+  , ecdsaSig
+  , ecdsaPk
   , DigestType(..)
   , digestToInt
   , digestFromInt
   ) where
+
+import qualified Data.ByteString as BS
+import qualified Crypto.PubKey.ECC.ECDSA as ECDSA
+import qualified Crypto.PubKey.ECC.Types as ECCTypes
+import Data.Bifunctor (Bifunctor(bimap))
+import Crypto.Number.Serialize (os2ip)
 
 data AlgorithmType
   = RSAMD5
@@ -82,6 +90,21 @@ algorithmFromMnemonic "INDIRECT" = Just INDIRECT
 algorithmFromMnemonic "PRIVATEDNS" = Just PRIVATEDNS
 algorithmFromMnemonic "PRIVATEOID" = Just PRIVATEOID
 algorithmFromMnemonic _ = Nothing
+
+-- https://datatracker.ietf.org/doc/html/rfc6605#section-4
+ecdsaSig :: BS.ByteString -> Maybe ECDSA.Signature
+ecdsaSig sig
+  | BS.length sig /= 64 = Nothing
+  | otherwise = Just $ uncurry ECDSA.Signature $ bimap os2ip os2ip $ BS.splitAt 32 sig
+
+p256 :: ECCTypes.Curve
+p256 = ECCTypes.getCurveByName ECCTypes.SEC_p256r1
+
+-- https://datatracker.ietf.org/doc/html/rfc6605#section-4
+ecdsaPk :: BS.ByteString -> Maybe ECDSA.PublicKey
+ecdsaPk key
+  | BS.length key /= 64 = Nothing
+  | otherwise = Just $ ECDSA.PublicKey p256 $ uncurry ECCTypes.Point $ bimap os2ip os2ip $ BS.splitAt 32 key
 
 data DigestType = NULL | SHA1 | SHA256 | GOST_R_31_11_94 | SHA384
   deriving (Eq, Ord)

@@ -28,6 +28,7 @@ library
       DNS.RRSet
       DNS.SEC.Crypto
       DNS.SEC.Keys
+      DNS.SEC.Verification
       DNS.ZoneFile
       DNS.ZoneFile.Printing
       NameConstraint
@@ -73,6 +74,7 @@ library
     , bytestring
     , containers
     , cryptohash-sha256
+    , crypton
     , iproute
     , lens
     , parsec
@@ -95,6 +97,7 @@ executable dns-regressor-prolog
     , bytestring
     , containers
     , cryptohash-sha256
+    , crypton
     , dns-regressor
     , iproute
     , lens
@@ -137,6 +140,7 @@ test-suite dns-regressor-test
     , bytestring
     , containers
     , cryptohash-sha256
+    , crypton
     , dns-regressor
     , iproute
     , lens

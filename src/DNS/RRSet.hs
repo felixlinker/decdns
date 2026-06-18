@@ -10,6 +10,7 @@ module DNS.RRSet
   , singleton
   , RRSet
   , StdRRSet
+  , canonicalRRSet
   , toRecords ) where
 
 import qualified Data.List.NonEmpty as NE
@@ -67,6 +68,9 @@ partition p rd =
 type RDataSet = RTypedSet RData
 type RRSet a = Named a (NE.NonEmpty RData)
 type StdRRSet = RRSet String
+
+canonicalRRSet :: StdRRSet -> StdRRSet
+canonicalRRSet (Named n set) = Named (canonicalName n) (fmap canonicalRData set)
 
 insert :: RData -> RDataSet -> RDataSet
 insert rd = RDS . M.alter (Just . maybe (NE.singleton rd) (rd NE.<|)) (toType $ rtype rd) . rds
