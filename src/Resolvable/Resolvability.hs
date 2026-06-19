@@ -148,7 +148,7 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) =
               (resolves nameServer (ttypeTerm cov) n' d (ad 1))
               (cs ++  [ resolves nameServer (ttypeTerm cov) n' d (ad 0)
                             , resolves nameServer dnskeyType sigName d_KEY (ad 1)
-                            , member k d
+                            , member k d_KEY
                             , rrsigValid n' d (TComplex sig) k ])
       A {} -> return []
       AAAA {} -> return []
