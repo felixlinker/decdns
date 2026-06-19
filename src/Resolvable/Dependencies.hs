@@ -108,21 +108,23 @@ extendAndMerge t (CQuery t' neqs) cu = do
 
 asName :: Term -> Except String (Name String)
 asName t = do
-  ts <- exceptMaybe "name term is not a list" $ collectList t
-  ls <- exceptMaybe "label not ground" $ mapM asString ts
+  ts <- exceptMaybe ("name term is not a list: " ++ show t) $ collectList t
+  ls <- exceptMaybe ("label not ground: " ++ show t) $ mapM asAtom ts
   -- Add empty label was we do not represent it in Prolog
   return $ Name (NE.reverse $ "" NE.:| ls)
   where
-    asString :: Term -> Maybe String
-    asString (TString s) = Just s
-    asString _ = Nothing
+    asAtom :: Term -> Maybe String
+    asAtom (TAtom a) = Just a
+    asAtom _ = Nothing
 
 asType :: Term -> Except String Type
 asType (TComplex d) = return d
-asType _ = throwE "data not ground"
+asType t = throwE ("data not ground: " ++ show t)
 
 asTypes :: Term -> Except String [Type]
-asTypes = mapM asType <=< exceptMaybe "data not ground" . collectList
+asTypes t = do
+  l <- exceptMaybe ("data not ground: " ++ show t) $ collectList t
+  mapM asType l
 
 asDNSKEYData :: Type -> Except String DNSKEYData
 asDNSKEYData (DNSKEY dat) = return dat
