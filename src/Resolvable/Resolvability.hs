@@ -103,7 +103,7 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) =
           (t, d) <- freshVars2 ("T", "D")
           return $ Rule rannot (resolves nameServer t n' d (ad 1))
             (cs ++  [ t \= cnameType
-                          , resolves nameServer cnameType (nameWithoutSynthesis n) (list [dataTerm r]) (ad 1)
+                          , resolves nameServer cnameType (nameWithoutSynthesis n) (list [TComplex r]) (ad 1)
                           , resolves rootServer t cname d (ad 1) ]) ]
       DNAME (nameTerm -> dname) -> sequence
         [ do  -- Unauthenticated
@@ -119,7 +119,7 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) =
           -- Do not expect wildcard neq constraints on DNAME records
           let n' = nameWithoutSynthesis n
           return $ Rule rannot (resolves nameServer t (rewrite n') d (ad 1))
-            [ resolves nameServer dnameType n' (list [dataTerm r]) (ad 1)
+            [ resolves nameServer dnameType n' (list [TComplex r]) (ad 1)
             , resolves rootServer t (rewrite dname) d (ad 1) ] ]
       -- TODO: Check that sigName is the name of the zone containing the record;
       -- does that mean there ex. a corresponding SOA record? Could be, but seems
