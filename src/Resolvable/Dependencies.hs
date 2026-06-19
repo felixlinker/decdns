@@ -128,15 +128,15 @@ asTypes t = do
 
 asDNSKEYData :: Type -> Except String DNSKEYData
 asDNSKEYData (DNSKEY dat) = return dat
-asDNSKEYData _ = throwE "data of wrong type"
+asDNSKEYData t = throwE $ "expected DNSKEY got: " ++ show t
 
 asDSData :: Type -> Except String DSData
 asDSData (DS dat) = return dat
-asDSData _ = throwE "data of wrong type"
+asDSData t = throwE $ "expected DS got: " ++ show t
 
 asRRSigData :: Type -> Except String (RRSIGData BS.ByteString)
 asRRSigData (RRSIG dat) = return dat
-asRRSigData _ = throwE "data of wrong type"
+asRRSigData t = throwE $ "expected RRSIG got: " ++ show t
 
 solveBody :: [ConstrainedQuery] -> Rule a -> Except String [ConstrainedQuery]
 solveBody rs (Rule _ h b) = map (\u -> CQuery (CU.apply u h) (CU.constraints u)) <$> rec b [CU.identity]
@@ -151,7 +151,7 @@ solveBody rs (Rule _ h b) = map (\u -> CQuery (CU.apply u h) (CU.constraints u))
         let ul = CU.apply u l
         l' <- exceptMaybe ("variable list for non-deterministic choice: " ++ show ul) (collectList ul)
         return $ mapMaybe (\el -> CU.extendUnifier x el u) l')
-      TVDigestValid n dsT dnskeyT -> foreachM choices $ \u -> do
+      TVDigestValid n dnskeyT dsT -> foreachM choices $ \u -> do
         let app = CU.apply u
         n' <- asName (app n)
         dsDat <- asDSData =<< asType (app dsT)
