@@ -11,7 +11,7 @@ module Resolvable.Dependencies
   , computeResolvable ) where
 
 import Control.Arrow (Arrow(first))
-import Control.Monad (when, (<=<))
+import Control.Monad (when, guard)
 import qualified Data.ByteString as BS
 import qualified Data.Set as S
 import Data.List (uncons, partition)
@@ -28,7 +28,7 @@ import qualified Util.PartialOrder as PO
 import Resolvable.Resolvability (RComp (RComp))
 import NameConstraint (ConstrainedName)
 import Control.Monad.Trans.Except (Except, throwE)
-import Util.Monad (exceptMaybe)
+import Util.Monad (exceptMaybe, foreachM)
 import DNS.SEC.Verification (verifySignature, verifyDigest)
 
 class FromRule t where
@@ -137,35 +137,36 @@ asRRSigData (RRSIG dat) = return dat
 asRRSigData _ = throwE "data of wrong type"
 
 solveBody :: [ConstrainedQuery] -> Rule a -> Except String [ConstrainedQuery]
-solveBody rs (Rule _ h b) = map (\u -> CQuery (CU.apply u h) (CU.constraints u)) <$> rec [CU.identity] b
+solveBody rs (Rule _ h b) = map (\u -> CQuery (CU.apply u h) (CU.constraints u)) <$> rec b [CU.identity]
   where
-    rec :: [CU.ConstrainedUnifier] -> [Term] -> Except String [CU.ConstrainedUnifier]
-    rec choices [] = return choices
-    rec choices (t:recArg) = case toView t of
-      TVNeq t1 t2 -> rec (mapMaybe (CU.addConstraint t1 t2) choices) recArg
-      TVResolves {} -> rec (extendChoicesWith (extendAndMerge t) rs) recArg
-      TVMember x l -> do
-        l' <- exceptMaybe "variable list for non-deterministic choice" (collectList l)
-        return $ extendChoicesWith (CU.extendUnifier x) l'
-      TVDigestValid n dsT dnskeyT -> do
-        n' <- asName n
-        dsDat <- asDSData =<< asType dsT
-        dnskeyDat <- asDNSKEYData =<< asType dnskeyT
-        check $ verifyDigest n' dsDat dnskeyDat
-      TVRRSIGValid n dat sig k -> do
-        n' <- asName n
-        rrset <- asTypes dat
-        sigDat <- asRRSigData =<< asType sig
-        DNSKEYData _ _ k' <- asDNSKEYData =<< asType k
-        check $ verifySignature n' rrset sigDat k'
+    rec :: [Term] -> [CU.ConstrainedUnifier] -> Except String [CU.ConstrainedUnifier]
+    rec [] choices = return choices
+    rec (t:recArg) choices = case toView t of
+      TVNeq t1 t2 -> rec recArg (mapMaybe (CU.addConstraint t1 t2) choices)
+      TVResolves {} -> rec recArg =<< foreachM choices
+        (\u -> return $ mapMaybe (\cq -> extendAndMerge t cq u) rs)
+      TVMember x l -> rec recArg =<< foreachM choices (\u -> do
+        let ul = CU.apply u l
+        l' <- exceptMaybe ("variable list for non-deterministic choice: " ++ show ul) (collectList ul)
+        return $ mapMaybe (\el -> CU.extendUnifier x el u) l')
+      TVDigestValid n dsT dnskeyT -> foreachM choices $ \u -> do
+        let app = CU.apply u
+        n' <- asName (app n)
+        dsDat <- asDSData =<< asType (app dsT)
+        dnskeyDat <- asDNSKEYData =<< asType (app dnskeyT)
+        checkReturn (verifyDigest n' dsDat dnskeyDat) u
+      TVRRSIGValid n dat sig k -> foreachM choices $ \u -> do
+        let app = CU.apply u
+        n' <- asName (app n)
+        rrset <- asTypes (app dat)
+        sigDat <- asRRSigData =<< asType (app sig)
+        DNSKEYData _ _ k' <- asDNSKEYData =<< asType (app k)
+        checkReturn (verifySignature n' rrset sigDat k') u
       -- This drops unsupported predicates, implicitly assuming that they are true
-      _ -> rec choices recArg
+      _ -> rec recArg choices
       where
-        check :: Bool -> Except String [CU.ConstrainedUnifier]
-        check p = if p then return choices else return []
-
-        extendChoicesWith :: (a -> CU.ConstrainedUnifier -> Maybe CU.ConstrainedUnifier) -> [a] -> [CU.ConstrainedUnifier]
-        extendChoicesWith f as = concatMap (\u -> mapMaybe (`f` u) as) choices
+        checkReturn :: Bool -> a -> Except String [a]
+        checkReturn p a = return $ guard p >> [a]
 
 -- TODO: Use Except monad transformer
 computeResolvable :: [Rule (Maybe RComp)] -> Except String [ConstrainedQuery]
