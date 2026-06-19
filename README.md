@@ -9,11 +9,12 @@ The tool provides many commands, but its core utility is to compute two things, 
 1. Are there any queries that were resolvable in the old configuration but are not resolvable in the new configuration?
 We intend to apply some lightweight reasoning about whether regressions in resolvability are "trivial" (thus, most likely intended).
 For example, if all records that could directly answer a query were deleted, we would like to consider that deletion "trivial" and thus probably intended.
-2. Can the updates be rolled out in a way so that resolvability of queries is not degraded during the rollout, e.g., because resolvers some cached data that conflicts with the update?
+2. Can the updates be rolled out in a way so that resolvability of queries is not degraded during the rollout, e.g., because resolvers have cached data that conflicts with the update?
 For example, say that a domain `a.com` aliases to `b.com`, but `b.com` is decommissioned and its addresses moved to `a.com`.
 In that case, we should first remove the CNAME record for `a.com` and add its new IP addresses before deleting `b.com`.
 A resolver having cached `a.com`'s CNAME record may otherwise fail looking up `b.com`.
-The tool can also report that no such roll out is possible, e.g., because the update introduces a cyclic dependency.
+The rollout computation can also determine that no such rollout is possible, e.g., because the update introduces a cyclic dependency.
+The command-line interface currently does not print a diagnostic in that case.
 
 Our tool compiles DNS zone files into logic programs that can be serialized as Prolog programs.
 Generally, our output will use SWI-Prolog syntax.
@@ -43,11 +44,11 @@ Available commands are:
   Arguments are as with the previous command, but the list of zone files reflect the old and new configuration respectively.
 - `resolvable [names...] -- [zone files...]`:
   Like `pl-resolvable`, but reason statically and symbolically.
-  Out is printed to stdout as Prolog facts.
+  Output is printed to stdout as Prolog facts.
 - `regressions [names...] -- [old zone files...] -- [new zone files...]`:
   Like `pl-regressions`, but reason statically and symbolically.
-  Out is printed to stdout as Prolog facts.
-  Also prints the order in which the updates can be rolled out.
+  Output is printed to stdout as Prolog facts.
+  If a non-empty rollout is found, also prints the order in which the updates can be rolled out.
 - `diff [old zone files...] -- [new zone files...]`:
   Print the diff of the zone file configurations.
 - `dependencies [names...] -- [zone files...]`:
