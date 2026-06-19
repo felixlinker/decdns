@@ -99,7 +99,8 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) =
           (n', cs) <- nameWithSynthesis n
           (t, d) <- freshVars2 ("T", "D")
           return $ Rule rannot (resolves nameServer t n' d (ad 0))
-            (cs ++ [ resolves rootServer t cname d (ad 0) ])
+            (cs ++  [ t \= cnameType
+                          , resolves rootServer t cname d (ad 0) ])
         , do  -- Authenticated
           (n', cs) <- nameWithSynthesis n
           (t, d) <- freshVars2 ("T", "D")
