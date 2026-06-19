@@ -1,11 +1,25 @@
 {-# LANGUAGE ViewPatterns #-}
 module DNS.SEC.VerificationSpec (tests) where
 
+import Data.List (uncons)
 import Data.Word (Word16)
 
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertBool, (@?=), testCase)
-import DNS.SEC.Crypto (AlgorithmType (ECDSAP256SHA256), DigestType (SHA256))
+import Test.Tasty.QuickCheck
+  ( Gen
+  , Property
+  , chooseInt
+  , counterexample
+  , elements
+  , forAll
+  , oneof
+  , testProperty, chooseAny, suchThat
+  )
+import DNS.SEC.Crypto
+  ( AlgorithmType (ECDSAP256SHA256, ECDSAP384SHA384)
+  , DigestType (SHA256)
+  )
 import Parsing.Bytes (base64, hex)
 import qualified Data.ByteString as BS
 import Text.Parsec (runParser)
@@ -17,6 +31,7 @@ import DNS.SEC.Verification
 import DNS.Name (Name, Named (Named))
 import DNS.NameSpec (mkName)
 import qualified DNS.RecordType as RT
+import Data.Maybe (fromMaybe)
 
 thd :: (a, b, c) -> c
 thd (_, _, c) = c
@@ -28,6 +43,7 @@ tests =
     [ testGroup "key tag" (zipWith (testKeyTag . show) [0 :: Int, 1..] dnskeyTestCases)
     , testGroup "key digest" (zipWith (testKeyDigest . show) [0 :: Int, 1..] (filter (not . null . thd) dnskeyTestCases))
     , testCase "verifies signatures from the static signed zones" testSignedZones
+    , testProperty "rejects a modified RRSIG or incomplete RRset" propRejectsMutatedVector
     ]
 
 type KeyTestCase = (Record String, Word16, String)  -- DNSKEY, key tag, SHA256 digest
@@ -75,6 +91,60 @@ testSignedZones = mapM_ verifyVector signatureVectors
       assertBool
         ("signature verification failed for " ++ show owner ++ " " ++ show (_typeCovered sig))
         (verifySignature owner rrset sig (_publicKey key))
+
+propRejectsMutatedVector :: Property
+propRejectsMutatedVector =
+  forAll (elements signatureVectors) $ \original ->
+    forAll (mutateSignatureVector original) $ \(owner, rrset, sig, key) ->
+      counterexample ("mutated vector still verified: " ++ show (owner, rrset, sig, key)) $
+        not (verifySignature owner rrset sig (_publicKey key))
+
+mutateSignatureVector :: SignatureVector -> Gen SignatureVector
+mutateSignatureVector (owner, rrset, sig, key) =
+  oneof
+    [ (\sig' -> (owner, rrset, sig', key)) <$> mutateRRSIG sig
+    , do
+      rrset' <- dropOne rrset
+      return (owner, rrset', sig, key)
+    ]
+
+mutateRRSIG :: RRSIGData BS.ByteString -> Gen (RRSIGData BS.ByteString)
+mutateRRSIG sig =
+  oneof
+    [ (\x -> sig { _typeCovered = x }) <$> differentRecordType (_typeCovered sig)
+    , pure sig { _signatureAlgorithm = ECDSAP384SHA384 }
+    , pure sig { _labels = _labels sig + 1 }
+    , pure sig { _originalTTL = _originalTTL sig + 1 }
+    , pure sig { _signatureExpiration = _signatureExpiration sig + 1 }
+    , pure sig { _signatureInception = _signatureInception sig + 1 }
+    , pure sig { _verificationKeyTag = _verificationKeyTag sig + 1 }
+    , pure sig { _signersName = differentName (_signersName sig) }
+    , (\x -> sig { _signature = x }) <$> byteFlip (_signature sig)
+    ]
+
+differentName :: Name String -> Name String
+differentName name
+  | name == comName = aComName
+  | otherwise = comName
+
+differentRecordType :: RT.Type -> Gen RT.Type
+differentRecordType typ = elements (filter (/= typ) RT.allTypes)
+
+dropOne :: [a] -> Gen [a]
+dropOne l = do
+  i <- chooseInt (0, length l - 1)
+  let (prefix, suffix) = splitAt i l
+  let (_, suffix') = fromMaybe undefined $ uncons suffix
+  return $ prefix ++ suffix'
+
+byteFlip :: BS.ByteString -> Gen BS.ByteString
+byteFlip bytes = do
+  byteIndex <- chooseInt (0, BS.length bytes - 1)
+  let (prefix, suffix) = BS.splitAt byteIndex bytes
+  -- choice of byteIndex ensures that suffix is non-empty
+  let (h, t) = fromMaybe undefined $ BS.uncons suffix
+  byte' <- suchThat chooseAny (/= h)
+  return $ prefix <> BS.singleton byte' <> t
 
 signatureVectors :: [SignatureVector]
 signatureVectors =
