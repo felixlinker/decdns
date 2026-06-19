@@ -15,7 +15,7 @@ module DNS.ZoneFileSpec
 import qualified Data.ByteString as BS
 import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE
-import Data.Word (Word8)
+import Data.Word (Word8, Word32)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck
 import Test.Tasty.HUnit
@@ -333,11 +333,7 @@ genByte :: Gen Word8
 genByte = fromIntegral <$> (chooseInt (0, 255) :: Gen Int)
 
 genRRSIGTime :: Gen Int
-genRRSIGTime =
-  oneof
-    [ chooseInt (0, 2000000000)
-    , elements [20240101000000, 20251231235959, 20300102030405]
-    ]
+genRRSIGTime = chooseInt (0, fromIntegral (maxBound :: Word32))
 
 genTypeBitMaps :: Gen [RT.Type]
 genTypeBitMaps = fmap L.nub (listOf1 (elements nsecTypeUniverse))
