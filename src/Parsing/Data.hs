@@ -112,9 +112,9 @@ rrsig = do
   sep
   originalTTL <- int
   sep
-  signatureExpiration <- int
+  signatureExpiration <- try time <|> int
   sep
-  signatureInception <- int
+  signatureInception <- try time <|> int
   sep
   tag <- int
   sep

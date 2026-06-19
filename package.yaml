@@ -26,6 +26,7 @@ dependencies:
 - iproute
 - crypton
 - memory
+- time
 
 ghc-options:
 - -Wall

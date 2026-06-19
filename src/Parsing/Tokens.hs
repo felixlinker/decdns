@@ -7,10 +7,13 @@ module Parsing.Tokens
   , int
   , category
   , ipv4
-  , ipv6 ) where
+  , ipv6
+  , time ) where
 
 import Data.Functor (($>), void)
 import Data.IP (IPv4, IPv6)
+import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
+import Data.Time.Format (defaultTimeLocale, parseTimeM)
 import Text.Parsec
 import Text.Parsec.Char as Char
 
@@ -47,3 +50,8 @@ ipv6 = do
   addr <- many1 (hexDigit <|> colon)
   maybe (fail "cannot parse IPv6") return (readMaybe addr)
 
+time :: Stream s m Char => ParsecT s u m Int
+time = do
+  digits <- many1 digit
+  utc <- parseTimeM False defaultTimeLocale "%Y%m%d%H%M%S" digits
+  return $ floor $ utcTimeToPOSIXSeconds utc
