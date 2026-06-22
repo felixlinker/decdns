@@ -19,9 +19,9 @@ computeRegressions oldf newf = do
   (old, new) <- ((,) . computeResolvable <$> oldf) <*> (computeResolvable <$> newf)
   return $ do  -- Enter list monad
       old' <- abortOnError old
-      q <- old'
+      q <- S.toList old'
       new' <- abortOnError new
-      let mappings = map (matchDelta q) new'
+      let mappings = map (matchDelta q) (S.toList new')
       if all isNothing mappings
         then [q]
         else concatMap (fromMaybe []) mappings

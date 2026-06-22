@@ -94,6 +94,7 @@ fromRules rs = go rs PO.empty
 
 -- TODO: Refactor
 data ConstrainedQuery = CQuery Term CU.Neqs
+  deriving (Eq, Ord)
 
 toRule :: ConstrainedQuery -> Rule ()
 toRule (CQuery q (S.toList -> neqs)) = Rule () q (map (uncurry (\=)) neqs)
@@ -138,8 +139,8 @@ asRRSigData :: Type -> Except String (RRSIGData BS.ByteString)
 asRRSigData (RRSIG dat) = return dat
 asRRSigData t = throwE $ "expected RRSIG got: " ++ show t
 
-solveBody :: [ConstrainedQuery] -> Rule a -> Except String [ConstrainedQuery]
-solveBody rs (Rule _ h b) = map (\u -> CQuery (CU.apply u h) (CU.constraints u)) <$> rec b [CU.identity]
+solveBody :: S.Set ConstrainedQuery -> Rule a -> Except String (S.Set ConstrainedQuery)
+solveBody (S.toList -> rs) (Rule _ h b) = S.fromList . map (\u -> CQuery (CU.apply u h) (CU.constraints u)) <$> rec b [CU.identity]
   where
     rec :: [Term] -> [CU.ConstrainedUnifier] -> Except String [CU.ConstrainedUnifier]
     rec [] choices = return choices
@@ -171,16 +172,16 @@ solveBody rs (Rule _ h b) = map (\u -> CQuery (CU.apply u h) (CU.constraints u))
         checkReturn p a = return $ guard p >> [a]
 
 -- TODO: Use Except monad transformer
-computeResolvable :: [Rule (Maybe RComp)] -> Except String [ConstrainedQuery]
+computeResolvable :: [Rule (Maybe RComp)] -> Except String (S.Set ConstrainedQuery)
 computeResolvable (filter (isResolves . rhead) -> rs) = do
   ord <- exceptMaybe "cyclic dependencies" $ PO.transitiveClosure $ fromRules rs
-  rec ord rs []
+  rec ord rs S.empty
   where
-    rec :: RuleDependencies -> [Rule (Maybe RComp)] -> [ConstrainedQuery] -> Except String [ConstrainedQuery]
+    rec :: RuleDependencies -> [Rule (Maybe RComp)] -> S.Set ConstrainedQuery -> Except String (S.Set ConstrainedQuery)
     rec _ [] acc = return acc
     rec ord toSolve acc =
       let (mins, recArg) = partition (maybe False (PO.minimal ord) . fromRule) toSolve
       in do
         when (null mins) (throwE "non-termination")
-        acc' <- concat <$> mapM (solveBody acc) mins
-        rec (foldr (maybe id PO.remove . fromRule) ord mins) recArg (acc' ++ acc)
+        acc' <- mconcat <$> mapM (solveBody acc) mins
+        rec (foldr (maybe id PO.remove . fromRule) ord mins) recArg (acc' <> acc)
