@@ -2,6 +2,7 @@ module Util.Monad
   ( one
   , foreachM
   , exceptMaybe
+  , maybeExcept
   , abortOnError
   , handleError ) where
 import Control.Monad.Trans.Except (Except, throwE, runExcept)
@@ -15,6 +16,9 @@ foreachM t f = concat <$> mapM f t
 
 exceptMaybe :: e -> Maybe a -> Except e a
 exceptMaybe e = maybe (throwE e) return
+
+maybeExcept :: Except e a -> Maybe a
+maybeExcept = either (const Nothing) Just . runExcept
 
 abortOnError :: MonadPlus m => Except e a -> m a
 abortOnError = either (const mzero) return . runExcept
