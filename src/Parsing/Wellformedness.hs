@@ -22,8 +22,8 @@ expectNot p err = if p then Just err else Nothing
 (==>) :: Bool -> Bool -> Bool
 (==>) p q = not p || q
 
-wellformed :: Zone String -> Maybe String
-wellformed (Zone org r@(Tr.Node apexData rcs)) =
+wellformed :: Name String -> Zone String -> Maybe String
+wellformed ns (Zone org r@(Tr.Node apexData rcs)) =
   asum  [ expectNot wildcardOrigin "zone origin has wildcard"
         , expect (hasType T.SOA apexData) "zone misses SOA record"
         , expectNot (any (hasType T.SOA) dataNoApex) "zone has non-apex SOA"
@@ -36,6 +36,7 @@ wellformed (Zone org r@(Tr.Node apexData rcs)) =
         -- at or below the NS record.
         -- Ignore records at apex. Other records next to NSes are legal there.
         , expect (checkZoneCuts org dataNoApex) "illegal record at or below zone cut"
+        , expectNot (any (selfDelegation ns) r) "NS record is self-delegation"
         , expect (singletonTypes r) "more than one DNAME or CNAME record at owner name"
         , expect (wildcardRestrictions orgLabel r) "DNAME, DS or NS wildcard record"
         , expect (rrsigSignerName org r) "RRSIG has illegal signer name"
@@ -124,3 +125,6 @@ noDNSKEY = Tr.allNamed checkData N.root  -- Use N.root because implementation ig
   where
     checkData :: Name String -> RRSet.RDataSet -> Bool
     checkData _ = not . hasType T.DNSKEY
+
+selfDelegation :: Name String -> RRSet.RDataSet -> Bool
+selfDelegation ns = maybe False (any ((== NS ns) . rtype)) . getType T.NS

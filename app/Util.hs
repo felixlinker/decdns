@@ -28,12 +28,12 @@ parseZoneFileZones :: FilePath -> IO (Name String, [Zone ConstrainedLabel])
 parseZoneFileZones path = do
   content <- readFile path
   zones <- fmap fromRecordList . handleParser =<< parseZoneFile path content
-  mapM_ wf zones
   ns <- parseName path >>= handleParser
+  mapM_ (wf ns) zones
   return (ns, map compileWildcards zones)
   where
-    wf :: Zone String -> IO ()
-    wf zone = maybe (return ()) failIO (wellformed zone)
+    wf :: Name String -> Zone String -> IO ()
+    wf ns zone = maybe (return ()) failIO (wellformed ns zone)
 
 parseNames :: [String] -> IO [Name String]
 parseNames = mapM (handleParser <=< parseName)
