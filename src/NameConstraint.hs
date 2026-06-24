@@ -28,7 +28,7 @@ data LabelConstraint a = Wildcard [a] | Exactly a
   deriving (Eq, Ord)
 
 instance Label a => Label (LabelConstraint a) where
-  lwildcard = Wildcard []
+  lwildcard = Wildcard [lwildcard]
   lempty = Exactly lempty
 
 matches :: Ord a => LabelConstraint a -> LabelConstraint a -> Bool
@@ -59,7 +59,7 @@ toName :: ConstrainedName -> Name String
 toName (Name cs) = Name (NE.map show cs)
 
 existIn :: T.Node String v -> [String]
-existIn = filter (/= "*") . M.keys . T.children
+existIn = M.keys . T.children
 
 compileWildcards :: Zone String -> Zone ConstrainedLabel
 compileWildcards (Zone (Name n) r) = Zone (Name (NE.map Exactly n)) (go r)
@@ -82,7 +82,7 @@ match (Name (NE.reverse -> ls)) (Name (NE.reverse -> cs)) = do
       | a == c = (a:) <$> rec as ncs
       | otherwise = Nothing
     match' (a NE.:| as) ((Wildcard c) NE.:| ncs)
-      | (a /= "*") && (a `notElem` c) && null ncs = Just (a:as)
+      | (a `notElem` c) && null ncs = Just (a:as)
       | a == "*" = (a:) <$> rec as ncs
       | otherwise = Nothing
 

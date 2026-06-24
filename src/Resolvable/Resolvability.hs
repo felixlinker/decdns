@@ -47,9 +47,15 @@ data RComp = RComp
   , fromRecord :: ConstrainedRRSet }
   deriving (Eq, Ord)
 
+synthesisCases :: [ConstrainedName -> Fresh (Term, [Term])]
+synthesisCases = [nameWithoutSynthesis', nameWithSynthesis]
+  where
+    nameWithoutSynthesis' :: ConstrainedName -> Fresh (Term, [Term])
+    nameWithoutSynthesis' n = return (nameWithoutSynthesis n, [])
+
 resolvableBase :: [Name String] -> Name String -> ConstrainedRRSet -> Fresh [Rule (Maybe RComp)]
-resolvableBase rootServers ns s@(Named n rds@((RData _ _ ty) NE.:| _)) = do
-    (n', cs) <- nameWithSynthesis n
+resolvableBase rootServers ns s@(Named n rds@((RData _ _ ty) NE.:| _)) = foreachM synthesisCases $ \synth -> do
+    (n', cs) <- synth n
     -- TODO: Refine so that only root keys are trusted
     -- Set the ad bit of DNSKEY entries stored at root servers to 1
     let isDNSKEY = toType ty == T.DNSKEY
@@ -91,15 +97,15 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) =
             let (injectLast l . captureListTail nTail -> n') = nameWithoutSynthesis n
             return $ Rule rannot (resolves nameServer dsType n' d (ad 1))
               [ resolves delegatedNs dsType n' d (ad 1) ] ]
-      CNAME (nameTerm -> cname) -> sequence
+      CNAME (nameTerm -> cname) -> foreachM synthesisCases $ \synth -> sequence
         [ do  -- Unauthenticated
-          (n', cs) <- nameWithSynthesis n
+          (n', cs) <- synth n
           (t, d) <- freshVars2 ("T", "D")
           return $ Rule rannot (resolves nameServer t n' d (ad 0))
             (cs ++  [ t \= cnameType
                           , resolves rootServer t cname d (ad 0) ])
         , do  -- Authenticated
-          (n', cs) <- nameWithSynthesis n
+          (n', cs) <- synth n
           (t, d) <- freshVars2 ("T", "D")
           return $ Rule rannot (resolves nameServer t n' d (ad 1))
             (cs ++  [ t \= cnameType
@@ -127,8 +133,8 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) =
       -- that this will be implicitly addressed by the ad(1) resolution of the
       -- DNSKEY record.
       sig@(RRSIG (RRSIGData cov _ _ _ _ _ _ (nameTerm -> sigName) _)) ->
-        one $ case cov of
-          T.DNSKEY -> do
+        case cov of
+          T.DNSKEY -> one $ do
             let n' = nameWithoutSynthesis n
             (d, d_DS, k, kRef) <- freshVars4 ("D", "D_DS", "K", "K_REF")
             return $ Rule rannot
@@ -139,8 +145,8 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) =
                     , member kRef d_DS
                     , digestValid n' k kRef
                     , rrsigValid n' d (TComplex sig) k ]
-          _ -> do
-            (n', cs) <- nameWithSynthesis n
+          _ -> foreachM synthesisCases $ \synth -> one $ do
+            (n', cs) <- synth n
             (d, d_KEY, k) <- freshVars3 ("D", "D_KEY", "K")
             return $ Rule rannot
               (resolves nameServer (ttypeTerm cov) n' d (ad 1))
