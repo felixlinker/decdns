@@ -36,7 +36,7 @@ wellformed ns (Zone org r@(Tr.Node apexData rcs)) =
         -- at or below the NS record.
         -- Ignore records at apex. Other records next to NSes are legal there.
         , expect (checkZoneCuts org dataNoApex) "illegal record at or below zone cut"
-        , expectNot (any (selfDelegation ns) r) "NS record is self-delegation"
+        , expectNot (any (selfDelegation ns) dataNoApex) "NS record is self-delegation"
         , expect (singletonTypes r) "more than one DNAME or CNAME record at owner name"
         , expect (wildcardRestrictions orgLabel r) "DNAME, DS or NS wildcard record"
         , expect (rrsigSignerName org r) "RRSIG has illegal signer name"
