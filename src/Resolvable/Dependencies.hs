@@ -171,7 +171,6 @@ solveBody (S.toList -> rs) (Rule _ h b) = S.fromList . map (\u -> CQuery (CU.app
         checkReturn :: Bool -> a -> Except String [a]
         checkReturn p a = return $ guard p >> [a]
 
--- TODO: Use Except monad transformer
 computeResolvable :: [Rule (Maybe RComp)] -> Except String (S.Set ConstrainedQuery)
 computeResolvable (filter (isResolves . rhead) -> rs) = do
   ord <- exceptMaybe "cyclic dependencies" $ PO.transitiveClosure $ fromRules rs
