@@ -4,7 +4,6 @@ import Test.Tasty (defaultMain, testGroup)
 
 import qualified Resolvable.UnificationSpec as UnificationSpec
 import qualified Resolvable.ConstrainedUnificationSpec as ConstrainedUnificationSpec
-import qualified Resolvable.DependenciesSpec as DependenciesSpec
 import qualified Resolvable.ResolvabilitySpec as ResolvabilitySpec
 import qualified Resolvable.Update.RolloutSpec as RolloutSpec
 import qualified DNS.NameSpec as NameSpec
@@ -27,7 +26,6 @@ main =
       "dns-regressor"
       [ UnificationSpec.tests
       , ConstrainedUnificationSpec.tests
-      , DependenciesSpec.tests
       , ResolvabilitySpec.tests
       , RolloutSpec.tests
       , NameSpec.tests

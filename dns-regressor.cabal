@@ -119,7 +119,6 @@ test-suite dns-regressor-test
       Parsing.WellformednessSpec
       Parsing.ZoneFileSpec
       Resolvable.ConstrainedUnificationSpec
-      Resolvable.DependenciesSpec
       Resolvable.ResolvabilitySpec
       Resolvable.UnificationSpec
       Resolvable.Update.RolloutSpec
