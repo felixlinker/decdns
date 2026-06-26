@@ -7,8 +7,6 @@ module Resolvable.Prolog.Core
   , freshVars2
   , freshVars3
   , freshVars4
-  , freshVars5
-  , freshVars6
   , replace
   , equiv
   , emptyList
@@ -117,25 +115,6 @@ freshVars4 (a, b, c, d) = do
   vc <- freshVar c
   vd <- freshVar d
   return (va, vb, vc, vd)
-
-freshVars5 :: (String, String, String, String, String) -> Fresh (Term, Term, Term, Term, Term)
-freshVars5 (a, b, c, d, e) = do
-  va <- freshVar a
-  vb <- freshVar b
-  vc <- freshVar c
-  vd <- freshVar d
-  ve <- freshVar e
-  return (va, vb, vc, vd, ve)
-
-freshVars6 :: (String, String, String, String, String, String) -> Fresh (Term, Term, Term, Term, Term, Term)
-freshVars6 (a, b, c, d, e, f) = do
-  va <- freshVar a
-  vb <- freshVar b
-  vc <- freshVar c
-  vd <- freshVar d
-  ve <- freshVar e
-  vf <- freshVar f
-  return (va, vb, vc, vd, ve, vf)
 
 tBin :: String -> Term -> Term -> Term
 tBin n a b = TFunctor n [ a, b ]
