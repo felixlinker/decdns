@@ -68,11 +68,12 @@ import Util.Bytes (toB64)
 
 import qualified Data.ByteString as BS
 import Data.List (intercalate, groupBy, sortOn)
+import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
 import Data.Char (toLower, toUpper)
 import Data.Semigroup (Semigroup(..), sconcat)
 import Data.Tuple (swap)
-import Data.Maybe (isNothing)
+import Data.Maybe (isNothing, fromMaybe)
 
 infixFunctors :: [String]
 infixFunctors =
@@ -206,6 +207,13 @@ walk f t@(TString _) = f t
 walk f t@(TInt _) = f t
 walk f t@(TComplex _) = f t
 
+vars :: Term -> [String]
+vars = walk grabVar
+  where
+    grabVar :: Term -> [String]
+    grabVar (TVar n) = [n]
+    grabVar _ = []
+
 replace :: (Term -> Term) -> Term -> Term
 replace f t = rec (f t)
   where
@@ -266,14 +274,30 @@ instance Functor Rule where
   fmap f (Rule a h b) = Rule (f a) h b
 
 instance Show (Rule a) where
-  show (Rule _ h []) = show h ++ "."
-  show (Rule _ h b) = show h ++ " :- " ++ intercalate ", " (map show b) ++ "."
+  show r = case singletonsToWildcards r of
+    Rule _ h [] -> show h ++ "."
+    Rule _ h b -> show h ++ " :- " ++ intercalate ", " (map show b) ++ "."
 
 fact :: a -> Term -> Rule a
 fact ann h = Rule ann h []
 
 mapRule :: (Term -> Term) -> Rule a -> Rule a
 mapRule f (Rule a h b) = Rule a (f h) (map f b)
+
+varCount :: Rule a -> (String -> Int)
+varCount (Rule _ (vars -> hvs) (concatMap vars -> bvs)) =
+  let vs = foldr (M.alter (Just . maybe 1 (+1))) M.empty (hvs ++ bvs)
+  in fromMaybe 0 . (`M.lookup` vs)
+
+singletonsToWildcards :: Rule a -> Rule a
+singletonsToWildcards r = mapRule (replace repF) r
+  where
+    vc :: String -> Int
+    vc = varCount r
+
+    repF :: Term -> Term
+    repF v@(TVar n) = if vc n == 1 then TWildcard else v
+    repF t = t
 
 showKnowledgeBase :: [Rule a] -> String
 showKnowledgeBase kb =
@@ -373,11 +397,10 @@ keyTag d tag = TFunctor keyTagSym [ d, tag ]
 
 nameWithSynthesis :: ConstrainedName -> Fresh (Term, [Term])
 nameWithSynthesis (Name (l NE.:| ls)) = case l of
-  Wildcard [] -> do
-    return (listWithTail (reverse (TWildcard : exactlyNatoms ls)) TWildcard, [])
   Wildcard cs -> do
-    h <- TVar <$> fresh "H"
-    return (listWithTail (reverse (h : exactlyNatoms ls)) TWildcard, neqs h cs)
+    h <- freshVar "H"
+    t <- freshVar "T"
+    return (listWithTail (reverse (h : exactlyNatoms ls)) t, neqs h cs)
   _ -> return (list (reverse (exactlyNatoms (l:ls))), [])
   where
     neqs :: Term -> [String] -> [Term]

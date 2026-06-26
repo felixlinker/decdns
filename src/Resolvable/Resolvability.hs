@@ -80,12 +80,12 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) =
     go rootServer r = case r of
       NS (nameTerm -> delegatedNs) -> concat <$> sequence
         [ foreachM [aType, aaaaType] $ \glueType -> one $ do  -- Unauthenticated
-            (nTail, t, d) <- freshVars3 ("N", "T", "D")
+            (nTail, t, d, dIp) <- freshVars4 ("N", "T", "D", "D_IP")
             -- Do not expect wildcard neq constraints on NS records
             let (captureListTail nTail -> n') = nameWithoutSynthesis n
             return $ Rule rannot (resolves nameServer t n' d (ad 0))
               [ resolves delegatedNs t n' d (ad 0)
-              , resolves rootServer glueType delegatedNs TWildcard (ad 0) ]
+              , resolves rootServer glueType delegatedNs dIp (ad 0) ]
         , one $ do  -- Authenticated not-DS
             (nTail, t, d) <- freshVars3 ("N", "T", "D")
             let (captureListTail nTail -> n') = nameWithoutSynthesis n
