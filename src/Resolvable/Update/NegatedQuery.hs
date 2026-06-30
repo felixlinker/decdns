@@ -37,8 +37,5 @@ without cq@(CQuery t neqs) neg =
       | U.isRenaming u = Nothing
       | otherwise = Just $ S.fromAscList $ M.toAscList um
 
-withouts :: [ConstrainedQuery] -> [ConstrainedQuery] -> [ConstrainedQuery]
-withouts qs (concatMap negateQuery -> negs) = mapMaybe (`withoutAll` negs) qs
-  where
-    withoutAll :: ConstrainedQuery -> [NegatedQuery] -> Maybe ConstrainedQuery
-    withoutAll q = foldr (\nq -> (>>= (`without` nq))) (Just q)
+withouts :: ConstrainedQuery -> [ConstrainedQuery] -> Maybe ConstrainedQuery
+withouts q (concatMap negateQuery -> negs) = foldr (\nq -> (>>= (`without` nq))) (Just q) negs
