@@ -48,6 +48,7 @@ library
       Resolvable.Resolvability
       Resolvable.Unification
       Resolvable.Update.Dependencies
+      Resolvable.Update.NegatedQuery
       Resolvable.Update.Resolvability
       Resolvable.Update.Rollout
       Resolvable.Update.Trivial

@@ -101,7 +101,8 @@ simplifyNeq a b = case a of
     dropWhenStrictEq a' = case b of
       TVar _ -> preserve
       TWildcard -> preserve
-      b' -> if a' == b' then preserve else []
+      b'  | a' == b' -> preserve
+          | otherwise -> []
 
     rec :: [(Term, Term)] -> [(Term, Term)]
     rec [] = [(a, b)]  -- preserve contradiction

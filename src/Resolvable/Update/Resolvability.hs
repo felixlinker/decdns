@@ -5,6 +5,7 @@ module Resolvable.Update.Resolvability
 
 import DNS.Name
 import Resolvable.Prolog.Core
+import Resolvable.Prolog.Symbols
 import Resolvable.Resolvability
 import Util.Fresh (Fresh, runFresh)
 
@@ -25,12 +26,7 @@ compileConfigs old new = do
   return $ old' ++ new'
   where
     renameFunctorInRule :: String -> Rule a -> Rule a
-    renameFunctorInRule = mapRule . renameFunctor resolvesName
-
-    resolvesName :: String
-    resolvesName = case resolves TWildcard TWildcard TWildcard TWildcard TWildcard of
-      TFunctor n _ -> n
-      _ -> undefined
+    renameFunctorInRule = mapRule . renameFunctor resolvesSym
 
 plRegressions :: [Name String] -> NameServersConfig -> NameServersConfig -> [Rule (Maybe RComp)]
 plRegressions rootServers old new = (regression :) $ runFresh $ compileConfigs (c old) (c new)

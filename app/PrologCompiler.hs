@@ -9,7 +9,6 @@ import Resolvable.Update.Resolvability
 import Resolvable.Update.Rollout (diffServers, Rollout, rollout)
 import Resolvable.Dependencies ( computeResolvable, fromRules, RuleDependencies )
 import Util.Fresh (runFresh)
-import Util.Monad (handleError)
 import qualified Util.PartialOrder as PO
 
 import System.Environment (getArgs)
@@ -21,6 +20,8 @@ import Resolvable.Update.Trivial (partitionTrivial)
 import Control.Monad (unless, when)
 import DNS.Name (Name)
 import Data.Maybe (isNothing)
+import Control.Monad.Trans.Except (runExceptT, runExcept)
+import GHC.Base (failIO)
 
 indent :: String -> String
 indent s = if null s then "" else "  " ++ s
@@ -46,7 +47,8 @@ main = do
       rootServers <- parseNames roots
       cfg <- mapM parseZoneFileZones zones
       let compiled = runFresh $ plResolvable =<< compileConfig rootServers cfg
-      handleError (mapM_ print) (computeResolvable compiled)
+      res <- handleError $ runExcept (computeResolvable compiled)
+      mapM_ print res
     "diff" -> do
       (old, new) <- sepBy "--" args
       oldRecs <- mapM parseZoneFileZones old
@@ -61,11 +63,8 @@ main = do
       newRecs <- mapM parseZoneFileZones new
       let oldRecsC = compileConfig roots oldRecs
       let newRecsC = compileConfig roots newRecs
-      let (trivial, nonTrivial) = runFresh $ partitionTrivial (concatMap (concatMap allRecords . snd) oldRecs) (concatMap (concatMap allRecords . snd) newRecs) $ computeRegressions (plResolvable =<< oldRecsC) (plResolvable =<< newRecsC)
-      mapM_ print nonTrivial
-      unless (null trivial) $ do
-        putStrLn "\n% The following regressions may be inteded as all records that directly answer the query have been deleted."
-        mapM_ print trivial
+      regs <- handleError $ runFresh $ runExceptT $ computeRegressions (plResolvable =<< oldRecsC) (plResolvable =<< newRecsC)
+      mapM_ print regs
       let nsDiff = diffServers oldRecs newRecs
       let oldDeps = runFresh $ fromRules <$> oldRecsC
       let newDeps = runFresh $ fromRules <$> newRecsC
@@ -88,6 +87,9 @@ main = do
       mapM_ print parsed
     _ -> fail "unknown command"
   where
+    handleError :: Show a => Either a b -> IO b
+    handleError = either (failIO . show) return
+
     popArg :: [String] -> IO (String, [String])
     popArg = maybe (fail "too few arguments") return . uncons
 

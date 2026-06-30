@@ -17,6 +17,7 @@ module Resolvable.Prolog.Core
   , collectListWithTail
   , member
   , walk
+  , vars
   , renameFunctor
   , subterm
   , Rule(..)
@@ -63,7 +64,6 @@ import qualified DNS.RecordType as T
 import NameConstraint
 import Resolvable.Prolog.Symbols
 import Util.Fresh (Fresh, fresh)
-import Util.List (zipWithStrict)
 import Util.Bytes (toB64)
 
 import qualified Data.ByteString as BS
@@ -157,20 +157,9 @@ member :: Term -> Term -> Term
 member a b = TFunctor memberSym [ a, b ]
 
 equiv :: Term -> Term -> Bool
-equiv (TFunctor a argsa) (TFunctor b argsb) = a == b && maybe False and (zipWithStrict equiv argsa argsb)
-equiv TEmptyList TEmptyList = True
-equiv (TVar a) (TVar b) = a == b
 equiv TWildcard _ = True
 equiv _ TWildcard = True
-equiv (TAtomQuoted a) (TAtomQuoted b) = a == b
-equiv (TAtom a) (TAtom b) = a == b
-  -- where
-  --   tailEqual :: Maybe Term -> Maybe Term -> Bool
-  --   tailEqual Nothing Nothing = True
-  --   tailEqual (Just ta) (Just tb) = equiv ta tb
-  --   tailEqual _ _ = False
-equiv (TString a) (TString b) = a == b
-equiv _ _ = False
+equiv t1 t2 = t1 == t2
 
 instance Show Term where
   show t@(TFunctor op args)

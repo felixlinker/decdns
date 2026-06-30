@@ -5,7 +5,8 @@ module Resolvable.Prolog.TermView
   , toView
   , fromView
   , isResolves
-  , isNeq ) where
+  , isNeq
+  , isVar ) where
 
 import DNS.Record (Type)
 import Resolvable.Prolog.Symbols
@@ -102,3 +103,7 @@ isResolves _ = False
 isNeq :: Term -> Bool
 isNeq (toView -> TVNeq {}) = True
 isNeq _ = False
+
+isVar :: Term -> Bool
+isVar (TVar {}) = True
+isVar _ = False

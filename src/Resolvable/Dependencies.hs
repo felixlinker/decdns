@@ -27,7 +27,7 @@ import qualified Resolvable.ConstrainedUnification as CU
 import qualified Util.PartialOrder as PO
 import Resolvable.Resolvability (RComp (RComp))
 import NameConstraint (ConstrainedName)
-import Control.Monad.Trans.Except (Except, throwE)
+import Control.Monad.Trans.Except (ExceptT, throwE)
 import Util.Monad (exceptMaybe, foreachM)
 import DNS.SEC.Verification (verifySignature, verifyDigest)
 
@@ -107,7 +107,7 @@ extendAndMerge t (CQuery t' neqs) cu = do
   cu' <- CU.extendUnifier t t' cu
   foldr ((=<<) . uncurry CU.addConstraint) (Just cu') neqs
 
-asName :: Term -> Except String (Name String)
+asName :: Monad m => Term -> ExceptT String m (Name String)
 asName t = do
   ts <- exceptMaybe ("name term is not a list: " ++ show t) $ collectList t
   ls <- exceptMaybe ("label not ground: " ++ show t) $ mapM asAtom ts
@@ -118,31 +118,31 @@ asName t = do
     asAtom (TAtom a) = Just a
     asAtom _ = Nothing
 
-asType :: Term -> Except String Type
+asType :: Monad m => Term -> ExceptT String m Type
 asType (TComplex d) = return d
 asType t = throwE ("data not ground: " ++ show t)
 
-asTypes :: Term -> Except String [Type]
+asTypes :: Monad m => Term -> ExceptT String m [Type]
 asTypes t = do
   l <- exceptMaybe ("data not ground: " ++ show t) $ collectList t
   mapM asType l
 
-asDNSKEYData :: Type -> Except String DNSKEYData
+asDNSKEYData :: Monad m => Type -> ExceptT String m DNSKEYData
 asDNSKEYData (DNSKEY dat) = return dat
 asDNSKEYData t = throwE $ "expected DNSKEY got: " ++ show t
 
-asDSData :: Type -> Except String DSData
+asDSData :: Monad m => Type -> ExceptT String m DSData
 asDSData (DS dat) = return dat
 asDSData t = throwE $ "expected DS got: " ++ show t
 
-asRRSigData :: Type -> Except String (RRSIGData BS.ByteString)
+asRRSigData :: Monad m => Type -> ExceptT String m (RRSIGData BS.ByteString)
 asRRSigData (RRSIG dat) = return dat
 asRRSigData t = throwE $ "expected RRSIG got: " ++ show t
 
-solveBody :: S.Set ConstrainedQuery -> Rule a -> Except String (S.Set ConstrainedQuery)
+solveBody :: Monad m => S.Set ConstrainedQuery -> Rule a -> ExceptT String m (S.Set ConstrainedQuery)
 solveBody (S.toList -> rs) (Rule _ h b) = S.fromList . map (\u -> CQuery (CU.apply u h) (CU.constraints u)) <$> rec b [CU.identity]
   where
-    rec :: [Term] -> [CU.ConstrainedUnifier] -> Except String [CU.ConstrainedUnifier]
+    rec :: Monad m => [Term] -> [CU.ConstrainedUnifier] -> ExceptT String m [CU.ConstrainedUnifier]
     rec [] choices = return choices
     rec (t:recArg) choices = case toView t of
       TVNeq t1 t2 -> rec recArg (mapMaybe (CU.addConstraint t1 t2) choices)
@@ -168,15 +168,15 @@ solveBody (S.toList -> rs) (Rule _ h b) = S.fromList . map (\u -> CQuery (CU.app
       -- This drops unsupported predicates, implicitly assuming that they are true
       _ -> rec recArg choices
       where
-        checkReturn :: Bool -> a -> Except String [a]
+        checkReturn :: Monad m => Bool -> a -> ExceptT String m [a]
         checkReturn p a = return $ guard p >> [a]
 
-computeResolvable :: [Rule (Maybe RComp)] -> Except String (S.Set ConstrainedQuery)
+computeResolvable :: Monad m => [Rule (Maybe RComp)] -> ExceptT String m (S.Set ConstrainedQuery)
 computeResolvable (filter (isResolves . rhead) -> rs) = do
   ord <- exceptMaybe "cyclic dependencies" $ PO.transitiveClosure $ fromRules rs
   rec ord rs S.empty
   where
-    rec :: RuleDependencies -> [Rule (Maybe RComp)] -> S.Set ConstrainedQuery -> Except String (S.Set ConstrainedQuery)
+    rec :: Monad m => RuleDependencies -> [Rule (Maybe RComp)] -> S.Set ConstrainedQuery -> ExceptT String m (S.Set ConstrainedQuery)
     rec _ [] acc = return acc
     rec ord toSolve acc =
       let (mins, recArg) = partition (maybe False (PO.minimal ord) . fromRule) toSolve

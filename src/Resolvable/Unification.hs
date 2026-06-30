@@ -2,6 +2,7 @@
 module Resolvable.Unification
   ( Unifier(..)
   , identity
+  , isRenaming
   , apply
   , unify
   , unifies
@@ -15,6 +16,7 @@ import Data.List (intercalate)
 import Data.Maybe (fromMaybe, isJust, isNothing)
 
 import Resolvable.Prolog.Core
+import Resolvable.Prolog.TermView
 import Util.List (zipWithStrict)
 
 newtype Unifier = Unifier (M.Map Term Term)
@@ -33,10 +35,6 @@ singleton _ _ = undefined
 isRenaming :: Unifier -> Bool
 isRenaming (Unifier (M.elems -> ts)) = all isVar ts && not (hasDuplicates ts)
   where
-    isVar :: Term -> Bool
-    isVar (TVar _) = True
-    isVar _ = False
-
     hasDuplicates :: Ord a => [a] -> Bool
     hasDuplicates = isNothing . foldr (\a -> (>>= S.alterF insertP a)) (Just S.empty)
 
