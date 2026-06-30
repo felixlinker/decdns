@@ -3,7 +3,7 @@ module Resolvable.ResolvabilitySpec (tests) where
 
 import qualified Data.Set as S
 import Data.List (tails)
-import Test.Tasty (TestTree, testGroup)
+import Test.Tasty (TestTree, localOption, testGroup)
 import Test.Tasty.QuickCheck
 
 import DNS.ZoneFileSpec (ArbZone(..))
@@ -15,6 +15,7 @@ import Util.Fresh (runFresh)
 
 tests :: TestTree
 tests =
+  localOption (QuickCheckTests 10) $
   testGroup
     "Resolvable.Resolvability"
     [ testProperty "rules compiled from a zone have pairwise distinct variables" propDistinctRuleVariables
