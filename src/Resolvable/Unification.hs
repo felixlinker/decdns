@@ -3,6 +3,8 @@ module Resolvable.Unification
   ( Unifier(..)
   , Apply(..)
   , identity
+  , toList
+  , restrict
   , isRenaming
   , unify
   , unifies
@@ -17,6 +19,7 @@ import Data.Maybe (fromMaybe, isJust, isNothing)
 
 import Resolvable.Prolog.Core
 import Util.List (zipWithStrict)
+import Data.Bifunctor (Bifunctor(bimap))
 
 newtype Unifier = Unifier (M.Map Term Term)
   deriving Eq
@@ -27,12 +30,24 @@ instance Show Unifier where
 class Apply t where
   apply :: Unifier -> t -> t
 
+instance Apply t => Apply [t] where
+  apply u = map (apply u)
+
+instance (Apply a, Apply b) => Apply (a, b) where
+  apply u = bimap (apply u) (apply u)
+
 identity :: Unifier
 identity = Unifier M.empty
 
 singleton :: Term -> Term -> Unifier
 singleton v@(TVar _) t = Unifier (M.singleton v t)
 singleton _ _ = undefined
+
+toList :: Unifier -> [(Term, Term)]
+toList (Unifier u) = M.toList u
+
+restrict :: S.Set Term -> Unifier -> Unifier
+restrict dom (Unifier m) = Unifier $ M.filterWithKey (\k _ -> S.member k dom) m
 
 isRenaming :: Unifier -> Bool
 isRenaming (Unifier (M.elems -> ts)) = all isVar ts && not (hasDuplicates ts)

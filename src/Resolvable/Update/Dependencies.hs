@@ -10,7 +10,6 @@ import Resolvable.Prolog.Core
 import Util.Fresh
 import Resolvable.Resolvability (RComp)
 import Resolvable.Update.NegatedQuery (withouts)
-import Data.Maybe (mapMaybe)
 
 toExcept :: Monad m => m a -> ExceptT e m a
 toExcept = ExceptT . fmap Right
@@ -21,4 +20,4 @@ computeRegressions (toExcept -> oldf) (toExcept -> newf) = do
   newRs <- newf
   resOld <- S.toList <$> computeResolvable oldRs
   resNew <- S.toList <$> computeResolvable newRs
-  return $ mapMaybe (`withouts` resNew) resOld
+  return $ concatMap (`withouts` resNew) resOld

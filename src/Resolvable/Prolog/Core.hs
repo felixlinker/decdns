@@ -1,4 +1,3 @@
-{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Prolog.Core
   -- TODO: Enforce usage of termView or exported constructors by hiding constructors of Term
@@ -72,6 +71,7 @@ import Util.Bool
 import qualified Data.ByteString as BS
 import Data.List (intercalate, groupBy, sortOn)
 import qualified Data.Map as M
+import qualified Data.Set as S
 import qualified Data.List.NonEmpty as NE
 import Data.Char (toLower, toUpper)
 import Data.Semigroup (Semigroup(..), sconcat)
@@ -210,12 +210,15 @@ isWildcard _ = False
 ground :: Term -> Bool
 ground = bool . walk (\t -> And (not (isWildcard t) && not (isVar t)))
 
-vars :: Term -> [String]
-vars = walk grabVar
+varNames :: Term -> [String]
+varNames = walk grabVar
   where
     grabVar :: Term -> [String]
     grabVar (TVar n) = [n]
     grabVar _ = []
+
+vars :: Term -> S.Set Term
+vars = S.fromList . map TVar . varNames
 
 replace :: (Term -> Term) -> Term -> Term
 replace f t = rec (f t)
@@ -275,7 +278,7 @@ mapRule :: (Term -> Term) -> Rule a -> Rule a
 mapRule f (Rule a h b) = Rule a (f h) (map f b)
 
 varCount :: Rule a -> (String -> Int)
-varCount (Rule _ (vars -> hvs) (concatMap vars -> bvs)) =
+varCount (Rule _ (varNames -> hvs) (concatMap varNames -> bvs)) =
   let vs = foldr (M.alter (Just . maybe 1 (+1))) M.empty (hvs ++ bvs)
   in fromMaybe 0 . (`M.lookup` vs)
 

@@ -3,11 +3,13 @@ module Resolvable.ConstrainedUnification
   ( ConstrainedUnifier(..)
   , fromNeqs
   , Neqs
+  , union
   , toList
   , asPredicates
   , fromList
   , simplify
   , identity
+  , restrict
   , fromUnifier
   , apply
   , applyRule
@@ -17,7 +19,8 @@ module Resolvable.ConstrainedUnification
 
 import Data.Functor (($>))
 import qualified Data.Map as M
-import qualified Data.List.NonEmpty as NE
+import qualified Data.Set as S
+import qualified Data.Map.Merge.Strict as MM
 
 import qualified Resolvable.Unification as U
 import Resolvable.Prolog.Core
@@ -27,7 +30,10 @@ import Data.List (intercalate)
 import Data.Bifunctor (Bifunctor(bimap))
 import Util.List (zipStrict)
 
-type Neqs = M.Map String (NE.NonEmpty Term)
+type Neqs = M.Map String (S.Set Term)
+
+union :: Neqs -> Neqs -> Neqs
+union = MM.merge MM.preserveMissing MM.preserveMissing (MM.zipWithMatched (const (<>)))
 
 fromListUnchecked :: [(String, Term)] -> Neqs
 fromListUnchecked = foldr (uncurry addConstraintUnchecked) M.empty
@@ -36,7 +42,7 @@ fromList :: [(Term, Term)] -> Maybe Neqs
 fromList = fmap (foldr (uncurry addConstraintUnchecked) M.empty) . simplifyL
 
 toList :: Neqs -> [(Term, Term)]
-toList = concatMap (\(vn, ts) -> map (TVar vn,) (NE.toList ts)) . M.toList
+toList = concatMap (\(vn, ts) -> map (TVar vn,) (S.toList ts)) . M.toList
 
 asPredicates :: Neqs -> [Term]
 asPredicates = map (uncurry (\=)) . toList
@@ -53,6 +59,10 @@ instance Show ConstrainedUnifier where
 
 identity :: ConstrainedUnifier
 identity = CUnifier U.identity M.empty
+
+restrict :: S.Set Term -> ConstrainedUnifier -> ConstrainedUnifier
+restrict dom (CUnifier u neqs) =
+  CUnifier (U.restrict dom u) (M.filterWithKey (\k _ -> S.member (TVar k) dom) neqs)
 
 fromNeqs :: Neqs -> ConstrainedUnifier
 fromNeqs = CUnifier U.identity
@@ -77,7 +87,7 @@ applyRule cu (Rule ann h bs) = do
       return (t':bs', u')
 
 addConstraintUnchecked :: String -> Term -> Neqs -> Neqs
-addConstraintUnchecked k v = M.alter (Just . maybe (NE.singleton v) (v NE.<|)) k
+addConstraintUnchecked k v = M.alter (Just . maybe (S.singleton v) (S.insert v)) k
 
 addConstraint :: Term -> Term -> ConstrainedUnifier -> Maybe ConstrainedUnifier
 addConstraint a b (CUnifier u neqs) =
