@@ -1,32 +1,37 @@
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Update.NegatedQuerySpec (tests) where
 
-import Control.Monad (forM_)
 import qualified Data.Set as S
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (Assertion, testCase, (@?=))
+import Test.Tasty.HUnit (testCase, (@?=))
 
 import Resolvable.Dependencies (ConstrainedQuery(..))
 import Resolvable.Prolog.Core (Term(..), list, listWithTail)
 import Resolvable.Update.NegatedQuery (withouts)
 import Data.Char (isUpper)
 import Data.Bifunctor (Bifunctor(bimap))
+import Data.List (intercalate)
 
 tests :: TestTree
 tests =
   testGroup
     "Resolvable.Update.NegatedQuery"
-    [ testCase "minus" minusTests
-    ]
+    minusTests
 
-minusTests :: Assertion
+minusTests :: [TestTree]
 minusTests =
-  forM_
+  map mkTestCase
     [ ( q ["com", "a"]
       , [q ["com", "X"]]
       , Nothing )
     , ( q ["com", "a"]
+      , [q ["com", "a"]]
+      , Nothing )
+    , ( q ["com", "a"]
       , [q ["com", "b"]]
+      , Just (q ["com", "a"]) )
+    , ( q ["com", "a"]
+      , [qC ["com", "X"] [("X", "a")]]
       , Just (q ["com", "a"]) )
     , ( q ["com", "a"]
       , [qC ["com", "X", "Y"] [("X", "*")]]
@@ -39,7 +44,7 @@ minusTests =
       , Just (q ["com", "*"]) )
     , ( q ["com", "*"]
       , [qTail ["com", "H"] "T" [("H", "*")], q ["com", "*"]]
-      , Nothing )
+      , Just (q ["com", "*"]) )
     , ( q ["com", "X"]
       , [q ["net", "a"]]
       , Just (q ["com", "X"]) )
@@ -57,24 +62,27 @@ minusTests =
       , Nothing )
     , ( qC ["com", "X"] [("X", "a")]
       , [qC ["com", "Y"] [("Y", "a")]]
-      , Just (qC ["com", "X"] [("X", "a")]) )
+      , Nothing )
     , ( qC ["com", "X"] [("X", "a")]
       , [qC ["com", "Y"] [("Y", "a"), ("Y", "b")]]
-      , Just (qC ["com", "X"] [("X", "a"), ("X", "b")]) )
+      , Just (q ["com", "b"]) )
     , ( q ["com", "X", "Y"]
       , [q ["com", "a", "b"]]
       , Just (qC ["com", "X", "Y"] [("X", "a"), ("Y", "b")]) ) ]
-    $ \(q', n, expected) -> withouts q' n @?= expected
+  where
+    mkTestCase (q', n, expected) =
+      testCase (show q' ++ " without " ++ intercalate ", " (map show n) ++ " should be " ++ maybe "empty" show expected) $
+        withouts q' n @?= expected
 
 q :: [String] -> ConstrainedQuery
 q = (`qC` [])
 
 qC :: [String] -> [(String, String)] -> ConstrainedQuery
-qC (map fromString -> ts) (map (bimap fromString fromString) -> neqs) = CQuery (list ts) (S.fromList neqs)
+qC (map fromString -> ts) (map (bimap fromString fromString) -> neqs) = CQuery (TFunctor "p" [list ts]) (S.fromList neqs)
 
 qTail :: [String] -> String -> [(String, String)] -> ConstrainedQuery
 qTail (map fromString -> ts) (fromString -> tailVar) (map (bimap fromString fromString) -> neqs) =
-  CQuery (listWithTail ts tailVar) (S.fromList neqs)
+  CQuery (TFunctor "p" [listWithTail ts tailVar]) (S.fromList neqs)
 
 fromString :: String -> Term
 fromString "" = undefined
