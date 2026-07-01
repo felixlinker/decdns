@@ -1,6 +1,7 @@
 module Resolvable.ConstrainedUnification
   ( ConstrainedUnifier(..)
   , Neqs
+  , simplify
   , identity
   , fromUnifier
   , apply
@@ -9,6 +10,7 @@ module Resolvable.ConstrainedUnification
   , extendUnifier
   , mergeUnifiers ) where
 
+import Data.Functor (($>))
 import qualified Data.Set as S
 import qualified Data.Map as M
 
@@ -57,53 +59,50 @@ addConstraint :: Term -> Term -> ConstrainedUnifier -> Maybe ConstrainedUnifier
 addConstraint a b (CUnifier u neqs) =
   let a' = U.apply u a
       b' = U.apply u b
-      new = simplifyNeq a' b'
-  in  if any (uncurry equiv) new
-      then Nothing
-      else Just (CUnifier u (foldr S.insert neqs new))
+  in CUnifier u . foldr S.insert neqs <$> simplifyNeq a' b'
 
 extendUnifier :: Term -> Term -> ConstrainedUnifier -> Maybe ConstrainedUnifier
 extendUnifier a b (CUnifier u neqs) = do
   u' <- U.extendUnifier a b u
-  let neqs' = S.fromList $ simplify $ map (bimap (U.apply u') (U.apply u')) $ S.toList neqs
-  guard (all (uncurry (/=)) neqs')
-  return $ CUnifier u' neqs'
+  CUnifier u' . S.fromList <$> simplifyL (map (bimap (U.apply u') (U.apply u')) $ S.toList neqs)
 
 mergeUnifiers :: ConstrainedUnifier -> ConstrainedUnifier -> Maybe ConstrainedUnifier
 mergeUnifiers keep (CUnifier (U.Unifier m) neqs) =
   let withNeqs = foldr (\(a, b) -> (>>= addConstraint a b)) (Just keep) neqs
   in foldr (\(a, b) -> (>>= extendUnifier a b)) withNeqs (M.toList m)
 
-simplify :: [(Term, Term)] -> [(Term, Term)]
-simplify = concatMap (uncurry simplifyNeq)
+simplify :: Neqs -> Maybe Neqs
+simplify = fmap S.fromAscList . simplifyL . S.toAscList
 
-simplifyNeq :: Term -> Term -> [(Term, Term)]
+simplifyL :: [(Term, Term)] -> Maybe [(Term, Term)]
+simplifyL = fmap concat . mapM (uncurry simplifyNeq)
+
+simplifyNeq :: Term -> Term -> Maybe [(Term, Term)]
+simplifyNeq TWildcard _ = Just []
+simplifyNeq _ TWildcard = Just []
+simplifyNeq a@(TVar _) b = guard (a /= b) $> [(a, b)]
+-- NOTE: a below cannot be a variable
+simplifyNeq a b@(TVar _) = simplifyNeq b a
 simplifyNeq a b = case a of
-  TVar _ -> preserve
-  TWildcard -> preserve
+  TEmptyList      -> contradictionWhenEq
+  (TAtomQuoted _) -> contradictionWhenEq
+  (TAtom _)       -> contradictionWhenEq
+  (TString _)     -> contradictionWhenEq
+  (TInt _)        -> contradictionWhenEq
+  (TComplex _)    -> contradictionWhenEq
   TFunctor na argsa -> case b of
-    TVar _ -> preserve
-    TWildcard -> preserve
     TFunctor nb argsb
-      | na == nb -> maybe [] rec (zipStrict argsa argsb)
-    _ -> []
-  TEmptyList -> dropWhenStrictEq TEmptyList
-  a'@(TAtomQuoted _) -> dropWhenStrictEq a'
-  a'@(TAtom _) -> dropWhenStrictEq a'
-  a'@(TString _) -> dropWhenStrictEq a'
-  a'@(TInt _) -> dropWhenStrictEq a'
-  a'@(TComplex _) -> dropWhenStrictEq a'
+      | na == nb -> maybe redundant rec (zipStrict argsa argsb)
+    _ -> redundant
   where
-    preserve :: [(Term, Term)]
-    preserve = [(a, b)]
+    redundant :: Maybe [a]
+    redundant = Just []
 
-    dropWhenStrictEq :: Term -> [(Term, Term)]
-    dropWhenStrictEq a' = case b of
-      TVar _ -> preserve
-      TWildcard -> preserve
-      b'  | a' == b' -> preserve
-          | otherwise -> []
+    contradictionWhenEq :: Maybe [(Term, Term)]
+    contradictionWhenEq = case b of
+      b'  | a == b'   -> Nothing
+          | otherwise -> redundant
 
-    rec :: [(Term, Term)] -> [(Term, Term)]
-    rec [] = [(a, b)]  -- preserve contradiction
-    rec zipped = concatMap (uncurry simplifyNeq) zipped
+    rec :: [(Term, Term)] -> Maybe [(Term, Term)]
+    rec [] = Nothing
+    rec zipped = simplifyL zipped

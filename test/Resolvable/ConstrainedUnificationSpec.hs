@@ -14,6 +14,7 @@ import Resolvable.ConstrainedUnification
   , extendUnifier
   , identity
   , mergeUnifiers
+  , simplify
   )
 import Resolvable.Util (genTermNoWildcard)
 import Data.Maybe (fromMaybe)
@@ -31,6 +32,10 @@ tests =
         , testCase "rejects unification that violates a stored constraint" rejectsConstraintViolation
         , testCase "rejects when constraint becomes equal after chained bindings" rejectsChainedViolation
         , testCase "keeps constraints after unrelated bindings" keepsConstraintsAfterBinding
+        , testCase "simplify drops constraints involving wildcards" simplifyDropsWildcardConstraints
+        , testCase "simplify rejects equal ground terms" simplifyRejectsEqualGroundTerms
+        , testCase "simplify keeps variable constraints" simplifyKeepsVariableConstraints
+        , testCase "simplify decomposes matching functors" simplifyDecomposesMatchingFunctors
         ]
     ]
 
@@ -69,6 +74,30 @@ keepsConstraintsAfterBinding =
       case extendUnifier (TVar "Y") (TAtom "a") u2 of
         Nothing -> pure ()
         Just _ -> assertFailure "expected constraint to still block equality"
+
+simplifyDropsWildcardConstraints :: Assertion
+simplifyDropsWildcardConstraints =
+  simplify (S.fromList [(TWildcard, TAtom "a"), (TVar "X", TWildcard)])
+    @?= Just S.empty
+
+simplifyRejectsEqualGroundTerms :: Assertion
+simplifyRejectsEqualGroundTerms =
+  simplify (S.singleton (TAtom "a", TAtom "a")) @?= Nothing
+
+simplifyKeepsVariableConstraints :: Assertion
+simplifyKeepsVariableConstraints =
+  simplify (S.fromList [(TVar "X", TVar "Y"), (TAtom "a", TVar "Z")])
+    @?= Just (S.fromList [(TVar "X", TVar "Y"), (TVar "Z", TAtom "a")])
+
+simplifyDecomposesMatchingFunctors :: Assertion
+simplifyDecomposesMatchingFunctors =
+  simplify
+    ( S.singleton
+        ( TFunctor "f" [TVar "X", TVar "Y"]
+        , TFunctor "f" [TAtom "a", TAtom "b"]
+        )
+    )
+    @?= Just (S.fromList [(TVar "X", TAtom "a"), (TVar "Y", TAtom "b")])
 
 data Op
   = OpExtend Term Term
