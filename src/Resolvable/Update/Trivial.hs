@@ -17,7 +17,9 @@ import Data.Maybe (isJust)
 import NameConstraint (ConstrainedRecord)
 import Util.Fresh
 
-matchesQuery :: ConstrainedQuery -> Term -> C.Neqs -> Bool
+type Neqs = S.Set (Term, Term)
+
+matchesQuery :: ConstrainedQuery -> Term -> Neqs -> Bool
 matchesQuery (CQuery t neqs) t' neqs' = isJust $ do
   cu <- C.extendUnifier t t' (C.CUnifier U.identity neqs)
   foldr (\(n1, n2) -> (C.addConstraint n1 n2 =<<)) (Just cu) neqs'
@@ -29,20 +31,20 @@ partitionTrivial old new fqs = do
   new' <- cNew
   return $ L.partition (isTrivial old' new') qs
   where
-    cOld :: Fresh [(Term, C.Neqs)]
+    cOld :: Fresh [(Term, Neqs)]
     cOld = mapM cResolvable old
 
-    cNew :: Fresh [(Term, C.Neqs)]
+    cNew :: Fresh [(Term, Neqs)]
     cNew = mapM cResolvable new
 
     toConstraint :: Term -> (Term, Term)
     toConstraint (toView -> TVNeq a b) = (a, b)
     toConstraint _ = undefined
 
-    cResolvable :: ConstrainedRecord -> Fresh (Term, C.Neqs)
+    cResolvable :: ConstrainedRecord -> Fresh (Term, Neqs)
     cResolvable (Named cn d) = do
       (n, S.fromList . map toConstraint -> neqs) <- nameWithSynthesis cn
       return (resolvable TWildcard (typeTerm (rtype d)) n, neqs)
 
-    isTrivial :: [(Term, C.Neqs)] -> [(Term, C.Neqs)] -> ConstrainedQuery -> Bool
+    isTrivial :: [(Term, Neqs)] -> [(Term, Neqs)] -> ConstrainedQuery -> Bool
     isTrivial old' new' q = any (uncurry (matchesQuery q)) old' && not (any (uncurry (matchesQuery q)) new')

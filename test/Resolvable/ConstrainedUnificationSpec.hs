@@ -3,18 +3,20 @@ module Resolvable.ConstrainedUnificationSpec (tests) where
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertFailure, testCase, (@?=))
 import Test.Tasty.QuickCheck
-import qualified Data.Set as S
 import Data.List (foldl')
 
 import Resolvable.Prolog.Core (Term(..))
 import Resolvable.ConstrainedUnification
   ( ConstrainedUnifier(..)
+  , Neqs
   , addConstraint
   , apply
   , extendUnifier
+  , fromList
   , identity
   , mergeUnifiers
   , simplify
+  , toList
   )
 import Resolvable.Util (genTermNoWildcard)
 import Data.Maybe (fromMaybe)
@@ -43,6 +45,9 @@ expectJust :: String -> Maybe a -> (a -> Assertion) -> Assertion
 expectJust msg m k = case m of
   Nothing -> assertFailure msg
   Just v -> k v
+
+mkNeqs :: [(Term, Term)] -> Neqs
+mkNeqs = fromMaybe (error "invalid test constraints") . fromList
 
 rejectsEqualConstraint :: Assertion
 rejectsEqualConstraint =
@@ -77,27 +82,29 @@ keepsConstraintsAfterBinding =
 
 simplifyDropsWildcardConstraints :: Assertion
 simplifyDropsWildcardConstraints =
-  simplify (S.fromList [(TWildcard, TAtom "a"), (TVar "X", TWildcard)])
-    @?= Just S.empty
+  simplify (mkNeqs [(TWildcard, TAtom "a"), (TVar "X", TWildcard)])
+    @?= Just (mkNeqs [])
 
 simplifyRejectsEqualGroundTerms :: Assertion
 simplifyRejectsEqualGroundTerms =
-  simplify (S.singleton (TAtom "a", TAtom "a")) @?= Nothing
+  fromList [(TAtom "a", TAtom "a")] @?= Nothing
 
 simplifyKeepsVariableConstraints :: Assertion
 simplifyKeepsVariableConstraints =
-  simplify (S.fromList [(TVar "X", TVar "Y"), (TAtom "a", TVar "Z")])
-    @?= Just (S.fromList [(TVar "X", TVar "Y"), (TVar "Z", TAtom "a")])
+  simplify (mkNeqs [(TVar "X", TVar "Y"), (TAtom "a", TVar "Z")])
+    @?= Just (mkNeqs [(TVar "X", TVar "Y"), (TVar "Z", TAtom "a")])
 
 simplifyDecomposesMatchingFunctors :: Assertion
 simplifyDecomposesMatchingFunctors =
   simplify
-    ( S.singleton
+    ( mkNeqs
+      [
         ( TFunctor "f" [TVar "X", TVar "Y"]
         , TFunctor "f" [TAtom "a", TAtom "b"]
         )
+      ]
     )
-    @?= Just (S.fromList [(TVar "X", TAtom "a"), (TVar "Y", TAtom "b")])
+    @?= Just (mkNeqs [(TVar "X", TAtom "a"), (TVar "Y", TAtom "b")])
 
 data Op
   = OpExtend Term Term
@@ -134,10 +141,10 @@ constrainedEq (CUnifier u1 c1) (CUnifier u2 c2) =
   counterexample "unifier mismatch" (u1 == u2)
     .&&. counterexample "constraint mismatch" (c1 == c2)
 
-checkConstraints :: ConstrainedUnifier -> S.Set (Term, Term) -> Property
+checkConstraints :: ConstrainedUnifier -> Neqs -> Property
 checkConstraints u neqs =
   conjoin [ counterexample ("constraint violated: " ++ show a ++ " == " ++ show b) (apply u a /= apply u b)
-          | (a, b) <- S.toList neqs
+          | (a, b) <- toList neqs
           ]
 
 genConstrainedUnifier :: Gen ConstrainedUnifier

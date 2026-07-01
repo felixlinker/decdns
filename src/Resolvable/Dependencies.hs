@@ -7,6 +7,7 @@ module Resolvable.Dependencies
   , RecordDependencies
   , RuleDependencies
   , ConstrainedQuery(..)
+  , unifyQueries
   , fromRules
   , computeResolvable ) where
 
@@ -30,6 +31,7 @@ import NameConstraint (ConstrainedName)
 import Control.Monad.Trans.Except (ExceptT, throwE)
 import Util.Monad (exceptMaybe, foreachM)
 import DNS.SEC.Verification (verifySignature, verifyDigest)
+import Data.Bifunctor (Bifunctor(bimap))
 
 class FromRule t where
   fromRule :: Rule (Maybe RComp) -> Maybe t
@@ -96,16 +98,26 @@ fromRules rs = go rs PO.empty
 data ConstrainedQuery = CQuery Term CU.Neqs
   deriving (Eq, Ord)
 
+instance Apply (Maybe ConstrainedQuery) where
+  apply _ Nothing = Nothing
+  apply u (Just (CQuery t neqs)) = do
+    let app = apply u
+    neqs' <- CU.fromList (map (bimap app app) (CU.toList neqs))
+    return $ CQuery (apply u t) neqs'
+
 toRule :: ConstrainedQuery -> Rule ()
-toRule (CQuery q (S.toList -> neqs)) = Rule () q (map (uncurry (\=)) neqs)
+toRule (CQuery q neqs) = Rule () q (CU.asPredicates neqs)
 
 instance Show ConstrainedQuery where
   show = show . toRule
 
+unifyQueries :: ConstrainedQuery -> ConstrainedQuery -> Maybe CU.ConstrainedUnifier
+unifyQueries (CQuery t neqs) q2 = extendAndMerge t q2 (CU.fromNeqs neqs)
+
 extendAndMerge :: Term -> ConstrainedQuery -> CU.ConstrainedUnifier -> Maybe CU.ConstrainedUnifier
 extendAndMerge t (CQuery t' neqs) cu = do
   cu' <- CU.extendUnifier t t' cu
-  foldr ((=<<) . uncurry CU.addConstraint) (Just cu') neqs
+  foldr ((=<<) . uncurry CU.addConstraint) (Just cu') (CU.toList neqs)
 
 asName :: Monad m => Term -> ExceptT String m (Name String)
 asName t = do

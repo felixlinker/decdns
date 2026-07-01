@@ -1,9 +1,9 @@
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Unification
   ( Unifier(..)
+  , Apply(..)
   , identity
   , isRenaming
-  , apply
   , unify
   , unifies
   , equivModuloRenaming
@@ -16,7 +16,6 @@ import Data.List (intercalate)
 import Data.Maybe (fromMaybe, isJust, isNothing)
 
 import Resolvable.Prolog.Core
-import Resolvable.Prolog.TermView
 import Util.List (zipWithStrict)
 
 newtype Unifier = Unifier (M.Map Term Term)
@@ -24,6 +23,9 @@ newtype Unifier = Unifier (M.Map Term Term)
 
 instance Show Unifier where
   show (Unifier m) = "{" ++ intercalate ", " (map (\(k, v) -> show k ++ " -> " ++ show v) (M.toList m)) ++ "}"
+
+class Apply t where
+  apply :: Unifier -> t -> t
 
 identity :: Unifier
 identity = Unifier M.empty
@@ -42,16 +44,16 @@ isRenaming (Unifier (M.elems -> ts)) = all isVar ts && not (hasDuplicates ts)
     insertP False = Just True  -- Insert if not found
     insertP True = Nothing     -- Abort if found
 
-apply :: Unifier -> Term -> Term
-apply u (TFunctor op (map (apply u) -> args)) = TFunctor op args
-apply _ TEmptyList = TEmptyList
-apply (Unifier m) v@(TVar _) = fromMaybe v (M.lookup v m)
-apply _ TWildcard = TWildcard
-apply _ t@(TAtomQuoted _) = t
-apply _ t@(TAtom _) = t
-apply _ t@(TString _) = t
-apply _ t@(TInt _) = t
-apply _ t@(TComplex _) = t
+instance Apply Term where
+  apply u (TFunctor op (map (apply u) -> args)) = TFunctor op args
+  apply _ TEmptyList = TEmptyList
+  apply (Unifier m) v@(TVar _) = fromMaybe v (M.lookup v m)
+  apply _ TWildcard = TWildcard
+  apply _ t@(TAtomQuoted _) = t
+  apply _ t@(TAtom _) = t
+  apply _ t@(TString _) = t
+  apply _ t@(TInt _) = t
+  apply _ t@(TComplex _) = t
 
 unify :: Term -> Term -> Maybe Unifier
 unify t1 t2 = extendUnifier t1 t2 identity

@@ -1,6 +1,11 @@
+{-# LANGUAGE TupleSections #-}
 module Resolvable.ConstrainedUnification
   ( ConstrainedUnifier(..)
+  , fromNeqs
   , Neqs
+  , toList
+  , asPredicates
+  , fromList
   , simplify
   , identity
   , fromUnifier
@@ -11,8 +16,8 @@ module Resolvable.ConstrainedUnification
   , mergeUnifiers ) where
 
 import Data.Functor (($>))
-import qualified Data.Set as S
 import qualified Data.Map as M
+import qualified Data.List.NonEmpty as NE
 
 import qualified Resolvable.Unification as U
 import Resolvable.Prolog.Core
@@ -22,22 +27,38 @@ import Data.List (intercalate)
 import Data.Bifunctor (Bifunctor(bimap))
 import Util.List (zipStrict)
 
-type Neqs = S.Set (Term, Term)
+type Neqs = M.Map String (NE.NonEmpty Term)
+
+fromListUnchecked :: [(String, Term)] -> Neqs
+fromListUnchecked = foldr (uncurry addConstraintUnchecked) M.empty
+
+fromList :: [(Term, Term)] -> Maybe Neqs
+fromList = fmap (foldr (uncurry addConstraintUnchecked) M.empty) . simplifyL
+
+toList :: Neqs -> [(Term, Term)]
+toList = concatMap (\(vn, ts) -> map (TVar vn,) (NE.toList ts)) . M.toList
+
+asPredicates :: Neqs -> [Term]
+asPredicates = map (uncurry (\=)) . toList
 
 data ConstrainedUnifier =
   CUnifier  { unif :: U.Unifier
             , constraints :: Neqs }
 
 instance Show ConstrainedUnifier where
-  show (CUnifier u neqs) =
-    let cond = intercalate ", " (map (\(a, b) -> show a ++ " \\= " ++ show b) $ S.toList neqs)
-    in  show u ++ " s.t. " ++ (if null cond then "True" else cond)
+  show (CUnifier u neqs) = show u ++ " s.t. " ++ (if null cond then "True" else cond)
+    where
+      cond :: String
+      cond = intercalate ", " $ map show $ asPredicates neqs
 
 identity :: ConstrainedUnifier
-identity = CUnifier U.identity S.empty
+identity = CUnifier U.identity M.empty
+
+fromNeqs :: Neqs -> ConstrainedUnifier
+fromNeqs = CUnifier U.identity
 
 fromUnifier :: U.Unifier -> ConstrainedUnifier
-fromUnifier = (`CUnifier` S.empty)
+fromUnifier = (`CUnifier` M.empty)
 
 apply :: ConstrainedUnifier -> Term -> Term
 apply (CUnifier u _) = U.apply u
@@ -55,32 +76,35 @@ applyRule cu (Rule ann h bs) = do
             _ -> Just (apply u t, u)
       return (t':bs', u')
 
+addConstraintUnchecked :: String -> Term -> Neqs -> Neqs
+addConstraintUnchecked k v = M.alter (Just . maybe (NE.singleton v) (v NE.<|)) k
+
 addConstraint :: Term -> Term -> ConstrainedUnifier -> Maybe ConstrainedUnifier
 addConstraint a b (CUnifier u neqs) =
   let a' = U.apply u a
       b' = U.apply u b
-  in CUnifier u . foldr S.insert neqs <$> simplifyNeq a' b'
+  in CUnifier u . foldr (uncurry addConstraintUnchecked) neqs <$> simplifyNeq a' b'
 
 extendUnifier :: Term -> Term -> ConstrainedUnifier -> Maybe ConstrainedUnifier
 extendUnifier a b (CUnifier u neqs) = do
   u' <- U.extendUnifier a b u
-  CUnifier u' . S.fromList <$> simplifyL (map (bimap (U.apply u') (U.apply u')) $ S.toList neqs)
+  CUnifier u' . fromListUnchecked <$> simplifyL (map (bimap (U.apply u') (U.apply u')) $ toList neqs)
 
 mergeUnifiers :: ConstrainedUnifier -> ConstrainedUnifier -> Maybe ConstrainedUnifier
 mergeUnifiers keep (CUnifier (U.Unifier m) neqs) =
-  let withNeqs = foldr (\(a, b) -> (>>= addConstraint a b)) (Just keep) neqs
+  let withNeqs = foldr (\(a, b) -> (>>= addConstraint a b)) (Just keep) (toList neqs)
   in foldr (\(a, b) -> (>>= extendUnifier a b)) withNeqs (M.toList m)
 
 simplify :: Neqs -> Maybe Neqs
-simplify = fmap S.fromAscList . simplifyL . S.toAscList
+simplify = fmap fromListUnchecked . simplifyL . toList
 
-simplifyL :: [(Term, Term)] -> Maybe [(Term, Term)]
+simplifyL :: [(Term, Term)] -> Maybe [(String, Term)]
 simplifyL = fmap concat . mapM (uncurry simplifyNeq)
 
-simplifyNeq :: Term -> Term -> Maybe [(Term, Term)]
+simplifyNeq :: Term -> Term -> Maybe [(String, Term)]
 simplifyNeq TWildcard _ = Just []
 simplifyNeq _ TWildcard = Just []
-simplifyNeq a@(TVar _) b = guard (a /= b) $> [(a, b)]
+simplifyNeq a@(TVar vn) b = guard (a /= b) $> [(vn, b)]
 -- NOTE: a below cannot be a variable
 simplifyNeq a b@(TVar _) = simplifyNeq b a
 simplifyNeq a b = case a of
@@ -98,11 +122,11 @@ simplifyNeq a b = case a of
     redundant :: Maybe [a]
     redundant = Just []
 
-    contradictionWhenEq :: Maybe [(Term, Term)]
-    contradictionWhenEq = case b of
-      b'  | a == b'   -> Nothing
-          | otherwise -> redundant
+    contradictionWhenEq :: Maybe [(String, Term)]
+    contradictionWhenEq
+      | a == b    = Nothing
+      | otherwise = redundant
 
-    rec :: [(Term, Term)] -> Maybe [(Term, Term)]
+    rec :: [(Term, Term)] -> Maybe [(String, Term)]
     rec [] = Nothing
     rec zipped = simplifyL zipped
