@@ -17,6 +17,8 @@ module Resolvable.Prolog.Core
   , collectListWithTail
   , member
   , walk
+  , isVar
+  , ground
   , vars
   , renameFunctor
   , subterm
@@ -65,6 +67,7 @@ import NameConstraint
 import Resolvable.Prolog.Symbols
 import Util.Fresh (Fresh, fresh)
 import Util.Bytes (toB64)
+import Util.Bool
 
 import qualified Data.ByteString as BS
 import Data.List (intercalate, groupBy, sortOn)
@@ -196,6 +199,17 @@ walk f t@(TString _) = f t
 walk f t@(TInt _) = f t
 walk f t@(TComplex _) = f t
 
+isVar :: Term -> Bool
+isVar (TVar {}) = True
+isVar _ = False
+
+isWildcard :: Term -> Bool
+isWildcard TWildcard = True
+isWildcard _ = False
+
+ground :: Term -> Bool
+ground = bool . walk (\t -> And (not (isWildcard t) && not (isVar t)))
+
 vars :: Term -> [String]
 vars = walk grabVar
   where
@@ -225,21 +239,8 @@ renameFunctor from to = replace go
       | otherwise = t
     go t = t
 
-newtype Or = Or Bool
-
-toBool :: Or -> Bool
-toBool (Or b) = b
-
-instance Semigroup Or where
-  Or True <> _ = Or True
-  _ <> o = o
-
-instance Monoid Or where
-  mempty :: Or
-  mempty = Or False
-
 subterm :: Term -> Term -> Bool
-subterm t1 t2 = toBool $ walk (\t -> Or (t == t1)) t2
+subterm t1 = bool . walk (\t -> Or (t == t1))
 
 (^) :: Term -> Term -> Term
 (^) = tBin caretSym

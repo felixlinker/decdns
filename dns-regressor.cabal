@@ -52,6 +52,7 @@ library
       Resolvable.Update.Resolvability
       Resolvable.Update.Rollout
       Resolvable.Update.Trivial
+      Util.Bool
       Util.Bytes
       Util.Debug
       Util.Debug.Stub
