@@ -72,7 +72,10 @@ minusTests =
       , [ q ["com", "b"] ] )
     , ( q ["com", "X", "Y"]
       , [q ["com", "a", "b"]]
-      , [ qC ["com", "X", "Y"] [("X", "a"), ("Y", "b")] ] ) ]
+      , [ qC ["com", "X", "Y"] [("X", "a"), ("Y", "b")] ] )
+    , ( q ["com", "X", "Y"]
+      , [q ["com", "Z", "Z"]]
+      , [ qC ["com", "X", "Y"] [("X", "Y")] ] ) ]
   where
     mkTestCase (q', n, expected) =
       testCase (show q' ++ " without " ++ intercalate " and " (map show n)) $
