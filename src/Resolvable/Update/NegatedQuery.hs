@@ -2,53 +2,54 @@
 module Resolvable.Update.NegatedQuery
   ( withouts ) where
 
-import Data.Maybe (mapMaybe)
-import qualified Data.Set as S
+import Data.Maybe (mapMaybe, fromMaybe)
+import qualified Data.Map as M
 
 import Resolvable.Dependencies
 import qualified Resolvable.ConstrainedUnification as CU
 import qualified Resolvable.Unification as U
 import Resolvable.Prolog.Core
-import Control.Monad (guard)
 
--- Take a constrained unifier and negate it. Effectively, all inequalities
--- become assignemnts, and all assignments (in the unifier) become inequalities.
--- The only exception are cases where variables renamed, in the unifier, which
--- are preserved.
-negateUnif :: CU.ConstrainedUnifier -> [CU.ConstrainedUnifier]
-negateUnif (CU.CUnifier u (CU.toList -> neqs)) =
-  let disj = if null neqs
-        then [U.identity]
-        else foldr (\(t1, t2) -> maybe id (:) (U.unify t1 t2)) [] neqs
-  in mapMaybe (`toCUnif` U.toList u) disj
-  where
-    toCUnif :: U.Unifier -> [(Term, Term)] -> Maybe CU.ConstrainedUnifier
-    toCUnif unif = foldr (\ts -> (>>= addUnif ts)) (Just (CU.fromUnifier unif))
+negateQuery :: ConstrainedQuery -> Maybe [Term]
+negateQuery (CQuery t (CU.toList -> neqs))
+  | null neqs = Nothing
+  -- Treat failing unification as undefined because we know that CU.toList will
+  -- return variables as left term, which always succeeds.
+  | otherwise = Just $ map (maybe undefined (`U.apply` t) . uncurry U.unify) neqs
 
-    addUnif :: (Term, Term) -> CU.ConstrainedUnifier -> Maybe CU.ConstrainedUnifier
-    addUnif (a, b)
-      | isVar a && isVar b =  CU.extendUnifier a b
-      | otherwise = CU.addConstraint a b
+-- @unified a b@ "intersects" a with b.
+unified :: ConstrainedQuery -> Term -> Maybe ConstrainedQuery
+unified (CQuery t neqs) t' = do
+  u <- U.unify t t'
+  let app = U.apply u
+  neqs' <- CU.fromList $ app $ CU.toList neqs
+  return $ CQuery (U.apply u t) neqs'
+
+-- @disunified a b@ "subtracts" b from a. Assumes that intersection of b and a
+-- is non-empty.
+disunified :: ConstrainedQuery -> Term -> [ConstrainedQuery]
+disunified (CQuery t (CU.toList -> neqs)) t' = fromMaybe [] $ do
+  (U.Unifier (M.toList -> u)) <- U.filterRenamings . U.restrict (vars t) <$> U.unify t t'
+  -- The above unifier is the intersection of @t@ and @t'@. As we want to
+  -- subtract @t'@, we treat the the unifier as a conjuction of assignments, the
+  -- negation of which is a disjunction of inequalites, which we add to the
+  -- constrained query below.
+  return $ mapMaybe (fmap (CQuery t) . CU.fromList . (:neqs)) u
 
 without :: ConstrainedQuery -> ConstrainedQuery -> [ConstrainedQuery]
-without pos@(CQuery t _) neg =
-  -- First intersect the two sets of terms...
-  let intersection = unifyQueries pos neg
-  -- ...then apply the resulting unifier, but negated.
-  in maybe [pos] (mapMaybe app . negateUnif) intersection
-  where
-    dom :: S.Set Term
-    dom = vars t
-
-    app :: CU.ConstrainedUnifier -> Maybe ConstrainedQuery
-    app (CU.restrict dom -> CU.CUnifier u neqs) = do
-      (CQuery q neqs') <- U.apply u (Just pos)
-      let restricted = CQuery q (CU.union neqs neqs')
-      -- If applying the negated unifier yiels the original term, no reduction
-      -- occurred. In this case, we must subtract the entire unifier, i.e., the
-      -- empty set is the result.
-      guard (restricted /= pos)
-      return restricted
+without pos@(CQuery t _) neg@(CQuery t' _)
+  | U.unifies t t' =
+            -- If @neg@ does not contain inequalities, we subtract @t'@ from
+            -- @pos@ by disunification.
+      maybe (disunified pos t')
+            -- If @neg@ contains inequalities, we can easliy create its inverse
+            -- by treating the inequalites as disjunction of assignments. In
+            -- that case, we only need to unify @pos@ with each disjunct.
+            (mapMaybe (unified pos))
+            (negateQuery neg)
+  -- If the intersection of t and t' is empty, we need not consider t' for
+  -- subtraction.
+  | otherwise = [pos]
 
 withouts :: ConstrainedQuery -> [ConstrainedQuery] -> [ConstrainedQuery]
 withouts q = foldr (\nq -> concatMap (`without` nq)) [q]

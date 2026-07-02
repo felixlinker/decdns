@@ -6,6 +6,7 @@ module Resolvable.Unification
   , toList
   , restrict
   , isRenaming
+  , filterRenamings
   , unify
   , unifies
   , equivModuloRenaming
@@ -58,6 +59,21 @@ isRenaming (Unifier (M.elems -> ts)) = all isVar ts && not (hasDuplicates ts)
     insertP :: Bool -> Maybe Bool
     insertP False = Just True  -- Insert if not found
     insertP True = Nothing     -- Abort if found
+
+-- Remove all renamings from the unifier.
+-- For example, [X -> Z, Y -> Z] becomes [Y -> X].
+filterRenamings :: Unifier -> Unifier
+filterRenamings (Unifier m) = fst $ foldr foldf (identity, identity) $ M.toList m
+  where
+    foldf :: (Term, Term) -> (Unifier, Unifier) -> (Unifier, Unifier)
+    foldf (from, to) (acc@(Unifier m'), aux@(Unifier m''))
+      -- Apply the unifier to @to@ as it either does or may contain the dropped
+      -- renaming. Need not apply unifier to @from@ because we always store
+      -- unifier in a form where there are no chains of renamings.
+      | to `M.member` m'' || not (isVar to) = (Unifier (M.insert from (apply aux to) m'), aux)
+      -- Drop the mapping from @from@ to @to@ and stores its inverse in the
+      -- auxiliary unifier.
+      | otherwise = (acc, Unifier (M.insert to from m''))
 
 instance Apply Term where
   apply u (TFunctor op (map (apply u) -> args)) = TFunctor op args
