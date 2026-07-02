@@ -1,5 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
-module Resolvable.Update.NegatedQuery
+module Resolvable.Update.Disunification
   ( withouts ) where
 
 import Data.Maybe (mapMaybe, fromMaybe)

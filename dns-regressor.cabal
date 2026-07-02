@@ -48,7 +48,7 @@ library
       Resolvable.Resolvability
       Resolvable.Unification
       Resolvable.Update.Dependencies
-      Resolvable.Update.NegatedQuery
+      Resolvable.Update.Disunification
       Resolvable.Update.Resolvability
       Resolvable.Update.Rollout
       Resolvable.Update.Trivial
@@ -123,7 +123,7 @@ test-suite dns-regressor-test
       Resolvable.ConstrainedUnificationSpec
       Resolvable.ResolvabilitySpec
       Resolvable.UnificationSpec
-      Resolvable.Update.NegatedQuerySpec
+      Resolvable.Update.DisunificationSpec
       Resolvable.Update.RolloutSpec
       Resolvable.Util
       Util.FreshSpec

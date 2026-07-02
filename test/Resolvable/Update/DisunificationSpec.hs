@@ -1,5 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
-module Resolvable.Update.NegatedQuerySpec
+module Resolvable.Update.DisunificationSpec
   ( tests
   , q
   , qC ) where
@@ -10,7 +10,7 @@ import Test.Tasty.HUnit (testCase, (@?=))
 import Resolvable.Dependencies (ConstrainedQuery(..))
 import Resolvable.Prolog.Core (Term(..), list, listWithTail)
 import qualified Resolvable.ConstrainedUnification as CU
-import Resolvable.Update.NegatedQuery (withouts)
+import Resolvable.Update.Disunification (withouts)
 import Data.Char (isUpper)
 import Data.Bifunctor (Bifunctor(bimap))
 import Data.List (intercalate)

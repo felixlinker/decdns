@@ -9,7 +9,7 @@ import Resolvable.Dependencies
 import Resolvable.Prolog.Core
 import Util.Fresh
 import Resolvable.Resolvability (RComp)
-import Resolvable.Update.NegatedQuery (withouts)
+import Resolvable.Update.Disunification (withouts)
 
 toExcept :: Monad m => m a -> ExceptT e m a
 toExcept = ExceptT . fmap Right

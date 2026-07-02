@@ -5,7 +5,7 @@ import Test.Tasty (defaultMain, testGroup)
 import qualified Resolvable.UnificationSpec as UnificationSpec
 import qualified Resolvable.ConstrainedUnificationSpec as ConstrainedUnificationSpec
 import qualified Resolvable.ResolvabilitySpec as ResolvabilitySpec
-import qualified Resolvable.Update.NegatedQuerySpec as NegatedQuerySpec
+import qualified Resolvable.Update.DisunificationSpec as DisunificationSpec
 import qualified Resolvable.Update.RolloutSpec as RolloutSpec
 import qualified DNS.NameSpec as NameSpec
 import qualified DNS.RecordSpec as RecordSpec
@@ -28,7 +28,7 @@ main =
       [ UnificationSpec.tests
       , ConstrainedUnificationSpec.tests
       , ResolvabilitySpec.tests
-      , NegatedQuerySpec.tests
+      , DisunificationSpec.tests
       , RolloutSpec.tests
       , NameSpec.tests
       , RecordSpec.tests
