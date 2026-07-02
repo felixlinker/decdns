@@ -1,26 +1,21 @@
 {-# LANGUAGE TupleSections #-}
 module Resolvable.ConstrainedUnification
   ( ConstrainedUnifier(..)
-  , fromNeqs
   , Neqs
-  , union
   , toList
   , asPredicates
   , fromList
   , simplify
   , identity
-  , restrict
   , fromUnifier
   , apply
   , applyRule
   , addConstraint
-  , extendUnifier
-  , mergeUnifiers ) where
+  , extendUnifier ) where
 
 import Data.Functor (($>))
 import qualified Data.Map as M
 import qualified Data.Set as S
-import qualified Data.Map.Merge.Strict as MM
 
 import qualified Resolvable.Unification as U
 import Resolvable.Prolog.Core
@@ -31,9 +26,6 @@ import Data.Bifunctor (Bifunctor(bimap))
 import Util.List (zipStrict)
 
 type Neqs = M.Map String (S.Set Term)
-
-union :: Neqs -> Neqs -> Neqs
-union = MM.merge MM.preserveMissing MM.preserveMissing (MM.zipWithMatched (const (<>)))
 
 fromListUnchecked :: [(String, Term)] -> Neqs
 fromListUnchecked = foldr (uncurry addConstraintUnchecked) M.empty
@@ -59,13 +51,6 @@ instance Show ConstrainedUnifier where
 
 identity :: ConstrainedUnifier
 identity = CUnifier U.identity M.empty
-
-restrict :: S.Set Term -> ConstrainedUnifier -> ConstrainedUnifier
-restrict dom (CUnifier u neqs) =
-  CUnifier (U.restrict dom u) (M.filterWithKey (\k _ -> S.member (TVar k) dom) neqs)
-
-fromNeqs :: Neqs -> ConstrainedUnifier
-fromNeqs = CUnifier U.identity
 
 fromUnifier :: U.Unifier -> ConstrainedUnifier
 fromUnifier = (`CUnifier` M.empty)
@@ -99,11 +84,6 @@ extendUnifier :: Term -> Term -> ConstrainedUnifier -> Maybe ConstrainedUnifier
 extendUnifier a b (CUnifier u neqs) = do
   u' <- U.extendUnifier a b u
   CUnifier u' . fromListUnchecked <$> simplifyL (map (bimap (U.apply u') (U.apply u')) $ toList neqs)
-
-mergeUnifiers :: ConstrainedUnifier -> ConstrainedUnifier -> Maybe ConstrainedUnifier
-mergeUnifiers keep (CUnifier (U.Unifier m) neqs) =
-  let withNeqs = foldr (\(a, b) -> (>>= addConstraint a b)) (Just keep) (toList neqs)
-  in foldr (\(a, b) -> (>>= extendUnifier a b)) withNeqs (M.toList m)
 
 simplify :: Neqs -> Maybe Neqs
 simplify = fmap fromListUnchecked . simplifyL . toList

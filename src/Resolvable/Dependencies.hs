@@ -7,7 +7,6 @@ module Resolvable.Dependencies
   , RecordDependencies
   , RuleDependencies
   , ConstrainedQuery(..)
-  , unifyQueries
   , fromRules
   , computeResolvable ) where
 
@@ -110,9 +109,6 @@ toRule (CQuery q neqs) = Rule () q (CU.asPredicates neqs)
 
 instance Show ConstrainedQuery where
   show = show . toRule
-
-unifyQueries :: ConstrainedQuery -> ConstrainedQuery -> Maybe CU.ConstrainedUnifier
-unifyQueries (CQuery t neqs) q2 = extendAndMerge t q2 (CU.fromNeqs neqs)
 
 extendAndMerge :: Term -> ConstrainedQuery -> CU.ConstrainedUnifier -> Maybe CU.ConstrainedUnifier
 extendAndMerge t (CQuery t' neqs) cu = do
