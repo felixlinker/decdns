@@ -36,6 +36,7 @@ wellformed ns (Zone org r@(Tr.Node apexData rcs)) =
         -- at or below the NS record.
         -- Ignore records at apex. Other records next to NSes are legal there.
         , expect (checkZoneCuts org dataNoApex) "illegal record at or below zone cut"
+        , expect (checkDNAME r) "CNAME next to DNAME or records below DNAME"
         , expectNot (any (selfDelegation ns) dataNoApex) "NS record is self-delegation"
         , expect (singletonTypes r) "more than one DNAME or CNAME record at owner name"
         , expect (wildcardRestrictions orgLabel r) "DNAME, DS or NS wildcard record"
@@ -128,3 +129,9 @@ noDNSKEY = Tr.allNamed checkData N.root  -- Use N.root because implementation ig
 
 selfDelegation :: Name String -> RRSet.RDataSet -> Bool
 selfDelegation ns = maybe False (any ((== NS ns) . rtype)) . getType T.NS
+
+-- See: https://datatracker.ietf.org/doc/html/rfc6672#section-2.4
+checkDNAME :: Tr.Node String RRSet.RDataSet -> Bool
+checkDNAME (Tr.Node rs cs)
+  | hasType T.DNAME rs = not (hasType T.CNAME rs) && M.null cs
+  | otherwise = all checkDNAME cs
