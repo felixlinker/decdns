@@ -65,7 +65,7 @@ import qualified DNS.RecordType as T
 import NameConstraint
 import Resolvable.Prolog.Symbols
 import Util.Fresh (Fresh, fresh)
-import Util.Bytes (toB64)
+import Util.Bytes (toB64, toHex)
 import Util.Bool
 
 import qualified Data.ByteString as BS
@@ -349,6 +349,9 @@ algTerm = TInt . algorithmToInt
 b64Term :: BS.ByteString -> Term
 b64Term = TString . toB64
 
+hexTerm :: BS.ByteString -> Term
+hexTerm = TString . toHex
+
 digestTerm :: DigestType -> Term
 digestTerm = TInt . digestToInt
 
@@ -368,7 +371,7 @@ dataTerm t = TFunctor (ttypeSym $ toType t) $ case t of
   DNSKEY (DNSKEYData fs alg k) -> [TInt (dnsKeyFlagsToInt fs), algTerm alg, b64Term k]
   RRSIG (RRSIGData ty alg ls ottl sigExp sigInc tag sigName sig) -> [ttypeTerm ty, algTerm alg, TInt ls, TInt ottl, TInt sigExp, TInt sigInc, TInt tag, nameTerm sigName, b64Term sig]
   NSEC (NSECData nextN covered) -> [nameTerm nextN, list (map ttypeTerm covered)]
-  DS (DSData tag alg digT dig) -> [TInt tag, algTerm alg, digestTerm digT, b64Term dig]
+  DS (DSData tag alg digT dig) -> [TInt tag, algTerm alg, digestTerm digT, hexTerm dig]
 
 resolves :: Term -> Term -> Term -> Term -> Term -> Term
 resolves ns qtype qname d adb = TFunctor resolvesSym [ ns, qtype, qname, d, adb ]
