@@ -26,6 +26,7 @@ recordType :: Stream s m Char => ParsecT s u m T.Type
 recordType = asum $ map try
   [ string "CNAME" $> T.CNAME
   , string "DNAME" $> T.DNAME
+  , string "NSEC3PARAM" $> T.NSEC3PARAM
   , string "NSEC3" $> T.NSEC3
   , string "NSEC" $> T.NSEC
   , string "NS" $> T.NS
@@ -56,6 +57,7 @@ recordTypeData = do
     T.NSEC -> nsec
     T.DS -> ds
     T.NSEC3 -> nsec3
+    T.NSEC3PARAM -> nsec3param
 
 cname :: Stream s m Char => TypeParser s m
 cname = CNAME <$> absName
@@ -144,6 +146,16 @@ nsec3 = do
   nextHashedOwner <- base32Hex
   types <- many (try (sep >> recordType))
   return $ NSEC3 (NSEC3Data hashAlgorithm flags iterations salt nextHashedOwner types)
+
+nsec3param :: Stream s m Char => TypeParser s m
+nsec3param = do
+  hashAlgorithm <- nsec3DigestType
+  sep
+  flags <- nsec3FlagsFromInt <$> int
+  sep
+  iterations <- int
+  sep
+  NSEC3PARAM hashAlgorithm flags iterations <$> (string "-" $> BS.empty <|> hex)
 
 ds :: Stream s m Char => TypeParser s m
 ds = do

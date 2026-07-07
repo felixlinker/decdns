@@ -177,6 +177,12 @@ data Type =
   | RRSIG (RRSIGData BS.ByteString)
   | NSEC NSECData
   | NSEC3 NSEC3Data
+  | NSEC3PARAM
+      { _paramHashAlgorithm :: NSEC3DigestType
+      , _paramFlags :: [NSEC3Flags]
+      , _paramIterations :: Int
+      , _paramSalt :: BS.ByteString
+      }
   | DS DSData
   deriving (Eq, Ord)
 
@@ -193,6 +199,12 @@ showData (DNSKEY keyData) = show keyData
 showData (RRSIG sigDat) = show sigDat
 showData (NSEC nsecDat) = show nsecDat
 showData (NSEC3 nsec3Dat) = show nsec3Dat
+showData (NSEC3PARAM hashAlgorithm optOut iterations salt) = unwords
+  [ show hashAlgorithm
+  , show (nsec3FlagsToInt optOut)
+  , show iterations
+  , if BS.null salt then "-" else toHex salt
+  ]
 showData (DS dsData) = show dsData
 
 canonicalType :: Type -> Type
@@ -204,6 +216,7 @@ canonicalType (DNAME n) = DNAME $ canonicalName n
 canonicalType (RRSIG sig) = RRSIG $ canonicalRRSIGData sig
 canonicalType (NSEC nsecDat) = NSEC $ canonicalNSECData nsecDat
 canonicalType r@(NSEC3 _) = r
+canonicalType r@(NSEC3PARAM {}) = r
 canonicalType r@(A _) = r
 canonicalType r@(AAAA _) = r
 canonicalType r@(TXT _) = r
@@ -226,6 +239,7 @@ toType (DNSKEY {}) = T.DNSKEY
 toType (RRSIG _) = T.RRSIG
 toType (NSEC {}) = T.NSEC
 toType (NSEC3 {}) = T.NSEC3
+toType (NSEC3PARAM {}) = T.NSEC3PARAM
 toType (DS {}) = T.DS
 
 data Cat = IN
@@ -310,6 +324,11 @@ instance Serialize Type where
   serialize (RRSIG sig) = serialize sig
   serialize (NSEC nsecData) = serialize nsecData
   serialize (NSEC3 nsec3Data) = serialize nsec3Data
+  serialize (NSEC3PARAM hashAlgorithm optOut iterations salt) =
+    word8 (nsec3DigestToInt hashAlgorithm)
+      <> word8 (nsec3FlagsToInt optOut)
+      <> word16 iterations
+      <> withLength salt
   serialize (DS dsData) = serialize dsData
 
 canonicalRData :: RData -> RData

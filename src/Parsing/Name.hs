@@ -31,7 +31,7 @@ letDig = letter <|> digit
 
 label :: Stream s m Char => ParsecT s u m String
 label = string "*" <|> do
-  p0 <- letter
+  p0 <- letDig
   p1 <- many letDigHyp
   p2 <- many letDig
   return $ map toLower $ p0 : p1 ++ p2

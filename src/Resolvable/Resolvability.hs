@@ -194,6 +194,7 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) =
       SOA {} -> return []
       NSEC {} -> return []
       NSEC3 {} -> return []
+      NSEC3PARAM {} -> return []
       DS {} -> return []
       DNSKEY {} -> return []
 

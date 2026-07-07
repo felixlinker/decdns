@@ -34,7 +34,7 @@ setTTL = do
   writeState lastTTL t
 
 record :: Stream s m Char => Parser s m StandardRecord
-record = try catTtlType <|> try nameCatTtlType <|> nameTtlCatType
+record = try catTtlType <|> try ttlCatType <|> try nameCatTtlType <|> nameTtlCatType
 
 -- This parser is required because the category can be parsed as label. We
 -- prioritize that parsing over parsing it as name for correctness in more
@@ -47,6 +47,19 @@ catTtlType = do
   c <- tryOrState category lastCat
   skipSep
   t <- tryOrState int lastTTL
+  skipSep
+  ty <- recordTypeData
+  endOfEntry
+  return $ Named n (RData c t ty)
+
+ttlCatType :: Stream s m Char => Parser s m (Record String)
+ttlCatType = do
+  skipSep
+  n <- readState lastName
+  t <- int
+  writeState lastTTL t
+  skipSep
+  c <- tryOrState category lastCat
   skipSep
   ty <- recordTypeData
   endOfEntry

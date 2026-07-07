@@ -431,6 +431,7 @@ dataTerm t = TFunctor (ttypeSym $ toType t) $ case t of
   RRSIG (RRSIGData ty alg ls ottl sigExp sigInc tag sigName sig) -> [ttypeTerm ty, algTerm alg, TInt ls, TInt ottl, TInt sigExp, TInt sigInc, TInt tag, nameTerm sigName, b64Term sig]
   NSEC (NSECData nextN covered) -> [nameTerm nextN, list (map ttypeTerm covered)]
   NSEC3 (NSEC3Data alg flags iter salt nextHashedOwner types) -> [TInt (nsec3DigestToInt alg), TInt (nsec3FlagsToInt flags), TInt iter, hexTerm salt, hexTerm nextHashedOwner, list (map ttypeTerm types) ]
+  NSEC3PARAM alg flags iter salt -> [TInt (nsec3DigestToInt alg), TInt (nsec3FlagsToInt flags), TInt iter, hexTerm salt]
   DS (DSData tag alg digT dig) -> [TInt tag, algTerm alg, digestTerm digT, hexTerm dig]
 
 resolves :: Term -> Term -> Term -> Term -> Term -> Term -> Term -> Term
