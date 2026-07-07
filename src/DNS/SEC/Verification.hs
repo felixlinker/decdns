@@ -3,7 +3,11 @@ module DNS.SEC.Verification
   ( verifySignature
   , keyTag
   , keyDigest
-  , verifyDigest ) where
+  , verifyDigest
+  , nsec3Hash
+  , verifyClosestEncloserProof
+  , nsec3Unsigned
+  , nsecUnsigned ) where
 
 import Crypto.Hash (Digest, hash)
 import qualified Crypto.Hash.Algorithms as Hash
@@ -15,8 +19,10 @@ import Data.List (intersperse)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as S
 import Data.Word (Word16, Word32)
+import Control.Monad (guard)
 
 import DNS.Name
+import qualified DNS.RecordType as T
 import DNS.Record
 import Util.Bytes
 import DNS.SEC.Crypto
@@ -77,3 +83,55 @@ verifyDigest ownerName (DSData tag alg typ dig) k =
       tag == fromIntegral (keyTag k)
   &&  alg == _keyAlgorithm k
   &&  keyDigest ownerName typ k == dig
+
+-- See: https://datatracker.ietf.org/doc/html/rfc5155#autoid-29
+nsec3Hash :: NSEC3Data -> Name String -> BS.ByteString
+nsec3Hash (NSEC3Data NSEC3_SHA1 _ iter salt _ _) (serialize . canonicalName -> x) = ih iter
+  where
+    ih ::  Int -> BS.ByteString
+    ih 0 = BA.convert (hash $ x <> salt :: Digest Hash.SHA1)
+    ih n =
+      let rec = ih (n - 1)
+      in  BA.convert (hash $ rec <> salt :: Digest Hash.SHA1)
+
+-- See: https://datatracker.ietf.org/doc/html/rfc5155#section-8.3 and
+-- https://datatracker.ietf.org/doc/html/rfc5155#section-8.9
+verifyClosestEncloserProof :: Name String -> Name String -> NSEC3Data -> Name String -> NSEC3Data -> Bool
+verifyClosestEncloserProof (canonicalName -> qname) hashedClosestEncloser closestEncloserData@(NSEC3Data { _nsec3TypeBitMaps = ts, _optOut = optOutFlag }) hashedOwner (NSEC3Data { _nextHashedOwner = next }) =
+  fromMaybe False $ do
+    guard optOutFlag
+    guard (T.DNAME `notElem` ts)
+    -- T.NS `elem` ts ==> T.SOA `elem` ts
+    guard (T.NS `notElem` ts || T.SOA `elem` ts)
+    let Name (b32 NE.:| _) = hashedClosestEncloser
+    closestEncloserHash <- fromB32 b32
+    nonExHash <- findNonExHash Nothing qname closestEncloserHash
+    let Name (b32' NE.:| _) = hashedOwner
+    hashedOwnerHash <- fromB32 b32'
+    return (hashedOwnerHash < nonExHash && nonExHash < next)
+  where
+    -- Find the original name of the closest encloser given the closest
+    -- encloser's hashed owner name. Return the hash of the immediate child
+    -- name.
+    findNonExHash :: Maybe BS.ByteString -> Name String -> BS.ByteString -> Maybe BS.ByteString
+    findNonExHash acc n hashed =
+      let hn = nsec3Hash closestEncloserData n
+      in if hn == hashed
+        then acc
+        else do
+          n' <- Name <$> NE.nonEmpty (NE.tail $ labels n)
+          findNonExHash (Just hn) n' hashed
+
+-- See: https://datatracker.ietf.org/doc/html/rfc5155#section-8.9
+nsec3Unsigned :: Name String -> Name String -> NSEC3Data -> Bool
+nsec3Unsigned originalOwner hashedOwner dat@(NSEC3Data { _nsec3TypeBitMaps = ts }) = fromMaybe False $ do
+  let Name (b32 NE.:| _) = hashedOwner
+  hashedOwnerHash <- fromB32 b32
+  return $ nsec3Hash dat originalOwner == hashedOwnerHash
+    && T.DS `notElem` ts
+    && T.NS `elem` ts
+    && T.SOA `notElem` ts
+
+nsecUnsigned :: Name String -> Name String -> NSECData -> Bool
+nsecUnsigned owner nsecOwner (NSECData { _nsecTypeBitMaps = ts }) =
+  owner == nsecOwner && T.DS `notElem` ts

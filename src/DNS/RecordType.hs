@@ -5,14 +5,14 @@ module DNS.RecordType
 
 import Util.Bytes (Serialize(..), word16)
 
-data Type = CNAME | DNAME | NS | A | AAAA | TXT | MX | SOA | DNSKEY | RRSIG | NSEC | DS
+data Type = CNAME | DNAME | NS | A | AAAA | TXT | MX | SOA | DNSKEY | RRSIG | NSEC | NSEC3 | DS
   deriving (Eq, Ord, Show)
 
 instance Serialize Type where
   serialize = word16 . typeToInt
 
 allTypes :: [Type]
-allTypes = [ CNAME, DNAME, NS, A, AAAA, TXT, MX, SOA, DNSKEY, RRSIG, NSEC, DS ]
+allTypes = [ CNAME, DNAME, NS, A, AAAA, TXT, MX, SOA, DNSKEY, RRSIG, NSEC, NSEC3, DS ]
 
 typeToInt :: Type -> Int
 typeToInt A = 1
@@ -27,3 +27,4 @@ typeToInt DS = 43
 typeToInt RRSIG = 46
 typeToInt NSEC = 47
 typeToInt DNSKEY = 48
+typeToInt NSEC3 = 50

@@ -6,6 +6,8 @@ module DNS.Record
   , DNSKEYData(..)
   , DSData(..)
   , RRSIGData(..)
+  , NSECData(..)
+  , NSEC3Data(..)
   , canonicalRRSIGData
   , Type(..)
   , canonicalType
@@ -111,6 +113,54 @@ canonicalRRSIGData :: RRSIGData a -> RRSIGData a
 canonicalRRSIGData rrsig =
   rrsig { _signersName = canonicalName (_signersName rrsig) }
 
+data NSECData = NSECData
+  { _nextDomainName :: Name String
+  , _nsecTypeBitMaps :: [T.Type] }
+  deriving (Eq, Ord)
+
+instance Show NSECData where
+  show (NSECData nextDomainName typeBitMaps) =
+    unwords (show nextDomainName : map show typeBitMaps)
+
+instance Serialize NSECData where
+  serialize (NSECData nextDomainName typeBitMaps) =
+    serialize nextDomainName <> nsecTypeBitMaps typeBitMaps
+
+canonicalNSECData :: NSECData -> NSECData
+canonicalNSECData (NSECData next ts) = NSECData (canonicalName next) ts
+
+data NSEC3Data = NSEC3Data
+  { _hashAlgorithm :: NSEC3DigestType
+  , _optOut :: Bool
+  , _iterations :: Int
+  , _salt :: BS.ByteString
+  , _nextHashedOwner :: BS.ByteString
+  , _nsec3TypeBitMaps :: [T.Type]
+  }
+  deriving (Eq, Ord)
+
+nsec3Flags :: Bool -> Int
+nsec3Flags False = 0
+nsec3Flags True = 1
+
+instance Show NSEC3Data where
+  show (NSEC3Data hashAlgorithm optOut iterations salt nextHashedOwner typeBitMaps) = unwords $
+    [ show hashAlgorithm
+    , show (nsec3Flags optOut)
+    , show iterations
+    , if BS.null salt then "-" else toHex salt
+    , toB32 nextHashedOwner
+    ] ++ map show typeBitMaps
+
+instance Serialize NSEC3Data where
+  serialize (NSEC3Data hashAlgorithm optOut iterations salt nextHashedOwner typeBitMaps) =
+    word8 (nsec3DigestToInt hashAlgorithm)
+      <> word8 (nsec3Flags optOut)
+      <> word16 iterations
+      <> withLength salt
+      <> withLength nextHashedOwner
+      <> nsecTypeBitMaps typeBitMaps
+
 data Type =
     CNAME (Name String)
   | DNAME (Name String)
@@ -129,8 +179,8 @@ data Type =
         , _minimum :: Int }
   | DNSKEY DNSKEYData
   | RRSIG (RRSIGData BS.ByteString)
-  | NSEC  { _nextDomainName :: Name String
-          , _typeBitMaps :: [T.Type] }
+  | NSEC NSECData
+  | NSEC3 NSEC3Data
   | DS DSData
   deriving (Eq, Ord)
 
@@ -145,8 +195,8 @@ showData (MX p n) = unwords [show p, show n]
 showData (SOA a b c d e f g) = unwords [show a, show b, show c, show d, show e, show f, show g]
 showData (DNSKEY keyData) = show keyData
 showData (RRSIG sigDat) = show sigDat
-showData (NSEC nextDomainName typeBitMaps) =
-  unwords (show nextDomainName : map show typeBitMaps)
+showData (NSEC nsecDat) = show nsecDat
+showData (NSEC3 nsec3Dat) = show nsec3Dat
 showData (DS dsData) = show dsData
 
 canonicalType :: Type -> Type
@@ -156,8 +206,13 @@ canonicalType r@(SOA { _mname = mn, _rname = rn }) = r { _mname = canonicalName 
 canonicalType r@(MX _ n) = r { _exchange = canonicalName n }
 canonicalType (DNAME n) = DNAME $ canonicalName n
 canonicalType (RRSIG sig) = RRSIG $ canonicalRRSIGData sig
-canonicalType r@(NSEC n _) = r { _nextDomainName = canonicalName n }
-canonicalType r = r
+canonicalType (NSEC nsecDat) = NSEC $ canonicalNSECData nsecDat
+canonicalType r@(NSEC3 _) = r
+canonicalType r@(A _) = r
+canonicalType r@(AAAA _) = r
+canonicalType r@(TXT _) = r
+canonicalType r@(DNSKEY _) = r
+canonicalType r@(DS _) = r
 
 instance Show Type where
   show t = show (toType t) ++ " " ++ showData t
@@ -174,6 +229,7 @@ toType (SOA {}) = T.SOA
 toType (DNSKEY {}) = T.DNSKEY
 toType (RRSIG _) = T.RRSIG
 toType (NSEC {}) = T.NSEC
+toType (NSEC3 {}) = T.NSEC3
 toType (DS {}) = T.DS
 
 data Cat = IN
@@ -256,8 +312,8 @@ instance Serialize Type where
       <> foldMap word32 [serial, refresh, retry, expire, minimumTtl]
   serialize (DNSKEY keyData) = serialize keyData
   serialize (RRSIG sig) = serialize sig
-  serialize (NSEC nextDomainName typeBitMaps) =
-    serialize nextDomainName <> nsecTypeBitMaps typeBitMaps
+  serialize (NSEC nsecData) = serialize nsecData
+  serialize (NSEC3 nsec3Data) = serialize nsec3Data
   serialize (DS dsData) = serialize dsData
 
 canonicalRData :: RData -> RData

@@ -367,7 +367,7 @@ dataTerm t = TFunctor (ttypeSym $ toType t) $ case t of
   SOA mn rn s rf rt e m -> [nameTerm mn, nameTerm rn, TInt s, TInt rf, TInt rt, TInt e, TInt m]
   DNSKEY (DNSKEYData fs alg k) -> [TInt (dnsKeyFlagsToInt fs), algTerm alg, b64Term k]
   RRSIG (RRSIGData ty alg ls ottl sigExp sigInc tag sigName sig) -> [ttypeTerm ty, algTerm alg, TInt ls, TInt ottl, TInt sigExp, TInt sigInc, TInt tag, nameTerm sigName, b64Term sig]
-  NSEC nextN covered -> [nameTerm nextN, list (map ttypeTerm covered)]
+  NSEC (NSECData nextN covered) -> [nameTerm nextN, list (map ttypeTerm covered)]
   DS (DSData tag alg digT dig) -> [TInt tag, algTerm alg, digestTerm digT, b64Term dig]
 
 resolves :: Term -> Term -> Term -> Term -> Term -> Term

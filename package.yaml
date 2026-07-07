@@ -23,6 +23,7 @@ dependencies:
 - lens
 - bytestring
 - base64-bytestring
+- base32
 - iproute
 - crypton
 - memory

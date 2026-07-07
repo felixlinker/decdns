@@ -19,8 +19,9 @@ import Test.Tasty.QuickCheck
 import DNS.SEC.Crypto
   ( AlgorithmType (ECDSAP256SHA256, ECDSAP384SHA384)
   , DigestType (SHA256)
+  , NSEC3DigestType (NSEC3_SHA1)
   )
-import Parsing.Bytes (base64, hex)
+import Parsing.Bytes (base32Hex, base64, hex)
 import qualified Data.ByteString as BS
 import Text.Parsec (runParser)
 import Util.Bytes (toHex)
@@ -42,6 +43,7 @@ tests =
     "DNS.SEC.Keys"
     [ testGroup "key tag" (zipWith (testKeyTag . show) [0 :: Int, 1..] dnskeyTestCases)
     , testGroup "key digest" (zipWith (testKeyDigest . show) [0 :: Int, 1..] (filter (not . null . thd) dnskeyTestCases))
+    , testGroup "NSEC3 hash" (zipWith (testNSEC3Hash . show) [0 :: Int, 1..] nsec3Vectors)
     , testCase "verifies signatures from the static signed zones" testSignedZones
     , testProperty "rejects a modified RRSIG or incomplete RRset" propRejectsMutatedVector
     ]
@@ -54,9 +56,13 @@ parseBase64 = either undefined id . runParser base64 () "<tests>"
 parseHex :: String -> BS.ByteString
 parseHex = either undefined id . runParser hex () "<tests>"
 
+parseBase32Hex :: String -> BS.ByteString
+parseBase32Hex = either undefined id . runParser base32Hex () "<tests>"
+
 r :: [String] -> Type -> Record String
 r n = record (mkName n) . RData IN 100
 
+-- TODO: I see four test cases but the test suite only seems to run one
 dnskeyTestCases :: [KeyTestCase]
 dnskeyTestCases =
   [ ( r ["com", "", ""] $ DNSKEY comZsk
@@ -150,7 +156,7 @@ signatureVectors :: [SignatureVector]
 signatureVectors =
   [ vector comName [soa ns1Name] RT.SOA 1 1200 23099 comName comZsk
       "Zudwp50+lG2UoUgg+dQwrEdbYBPu/6JvmO9dJE58XE8seqNAQvWl4JL0d7il/YOQsrV4lAyNfHlZvzTZ7rDvZg=="
-  , vector comName [NSEC aComName [RT.SOA, RT.RRSIG, RT.NSEC, RT.DNSKEY]] RT.NSEC 1 0 23099 comName comZsk
+  , vector comName [NSEC (NSECData aComName [RT.SOA, RT.RRSIG, RT.NSEC, RT.DNSKEY])] RT.NSEC 1 0 23099 comName comZsk
       "nswb0Ix/dCBI+y31MoZhoWoxJYGVW5t22c+/Fi+UnhtF5yQamKHm3KOJXiYkVxOyZQS8lSr0J9cgGILbXfIf3g=="
   , vector comName [DNSKEY comZsk, DNSKEY comKsk] RT.DNSKEY 1 1200 23099 comName comZsk
       "5GEccqRu3p/gf2VuPGr7tN40S+vDppqbyldfP5EaDPalhCo9SWVHy+50HvwEXMrqMI4EBOwqSDnFJc2hr8YnSw=="
@@ -158,21 +164,21 @@ signatureVectors =
       "orNm/I5iRFBBNHLTSPG712KhV4gh6/VjQFBdxHM/lqwfA81asy+lC1AznHsc2WWlZ1h2bXrexrKfP2Ngj7xqeg=="
   , vector aComName [DS (DSData 59726 ECDSAP256SHA256 SHA256 aComDigest)] RT.DS 2 1200 23099 comName comZsk
       "TZEsjl0wTWXTJ8On50DV1WmsOsje/5Gx1dP89xmt7vgq73q1XnMeF9tae6ocIUsnu1RSas1XXaqIhRpyiK1uRg=="
-  , vector aComName [NSEC ns1Name [RT.NS, RT.DS, RT.RRSIG, RT.NSEC]] RT.NSEC 2 0 23099 comName comZsk
+  , vector aComName [NSEC (NSECData ns1Name [RT.NS, RT.DS, RT.RRSIG, RT.NSEC])] RT.NSEC 2 0 23099 comName comZsk
       "bK1rYhCk9zXCm7GunxGmodpu3X+DBP0sHDmQYotNhvlpoL6eZMYw7ymp8IQ3mZ8pTbZmuzR82K5lLQpOZV+Kaw=="
   , vector ns1Name [A (read "1.2.3.4")] RT.A 2 1200 23099 comName comZsk
       "3XdYvOXShYuZLCZ5wHEY/faPPJBAOt0UCNiLtPNCHqi9XegqQmJcz/rES40y+KYA9hrwfXJ2fCUIHgNcCPoKfA=="
-  , vector ns1Name [NSEC ns2Name [RT.A, RT.RRSIG, RT.NSEC]] RT.NSEC 2 0 23099 comName comZsk
+  , vector ns1Name [NSEC (NSECData ns2Name [RT.A, RT.RRSIG, RT.NSEC])] RT.NSEC 2 0 23099 comName comZsk
       "fXUPVnTSGY5m+lJ+ENLTmfOHpBhq0Y/VvazJ6dC7scZ+iDpzwdL61Isl6wCbF5EqIrnpRejI50FiS4W6cxH00g=="
   , vector ns2Name [A (read "4.5.6.7")] RT.A 2 1200 23099 comName comZsk
       "byZ0YAt1dgdHxVUPoMGCpj/1So7bR2PCakaT/Ll97DP44bvkExW2Z1kq9nVXDh5Qfcpz65lP9mAUrVQiQ4juSQ=="
-  , vector ns2Name [NSEC comName [RT.A, RT.RRSIG, RT.NSEC]] RT.NSEC 2 0 23099 comName comZsk
+  , vector ns2Name [NSEC (NSECData comName [RT.A, RT.RRSIG, RT.NSEC])] RT.NSEC 2 0 23099 comName comZsk
       "Pdm2XQ2CFdvop2kkxcsnCPh9T2ouCO5cLcFPmQMOuTavHP5T1O28075HT3W77k6GUsVh2MNDnYZ7e9BHaKnlAA=="
   , vector aComName [soa ns2Name] RT.SOA 2 1200 30814 aComName aComZsk
       "Ne2VNOMCBogf6920EM6k0gt5t/PJA/BufL/5P0vxhvlYe1qPB1p1JDYJeI8QoSVtt3nBnGfcXU13ZuaVwvT7+g=="
   , vector aComName [A (read "8.9.10.11")] RT.A 2 1200 30814 aComName aComZsk
       "lRat5+VG8t5hH7tTdFa6kbnmH1ZhYW0sxLn5RespS39gNw19KBaRpLVas6gunRUlpj09of//FARF/zJU+Znwyw=="
-  , vector aComName [NSEC aComName [RT.A, RT.SOA, RT.RRSIG, RT.NSEC, RT.DNSKEY]] RT.NSEC 2 0 30814 aComName aComZsk
+  , vector aComName [NSEC (NSECData aComName [RT.A, RT.SOA, RT.RRSIG, RT.NSEC, RT.DNSKEY])] RT.NSEC 2 0 30814 aComName aComZsk
       "4JOKAiVGKxHbOk9YRJhIZbb0C1ND7dBkQQfhPULhFZUGplKCxKu5uNTRRzo41HqwiXIJ6wz8AbITCVNm7NjLyA=="
   , vector aComName [DNSKEY aComZsk, DNSKEY aComKsk] RT.DNSKEY 2 1200 30814 aComName aComZsk
       "waRQ7SaQ+Qp6MBE5dtQ1BJ4etYuH1tDalYLHXc7G/BMCHdopW00bZL0BRE+8M8XvPAzUvDWALC0c/qGwimTwYA=="
@@ -213,3 +219,29 @@ dnskey flags = DNSKEYData (dnsKeyFlagsFromInt flags) ECDSAP256SHA256 . parseBase
 
 aComDigest :: BS.ByteString
 aComDigest = parseHex "BAFD7C691EB978754C2CA32C5697AC4B21C8DC6534DA5EFDFBE9A7B17882501B"
+
+type NSEC3HashVector = (Name String, BS.ByteString)
+
+testNSEC3Hash :: String -> NSEC3HashVector -> TestTree
+testNSEC3Hash label (name, expectedHash) = testCase label $
+  nsec3Hash nsec3Data name @?= expectedHash
+
+nsec3Data :: NSEC3Data
+nsec3Data = NSEC3Data NSEC3_SHA1 False 12 (parseHex "aabbccdd") BS.empty []
+
+-- Source: https://datatracker.ietf.org/doc/html/rfc5155#appendix-A
+nsec3Vectors :: [NSEC3HashVector]
+nsec3Vectors =
+  [ (mkName ["example", ""], parseBase32Hex "0p9mhaveqvm6t7vbl5lop2u3t2rp3tom")
+  , (mkName ["a", "example", ""], parseBase32Hex "35mthgpgcu1qg68fab165klnsnk3dpvl")
+  , (mkName ["ai", "example", ""], parseBase32Hex "gjeqe526plbf1g8mklp59enfd789njgi")
+  , (mkName ["ns1", "example", ""], parseBase32Hex "2t7b4g4vsa5smi47k61mv5bv1a22bojr")
+  , (mkName ["ns2", "example", ""], parseBase32Hex "q04jkcevqvmu85r014c7dkba38o0ji5r")
+  , (mkName ["w", "example", ""], parseBase32Hex "k8udemvp1j2f7eg6jebps17vp3n8i58h")
+  , (mkName ["*", "w", "example", ""], parseBase32Hex "r53bq7cc2uvmubfu5ocmm6pers9tk9en")
+  , (mkName ["x", "w", "example", ""], parseBase32Hex "b4um86eghhds6nea196smvmlo4ors995")
+  , (mkName ["y", "w", "example", ""], parseBase32Hex "ji6neoaepv8b5o6k4ev33abha8ht9fgc")
+  , (mkName ["x", "y", "w", "example", ""], parseBase32Hex "2vptu5timamqttgl4luu9kg21e0aor3s")
+  , (mkName ["xx", "example", ""], parseBase32Hex "t644ebqk9bibcna874givr6joj62mlhv")
+  , (mkName ["2t7b4g4vsa5smi47k61mv5bv1a22bojr", "example", ""], parseBase32Hex "kohar7mbb8dc2ce8a9qvl8hon4k53uhi")
+  ]

@@ -3,7 +3,7 @@ module DNS.RecordSpec (tests) where
 import qualified Data.ByteString as BS
 import Data.Word (Word8)
 import DNS.NameSpec (mkName)
-import DNS.Record (Type (NSEC))
+import DNS.Record (NSECData(NSECData), Type(NSEC))
 import qualified DNS.RecordType as RT
 import Util.Bytes (Serialize(serialize))
 import Test.Tasty (TestTree, testGroup)
@@ -18,7 +18,7 @@ tests =
     "DNS.Record"
     -- From: https://datatracker.ietf.org/doc/html/rfc4034#section-4.3
     [ testCase "serializes RFC 4034 NSEC RDATA" $
-        serialize (NSEC host [RT.A, RT.MX, RT.RRSIG, RT.NSEC])
+        serialize (NSEC (NSECData host [RT.A, RT.MX, RT.RRSIG, RT.NSEC]))
           @?= BS.pack
             [ 0x04, c 'h', c 'o', c 's', c 't'
             , 0x07, c 'e', c 'x', c 'a', c 'm', c 'p', c 'l', c 'e'

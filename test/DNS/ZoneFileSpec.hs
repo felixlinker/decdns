@@ -272,7 +272,7 @@ genNSECRecord org = do
   ttl <- genTTL
   nextDomainName <- genAbsoluteName
   typeBitMaps <- genTypeBitMaps
-  return $ Named ownerName (RData IN ttl (NSEC nextDomainName typeBitMaps))
+  return $ Named ownerName (RData IN ttl (NSEC (NSECData nextDomainName typeBitMaps)))
 
 genDSRecord :: Name String -> Gen StandardRecord
 genDSRecord org = do

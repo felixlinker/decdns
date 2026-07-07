@@ -6,9 +6,13 @@ module Util.Bytes
   , chunk
   , withLength
   , toHex
-  , toB64 ) where
+  , fromB64
+  , toB64
+  , fromB32
+  , toB32 ) where
 
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Base32.Hex as B32Hex
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Builder as BBS
 import qualified Data.ByteString.Base64 as B64
@@ -62,5 +66,14 @@ toHex = concatMap (map toUpper . pad . (`showHex` "")) . BS.unpack
     pad [x] = ['0', x]
     pad xs = xs
 
+fromB64 :: String -> Maybe BS.ByteString
+fromB64 = either (const Nothing) Just . B64.decode . C.pack
+
 toB64 :: BS.ByteString -> String
 toB64 = C.unpack . B64.encode
+
+fromB32 :: String -> Maybe BS.ByteString
+fromB32 = either (const Nothing) Just . B32Hex.decodeBase32Unpadded . C.pack . map toUpper
+
+toB32 :: BS.ByteString -> String
+toB32 = C.unpack . B32Hex.encodeBase32Unpadded'

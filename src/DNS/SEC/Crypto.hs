@@ -8,6 +8,9 @@ module DNS.SEC.Crypto
   , DigestType(..)
   , digestToInt
   , digestFromInt
+  , NSEC3DigestType(..)
+  , nsec3DigestToInt
+  , nsec3DigestFromInt
   ) where
 
 import qualified Data.ByteString as BS
@@ -126,3 +129,16 @@ digestFromInt 2 = Just SHA256
 digestFromInt 3 = Just GOST_R_31_11_94
 digestFromInt 4 = Just SHA384
 digestFromInt _ = Nothing
+
+data NSEC3DigestType = NSEC3_SHA1
+  deriving (Eq, Ord)
+
+nsec3DigestToInt :: NSEC3DigestType -> Int
+nsec3DigestToInt NSEC3_SHA1 = 1
+
+instance Show NSEC3DigestType where
+  show = show . nsec3DigestToInt
+
+nsec3DigestFromInt :: Int -> Maybe NSEC3DigestType
+nsec3DigestFromInt 1 = Just NSEC3_SHA1
+nsec3DigestFromInt _ = Nothing

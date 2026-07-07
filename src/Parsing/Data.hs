@@ -5,6 +5,7 @@ module Parsing.Data
   , recordTypeData ) where
 
 import Data.Char (isPrint)
+import qualified Data.ByteString as BS
 import Data.Functor (($>))
 import Control.Applicative (asum)
 import Control.Monad (when)
@@ -25,6 +26,7 @@ recordType :: Stream s m Char => ParsecT s u m T.Type
 recordType = asum $ map try
   [ string "CNAME" $> T.CNAME
   , string "DNAME" $> T.DNAME
+  , string "NSEC3" $> T.NSEC3
   , string "NSEC" $> T.NSEC
   , string "NS" $> T.NS
   , string "AAAA" $> T.AAAA
@@ -53,6 +55,7 @@ recordTypeData = do
     T.RRSIG -> rrsig
     T.NSEC -> nsec
     T.DS -> ds
+    T.NSEC3 -> nsec3
 
 cname :: Stream s m Char => TypeParser s m
 cname = CNAME <$> absName
@@ -125,10 +128,26 @@ rrsig = do
 nsec :: Stream s m Char => TypeParser s m
 nsec = do
   nextDomainName <- absName
+  types <- many (try (sep >> recordType))
+  return $ NSEC (NSECData nextDomainName types)
+
+nsec3 :: Stream s m Char => TypeParser s m
+nsec3 = do
+  hashAlgorithm <- nsec3DigestType
   sep
-  firstType <- recordType
-  restTypes <- many (try (sep >> recordType))
-  return $ NSEC nextDomainName (firstType : restTypes)
+  flagValue <- int
+  optOut <- case flagValue of
+    0 -> return False
+    1 -> return True
+    _ -> fail "unsupported NSEC3 flags"
+  sep
+  iterations <- int
+  sep
+  salt <- string "-" $> BS.empty <|> hex
+  sep
+  nextHashedOwner <- base32Hex
+  types <- many (try (sep >> recordType))
+  return $ NSEC3 (NSEC3Data hashAlgorithm optOut iterations salt nextHashedOwner types)
 
 ds :: Stream s m Char => TypeParser s m
 ds = do
@@ -162,3 +181,8 @@ digestTypeCode :: Stream s m Char => Parser s m DigestType
 digestTypeCode = do
   n <- int
   maybe (fail "unknown DNSSEC digest type") return (digestFromInt n)
+
+nsec3DigestType :: Stream s m Char => Parser s m NSEC3DigestType
+nsec3DigestType = do
+  n <- int
+  maybe (fail "unknown NSEC3 hash algorithm") return (nsec3DigestFromInt n)
