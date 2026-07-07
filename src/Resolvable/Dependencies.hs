@@ -44,22 +44,21 @@ instance FromRule ResolvableAt where
 fromAnnot :: RComp -> ResolvableAt
 fromAnnot (RComp ns (name -> owner)) = ResolvableAt (ns, owner)
 
-newtype Resolves = Resolves (Term, Term, Term, Term)
+newtype Resolves = Resolves (Term, Term, Term, Term, Term, Term)
   deriving (Eq, Ord)
 
 instance Show Resolves where
   show (Resolves trip) = show trip
 
--- TODO:
 fromTerm :: Term -> Maybe Resolves
-fromTerm (toView -> TVResolves ns t n _ _ _ auth) = Just $ Resolves (canon ns, canon t, canon n, auth)
+fromTerm (toView -> TVResolves ns t n _ recurse verify auth) = Just $ Resolves (canon ns, canon t, canon n, canon recurse, canon verify, auth)
 fromTerm _ = Nothing
 
 instance FromRule Resolves where
   fromRule = fromTerm . rhead
 
 matches :: Resolves -> Name String -> Name String -> Bool
-matches (Resolves (nsT, nT, _, _)) ns n = unifies (list [nsT, nT]) (list [nameTerm ns, nameTerm n])
+matches (Resolves (nsT, nT, _, _, _, _)) ns n = unifies (list [nsT, nT]) (list [nameTerm ns, nameTerm n])
 
 canon :: Term -> Term
 canon = replace aux
