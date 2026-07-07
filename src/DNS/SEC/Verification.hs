@@ -97,9 +97,9 @@ nsec3Hash (NSEC3Data NSEC3_SHA1 _ iter salt _ _) (serialize . canonicalName -> x
 -- See: https://datatracker.ietf.org/doc/html/rfc5155#section-8.3 and
 -- https://datatracker.ietf.org/doc/html/rfc5155#section-8.9
 verifyClosestEncloserProof :: Name String -> Name String -> NSEC3Data -> Name String -> NSEC3Data -> Bool
-verifyClosestEncloserProof (canonicalName -> qname) hashedClosestEncloser closestEncloserData@(NSEC3Data { _nsec3TypeBitMaps = ts, _optOut = optOutFlag }) hashedOwner (NSEC3Data { _nextHashedOwner = next }) =
+verifyClosestEncloserProof (canonicalName -> qname) hashedClosestEncloser closestEncloserData@(NSEC3Data { _nsec3TypeBitMaps = ts, _nsec3Flags = flags }) hashedOwner (NSEC3Data { _nextHashedOwner = next }) =
   fromMaybe False $ do
-    guard optOutFlag
+    guard (OPT_OUT `elem` flags)
     guard (T.DNAME `notElem` ts)
     -- T.NS `elem` ts ==> T.SOA `elem` ts
     guard (T.NS `notElem` ts || T.SOA `elem` ts)

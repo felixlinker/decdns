@@ -131,7 +131,7 @@ canonicalNSECData (NSECData next ts) = NSECData (canonicalName next) ts
 
 data NSEC3Data = NSEC3Data
   { _hashAlgorithm :: NSEC3DigestType
-  , _optOut :: Bool
+  , _nsec3Flags :: [NSEC3Flags]
   , _iterations :: Int
   , _salt :: BS.ByteString
   , _nextHashedOwner :: BS.ByteString
@@ -139,14 +139,10 @@ data NSEC3Data = NSEC3Data
   }
   deriving (Eq, Ord)
 
-nsec3Flags :: Bool -> Int
-nsec3Flags False = 0
-nsec3Flags True = 1
-
 instance Show NSEC3Data where
   show (NSEC3Data hashAlgorithm optOut iterations salt nextHashedOwner typeBitMaps) = unwords $
     [ show hashAlgorithm
-    , show (nsec3Flags optOut)
+    , show (nsec3FlagsToInt optOut)
     , show iterations
     , if BS.null salt then "-" else toHex salt
     , toB32 nextHashedOwner
@@ -155,7 +151,7 @@ instance Show NSEC3Data where
 instance Serialize NSEC3Data where
   serialize (NSEC3Data hashAlgorithm optOut iterations salt nextHashedOwner typeBitMaps) =
     word8 (nsec3DigestToInt hashAlgorithm)
-      <> word8 (nsec3Flags optOut)
+      <> word8 (nsec3FlagsToInt optOut)
       <> word16 iterations
       <> withLength salt
       <> withLength nextHashedOwner

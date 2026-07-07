@@ -135,11 +135,7 @@ nsec3 :: Stream s m Char => TypeParser s m
 nsec3 = do
   hashAlgorithm <- nsec3DigestType
   sep
-  flagValue <- int
-  optOut <- case flagValue of
-    0 -> return False
-    1 -> return True
-    _ -> fail "unsupported NSEC3 flags"
+  flags <- nsec3FlagsFromInt <$> int
   sep
   iterations <- int
   sep
@@ -147,7 +143,7 @@ nsec3 = do
   sep
   nextHashedOwner <- base32Hex
   types <- many (try (sep >> recordType))
-  return $ NSEC3 (NSEC3Data hashAlgorithm optOut iterations salt nextHashedOwner types)
+  return $ NSEC3 (NSEC3Data hashAlgorithm flags iterations salt nextHashedOwner types)
 
 ds :: Stream s m Char => TypeParser s m
 ds = do

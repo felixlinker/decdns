@@ -11,8 +11,12 @@ module DNS.SEC.Crypto
   , NSEC3DigestType(..)
   , nsec3DigestToInt
   , nsec3DigestFromInt
+  , NSEC3Flags(..)
+  , nsec3FlagsToInt
+  , nsec3FlagsFromInt
   ) where
 
+import Data.Bits ((.|.))
 import qualified Data.ByteString as BS
 import qualified Crypto.PubKey.ECC.ECDSA as ECDSA
 import qualified Crypto.PubKey.ECC.Types as ECCTypes
@@ -142,3 +146,16 @@ instance Show NSEC3DigestType where
 nsec3DigestFromInt :: Int -> Maybe NSEC3DigestType
 nsec3DigestFromInt 1 = Just NSEC3_SHA1
 nsec3DigestFromInt _ = Nothing
+
+data NSEC3Flags = OPT_OUT
+  deriving (Eq, Ord)
+
+nsec3FlagsToInt :: [NSEC3Flags] -> Int
+nsec3FlagsToInt = foldr ((.|.) . nsec3FlagToInt) 0
+
+nsec3FlagToInt :: NSEC3Flags -> Int
+nsec3FlagToInt OPT_OUT = 1
+
+nsec3FlagsFromInt :: Int -> [NSEC3Flags]
+nsec3FlagsFromInt 1 = [OPT_OUT]
+nsec3FlagsFromInt _ = []

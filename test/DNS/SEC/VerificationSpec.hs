@@ -227,7 +227,7 @@ testNSEC3Hash label (name, expectedHash) = testCase label $
   nsec3Hash nsec3Data name @?= expectedHash
 
 nsec3Data :: NSEC3Data
-nsec3Data = NSEC3Data NSEC3_SHA1 False 12 (parseHex "aabbccdd") BS.empty []
+nsec3Data = NSEC3Data NSEC3_SHA1 [] 12 (parseHex "aabbccdd") BS.empty []
 
 -- Source: https://datatracker.ietf.org/doc/html/rfc5155#appendix-A
 nsec3Vectors :: [NSEC3HashVector]
