@@ -6,6 +6,10 @@ module Resolvable.Prolog.Core
   , freshVars2
   , freshVars3
   , freshVars4
+  , freshVars5
+  , freshVars6
+  , freshVars7
+  , freshVars8
   , replace
   , equiv
   , emptyList
@@ -33,6 +37,9 @@ module Resolvable.Prolog.Core
 
   , dnskeyType
   , dsType
+  , nsecType
+  , closestEncloser
+  , nsec3Type
   , aType
   , aaaaType
   , cnameType
@@ -49,9 +56,13 @@ module Resolvable.Prolog.Core
   , dataTerm
   , resolves
   , resolvable
+  , top
+  , bot
   , ad
   , rrsigValid
   , digestValid
+  , nsecUnsigned
+  , nsec3Unsigned
   , keyTag
   , nameWithSynthesis
   , nameWithoutSynthesis
@@ -59,7 +70,7 @@ module Resolvable.Prolog.Core
 
 import DNS.Name
 import DNS.Record
-import DNS.SEC.Crypto ( algorithmToInt, digestToInt, AlgorithmType, DigestType )
+import DNS.SEC.Crypto ( algorithmToInt, digestToInt, AlgorithmType, DigestType, nsec3DigestToInt, nsec3FlagsToInt )
 import DNS.SEC.Keys (dnsKeyFlagsToInt)
 import qualified DNS.RecordType as T
 import NameConstraint
@@ -119,6 +130,48 @@ freshVars4 (a, b, c, d) = do
   vc <- freshVar c
   vd <- freshVar d
   return (va, vb, vc, vd)
+
+freshVars5 :: (String, String, String, String, String) -> Fresh (Term, Term, Term, Term, Term)
+freshVars5 (a, b, c, d, e) = do
+  va <- freshVar a
+  vb <- freshVar b
+  vc <- freshVar c
+  vd <- freshVar d
+  ve <- freshVar e
+  return (va, vb, vc, vd, ve)
+
+freshVars6 :: (String, String, String, String, String, String) -> Fresh (Term, Term, Term, Term, Term, Term)
+freshVars6 (a, b, c, d, e, f) = do
+  va <- freshVar a
+  vb <- freshVar b
+  vc <- freshVar c
+  vd <- freshVar d
+  ve <- freshVar e
+  vf <- freshVar f
+  return (va, vb, vc, vd, ve, vf)
+
+freshVars7 :: (String, String, String, String, String, String, String) -> Fresh (Term, Term, Term, Term, Term, Term, Term)
+freshVars7 (a, b, c, d, e, f, g) = do
+  va <- freshVar a
+  vb <- freshVar b
+  vc <- freshVar c
+  vd <- freshVar d
+  ve <- freshVar e
+  vf <- freshVar f
+  vg <- freshVar g
+  return (va, vb, vc, vd, ve, vf, vg)
+
+freshVars8 :: (String, String, String, String, String, String, String, String) -> Fresh (Term, Term, Term, Term, Term, Term, Term, Term)
+freshVars8 (a, b, c, d, e, f, g, h) = do
+  va <- freshVar a
+  vb <- freshVar b
+  vc <- freshVar c
+  vd <- freshVar d
+  ve <- freshVar e
+  vf <- freshVar f
+  vg <- freshVar g
+  vh <- freshVar h
+  return (va, vb, vc, vd, ve, vf, vg, vh)
 
 tBin :: String -> Term -> Term -> Term
 tBin n a b = TFunctor n [ a, b ]
@@ -313,6 +366,12 @@ dnskeyType = ttypeTerm T.DNSKEY
 dsType :: Term
 dsType = ttypeTerm T.DS
 
+nsecType :: Term
+nsecType = ttypeTerm T.NSEC
+
+nsec3Type :: Term
+nsec3Type = ttypeTerm T.NSEC3
+
 aType :: Term
 aType = ttypeTerm T.A
 
@@ -371,13 +430,20 @@ dataTerm t = TFunctor (ttypeSym $ toType t) $ case t of
   DNSKEY (DNSKEYData fs alg k) -> [TInt (dnsKeyFlagsToInt fs), algTerm alg, b64Term k]
   RRSIG (RRSIGData ty alg ls ottl sigExp sigInc tag sigName sig) -> [ttypeTerm ty, algTerm alg, TInt ls, TInt ottl, TInt sigExp, TInt sigInc, TInt tag, nameTerm sigName, b64Term sig]
   NSEC (NSECData nextN covered) -> [nameTerm nextN, list (map ttypeTerm covered)]
+  NSEC3 (NSEC3Data alg flags iter salt nextHashedOwner types) -> [TInt (nsec3DigestToInt alg), TInt (nsec3FlagsToInt flags), TInt iter, hexTerm salt, hexTerm nextHashedOwner, list (map ttypeTerm types) ]
   DS (DSData tag alg digT dig) -> [TInt tag, algTerm alg, digestTerm digT, hexTerm dig]
 
-resolves :: Term -> Term -> Term -> Term -> Term -> Term
-resolves ns qtype qname d adb = TFunctor resolvesSym [ ns, qtype, qname, d, adb ]
+resolves :: Term -> Term -> Term -> Term -> Term -> Term -> Term -> Term
+resolves ns qtype qname d rec ver adb = TFunctor resolvesSym [ ns, qtype, qname, d, rec, ver, adb ]
 
-resolvable :: Term -> Term -> Term -> Term
-resolvable ns qtype qname = TFunctor resolvableSym [ ns, qtype, qname ]
+resolvable :: Term -> Term -> Term -> Term -> Term -> Term
+resolvable ns qtype qname ver auth = TFunctor resolvableSym [ ns, qtype, qname, ver, auth ]
+
+top :: Term
+top = TFunctor "top" []
+
+bot :: Term
+bot = TFunctor "bot" []
 
 ad :: Int -> Term
 ad = TFunctor adSym . (:[]) . TInt
@@ -387,6 +453,15 @@ rrsigValid nam dat sig key  = TFunctor rrsigValidSym [ nam, dat, sig, key ]
 
 digestValid :: Term -> Term -> Term -> Term
 digestValid nam dsTerm dnskeyTerm = TFunctor digestValidSym [ nam, dsTerm, dnskeyTerm ]
+
+nsecUnsigned :: Term -> Term -> Term
+nsecUnsigned nam nsecTerm = TFunctor nsecUnsignedSym [ nam, nsecTerm ]
+
+closestEncloser :: Term -> Term -> Term -> Term -> Term -> Term
+closestEncloser owner hashedEncloser encloserData otherHashed nonExData = TFunctor closestEncloserSym [ owner, hashedEncloser, encloserData, otherHashed, nonExData ]
+
+nsec3Unsigned :: Term -> Term -> Term -> Term
+nsec3Unsigned owner hashedOwner nsec3Data = TFunctor nsec3UnsignedSym [ owner, hashedOwner, nsec3Data ]
 
 keyTag :: Term -> Term -> Term
 keyTag d tag = TFunctor keyTagSym [ d, tag ]

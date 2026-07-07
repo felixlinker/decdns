@@ -10,6 +10,9 @@ module Resolvable.Prolog.Symbols
   , adSym
   , rrsigValidSym
   , digestValidSym
+  , nsecUnsignedSym
+  , closestEncloserSym
+  , nsec3UnsignedSym
   , keyTagSym ) where
 
 caretSym :: String
@@ -44,6 +47,15 @@ rrsigValidSym = "rrsigValid"
 
 digestValidSym :: String
 digestValidSym = "digestValid"
+
+nsecUnsignedSym :: String
+nsecUnsignedSym = "nsecUnsigned"
+
+closestEncloserSym :: String
+closestEncloserSym = "closestEnclosers"
+
+nsec3UnsignedSym :: String
+nsec3UnsignedSym = "nsec3Unsigned"
 
 keyTagSym :: String
 keyTagSym = "keyTag"

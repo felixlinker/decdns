@@ -44,7 +44,7 @@ partitionTrivial old new fqs = do
     cResolvable :: ConstrainedRecord -> Fresh (Term, Neqs)
     cResolvable (Named cn d) = do
       (n, S.fromList . map toConstraint -> neqs) <- nameWithSynthesis cn
-      return (resolvable TWildcard (typeTerm (rtype d)) n, neqs)
+      return (resolvable TWildcard (typeTerm (rtype d)) n TWildcard TWildcard, neqs)
 
     isTrivial :: [(Term, Neqs)] -> [(Term, Neqs)] -> ConstrainedQuery -> Bool
     isTrivial old' new' q = any (uncurry (matchesQuery q)) old' && not (any (uncurry (matchesQuery q)) new')

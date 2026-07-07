@@ -50,8 +50,9 @@ newtype Resolves = Resolves (Term, Term, Term, Term)
 instance Show Resolves where
   show (Resolves trip) = show trip
 
+-- TODO:
 fromTerm :: Term -> Maybe Resolves
-fromTerm (toView -> TVResolves ns t n _ auth) = Just $ Resolves (canon ns, canon t, canon n, auth)
+fromTerm (toView -> TVResolves ns t n _ _ _ auth) = Just $ Resolves (canon ns, canon t, canon n, auth)
 fromTerm _ = Nothing
 
 instance FromRule Resolves where
