@@ -78,9 +78,11 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) =
 
     go :: Term -> Type -> Fresh [Rule (Maybe RComp)]
     go rootServer r = case r of
-      NS (nameTerm -> delegatedNs) ->
-        let glueS = rootServer
-            glueRec = top
+      NS s' ->
+        let delegatedNs = nameTerm s'
+            expectGlue = isSubDomain s' (toName n)
+            glueS = if expectGlue then nameServer else rootServer
+            glueRec = if expectGlue then bot else top
         in  concat <$> sequence
         [ foreachM [aType, aaaaType] $ \glueType -> one $ do  -- Unauthenticated
             (nTail, t, d, dIp, rec) <- freshVars5 ("N", "T", "D", "D_IP", "R")
