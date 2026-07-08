@@ -6,8 +6,8 @@ module DNS.SEC.Verification
   , verifyDigest
   , nsec3Hash
   , verifyClosestEncloserProof
-  , nsec3Unsigned
-  , nsecUnsigned ) where
+  , nsec3UnsignedSubzone
+  , nsecUnsignedSubzone ) where
 
 import Crypto.Hash (Digest, hash)
 import qualified Crypto.Hash.Algorithms as Hash
@@ -123,8 +123,8 @@ verifyClosestEncloserProof (canonicalName -> qname) hashedClosestEncloser closes
           findNonExHash (Just hn) n' hashed
 
 -- See: https://datatracker.ietf.org/doc/html/rfc5155#section-8.9
-nsec3Unsigned :: Name String -> Name String -> NSEC3Data -> Bool
-nsec3Unsigned originalOwner hashedOwner dat@(NSEC3Data { _nsec3TypeBitMaps = ts }) = fromMaybe False $ do
+nsec3UnsignedSubzone :: Name String -> Name String -> NSEC3Data -> Bool
+nsec3UnsignedSubzone originalOwner hashedOwner dat@(NSEC3Data { _nsec3TypeBitMaps = ts }) = fromMaybe False $ do
   let Name (b32 NE.:| _) = hashedOwner
   hashedOwnerHash <- fromB32 b32
   return $ nsec3Hash dat originalOwner == hashedOwnerHash
@@ -132,6 +132,6 @@ nsec3Unsigned originalOwner hashedOwner dat@(NSEC3Data { _nsec3TypeBitMaps = ts 
     && T.NS `elem` ts
     && T.SOA `notElem` ts
 
-nsecUnsigned :: Name String -> Name String -> NSECData -> Bool
-nsecUnsigned owner nsecOwner (NSECData { _nsecTypeBitMaps = ts }) =
+nsecUnsignedSubzone :: Name String -> Name String -> NSECData -> Bool
+nsecUnsignedSubzone owner nsecOwner (NSECData { _nsecTypeBitMaps = ts }) =
   owner == nsecOwner && T.DS `notElem` ts

@@ -29,7 +29,7 @@ import Resolvable.Resolvability (RComp (RComp))
 import NameConstraint (ConstrainedName)
 import Control.Monad.Trans.Except (ExceptT, throwE)
 import Util.Monad (exceptMaybe, foreachM)
-import DNS.SEC.Verification (verifySignature, verifyDigest)
+import DNS.SEC.Verification (verifySignature, verifyDigest, nsecUnsignedSubzone, nsec3UnsignedSubzone, verifyClosestEncloserProof)
 import Data.Bifunctor (Bifunctor(bimap))
 
 class FromRule t where
@@ -147,6 +147,14 @@ asRRSigData :: Monad m => Type -> ExceptT String m (RRSIGData BS.ByteString)
 asRRSigData (RRSIG dat) = return dat
 asRRSigData t = throwE $ "expected RRSIG got: " ++ show t
 
+asNSECData :: Monad m => Type -> ExceptT String m NSECData
+asNSECData (NSEC dat) = return dat
+asNSECData t = throwE $ "expected NSEC got: " ++ show t
+
+asNSEC3Data :: Monad m => Type -> ExceptT String m NSEC3Data
+asNSEC3Data (NSEC3 dat) = return dat
+asNSEC3Data t = throwE $ "expected NSEC3 got: " ++ show t
+
 solveBody :: Monad m => S.Set ConstrainedQuery -> Rule a -> ExceptT String m (S.Set ConstrainedQuery)
 solveBody (S.toList -> rs) (Rule _ h b) = S.fromList . map (\u -> CQuery (CU.apply u h) (CU.constraints u)) <$> rec b [CU.identity]
   where
@@ -173,6 +181,25 @@ solveBody (S.toList -> rs) (Rule _ h b) = S.fromList . map (\u -> CQuery (CU.app
         sigDat <- asRRSigData =<< asType (app sig)
         DNSKEYData _ _ k' <- asDNSKEYData =<< asType (app k)
         checkReturn (verifySignature n' rrset sigDat k') u
+      TVNSECUnsigned n nsecDat -> foreachM choices $ \u -> do
+        let app = CU.apply u
+        n' <- asName (app n)
+        nsecDat' <- asNSECData =<< asType (app nsecDat)
+        checkReturn (nsecUnsignedSubzone n' n' nsecDat') u
+      TVNSEC3Unsigned n hashedOwner nsec3Dat -> foreachM choices $ \u -> do
+        let app = CU.apply u
+        n' <- asName (app n)
+        hashedOwner' <- asName (app hashedOwner)
+        nseceDat' <- asNSEC3Data =<< asType (app nsec3Dat)
+        checkReturn (nsec3UnsignedSubzone n' hashedOwner' nseceDat') u
+      TVClosestEncloser n exN exDat nonExN nonExDat -> foreachM choices $ \u -> do
+        let app = CU.apply u
+        n' <- asName (app n)
+        exN' <- asName (app exN)
+        exDat' <- asNSEC3Data =<< asType (app exDat)
+        nonExN' <- asName (app nonExN)
+        nonExDat' <- asNSEC3Data =<< asType (app nonExDat)
+        checkReturn (verifyClosestEncloserProof n' exN' exDat' nonExN' nonExDat') u
       -- This drops unsupported predicates, implicitly assuming that they are true
       _ -> rec recArg choices
       where

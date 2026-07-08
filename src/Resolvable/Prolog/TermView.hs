@@ -19,6 +19,9 @@ data TermView = TVList Term Term
               | TVResolvable Term Term Term Term Term
               | TVRRSIGValid Term Term Term Term
               | TVDigestValid Term Term Term
+              | TVNSECUnsigned Term Term
+              | TVClosestEncloser Term Term Term Term Term
+              | TVNSEC3Unsigned Term Term Term
               | TVKeyTag Term Term
               | TVAd Bool
               | TVFunctor String [ Term ]
@@ -57,6 +60,15 @@ toView (TFunctor n args)
   | n == digestValidSym = case args of
     [ nam, dsTerm, dnskeyTerm ] -> TVDigestValid nam dsTerm dnskeyTerm
     _ -> undefined
+  | n == nsecUnsignedSym = case args of
+    [ nam, nsecDat ] -> TVNSECUnsigned nam nsecDat
+    _ -> undefined
+  | n == closestEncloserSym = case args of
+    [ nam, exNam, exDat, nonExNam, nonExDat ] -> TVClosestEncloser nam exNam exDat nonExNam nonExDat
+    _ -> undefined
+  | n == nsec3UnsignedSym = case args of
+    [ nam, hashedNam, nsecDat ] -> TVNSEC3Unsigned nam hashedNam nsecDat
+    _ -> undefined
   | n == keyTagSym = case args of
     [ key, tag ] -> TVKeyTag key tag
     _ -> undefined
@@ -83,6 +95,9 @@ fromView (TVResolves ns qtype qname d rec ver adb) = resolves ns qtype qname d r
 fromView (TVResolvable ns qtype qname ver auth) = resolvable ns qtype qname ver auth
 fromView (TVRRSIGValid nam dat sig key) = rrsigValid nam dat sig key
 fromView (TVDigestValid nam dsTerm dnskeyTerm) = digestValid nam dsTerm dnskeyTerm
+fromView (TVNSECUnsigned nam nsecDat) = nsecUnsigned nam nsecDat
+fromView (TVClosestEncloser nam exNam exDat nonExNam nonExDat) = closestEncloser nam exNam exDat nonExNam nonExDat
+fromView (TVNSEC3Unsigned nam hashedNam nsecDat) = nsec3Unsigned nam hashedNam nsecDat
 fromView (TVKeyTag key tag) = keyTag key tag
 fromView (TVAd b) = ad (fromEnum b)
 fromView (TVFunctor n args) = TFunctor n args
