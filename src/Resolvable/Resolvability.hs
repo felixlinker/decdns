@@ -54,15 +54,19 @@ synthesisCases = [nameWithoutSynthesis', nameWithSynthesis]
     nameWithoutSynthesis' n = return (nameWithoutSynthesis n, [])
 
 resolvableBase :: [Name String] -> Name String -> ConstrainedRRSet -> Fresh [Rule (Maybe RComp)]
-resolvableBase rootServers ns s@(Named n rds@((RData _ _ ty) NE.:| _)) = foreachM synthesisCases $ \synth -> do
+resolvableBase rootServers ns s@(Named n rds@((RData _ _ ty) NE.:| _)) =
+  foreachM synthesisCases $ \synth ->
+  foreachM rootKeyCases   $ \(ver, adb) -> do
     (n', cs) <- synth n
-    -- TODO: Refine so that only root keys are trusted
-    -- Set the ad bit of DNSKEY entries stored at root servers to 1
-    let isDNSKEY = toType ty == T.DNSKEY
-    -- TODO: At least also emit for 0
-    let adb = ad $ fromEnum (isDNSKEY && ns `elem` rootServers)
-    return [Rule rann (resolves (nameTerm ns) (typeTerm ty) n' (rrsetTerm rds) bot bot adb) cs]
+    return [Rule rann (resolves (nameTerm ns) (typeTerm ty) n' (rrsetTerm rds) bot ver adb) cs]
     where
+      -- TODO: Refine so that only root keys are trusted
+      rootKeyCases :: [(Term, Term)]
+      rootKeyCases
+        -- Set the ad bit of DNSKEY entries stored at root servers to 1
+        | toType ty == T.DNSKEY && ns `elem` rootServers = [(bot, ad 0), (top, ad 1)]
+        | otherwise = [(bot, ad 0)]
+
       rann :: Maybe RComp
       rann = Just (RComp ns s)
 
