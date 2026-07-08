@@ -68,7 +68,6 @@ wellformed ns (Zone org r@(Tr.Node apexData rcs)) =
         checkData :: RRSet.RDataSet -> Bool
         checkData rs = hasType T.CNAME rs ==> typesAllIn rs [T.CNAME, T.NSEC, T.RRSIG]
 
-    -- TODO: Can have records below CNAME
     checkZoneCuts :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
     checkZoneCuts n (Tr.Node rs cs) = if hasType T.NS rs
         then typesAllIn rs [T.NS, T.DS, T.NSEC, T.RRSIG, T.A, T.AAAA] && all (`typesAllIn` [T.A, T.AAAA]) (Tr.Node RRSet.empty cs)
