@@ -1,0 +1,78 @@
+; File written on Tue Jul  7 17:34:17 2026
+; dnssec-signzone version 9.20.23
+com.			1200	IN SOA	ns.com. example.com. (
+					0          ; serial
+					0          ; refresh (0 seconds)
+					0          ; retry (0 seconds)
+					0          ; expire (0 seconds)
+					0          ; minimum (0 seconds)
+					)
+			1200	RRSIG	SOA 13 1 1200 (
+					20260806143417 20260707143417 36552 com.
+					IGhHUTfJLwKRsevKkWsxeZtaAgSuXRF2zkN3
+					qAZ+Nb56v8JiM26aQIcuoT9TH8Y4mFR/nbhZ
+					/8R1MOAK4yjyTg== )
+			1200	NS	ns.com.
+			1200	RRSIG	NS 13 1 1200 (
+					20260806143417 20260707143417 36552 com.
+					jgrrMo0yMBKr1b8VArV21Jv4QBhd5y0ZXYBV
+					GpNuFXRu7nrC2izbR1Y2xFdb29qHHlGp/nQW
+					pNKGACF5yS8Xkg== )
+			1200	DNSKEY	256 3 13 (
+					rc7OFucwm9rzpps6+/t5a5oDdoZONT0ySCbF
+					Uzb5LYCm0s8OKQY+62WbjzRZpI4+dMLfUHJr
+					ijI1veDgPCsbnA==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 36552
+			1200	DNSKEY	257 3 13 (
+					UvIquJZJcl6GafC6Jm7vQ1drUfJmQTn4VTcm
+					G1pBKbt/GjQyDqZhnDqSgWpTVwIcDjBSYwma
+					RtmfSusEUXmlsQ==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 51101
+			1200	RRSIG	DNSKEY 13 1 1200 (
+					20260806143417 20260707143417 36552 com.
+					IlBs99h0fNQX+C2MrLIng1oFBmOsNYNUs8mL
+					xHDnDPUzELB2lTcpKRKrt8ujAbY3z2UxObVS
+					sbBaRBm4b4/suQ== )
+			1200	RRSIG	DNSKEY 13 1 1200 (
+					20260806143417 20260707143417 51101 com.
+					Ks1KUNRmxhTdm/wYdfHvXXSD3FDA4Fe9+chE
+					MG7zPCTIvEc/M1fjQVf6hc9lmUDFyepYiWZq
+					C+DjSH0QMafahA== )
+			0	NSEC3PARAM 1 0 1 DEADBEEF
+			0	RRSIG	NSEC3PARAM 13 1 0 (
+					20260806143417 20260707143417 36552 com.
+					yUSPPj3QvbsJzZiEHg0Jmzc0X3DhF4YIjhKg
+					cZk0SK6wac0/clV1y/rUICgsj6HBaCl/4F9I
+					P8HRyKNWy2+3Ng== )
+a.com.			1200	IN CNAME b.com.
+			1200	RRSIG	CNAME 13 2 1200 (
+					20260806143417 20260707143417 36552 com.
+					0DuiBQnBXfXWSnVGFtZNsvWqbj1gFeiOvkbL
+					sF052KbjrPYhQed7UHuhyA/VTrHbNyrsT7tL
+					QUTvPH0zNyIOsA== )
+b.com.			1200	IN NS	ns.b.com.
+ns.b.com.		1200	IN A	1.2.3.4
+5VL5NKIJE031ODJIUE3GRL823D3HRG9Q.com. 0	IN NSEC3 1 0 1 DEADBEEF (
+					7QIJOET3JMIPERTDJT8D79BQ40S6SKD2
+					NS )
+			0	RRSIG	NSEC3 13 2 0 (
+					20260806143417 20260707143417 36552 com.
+					lBsZp4eZEODOVhXxr6oiQhfJg1RWDBwy2V5N
+					+/0hh6C7p79/dJFMQH8frHewC7nZ00h5QcLY
+					dF7Rr7RdsoNsaQ== )
+7QIJOET3JMIPERTDJT8D79BQ40S6SKD2.com. 0	IN NSEC3 1 0 1 DEADBEEF (
+					SSA0Q5T55MH7PK0N46S259FR6I3075AE
+					CNAME RRSIG )
+			0	RRSIG	NSEC3 13 2 0 (
+					20260806143417 20260707143417 36552 com.
+					BhRRfNMum8Xgh5ylm6KcKmGS9KtMvM6MFMci
+					PcHoSw8tX6LfW/owRbwkvfRsrGv7oh/Lwzti
+					7crkbGHuO18gjQ== )
+SSA0Q5T55MH7PK0N46S259FR6I3075AE.com. 0	IN NSEC3 1 0 1 DEADBEEF (
+					5VL5NKIJE031ODJIUE3GRL823D3HRG9Q
+					NS SOA RRSIG DNSKEY NSEC3PARAM )
+			0	RRSIG	NSEC3 13 2 0 (
+					20260806143417 20260707143417 36552 com.
+					+d9awjpKQ4R29O4Nl8jJSvyfEWcRgBu2U/Bo
+					OBfOqbTFGyYV5v2bRVic7R0RYf6OhjGphEGU
+					jI3s0o1RWKqKlA== )

@@ -14,6 +14,21 @@ maintainer:     example@example.com
 copyright:      2025 Author name here
 license:        BSD-3-Clause
 build-type:     Simple
+extra-source-files:
+    examples/cname/base/ns.b.com.
+    examples/cname/base/ns.com.
+    examples/cname/broken/ns.com.
+    examples/cname/new/ns.com.
+    examples/cname/partially-signed-nsec3-oo/ns.b.com.
+    examples/cname/partially-signed-nsec3-oo/ns.com.
+    examples/cname/partially-signed-nsec3/ns.b.com.
+    examples/cname/partially-signed-nsec3/ns.com.
+    examples/cname/partially-signed/ns.b.com.
+    examples/cname/partially-signed/ns.com.
+    examples/cname/signed-nsec3/ns.b.com.
+    examples/cname/signed-nsec3/ns.com.
+    examples/cname/signed/ns.b.com.
+    examples/cname/signed/ns.com.
 
 source-repository head
   type: git
@@ -120,6 +135,7 @@ test-suite dns-regressor-test
       DNS.SEC.VerificationSpec
       DNS.ZoneFile.PrintingSpec
       DNS.ZoneFileSpec
+      Integration
       Parsing.WellformednessSpec
       Parsing.ZoneFileSpec
       Resolvable.ConstrainedUnificationSpec

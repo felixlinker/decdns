@@ -1,0 +1,7 @@
+$ORIGIN com.
+@ 1200 IN SOA ns.com. example.com. 0 0 0 0 0
+@ 1200 IN NS ns.com.
+
+a 1200 IN CNAME b.com.
+b 1200 IN NS ns.b.com.
+ns.b 1200 IN A 1.2.3.4

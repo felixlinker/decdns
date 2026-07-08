@@ -1,0 +1,66 @@
+; File written on Thu Jul  2 18:56:31 2026
+; dnssec-signzone version 9.20.23
+com.			1200	IN SOA	ns.com. example.com. (
+					0          ; serial
+					0          ; refresh (0 seconds)
+					0          ; retry (0 seconds)
+					0          ; expire (0 seconds)
+					0          ; minimum (0 seconds)
+					)
+			1200	RRSIG	SOA 13 1 1200 (
+					20260801155631 20260702155631 10079 com.
+					uU7Ujg4NsMLvybH1BXBaHVJKTMSMaAqOTC+3
+					dp0ZH2W8+yCwuFpIQrr2yXSApkaARdh41NId
+					iym1tfESFPy1Dg== )
+			1200	NS	ns.com.
+			1200	RRSIG	NS 13 1 1200 (
+					20260801155631 20260702155631 10079 com.
+					NmuBOHGOAct9g7cUb+V5nnZ1sS1njKcSiJmy
+					L0o9Tf1SiSMGWQSezfImzhNt1sFhN5ygWUfn
+					KB/67KuGNvLXQg== )
+			0	NSEC	a.com. NS SOA RRSIG NSEC DNSKEY
+			0	RRSIG	NSEC 13 1 0 (
+					20260801155631 20260702155631 10079 com.
+					uGp6c0HNQXY4VpFR53LbfBp+O7HQ6IgxBshJ
+					Wo19J0yQQXf7NO0w8oKzeJyfQ/mXS4iq8qVJ
+					jS9MroAzmNegoA== )
+			1200	DNSKEY	256 3 13 (
+					OXW7eKnKbyG/JJHCCpeG5R+kADcvuI83ONyG
+					QAra3dUXXm9AultHN1ag3UkvmD3vuc65f2Ri
+					IjPNUrAN1Ek3Sw==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 10079
+			1200	DNSKEY	257 3 13 (
+					N4AZpey/NCWPLrYKWRV7BcAi1WZhkgqjYzHP
+					2qw5n3T+i3SBLvjzzgtkh3Sps955VhehMvIy
+					+gvy/0o5i6YfWQ==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 35970
+			1200	RRSIG	DNSKEY 13 1 1200 (
+					20260801155631 20260702155631 10079 com.
+					NDBT2A+8NAeDWNQ1gT4uaM7O1Mub7FSM0SK0
+					PDWLHJyFC3ZyEwmGHfyrawh0V9De00N01hiU
+					YYyM0Wv+hNz0QA== )
+			1200	RRSIG	DNSKEY 13 1 1200 (
+					20260801155631 20260702155631 35970 com.
+					aDO9m4g2fANRfS48KQaCKzKLM4RUEi6dGGXP
+					pi6veEj8FS6PGvdIwVbTzVn42vy4r3HE9zxU
+					YwWiiHWd8dhahA== )
+a.com.			1200	IN CNAME b.com.
+			1200	RRSIG	CNAME 13 2 1200 (
+					20260801155631 20260702155631 10079 com.
+					xLtMswP+zb/UHKZ9C/h3KHjXDXdX7MoMo8cg
+					Bp3kf4gUtT0HZmedZY2hMFt8yxHxl4wuJLit
+					efjeQoTVfFZUCQ== )
+			0	NSEC	b.com. CNAME RRSIG NSEC
+			0	RRSIG	NSEC 13 2 0 (
+					20260801155631 20260702155631 10079 com.
+					2SHFIwIXheWW6S1bKCjpNbPdPMCEceFeQFxx
+					4U7Vc20xjMJaaB7U0jDXpVbw3cpMdU3geEjU
+					O164I19Vwff2/A== )
+b.com.			1200	IN NS	ns.b.com.
+			0	NSEC	com. NS RRSIG NSEC
+			0	RRSIG	NSEC 13 2 0 (
+					20260801155631 20260702155631 10079 com.
+					6QZ+hVCh1aUfRXMHp0fm2gPcw35OLtPJVIJp
+					8wAOF4K0qk9uEMl9mG+RC/pXTkG0dY3bwvIM
+					0Fe6nqecd+LkdQ== )
+ns.b.com.		1200	IN A	1.2.3.4

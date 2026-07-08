@@ -13,6 +13,7 @@ import qualified DNS.SEC.VerificationSpec as VerificationSpec
 import qualified DNS.DiffSpec as DiffSpec
 import qualified DNS.ZoneFileSpec as DNSZoneFileSpec
 import qualified DNS.ZoneFile.PrintingSpec as ZoneFilePrintingSpec
+import qualified Integration
 import qualified Parsing.WellformednessSpec as ParsingWellformednessSpec
 import qualified Parsing.ZoneFileSpec as ParsingZoneFileSpec
 import qualified Util.ListSpec as ListSpec
@@ -35,6 +36,7 @@ main =
       , VerificationSpec.tests
       , DiffSpec.tests
       , DNSZoneFileSpec.tests
+      , Integration.tests
       , ParsingWellformednessSpec.tests
       , ParsingZoneFileSpec.tests
       , ZoneFilePrintingSpec.tests
