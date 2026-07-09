@@ -45,6 +45,16 @@ tests =
             authenticatedResolutionTest "signed" signedFiles
         , testCase "signed-nsec3 authenticates the CNAME chain and child zone" $
             authenticatedResolutionTest "signed-nsec3" signedNsec3Files
+        , testCase "partially-signed authenticates unsigned child zone through NSEC" $
+            authenticatedUnsignedDelegationTest "partially-signed" partiallySignedFiles
+        , testCase "partially-signed-nsec3 authenticates unsigned child zone through NSEC3 owner proof" $
+            authenticatedUnsignedDelegationTest "partially-signed-nsec3" partiallySignedNsec3Files
+        , testCase "partially-signed-nsec3-oo filters invalid NSEC3 unsigned-delegation proof" $
+            doesNotAuthenticateUnsignedDelegationTest "partially-signed-nsec3-oo" partiallySignedNsec3OOFiles
+        , testCase "signed does not authenticate the child zone as unsigned through NSEC" $
+            signedDelegationDoesNotUseUnsignedProofTest "signed" signedFiles
+        , testCase "signed-nsec3 does not authenticate the child zone as unsigned through NSEC3" $
+            signedDelegationDoesNotUseUnsignedProofTest "signed-nsec3" signedNsec3Files
         , testCase "base does not authenticate unsigned answers" $ do
             results <- resolvableQueries baseFiles
             assertResolutions "base" results []
@@ -248,6 +258,10 @@ authenticated :: Name String -> RT.Type -> Name String -> Resolution
 authenticated ns rtype qname =
   Resolution (Query ns rtype qname) top (ad 1)
 
+authenticatedUnsigned :: Name String -> RT.Type -> Name String -> Resolution
+authenticatedUnsigned ns rtype qname =
+  Resolution (Query ns rtype qname) top (ad 0)
+
 com, net, aCom, bCom, nsCom, nsBCom :: Name String
 com = mkName ["com", ""]
 net = mkName ["net", ""]
@@ -291,6 +305,36 @@ authenticatedResolutionTest label files = do
     , authenticated nsCom RT.DNSKEY bCom
     , authenticated nsCom RT.DS bCom ]
     []
+
+authenticatedUnsignedDelegationTest :: String -> [FilePath] -> Assertion
+authenticatedUnsignedDelegationTest label files = do
+  results <- resolvableQueries files
+  assertResolutions label results
+    [ authenticatedUnsigned nsCom RT.A bCom
+    , authenticatedUnsigned nsCom RT.A nsBCom ]
+    [ authenticated nsCom RT.A bCom
+    , authenticated nsCom RT.A nsBCom
+    , authenticated nsCom RT.DS bCom ]
+
+signedDelegationDoesNotUseUnsignedProofTest :: String -> [FilePath] -> Assertion
+signedDelegationDoesNotUseUnsignedProofTest label files = do
+  results <- resolvableQueries files
+  assertResolutions label results
+    [ authenticated nsCom RT.A bCom
+    , authenticated nsCom RT.A nsBCom
+    , authenticated nsCom RT.DS bCom ]
+    [ authenticatedUnsigned nsCom RT.A bCom
+    , authenticatedUnsigned nsCom RT.A nsBCom ]
+
+doesNotAuthenticateUnsignedDelegationTest :: String -> [FilePath] -> Assertion
+doesNotAuthenticateUnsignedDelegationTest label files = do
+  results <- resolvableQueries files
+  assertResolutions label results []
+    [ authenticatedUnsigned nsCom RT.A bCom
+    , authenticatedUnsigned nsCom RT.A nsBCom
+    , authenticated nsCom RT.A bCom
+    , authenticated nsCom RT.A nsBCom
+    , authenticated nsCom RT.DS bCom ]
 
 regressionTest :: String -> [FilePath] -> [Query] -> [Query] -> Assertion
 regressionTest label newConfig expected unexpected = do
