@@ -10,7 +10,6 @@ module Resolvable.Unification
   , unify
   , unifies
   , equivModuloRenaming
-  , matchHead
   , extendUnifier ) where
 
 import qualified Data.Map.Strict as M
@@ -94,9 +93,6 @@ unifies t1 t2 = isJust (unify t1 t2)
 
 equivModuloRenaming :: Term -> Term -> Bool
 equivModuloRenaming t1 t2 = maybe False isRenaming (unify t1 t2)
-
-matchHead :: Term -> Rule a -> Bool
-matchHead t = unifies t . rhead
 
 extendUnifier :: Term -> Term -> Unifier -> Maybe Unifier
 -- Call @apply u@ on @to@ so that the unifier stays normal

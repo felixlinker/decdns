@@ -1,5 +1,6 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TupleSections #-}
 module Resolvable.Dependencies
   ( ResolvableAt(..)
   , Resolves(..)
@@ -7,11 +8,12 @@ module Resolvable.Dependencies
   , RecordDependencies
   , RuleDependencies
   , ConstrainedQuery(..)
+  , queryFromRule
   , fromRules
   , computeResolvable ) where
 
 import Control.Arrow (Arrow(first))
-import Control.Monad (when, filterM, foldM)
+import Control.Monad (when, filterM, foldM, guard)
 import qualified Data.ByteString as BS
 import qualified Data.Set as S
 import Data.List (uncons, partition)
@@ -31,6 +33,7 @@ import Control.Monad.Trans.Except (ExceptT, throwE)
 import Util.Monad (exceptMaybe, foreachM)
 import DNS.SEC.Verification (verifySignature, verifyDigest, nsecUnsignedSubzone, nsec3UnsignedSubzone, verifyClosestEncloserProof)
 import Data.Bifunctor (Bifunctor(bimap))
+import qualified Control.Monad.Trans.State as St
 
 class FromRule t where
   fromRule :: Rule (Maybe RComp) -> Maybe t
@@ -107,13 +110,30 @@ instance Apply (Maybe ConstrainedQuery) where
 toRule :: ConstrainedQuery -> Rule ()
 toRule (CQuery q neqs) = Rule () q (CU.asPredicates neqs)
 
+queryFromRule :: Rule a -> Maybe ConstrainedQuery
+queryFromRule (Rule _ h b) = do
+  (rest, cu) <- grabNeqs b CU.identity
+  guard (null rest)
+  return $ CQuery h (CU.constraints cu)
+
+grabNeqs :: [Term] -> CU.ConstrainedUnifier -> Maybe ([Term], CU.ConstrainedUnifier)
+grabNeqs ts = St.runStateT (filterM importNeq ts)
+  where
+    importNeq :: Term -> St.StateT CU.ConstrainedUnifier Maybe Bool
+    importNeq bodyT = case toView bodyT of
+      TVNeq x y -> do
+        St.modifyM (CU.addConstraint x y)
+        return False
+      _ -> return True
+
 instance Show ConstrainedQuery where
   show = show . toRule
 
-extendAndMerge :: Term -> ConstrainedQuery -> CU.ConstrainedUnifier -> Maybe CU.ConstrainedUnifier
-extendAndMerge t (CQuery t' neqs) cu = do
-  cu' <- CU.extendUnifier t t' cu
-  foldr ((=<<) . uncurry CU.addConstraint) (Just cu') (CU.toList neqs)
+matchHead :: Term -> Rule a -> CU.ConstrainedUnifier -> Maybe (CU.ConstrainedUnifier, [Term])
+matchHead t (Rule _ h b) cu = do
+  cu' <- CU.extendUnifier t h cu
+  (b', cu'') <- grabNeqs b cu'
+  return (cu'', CU.apply cu'' b')
 
 asName :: Monad m => Term -> ExceptT String m (Name String)
 asName t = do
@@ -155,20 +175,25 @@ asNSEC3Data :: Monad m => Type -> ExceptT String m NSEC3Data
 asNSEC3Data (NSEC3 dat) = return dat
 asNSEC3Data t = throwE $ "expected NSEC3 got: " ++ show t
 
-solveBody :: Monad m => S.Set ConstrainedQuery -> Rule a -> ExceptT String m (S.Set ConstrainedQuery)
-solveBody (S.toList -> rs) (Rule _ h b) = S.fromList . map (\u -> CQuery (CU.apply u h) (CU.constraints u)) <$> foldM solvePredicate [CU.identity] b
+solveBody :: (Monad m, Ord a) => S.Set (Rule a) -> Rule a -> ExceptT String m (S.Set (Rule a))
+solveBody (S.toList -> rs) (Rule ann h b) = S.fromList . map (\(u, b') -> CU.apply u $ Rule ann h b') <$> foldM solvePredicate [(CU.identity, [])] b
   where
-    solvePredicate :: Monad m => [CU.ConstrainedUnifier] -> Term -> ExceptT String m [CU.ConstrainedUnifier]
+    solvePredicate :: Monad m => [(CU.ConstrainedUnifier, [Term])] -> Term -> ExceptT String m [(CU.ConstrainedUnifier, [Term])]
     solvePredicate choices t = case toView t of
-      TVNeq t1 t2 -> return $ mapMaybe (CU.addConstraint t1 t2) choices
-      TVResolves {} -> foreachM choices
-        (\u -> return $ mapMaybe (\cq -> extendAndMerge t cq u) rs)
-      TVMember x l -> foreachM choices (\u -> do
+      TVNeq t1 t2 -> return $ mapMaybe (\(u, accB) -> (,accB) <$> CU.addConstraint t1 t2 u) choices
+      TVResolves {} -> foreachM choices $ \(u, accB) -> return $ mapMaybe (\cq -> do
+          (u', b') <- matchHead t cq u
+          return (u', CU.apply u' accB ++ b'))
+          rs
+      TVMember x l -> foreachM choices $ \(u, accB) -> do
         let ul = CU.apply u l
         l' <- exceptMaybe ("variable list for non-deterministic choice: " ++ show ul) (collectList ul)
-        return $ mapMaybe (\el -> CU.extendUnifier x el u) l')
+        return $ mapMaybe (\el -> do
+          u' <- CU.extendUnifier x el u
+          return (u', CU.apply u' accB))
+          l'
       TVDigestValid n dnskeyT dsT -> filterM
-        (\u -> do
+        (\(u, _) -> do
           let app = CU.apply u
           n' <- asName (app n)
           dsDat <- asDSData =<< asType (app dsT)
@@ -176,7 +201,7 @@ solveBody (S.toList -> rs) (Rule _ h b) = S.fromList . map (\u -> CQuery (CU.app
           return (verifyDigest n' dsDat dnskeyDat))
         choices
       TVRRSIGValid n dat sig k -> filterM
-        (\u -> do
+        (\(u, _) -> do
           let app = CU.apply u
           n' <- asName (app n)
           rrset <- asTypes (app dat)
@@ -185,14 +210,14 @@ solveBody (S.toList -> rs) (Rule _ h b) = S.fromList . map (\u -> CQuery (CU.app
           return (verifySignature n' rrset sigDat k'))
         choices
       TVNSECUnsigned n nsecDat -> filterM
-        (\u -> do
+        (\(u, _) -> do
           let app = CU.apply u
           n' <- asName (app n)
           nsecDat' <- asNSECData =<< asType (app nsecDat)
           return $ nsecUnsignedSubzone n' n' nsecDat')
         choices
       TVNSEC3Unsigned n hashedOwner nsec3Dat -> filterM
-        (\u -> do
+        (\(u, _) -> do
           let app = CU.apply u
           n' <- asName (app n)
           hashedOwner' <- asName (app hashedOwner)
@@ -200,7 +225,7 @@ solveBody (S.toList -> rs) (Rule _ h b) = S.fromList . map (\u -> CQuery (CU.app
           return $ nsec3UnsignedSubzone n' hashedOwner' nsec3Dat')
         choices
       TVClosestEncloser n exN exDat nonExN nonExDat -> filterM
-        (\u -> do
+        (\(u, _) -> do
           let app = CU.apply u
           n' <- asName (app n)
           exN' <- asName (app exN)
@@ -212,12 +237,12 @@ solveBody (S.toList -> rs) (Rule _ h b) = S.fromList . map (\u -> CQuery (CU.app
       -- This drops unsupported predicates, implicitly assuming that they are true
       _ -> return choices
 
-computeResolvable :: Monad m => [Rule (Maybe RComp)] -> ExceptT String m (S.Set ConstrainedQuery)
+computeResolvable :: Monad m => [Rule (Maybe RComp)] -> ExceptT String m (S.Set (Rule (Maybe RComp)))
 computeResolvable (filter (isResolves . rhead) -> rs) = do
   ord <- exceptMaybe "cyclic dependencies" $ PO.transitiveClosure $ fromRules rs
   rec ord rs S.empty
   where
-    rec :: Monad m => RuleDependencies -> [Rule (Maybe RComp)] -> S.Set ConstrainedQuery -> ExceptT String m (S.Set ConstrainedQuery)
+    rec :: Monad m => RuleDependencies -> [Rule (Maybe RComp)] -> S.Set (Rule (Maybe RComp)) -> ExceptT String m (S.Set (Rule (Maybe RComp)))
     rec _ [] acc = return acc
     rec ord toSolve acc =
       let (mins, recArg) = partition (maybe False (PO.minimal ord) . fromRule) toSolve

@@ -10,6 +10,7 @@ import Resolvable.Prolog.Core
 import Util.Fresh
 import Resolvable.Resolvability (RComp)
 import Resolvable.Update.Disunification (withouts)
+import Data.Maybe (mapMaybe)
 
 toExcept :: Monad m => m a -> ExceptT e m a
 toExcept = ExceptT . fmap Right
@@ -18,6 +19,7 @@ computeRegressions :: Fresh [Rule (Maybe RComp)] -> Fresh [Rule (Maybe RComp)] -
 computeRegressions (toExcept -> oldf) (toExcept -> newf) = do
   oldRs <- oldf
   newRs <- newf
-  resOld <- S.toList <$> computeResolvable oldRs
-  resNew <- S.toList <$> computeResolvable newRs
+  -- TODO: Guard that nothing is dropped
+  resOld <- mapMaybe queryFromRule . S.toList <$> computeResolvable oldRs
+  resNew <- mapMaybe queryFromRule . S.toList <$> computeResolvable newRs
   return $ concatMap (`withouts` resNew) resOld

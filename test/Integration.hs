@@ -20,7 +20,8 @@ import NameConstraint
   )
 import Parsing (parseName, parseZoneFile)
 import Parsing.Wellformedness (wellformed)
-import Resolvable.Dependencies (ConstrainedQuery (CQuery), computeResolvable)
+import Data.Maybe (mapMaybe)
+import Resolvable.Dependencies (ConstrainedQuery (CQuery), computeResolvable, queryFromRule)
 import Resolvable.Prolog.Core (Term (TWildcard), ad, nameTerm, resolves, top, ttypeTerm)
 import Resolvable.Resolvability (NameServersConfig, compileConfig, plResolvable)
 import Resolvable.Update.Dependencies (computeRegressions)
@@ -446,7 +447,8 @@ resolvableQueries :: [FilePath] -> IO (S.Set ConstrainedQuery)
 resolvableQueries files = do
   cfg <- loadConfig files
   let rules = runFresh $ plResolvable =<< compileConfig rootServers cfg
-  assertRight $ runFresh $ runExceptT $ computeResolvable rules
+  resolvable <- assertRight (runFresh $ runExceptT $ computeResolvable rules)
+  return $ S.fromList $ mapMaybe queryFromRule $ S.toList resolvable
 
 loadConfig :: [FilePath] -> IO NameServersConfig
 loadConfig = mapM loadConfigEntry
@@ -471,5 +473,4 @@ assertWellformed path ns zone =
     Just err -> assertFailure (path ++ ": " ++ err)
 
 assertRight :: Show e => Either e a -> IO a
-assertRight (Left err) = assertFailure (show err)
-assertRight (Right value) = return value
+assertRight = either (assertFailure . show) return
