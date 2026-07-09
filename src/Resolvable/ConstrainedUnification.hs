@@ -1,6 +1,8 @@
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
 module Resolvable.ConstrainedUnification
   ( ConstrainedUnifier(..)
+  , Apply(..)
   , Neqs
   , toList
   , asPredicates
@@ -8,7 +10,6 @@ module Resolvable.ConstrainedUnification
   , simplify
   , identity
   , fromUnifier
-  , apply
   , applyRule
   , addConstraint
   , extendUnifier ) where
@@ -54,9 +55,6 @@ identity = CUnifier U.identity M.empty
 
 fromUnifier :: U.Unifier -> ConstrainedUnifier
 fromUnifier = (`CUnifier` M.empty)
-
-apply :: ConstrainedUnifier -> Term -> Term
-apply (CUnifier u _) = U.apply u
 
 applyRule :: ConstrainedUnifier -> Rule a -> Maybe (Rule a, ConstrainedUnifier)
 applyRule cu (Rule ann h bs) = do
@@ -120,3 +118,16 @@ simplifyNeq a b = case a of
     rec :: [(Term, Term)] -> Maybe [(String, Term)]
     rec [] = Nothing
     rec zipped = simplifyL zipped
+
+class Apply a where
+  apply :: ConstrainedUnifier -> a -> a
+
+instance Apply a => Apply [a] where
+  apply cu = map (apply cu)
+
+instance Apply Term where
+  apply (CUnifier u _) = U.apply u
+
+instance Apply (Rule a) where
+  apply cu@(CUnifier _ neqs) (Rule ann (apply cu -> h') (apply cu -> b')) =
+    Rule ann h' (asPredicates neqs ++ b')
