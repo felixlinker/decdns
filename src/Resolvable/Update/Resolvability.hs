@@ -3,6 +3,8 @@ module Resolvable.Update.Resolvability
   , compileConfigs
   , plRegressions ) where
 
+import qualified Data.Set as S
+
 import DNS.Name
 import Resolvable.Prolog.Core
 import Resolvable.Prolog.Symbols
@@ -19,17 +21,17 @@ regression = Rule Nothing (TFunctor "regression" [ ns, q, n ]) [ resolves_old, (
     resolves_old = renameFunctor "resolves" "resolves_old" $ resolves ns q n TWildcard TWildcard TWildcard (ad 0)
     resolves_new = renameFunctor "resolves" "resolves_new" $ resolves ns q n TWildcard TWildcard TWildcard (ad 0)
 
-compileConfigs :: Fresh [Rule a] -> Fresh [Rule a] -> Fresh [Rule a]
+compileConfigs :: Ord a => Fresh (S.Set (Rule a)) -> Fresh (S.Set (Rule a)) -> Fresh (S.Set (Rule a))
 compileConfigs old new = do
-  old' <- map (renameFunctorInRule "resolves_old") <$> old
-  new' <- map (renameFunctorInRule "resolves_new") <$> new
-  return $ old' ++ new'
+  old' <- S.map (renameFunctorInRule "resolves_old") <$> old
+  new' <- S.map (renameFunctorInRule "resolves_new") <$> new
+  return $ old' <> new'
   where
     renameFunctorInRule :: String -> Rule a -> Rule a
     renameFunctorInRule = mapRule . renameFunctor resolvesSym
 
-plRegressions :: [Name String] -> NameServersConfig -> NameServersConfig -> [Rule (Maybe RComp)]
-plRegressions rootServers old new = (regression :) $ runFresh $ compileConfigs (c old) (c new)
+plRegressions :: [Name String] -> NameServersConfig -> NameServersConfig -> S.Set (Rule (Maybe RComp))
+plRegressions rootServers old new = S.insert regression $ runFresh $ compileConfigs (c old) (c new)
   where
-    c :: NameServersConfig -> Fresh [Rule (Maybe RComp)]
+    c :: NameServersConfig -> Fresh (S.Set (Rule (Maybe RComp)))
     c = compileConfig rootServers

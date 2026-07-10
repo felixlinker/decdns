@@ -12,11 +12,10 @@ module Resolvable.Dependencies
   , fromRules
   , computeResolvable ) where
 
-import Control.Arrow (Arrow(first))
 import Control.Monad (when, filterM, foldM, guard)
 import qualified Data.ByteString as BS
 import qualified Data.Set as S
-import Data.List (uncons, partition)
+import Data.List (uncons)
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (mapMaybe)
 
@@ -87,14 +86,12 @@ match rl@(Rule _ (toView -> TVResolves {}) b) rs@(Rule _ h'@(toView -> TVResolve
   return (smaller, larger)
 match _ _ = Nothing
 
-fromRules :: (FromRule a, Ord a) => [Rule (Maybe RComp)] -> PO.PartialOrder a
-fromRules rs = go rs PO.empty
+fromRules :: (FromRule a, Ord a) => S.Set (Rule (Maybe RComp)) -> PO.PartialOrder a
+fromRules rs = foldr go PO.empty rs
   where
-    go :: (FromRule a, Ord a) => [Rule (Maybe RComp)] -> PO.PartialOrder a -> PO.PartialOrder a
-    go [] acc = acc
-    go (r:rrec) acc =
-      let els = mapMaybe (match r) rs
-      in go rrec (foldr (uncurry PO.insert . first S.singleton) acc els)
+    go :: (FromRule a, Ord a) => Rule (Maybe RComp) -> PO.PartialOrder a -> PO.PartialOrder a
+    go r acc =
+      foldr (\r' foldAcc -> maybe foldAcc (\(S.singleton -> sml, lrg) -> PO.insert sml lrg foldAcc) (match r r')) acc rs
 
 -- TODO: Refactor
 data ConstrainedQuery = CQuery Term CU.Neqs
@@ -176,14 +173,16 @@ asNSEC3Data (NSEC3 dat) = return dat
 asNSEC3Data t = throwE $ "expected NSEC3 got: " ++ show t
 
 solveBody :: (Monad m, Ord a) => S.Set (Rule a) -> Rule a -> ExceptT String m (S.Set (Rule a))
-solveBody (S.toList -> rs) (Rule ann h b) = S.fromList . map (\(u, b') -> CU.apply u $ Rule ann h b') <$> foldM solvePredicate [(CU.identity, [])] b
+solveBody rs (Rule ann h b) = S.fromList . map (\(u, b') -> CU.apply u $ Rule ann h b') <$> foldM solvePredicate [(CU.identity, [])] b
   where
     solvePredicate :: Monad m => [(CU.ConstrainedUnifier, [Term])] -> Term -> ExceptT String m [(CU.ConstrainedUnifier, [Term])]
     solvePredicate choices t = case toView t of
       TVNeq t1 t2 -> return $ mapMaybe (\(u, accB) -> (,accB) <$> CU.addConstraint t1 t2 u) choices
-      TVResolves {} -> foreachM choices $ \(u, accB) -> return $ mapMaybe (\cq -> do
-          (u', b') <- matchHead t cq u
-          return (u', CU.apply u' accB ++ b'))
+      TVResolves {} -> foreachM choices $ \(u, accB) -> return $ foldr
+          (\cq acc -> maybe acc (:acc) $ do
+            (u', b') <- matchHead t cq u
+            return (u', CU.apply u' accB ++ b'))
+          []
           rs
       TVMember x l -> foreachM choices $ \(u, accB) -> do
         let ul = CU.apply u l
@@ -237,16 +236,17 @@ solveBody (S.toList -> rs) (Rule ann h b) = S.fromList . map (\(u, b') -> CU.app
       -- This drops unsupported predicates, implicitly assuming that they are true
       _ -> return choices
 
-computeResolvable :: Monad m => [Rule (Maybe RComp)] -> ExceptT String m (S.Set (Rule (Maybe RComp)))
-computeResolvable (filter (isResolves . rhead) -> rs) = do
+computeResolvable :: Monad m => S.Set (Rule (Maybe RComp)) -> ExceptT String m (S.Set (Rule (Maybe RComp)))
+computeResolvable (S.filter (isResolves . rhead) -> rs) = do
   ord <- exceptMaybe "cyclic dependencies" $ PO.transitiveClosure $ fromRules rs
   rec ord rs S.empty
   where
-    rec :: Monad m => RuleDependencies -> [Rule (Maybe RComp)] -> S.Set (Rule (Maybe RComp)) -> ExceptT String m (S.Set (Rule (Maybe RComp)))
-    rec _ [] acc = return acc
-    rec ord toSolve acc =
-      let (mins, recArg) = partition (maybe False (PO.minimal ord) . fromRule) toSolve
-      in do
-        when (null mins) (throwE "non-termination")
-        acc' <- mconcat <$> mapM (solveBody acc) mins
-        rec (foldr (maybe id PO.remove . fromRule) ord mins) recArg (acc' <> acc)
+    rec :: Monad m => RuleDependencies -> S.Set (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp)) -> ExceptT String m (S.Set (Rule (Maybe RComp)))
+    rec ord toSolve acc
+      | S.null toSolve = return acc
+      | otherwise =
+        let (mins, recArg) = S.partition (maybe False (PO.minimal ord) . fromRule) toSolve
+        in do
+          when (S.null mins) (throwE "non-termination")
+          acc' <- foldr (\r -> ((<>) <$> solveBody acc r <*>)) (return acc) mins
+          rec (foldr (maybe id PO.remove . fromRule) ord mins) recArg acc'

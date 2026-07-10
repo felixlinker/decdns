@@ -31,7 +31,7 @@ propDistinctRuleVariables (ArbZone z _) =
           , show r2
           ])
         (S.null shared)
-    | r1 : rest <- tails rules
+    | r1 : rest <- tails (S.toList rules)
     , r2 <- rest
     , let shared = variables r1 `S.intersection` variables r2
     ]

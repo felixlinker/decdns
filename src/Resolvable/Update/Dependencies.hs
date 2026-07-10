@@ -15,7 +15,7 @@ import Data.Maybe (mapMaybe)
 toExcept :: Monad m => m a -> ExceptT e m a
 toExcept = ExceptT . fmap Right
 
-computeRegressions :: Fresh [Rule (Maybe RComp)] -> Fresh [Rule (Maybe RComp)] -> ExceptT String Fresh [ConstrainedQuery]
+computeRegressions :: Fresh (S.Set (Rule (Maybe RComp))) -> Fresh (S.Set (Rule (Maybe RComp))) -> ExceptT String Fresh [ConstrainedQuery]
 computeRegressions (toExcept -> oldf) (toExcept -> newf) = do
   oldRs <- oldf
   newRs <- newf

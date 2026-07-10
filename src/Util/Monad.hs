@@ -9,8 +9,8 @@ import Control.Monad.Trans.Except (Except, ExceptT, throwE, runExcept)
 one :: Functor f => f a -> f [a]
 one = fmap return
 
-foreachM :: (Monad m, Traversable t) => t a -> (a -> m [b]) -> m [b]
-foreachM t f = concat <$> mapM f t
+foreachM :: (Monad m, Monoid b) => [a] -> (a -> m b) -> m b
+foreachM t f = mconcat <$> mapM f t
 
 exceptMaybe :: Monad m => e -> Maybe a -> ExceptT e m a
 exceptMaybe e = maybe (throwE e) return

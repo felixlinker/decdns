@@ -15,6 +15,7 @@ import System.Environment (getArgs)
 import Util
 import Data.List (uncons)
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Resolvable.Update.Dependencies (computeRegressions)
 import Control.Monad (unless, when, void)
 import DNS.Name (Name)
@@ -33,14 +34,14 @@ main = do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
       cfg <- mapM parseZoneFileZones zones
-      putStr (showKnowledgeBase $ runFresh $ plResolvable =<< compileConfig rootServers cfg)
+      putStr (showKnowledgeBase $ S.toList $ runFresh $ plResolvable =<< compileConfig rootServers cfg)
     "pl-regressions" -> do
       (roots, args') <- sepBy "--" args
       rootServers <- parseNames roots
       (old, new) <- sepBy "--" args'
       oldCfg <- mapM parseZoneFileZones old
       newCfg <- mapM parseZoneFileZones new
-      putStr (showKnowledgeBase (plRegressions rootServers oldCfg newCfg))
+      putStr (showKnowledgeBase $ S.toList $ plRegressions rootServers oldCfg newCfg)
     "resolvable" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
