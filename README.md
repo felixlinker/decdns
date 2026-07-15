@@ -22,16 +22,12 @@ We do not use SWI-Prolog reasoning, however, as SWI-Prolog's reasoning about neg
 
 ## Available commands
 
-The command line utilities provided by this repository all require zone files as arguments.
+The tool reasons statically about DNS zone files, as described above, and it requires zone files as arguments.
 Zone files must be provided as paths to files (or globs), and the respective file name indicates the name server's name serving the contents of that file.
-
-### `dns-regressor-prolog`
-
-Description: This tool reasons statically about DNS zone files, as described above.
-It takes a command and a list of arguments:
+The arguments are as follows:
 
 ```sh
-stack run dns-regressor-prolog -- [command] [args]
+stack run -- [command] [args]
 ```
 
 Available commands are:
