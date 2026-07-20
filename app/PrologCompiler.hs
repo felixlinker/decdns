@@ -48,7 +48,7 @@ main = do
       cfg <- mapM parseZoneFileZones zones
       let compiled = runFresh $ plResolvable =<< compileConfig rootServers cfg
       res <- handleError $ runExcept (computeResolvable compiled)
-      mapM_ (print . void) res
+      putStrLn $ showKnowledgeBase $ S.toList res
     "diff" -> do
       (old, new) <- sepBy "--" args
       oldRecs <- mapM parseZoneFileZones old

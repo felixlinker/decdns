@@ -249,4 +249,4 @@ computeResolvable (S.filter (isResolves . rhead) -> rs) = do
         in do
           when (S.null mins) (throwE "non-termination")
           acc' <- foldr (\r -> ((<>) <$> solveBody acc r <*>)) (return acc) mins
-          rec (foldr (maybe id PO.remove . fromRule) ord mins) recArg acc'
+          rec (foldr (maybe id PO.remove . fromRule) ord mins) recArg (acc' <> mins)

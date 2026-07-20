@@ -350,7 +350,7 @@ showKnowledgeBase kb =
   let grouped = groupBy (\r1 r2 -> headName r1 == headName r2) kb
       -- Note that we use negation because facts will have @not . null . rbody@
       -- be @False@, which is ordered before @True@.
-      factsFirst = map (sortOn (not . null . rbody)) grouped
+      factsFirst = map (sortOn (length . rbody)) grouped
   in unlines $ map show $ concat factsFirst
   where
     headName :: Rule a -> String
