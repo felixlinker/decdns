@@ -33,34 +33,34 @@ main = do
     "pl-resolvable" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
-      cfg <- mapM parseZoneFileZones zones
+      cfg <- concat <$> mapM parseZoneFileZones zones
       putStr (showKnowledgeBase $ S.toList $ runFresh $ plResolvable =<< compileConfig rootServers cfg)
     "pl-regressions" -> do
       (roots, args') <- sepBy "--" args
       rootServers <- parseNames roots
       (old, new) <- sepBy "--" args'
-      oldCfg <- mapM parseZoneFileZones old
-      newCfg <- mapM parseZoneFileZones new
+      oldCfg <- concat <$> mapM parseZoneFileZones old
+      newCfg <- concat <$> mapM parseZoneFileZones new
       putStr (showKnowledgeBase $ S.toList $ plRegressions rootServers oldCfg newCfg)
     "resolvable" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
-      cfg <- mapM parseZoneFileZones zones
+      cfg <- concat <$> mapM parseZoneFileZones zones
       let compiled = runFresh $ plResolvable =<< compileConfig rootServers cfg
       res <- handleError $ runExcept (computeResolvable compiled)
       putStrLn $ showKnowledgeBase $ S.toList res
     "diff" -> do
       (old, new) <- sepBy "--" args
-      oldRecs <- mapM parseZoneFileZones old
-      newRecs <- mapM parseZoneFileZones new
+      oldRecs <- concat <$> mapM parseZoneFileZones old
+      newRecs <- concat <$> mapM parseZoneFileZones new
       let nsDiff = diffServers oldRecs newRecs
       mapM_ (\(ns, d) -> print ns >> print d) (M.toList nsDiff)
     "regressions" -> do
       (sroots, args') <- sepBy "--" args
       roots <- parseNames sroots
       (old, new) <- sepBy "--" args'
-      oldRecs <- mapM parseZoneFileZones old
-      newRecs <- mapM parseZoneFileZones new
+      oldRecs <- concat <$> mapM parseZoneFileZones old
+      newRecs <- concat <$> mapM parseZoneFileZones new
       let oldRecsC = compileConfig roots oldRecs
       let newRecsC = compileConfig roots newRecs
       regs <- handleError $ runFresh $ runExceptT $ computeRegressions (plResolvable =<< oldRecsC) (plResolvable =<< newRecsC)
@@ -77,13 +77,13 @@ main = do
     "dependencies" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
-      compiled <- runFresh . compileConfig rootServers <$> mapM parseZoneFileZones zones
+      compiled <- runFresh . compileConfig rootServers . concat <$> mapM parseZoneFileZones zones
       let deps = fromRules compiled :: RuleDependencies
       when (isNothing $ PO.transitiveClosure deps)
         (putStrLn "% Dependencies cyclic")
       print deps
     "parse-only" -> do
-      parsed <- concatMap (map toStandardRecord . concatMap allRecords . snd) <$> mapM parseZoneFileZones args
+      parsed <- concatMap (map toStandardRecord . concatMap allRecords . snd) . concat <$> mapM parseZoneFileZones args
       mapM_ print parsed
     _ -> fail "unknown command"
   where

@@ -3,3 +3,4 @@ $ORIGIN com.
 @ 1200 IN NS ns.com.
 
 a 1200 IN CNAME b.com.
+;; Served by ns.com.

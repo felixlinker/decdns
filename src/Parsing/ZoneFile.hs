@@ -1,11 +1,13 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TupleSections #-}
 module Parsing.ZoneFile
-  ( parseZoneFile ) where
+  ( ServedZone
+  , parseRecords
+  , parseZoneFile ) where
 
 import Text.Parsec
 import Control.Applicative (asum)
 import Data.Functor (($>))
-import Data.Maybe (catMaybes)
 
 import Parsing.State
 import Parsing.Tokens
@@ -13,6 +15,8 @@ import Parsing.Name
 import Parsing.Data
 import DNS.Name (Name, Named(Named))
 import DNS.Record (StandardRecord, RData(..), Record)
+import Parsing.Dig
+import Data.Maybe (catMaybes)
 
 origin :: Stream s m Char => Parser s m (Name String)
 origin = do
@@ -99,8 +103,33 @@ line = do
     , setTTL $> Nothing
     , Just <$> record ]
 
-zoneFile :: Stream s m Char => Parser s m [StandardRecord]
-zoneFile = catMaybes <$> many line
+nsHintOrLine :: Stream s m Char => Parser s m (Maybe (Either StandardRecord (Name String)))
+nsHintOrLine = choice [right (try received), right (try served), left line]
+  where
+    left :: Monad m => m (Maybe a) -> m (Maybe (Either a b))
+    left = fmap (fmap Left)
 
-parseZoneFile :: Stream s m Char => SourceName -> s -> m (Either ParseError [StandardRecord])
+    right :: Monad m => m b -> m (Maybe (Either a b))
+    right = fmap (Just . Right)
+
+type ServedZone = (Name String, [StandardRecord])
+
+zone :: Stream s m Char => Parser s m ServedZone
+zone = aux []
+  where
+    aux :: Stream s m Char => [StandardRecord] -> Parser s m ServedZone
+    aux acc = do
+      l <- nsHintOrLine
+      maybe (aux acc) (either (aux . (:acc)) (return . (,acc))) l
+
+records :: Stream s m Char => Parser s m [StandardRecord]
+records = catMaybes <$> many line
+
+zoneFile :: Stream s m Char => Parser s m [ServedZone]
+zoneFile = many zone
+
+parseRecords :: Stream s m Char => SourceName -> s -> m (Either ParseError [StandardRecord])
+parseRecords = runParserT (records <* eof) emptyState
+
+parseZoneFile :: Stream s m Char => SourceName -> s -> m (Either ParseError [ServedZone])
 parseZoneFile = runParserT (zoneFile <* eof) emptyState

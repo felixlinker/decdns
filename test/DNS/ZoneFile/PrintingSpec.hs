@@ -8,7 +8,7 @@ import Test.Tasty.QuickCheck
 
 import qualified DNS.ZoneFileSpec as ZS
 import DNS.ZoneFile (fromRecordList)
-import Parsing.ZoneFile (parseZoneFile)
+import Parsing.ZoneFile (parseRecords)
 
 tests :: TestTree
 tests =
@@ -18,7 +18,7 @@ tests =
 
 propPrintParseRoundTrip :: ZS.ArbZone -> Property
 propPrintParseRoundTrip (ZS.ArbZone z printed) =
-  let parsed = fromRecordList <$> runIdentity (parseZoneFile "<quickcheck>" printed)
+  let parsed = fromRecordList <$> runIdentity (parseRecords "<quickcheck>" printed)
   in case parsed of
       Left err ->
         counterexample (show err) False

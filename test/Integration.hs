@@ -18,7 +18,8 @@ import NameConstraint
   , compileWildcards
   , exactly
   )
-import Parsing (parseName, parseZoneFile)
+import Parsing (parseName)
+import Parsing.ZoneFile (parseRecords)
 import Parsing.Wellformedness (wellformed)
 import Data.Maybe (mapMaybe)
 import Resolvable.Dependencies (ConstrainedQuery (CQuery), computeResolvable, queryFromRule)
@@ -462,7 +463,7 @@ loadConfig = mapM loadConfigEntry
 loadExampleFile :: FilePath -> IO (Name String, [StandardRecord], [Zone String])
 loadExampleFile path = do
   content <- readFile path
-  records <- assertRight =<< parseZoneFile path content
+  records <- assertRight =<< parseRecords path content
   ns <- assertRight =<< parseName path
   return (ns, records, fromRecordList records)
 

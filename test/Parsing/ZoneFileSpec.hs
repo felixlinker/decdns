@@ -15,7 +15,7 @@ import DNS.SEC.Crypto (AlgorithmType (RSASHA256), DigestType (SHA256))
 import DNS.ZoneFile (allRecords, fromRecordList)
 import Parsing.Data (recordTypeData)
 import Parsing.State (emptyState)
-import Parsing.ZoneFile (parseZoneFile)
+import Parsing.ZoneFile (parseRecords)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
@@ -40,13 +40,13 @@ tests =
 parsesRootRecord :: Assertion
 parsesRootRecord = do
   let zone = ". IN 1200 A 192.0.2.1\n"
-  rs <- either (fail . show) return =<< parseZoneFile "<test>" zone
+  rs <- either (fail . show) pure =<< parseRecords "<test>" zone
   length rs @?= 1
 
 parsesWildcardOwner :: Assertion
 parsesWildcardOwner = do
   let zone = "*.example.com. IN 1200 A 192.0.2.1\n"
-  records <- either (fail . show) return =<< parseZoneFile "<test>" zone
+  records <- either (fail . show) pure =<< parseRecords "<test>" zone
   map name records @?= [mkName ["*", "example", "com", ""]]
 
 parsesTTLDirective :: Assertion
@@ -58,7 +58,7 @@ parsesTTLDirective = do
         , "www IN A 192.0.2.2"
         ]
 
-  records <- either (fail . show) pure =<< parseZoneFile "<test>" input
+  records <- either (fail . show) pure =<< parseRecords "<test>" input
   length records @?= 2
   mapM_ ((3600 @=?) . rttl . value) records
 
@@ -71,7 +71,7 @@ parsesOmittedOwnerStartingWithClass = do
         , "IN AAAA 2001:db8::1"
         ]
 
-  zones <- either (fail . show) fromRecordList <$> parseZoneFile "<test>" input
+  zones <- either (fail . show) fromRecordList <$> parseRecords "<test>" input
   case zones of
     [z] -> do
       let recs = allRecords z
@@ -87,7 +87,7 @@ parsesExplicitOwnerNamedIN = do
         , "IN 300 IN A 192.0.2.10"
         ]
 
-  zones <- either (fail . show) fromRecordList <$> parseZoneFile "<test>" input
+  zones <- either (fail . show) fromRecordList <$> parseRecords "<test>" input
   case zones of
     [z] -> length (allRecords z) @?= 2
     zs -> assertFailure ("expected 1 zone, got " ++ show (length zs))
@@ -101,7 +101,7 @@ parsesMultilineRecordWithInlineComment = do
         , ". 300 IN A 192.0.2.10"
         ]
 
-  records <- either (fail . show) pure =<< parseZoneFile "<test>" input
+  records <- either (fail . show) pure =<< parseRecords "<test>" input
   length records @?= 2
 
 propParsesMultilineDNSKEYBlob :: Property

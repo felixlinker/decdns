@@ -72,3 +72,4 @@ b.com.			1200	IN NS	ns.b.com.
 					II+zcEKcanbsDw0CgJ5neyS2LvZE+Ys06dA7
 					ix5KmzPbQpwACw== )
 ns.b.com.		1200	IN A	1.2.3.4
+;; Served by ns.com.

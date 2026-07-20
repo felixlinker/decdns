@@ -1,18 +1,23 @@
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TupleSections #-}
 module Util
   ( sepBy
   , parseZoneFileZones
   , parseNames ) where
 
 import Control.Monad ((<=<))
+import Control.Monad.Trans.Except (Except, throwE, runExcept)
+import Data.Maybe (mapMaybe)
 import Data.List (uncons)
 import GHC.Base (failIO)
 import Text.Parsec (ParseError)
 
 import NameConstraint (compileWildcards, ConstrainedLabel)
-import Parsing (parseName, parseZoneFile)
+import Parsing (parseName, parseZoneFile, ServedZone)
 import DNS.ZoneFile (Zone, fromRecordList)
 import DNS.Name (Name)
 import Parsing.Wellformedness (wellformed)
+import Resolvable.Resolvability (NameServersConfig)
 
 sepBy :: String -> [String] -> IO ([String], [String])
 sepBy sep args = do
@@ -24,16 +29,20 @@ handleParser :: Either ParseError a -> IO a
 handleParser = either (failIO . show) return
 
 -- | Parse a zone file and return its origin together with compiled zones.
-parseZoneFileZones :: FilePath -> IO (Name String, [Zone ConstrainedLabel])
+parseZoneFileZones :: FilePath -> IO NameServersConfig
 parseZoneFileZones path = do
   content <- readFile path
-  zones <- fmap fromRecordList . handleParser =<< parseZoneFile path content
-  ns <- parseName path >>= handleParser
-  mapM_ (wf ns) zones
-  return (ns, map compileWildcards zones)
+  exceptZones <- map (runExcept . toZone) <$> (handleParser =<< parseZoneFile path content)
+  zones <- mapM (either failIO return) exceptZones
+  return $ map (fmap (map compileWildcards)) zones
   where
-    wf :: Name String -> Zone String -> IO ()
-    wf ns zone = maybe (return ()) failIO (wellformed ns zone)
+    wf :: Name String -> Zone String -> Except String ()
+    wf ns zone = maybe (return ()) throwE (wellformed ns zone)
+
+    toZone :: ServedZone -> Except String (Name String, [Zone String])
+    toZone (ns, fromRecordList -> zs) = do
+      mapM_ (wf ns) zs
+      return (ns, zs)
 
 parseNames :: [String] -> IO [Name String]
 parseNames = mapM (handleParser <=< parseName)

@@ -43,6 +43,7 @@ newtype ResolvableAt = ResolvableAt (Name String, ConstrainedName)
 instance FromRule ResolvableAt where
   fromRule = fmap fromAnnot . rannotation
 
+-- TODO: I should be able to rely on the rule contents here too.
 fromAnnot :: RComp -> ResolvableAt
 fromAnnot (RComp ns (name -> owner)) = ResolvableAt (ns, owner)
 

@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Parsing.Name
   ( absName
+  , relName
   , name
   , parseName
   , parseNameM ) where
@@ -47,14 +48,19 @@ absName = rootName <|> nonRootName
     rootName :: Stream s m Char => ParsecT s u m (Name String)
     rootName = dot $> root
 
-relName :: (Stream s m Char, OriginProvider u) => ParsecT s u m (Name String)
+relName :: (Stream s m Char) => ParsecT s u m (Name String)
 relName = do
+  ls <- sepBy1 Parsing.Name.label dot
+  maybe (fail "no labels parsed") (return . Name) (NE.nonEmpty ls)
+
+relToAbsName :: (Stream s m Char, OriginProvider u) => ParsecT s u m (Name String)
+relToAbsName = do
   ls <- sepBy1 Parsing.Name.label dot
   Just (Name org) <- getOrigin <$> getState
   return $ Name $ NE.prependList ls org
 
 name :: (Stream s m Char, OriginProvider u) => ParsecT s u m (Name String)
-name = choice [origin, try absName, relName]
+name = choice [origin, try absName, relToAbsName]
 
 skipPath :: Stream s m Char => ParsecT s u m ()
 skipPath = do

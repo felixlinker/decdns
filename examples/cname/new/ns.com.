@@ -3,3 +3,4 @@ $ORIGIN com.
 @ 1200 IN NS ns.com.
 
 * 1200 IN A 1.2.3.4
+;; Served by ns.com.

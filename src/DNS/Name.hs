@@ -7,6 +7,7 @@ module DNS.Name
   , root
   , labelCount
   , (<|)
+  , (|>)
   , prependLabels
   , mapLabels
   , isSubDomain
@@ -49,6 +50,9 @@ labelCount (Name ls) = length (NE.filter countLabel ls)
 
 (<|) :: a -> Name a -> Name a
 (<|) l (Name ls) = Name (l NE.<| ls)
+
+(|>) :: Name a -> a -> Name a
+(|>) (Name ls) l = Name (ls <> NE.singleton l)
 
 prependLabels :: [a] -> Name a -> Name a
 prependLabels ls (Name ls') = Name (NE.prependList ls ls')

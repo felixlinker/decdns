@@ -50,11 +50,13 @@ library
       Parsing
       Parsing.Bytes
       Parsing.Data
+      Parsing.Dig
       Parsing.Name
       Parsing.State
       Parsing.Tokens
       Parsing.Wellformedness
       Parsing.ZoneFile
+      Query
       Resolvable.ConstrainedUnification
       Resolvable.Dependencies
       Resolvable.Prolog.Core

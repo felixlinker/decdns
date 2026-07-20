@@ -36,6 +36,9 @@ instance Apply t => Apply [t] where
 instance (Apply a, Apply b) => Apply (a, b) where
   apply u = bimap (apply u) (apply u)
 
+instance Apply (Rule a) where
+  apply u (Rule ann h b) = Rule ann (apply u h) (apply u b)
+
 identity :: Unifier
 identity = Unifier M.empty
 
