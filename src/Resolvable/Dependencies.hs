@@ -15,6 +15,7 @@ module Resolvable.Dependencies
 import Control.Monad (when, filterM, guard)
 import qualified Data.ByteString as BS
 import Data.Either (fromRight)
+import Data.Functor (($>))
 import qualified Data.Set as S
 import Data.List (uncons)
 import qualified Data.List.NonEmpty as NE
@@ -175,21 +176,21 @@ asNSEC3Data (NSEC3 dat) = return dat
 asNSEC3Data t = throwE $ "expected NSEC3 got: " ++ show t
 
 solveBody :: Ord a => S.Set (Rule a) -> Rule a -> S.Set (Rule a)
-solveBody rs (Rule ann h b) = S.fromList $ map (\(u, b') -> CU.apply u $ Rule ann h b') $ foldr solvePredicate [(CU.identity, [])] b
+solveBody rs (Rule ann h b) = S.fromList $ map (\(u, b') -> CU.apply u $ Rule ann h b') $ foldl solvePredicate [(CU.identity, [])] b
   where
-    solvePredicate :: Term -> [(CU.ConstrainedUnifier, [Term])] -> [(CU.ConstrainedUnifier, [Term])]
-    solvePredicate t choices = case toView t of
+    solvePredicate :: [(CU.ConstrainedUnifier, [Term])] -> Term -> [(CU.ConstrainedUnifier, [Term])]
+    solvePredicate choices p = case toView p of
       TVNeq t1 t2 -> mapMaybe (\(u, accB) -> (,accB) <$> CU.addConstraint t1 t2 u) choices
       TVResolves {} -> concatMap
         (\(u, accB) -> foldr
           (\cq acc -> maybe acc (:acc) $ do
-            (u', b') <- matchHead t cq u
+            (u', b') <- matchHead p cq u
             return (u', CU.apply u' accB ++ b'))
           []
           rs)
         choices
       TVMember x l -> concatMap
-        (\(u, accB) -> fromRight [(u, accB)] $ runExcept $ do
+        (\(u, accB) -> fromRight [(u, accB ++ [p])] $ runExcept $ do
           let ul = CU.apply u l
           l' <- exceptMaybe "member" (collectList ul)
           return $ mapMaybe (\el -> do
@@ -197,16 +198,16 @@ solveBody rs (Rule ann h b) = S.fromList $ map (\(u, b') -> CU.apply u $ Rule an
             return (u', CU.apply u' accB))
             l')
         choices
-      TVDigestValid n dnskeyT dsT -> filter
-        (\(u, _) -> fromRight True $ runExcept $ do
+      TVDigestValid n dnskeyT dsT -> mapMaybe
+        (skipUnsolvable $ \u -> do
           let app = CU.apply u
           n' <- asName (app n)
           dsDat <- asDSData =<< asType (app dsT)
           dnskeyDat <- asDNSKEYData =<< asType (app dnskeyT)
-          return (verifyDigest n' dsDat dnskeyDat))
+          return $ verifyDigest n' dsDat dnskeyDat)
         choices
-      TVRRSIGValid n dat sig k -> filter
-        (\(u, _) -> fromRight True $ runExcept $ do
+      TVRRSIGValid n dat sig k -> mapMaybe
+        (skipUnsolvable $ \u -> do
           let app = CU.apply u
           n' <- asName (app n)
           rrset <- asTypes (app dat)
@@ -214,23 +215,23 @@ solveBody rs (Rule ann h b) = S.fromList $ map (\(u, b') -> CU.apply u $ Rule an
           DNSKEYData _ _ k' <- asDNSKEYData =<< asType (app k)
           return (verifySignature n' rrset sigDat k'))
         choices
-      TVNSECUnsigned n nsecDat -> filter
-        (\(u, _) -> fromRight True $ runExcept $ do
+      TVNSECUnsigned n nsecDat -> mapMaybe
+        (skipUnsolvable $ \u -> do
           let app = CU.apply u
           n' <- asName (app n)
           nsecDat' <- asNSECData =<< asType (app nsecDat)
           return $ nsecUnsignedSubzone n' n' nsecDat')
         choices
-      TVNSEC3Unsigned n hashedOwner nsec3Dat -> filter
-        (\(u, _) -> fromRight True $ runExcept $ do
+      TVNSEC3Unsigned n hashedOwner nsec3Dat -> mapMaybe
+        (skipUnsolvable $ \u -> do
           let app = CU.apply u
           n' <- asName (app n)
           hashedOwner' <- asName (app hashedOwner)
           nsec3Dat' <- asNSEC3Data =<< asType (app nsec3Dat)
           return $ nsec3UnsignedSubzone n' hashedOwner' nsec3Dat')
         choices
-      TVClosestEncloser n exN exDat nonExN nonExDat -> filter
-        (\(u, _) -> fromRight True $ runExcept $ do
+      TVClosestEncloser n exN exDat nonExN nonExDat -> mapMaybe
+        (skipUnsolvable $ \u -> do
           let app = CU.apply u
           n' <- asName (app n)
           exN' <- asName (app exN)
@@ -241,6 +242,12 @@ solveBody rs (Rule ann h b) = S.fromList $ map (\(u, b') -> CU.apply u $ Rule an
         choices
       -- This drops unsupported predicates, implicitly assuming that they are true
       _ -> choices
+      where
+        skipUnsolvable :: (CU.ConstrainedUnifier -> Except a Bool) -> (CU.ConstrainedUnifier, [Term]) -> Maybe (CU.ConstrainedUnifier, [Term])
+        skipUnsolvable check (u, accB) = either (const $ Just (u, accB ++ [p])) (returnWhen (u, accB)) $ runExcept (check u)
+          where
+            returnWhen :: a -> Bool -> Maybe a
+            returnWhen a = ($> a) . guard
 
 computeResolvable :: Monad m => S.Set (Rule (Maybe RComp)) -> ExceptT String m (S.Set (Rule (Maybe RComp)))
 computeResolvable (S.filter (isResolves . rhead) -> rs) = do
