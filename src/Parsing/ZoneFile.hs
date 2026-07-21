@@ -97,7 +97,9 @@ nameTtlCatType = do
 
 line :: Stream s m Char => Parser s m (Maybe StandardRecord)
 line = do
-  skipSepNewLine -- to skip leading comments and new lines
+  -- Backtrack over leading separators only when they reach EOF, so callers can
+  -- consume trailing comments and blank lines after parsing all entries.
+  _ <- try $ skipSepNewLine >> lookAhead anyChar
   asum $ map try
     [ origin $> Nothing
     , setTTL $> Nothing
@@ -123,10 +125,10 @@ zone = aux []
       maybe (aux acc) (either (aux . (:acc)) (return . (,acc))) l
 
 records :: Stream s m Char => Parser s m [StandardRecord]
-records = catMaybes <$> many line
+records = catMaybes <$> many line <* skipSepNewLine
 
 zoneFile :: Stream s m Char => Parser s m [ServedZone]
-zoneFile = many zone
+zoneFile = many zone <* skipSepNewLine
 
 parseRecords :: Stream s m Char => SourceName -> s -> m (Either ParseError [StandardRecord])
 parseRecords = runParserT (records <* eof) emptyState
