@@ -12,8 +12,9 @@ module Resolvable.Dependencies
   , fromRules
   , computeResolvable ) where
 
-import Control.Monad (when, filterM, foldM, guard)
+import Control.Monad (when, filterM, guard)
 import qualified Data.ByteString as BS
+import Data.Either (fromRight)
 import qualified Data.Set as S
 import Data.List (uncons)
 import qualified Data.List.NonEmpty as NE
@@ -28,8 +29,8 @@ import qualified Resolvable.ConstrainedUnification as CU
 import qualified Util.PartialOrder as PO
 import Resolvable.Resolvability (RComp (RComp))
 import NameConstraint (ConstrainedName)
-import Control.Monad.Trans.Except (ExceptT, throwE)
-import Util.Monad (exceptMaybe, foreachM)
+import Control.Monad.Trans.Except (ExceptT, Except, runExcept, throwE)
+import Util.Monad (exceptMaybe)
 import DNS.SEC.Verification (verifySignature, verifyDigest, nsecUnsignedSubzone, nsec3UnsignedSubzone, verifyClosestEncloserProof)
 import Data.Bifunctor (Bifunctor(bimap))
 import qualified Control.Monad.Trans.State as St
@@ -133,7 +134,7 @@ matchHead t (Rule _ h b) cu = do
   (b', cu'') <- grabNeqs b cu'
   return (cu'', CU.apply cu'' b')
 
-asName :: Monad m => Term -> ExceptT String m (Name String)
+asName :: Term -> Except String (Name String)
 asName t = do
   ts <- exceptMaybe ("name term is not a list: " ++ show t) $ collectList t
   ls <- exceptMaybe ("label not ground: " ++ show t) $ mapM asAtom ts
@@ -144,64 +145,68 @@ asName t = do
     asAtom (TAtom a) = Just a
     asAtom _ = Nothing
 
-asType :: Monad m => Term -> ExceptT String m Type
+asType :: Term -> Except String Type
 asType (TComplex d) = return d
 asType t = throwE ("data not ground: " ++ show t)
 
-asTypes :: Monad m => Term -> ExceptT String m [Type]
+asTypes :: Term -> Except String [Type]
 asTypes t = do
   l <- exceptMaybe ("data not ground: " ++ show t) $ collectList t
   mapM asType l
 
-asDNSKEYData :: Monad m => Type -> ExceptT String m DNSKEYData
+asDNSKEYData :: Type -> Except String DNSKEYData
 asDNSKEYData (DNSKEY dat) = return dat
 asDNSKEYData t = throwE $ "expected DNSKEY got: " ++ show t
 
-asDSData :: Monad m => Type -> ExceptT String m DSData
+asDSData :: Type -> Except String DSData
 asDSData (DS dat) = return dat
 asDSData t = throwE $ "expected DS got: " ++ show t
 
-asRRSigData :: Monad m => Type -> ExceptT String m (RRSIGData BS.ByteString)
+asRRSigData :: Type -> Except String (RRSIGData BS.ByteString)
 asRRSigData (RRSIG dat) = return dat
 asRRSigData t = throwE $ "expected RRSIG got: " ++ show t
 
-asNSECData :: Monad m => Type -> ExceptT String m NSECData
+asNSECData :: Type -> Except String NSECData
 asNSECData (NSEC dat) = return dat
 asNSECData t = throwE $ "expected NSEC got: " ++ show t
 
-asNSEC3Data :: Monad m => Type -> ExceptT String m NSEC3Data
+asNSEC3Data :: Type -> Except String NSEC3Data
 asNSEC3Data (NSEC3 dat) = return dat
 asNSEC3Data t = throwE $ "expected NSEC3 got: " ++ show t
 
-solveBody :: (Monad m, Ord a) => S.Set (Rule a) -> Rule a -> ExceptT String m (S.Set (Rule a))
-solveBody rs (Rule ann h b) = S.fromList . map (\(u, b') -> CU.apply u $ Rule ann h b') <$> foldM solvePredicate [(CU.identity, [])] b
+solveBody :: Ord a => S.Set (Rule a) -> Rule a -> S.Set (Rule a)
+solveBody rs (Rule ann h b) = S.fromList $ map (\(u, b') -> CU.apply u $ Rule ann h b') $ foldr solvePredicate [(CU.identity, [])] b
   where
-    solvePredicate :: Monad m => [(CU.ConstrainedUnifier, [Term])] -> Term -> ExceptT String m [(CU.ConstrainedUnifier, [Term])]
-    solvePredicate choices t = case toView t of
-      TVNeq t1 t2 -> return $ mapMaybe (\(u, accB) -> (,accB) <$> CU.addConstraint t1 t2 u) choices
-      TVResolves {} -> foreachM choices $ \(u, accB) -> return $ foldr
+    solvePredicate :: Term -> [(CU.ConstrainedUnifier, [Term])] -> [(CU.ConstrainedUnifier, [Term])]
+    solvePredicate t choices = case toView t of
+      TVNeq t1 t2 -> mapMaybe (\(u, accB) -> (,accB) <$> CU.addConstraint t1 t2 u) choices
+      TVResolves {} -> concatMap
+        (\(u, accB) -> foldr
           (\cq acc -> maybe acc (:acc) $ do
             (u', b') <- matchHead t cq u
             return (u', CU.apply u' accB ++ b'))
           []
-          rs
-      TVMember x l -> foreachM choices $ \(u, accB) -> do
-        let ul = CU.apply u l
-        l' <- exceptMaybe ("variable list for non-deterministic choice: " ++ show ul) (collectList ul)
-        return $ mapMaybe (\el -> do
-          u' <- CU.extendUnifier x el u
-          return (u', CU.apply u' accB))
-          l'
-      TVDigestValid n dnskeyT dsT -> filterM
-        (\(u, _) -> do
+          rs)
+        choices
+      TVMember x l -> concatMap
+        (\(u, accB) -> fromRight [(u, accB)] $ runExcept $ do
+          let ul = CU.apply u l
+          l' <- exceptMaybe "member" (collectList ul)
+          return $ mapMaybe (\el -> do
+            u' <- CU.extendUnifier x el u
+            return (u', CU.apply u' accB))
+            l')
+        choices
+      TVDigestValid n dnskeyT dsT -> filter
+        (\(u, _) -> fromRight True $ runExcept $ do
           let app = CU.apply u
           n' <- asName (app n)
           dsDat <- asDSData =<< asType (app dsT)
           dnskeyDat <- asDNSKEYData =<< asType (app dnskeyT)
           return (verifyDigest n' dsDat dnskeyDat))
         choices
-      TVRRSIGValid n dat sig k -> filterM
-        (\(u, _) -> do
+      TVRRSIGValid n dat sig k -> filter
+        (\(u, _) -> fromRight True $ runExcept $ do
           let app = CU.apply u
           n' <- asName (app n)
           rrset <- asTypes (app dat)
@@ -209,23 +214,23 @@ solveBody rs (Rule ann h b) = S.fromList . map (\(u, b') -> CU.apply u $ Rule an
           DNSKEYData _ _ k' <- asDNSKEYData =<< asType (app k)
           return (verifySignature n' rrset sigDat k'))
         choices
-      TVNSECUnsigned n nsecDat -> filterM
-        (\(u, _) -> do
+      TVNSECUnsigned n nsecDat -> filter
+        (\(u, _) -> fromRight True $ runExcept $ do
           let app = CU.apply u
           n' <- asName (app n)
           nsecDat' <- asNSECData =<< asType (app nsecDat)
           return $ nsecUnsignedSubzone n' n' nsecDat')
         choices
-      TVNSEC3Unsigned n hashedOwner nsec3Dat -> filterM
-        (\(u, _) -> do
+      TVNSEC3Unsigned n hashedOwner nsec3Dat -> filter
+        (\(u, _) -> fromRight True $ runExcept $ do
           let app = CU.apply u
           n' <- asName (app n)
           hashedOwner' <- asName (app hashedOwner)
           nsec3Dat' <- asNSEC3Data =<< asType (app nsec3Dat)
           return $ nsec3UnsignedSubzone n' hashedOwner' nsec3Dat')
         choices
-      TVClosestEncloser n exN exDat nonExN nonExDat -> filterM
-        (\(u, _) -> do
+      TVClosestEncloser n exN exDat nonExN nonExDat -> filter
+        (\(u, _) -> fromRight True $ runExcept $ do
           let app = CU.apply u
           n' <- asName (app n)
           exN' <- asName (app exN)
@@ -235,7 +240,7 @@ solveBody rs (Rule ann h b) = S.fromList . map (\(u, b') -> CU.apply u $ Rule an
           return $ verifyClosestEncloserProof n' exN' exDat' nonExN' nonExDat')
         choices
       -- This drops unsupported predicates, implicitly assuming that they are true
-      _ -> return choices
+      _ -> choices
 
 computeResolvable :: Monad m => S.Set (Rule (Maybe RComp)) -> ExceptT String m (S.Set (Rule (Maybe RComp)))
 computeResolvable (S.filter (isResolves . rhead) -> rs) = do
@@ -249,5 +254,5 @@ computeResolvable (S.filter (isResolves . rhead) -> rs) = do
         let (mins, recArg) = S.partition (maybe False (PO.minimal ord) . fromRule) toSolve
         in do
           when (S.null mins) (throwE "non-termination")
-          acc' <- foldr (\r -> ((<>) <$> solveBody acc r <*>)) (return acc) mins
+          let acc' = foldr (\r -> (solveBody acc r <>)) acc mins
           rec (foldr (maybe id PO.remove . fromRule) ord mins) recArg (acc' <> mins)

@@ -1,5 +1,4 @@
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TupleSections #-}
 module Util
   ( sepBy
   , parseZoneFileZones
@@ -7,12 +6,11 @@ module Util
 
 import Control.Monad ((<=<))
 import Control.Monad.Trans.Except (Except, throwE, runExcept)
-import Data.Maybe (mapMaybe)
 import Data.List (uncons)
 import GHC.Base (failIO)
 import Text.Parsec (ParseError)
 
-import NameConstraint (compileWildcards, ConstrainedLabel)
+import NameConstraint (compileWildcards)
 import Parsing (parseName, parseZoneFile, ServedZone)
 import DNS.ZoneFile (Zone, fromRecordList)
 import DNS.Name (Name)
