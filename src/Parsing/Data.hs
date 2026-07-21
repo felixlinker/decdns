@@ -2,13 +2,15 @@
 module Parsing.Data
   ( TypeParser
   , recordType
-  , recordTypeData ) where
+  , recordTypeData
+  , parseType
+  , parseTypeM ) where
 
 import Data.Char (isPrint)
 import qualified Data.ByteString as BS
 import Data.Functor (($>))
 import Control.Applicative (asum)
-import Control.Monad (when)
+import Control.Monad (when, MonadPlus, mzero)
 import Text.Parsec
 
 import Parsing.State
@@ -194,3 +196,9 @@ nsec3DigestType :: Stream s m Char => Parser s m NSEC3DigestType
 nsec3DigestType = do
   n <- int
   maybe (fail "unknown NSEC3 hash algorithm") return (nsec3DigestFromInt n)
+
+parseType :: Monad m => String -> m (Either ParseError T.Type)
+parseType = runParserT recordType () "parseType function"
+
+parseTypeM :: MonadPlus m => String -> m T.Type
+parseTypeM t = parseType t >>= either (const mzero) return

@@ -22,6 +22,7 @@ expectNot p err = if p then Just err else Nothing
 (==>) :: Bool -> Bool -> Bool
 (==>) p q = not p || q
 
+-- TODO: Enforce limits on NSEC3 iterations
 -- TODO: Wellformedness cannot address synthesized CNAME responses for DNAMEs;
 -- or drop and check that they have been correctly synthesized
 -- TODO: Enforce NSEC3 consistency according to RFC 5155, Sec. 7.2.

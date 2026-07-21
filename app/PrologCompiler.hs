@@ -22,6 +22,8 @@ import DNS.Name (Name)
 import Data.Maybe (isNothing)
 import Control.Monad.Trans.Except (runExceptT, runExcept)
 import GHC.Base (failIO)
+import Parsing (parseNameM, parseTypeM)
+import Query (queryStep)
 
 indent :: String -> String
 indent s = if null s then "" else "  " ++ s
@@ -85,6 +87,14 @@ main = do
     "parse-only" -> do
       parsed <- concatMap (map toStandardRecord . concatMap allRecords . snd) . concat <$> mapM parseZoneFileZones args
       mapM_ print parsed
+    "query" -> do
+      (roots, [qnameString, qtypeString]) <- sepBy "--" args
+      rootServers <- parseNames roots
+      qname <- parseNameM qnameString
+      qtype <- parseTypeM qtypeString
+      compiled <- compileConfig rootServers <$> parseStdin
+      kb <- handleError $ runExcept $ queryStep qname qtype compiled
+      putStrLn $ showKnowledgeBase $ S.toList kb
     _ -> fail "unknown command"
   where
     handleError :: Show a => Either a b -> IO b

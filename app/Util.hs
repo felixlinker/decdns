@@ -2,13 +2,14 @@
 module Util
   ( sepBy
   , parseZoneFileZones
+  , parseStdin
   , parseNames ) where
 
 import Control.Monad ((<=<))
 import Control.Monad.Trans.Except (Except, throwE, runExcept)
 import Data.List (uncons)
 import GHC.Base (failIO)
-import Text.Parsec (ParseError)
+import Text.Parsec (ParseError, SourceName)
 
 import NameConstraint (compileWildcards)
 import Parsing (parseName, parseZoneFile, ServedZone)
@@ -27,10 +28,9 @@ handleParser :: Either ParseError a -> IO a
 handleParser = either (failIO . show) return
 
 -- | Parse a zone file and return its origin together with compiled zones.
-parseZoneFileZones :: FilePath -> IO NameServersConfig
-parseZoneFileZones path = do
-  content <- readFile path
-  exceptZones <- map (runExcept . toZone) <$> (handleParser =<< parseZoneFile path content)
+parseZoneFileContents :: SourceName -> String -> IO NameServersConfig
+parseZoneFileContents s content = do
+  exceptZones <- map (runExcept . toZone) <$> (handleParser =<< parseZoneFile s content)
   zones <- mapM (either failIO return) exceptZones
   return $ map (fmap (map compileWildcards)) zones
   where
@@ -41,6 +41,17 @@ parseZoneFileZones path = do
     toZone (ns, fromRecordList -> zs) = do
       mapM_ (wf ns) zs
       return (ns, zs)
+
+parseStdin :: IO NameServersConfig
+parseStdin = do
+  content <- getContents
+  parseZoneFileContents "<stdin>" content
+
+-- | Parse a zone file and return its origin together with compiled zones.
+parseZoneFileZones :: FilePath -> IO NameServersConfig
+parseZoneFileZones path = do
+  content <- readFile path
+  parseZoneFileContents path content
 
 parseNames :: [String] -> IO [Name String]
 parseNames = mapM (handleParser <=< parseName)

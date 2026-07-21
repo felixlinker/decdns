@@ -94,6 +94,8 @@ nsec3Hash (NSEC3Data NSEC3_SHA1 _ iter salt _ _) (serialize . canonicalName -> x
       let rec = ih (n - 1)
       in  BA.convert (hash $ rec <> salt :: Digest Hash.SHA1)
 
+-- TODO: Compare with RFC 7129, Sec. 5.5.
+-- TODO: Compare with RFC 6840, Sec. 4.1.
 -- See: https://datatracker.ietf.org/doc/html/rfc5155#section-8.3 and
 -- https://datatracker.ietf.org/doc/html/rfc5155#section-8.9
 verifyClosestEncloserProof :: Name String -> Name String -> NSEC3Data -> Name String -> NSEC3Data -> Bool
@@ -132,6 +134,9 @@ nsec3UnsignedSubzone originalOwner hashedOwner dat@(NSEC3Data { _nsec3TypeBitMap
     && T.NS `elem` ts
     && T.SOA `notElem` ts
 
+-- TODO: Check an attacker could use NSEC data from the child to lie about the
+-- parent. This should be rejected due to an illegal signer's name. This also
+-- goes the other way around. The signer name length check should catch this.
 nsecUnsignedSubzone :: Name String -> Name String -> NSECData -> Bool
 nsecUnsignedSubzone owner nsecOwner (NSECData { _nsecTypeBitMaps = ts }) =
   owner == nsecOwner && T.DS `notElem` ts
