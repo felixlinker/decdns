@@ -3,7 +3,7 @@ module Integration (tests) where
 import Control.Monad (forM_)
 import Control.Monad.Trans.Except (runExceptT)
 import qualified Data.Map as M
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, mapMaybe)
 import qualified Data.Set as S
 
 import DNS.Diff (hasChanges)
@@ -21,7 +21,6 @@ import NameConstraint
 import Parsing (parseName)
 import Parsing.ZoneFile (parseRecords)
 import Parsing.Wellformedness (wellformed)
-import Data.Maybe (mapMaybe)
 import Resolvable.Dependencies (ConstrainedQuery (CQuery), computeResolvable, queryFromRule)
 import Resolvable.Prolog.Core (Term (TWildcard), ad, nameTerm, resolves, top, ttypeTerm)
 import Resolvable.Resolvability (NameServersConfig, compileConfig, plResolvable)
