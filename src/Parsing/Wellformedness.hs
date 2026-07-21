@@ -22,6 +22,9 @@ expectNot p err = if p then Just err else Nothing
 (==>) :: Bool -> Bool -> Bool
 (==>) p q = not p || q
 
+-- TODO: Enforce NSEC3 consistency according to RFC 5155, Sec. 7.2.
+-- TODO: Enforce tautologies on NSEC(3) bitmaps
+-- TODO: Enforce that there is the corresponding data for every RRSIG
 wellformed :: Name String -> Zone String -> Maybe String
 wellformed ns (Zone org r@(Tr.Node apexData rcs)) =
   asum  [ expectNot wildcardOrigin "zone origin has wildcard"
@@ -29,6 +32,7 @@ wellformed ns (Zone org r@(Tr.Node apexData rcs)) =
         , expectNot (any (hasType T.SOA) dataNoApex) "zone has non-apex SOA"
         -- See: https://datatracker.ietf.org/doc/html/rfc4035#section-2.4
         , expectNot (hasType T.DS apexData) "DS record at zone apex"
+        -- TODO: Rather ignore this
         , expect dnskeyFlags "DNSKEY flags miss zone key bit"
         , expect (checkCNAME org r) "CNAME record accompanied by records other than NSEC or RRSIG"
         -- TODO: Below check is too restrictive. A name server serving this zone
@@ -37,7 +41,9 @@ wellformed ns (Zone org r@(Tr.Node apexData rcs)) =
         -- Ignore records at apex. Other records next to NSes are legal there.
         , expect (checkZoneCuts org dataNoApex) "illegal record at or below zone cut"
         , expect (checkDNAME r) "CNAME next to DNAME or records below DNAME"
+        -- TODO: Address as limitation
         , expectNot (any (selfDelegation ns) dataNoApex) "NS record is self-delegation"
+        -- TODO: Add NSEC, SOA as singleton types (maybe also NSEC3?)
         , expect (singletonTypes r) "more than one DNAME or CNAME record at owner name"
         , expect (wildcardRestrictions orgLabel r) "DNAME, DS or NS wildcard record"
         , expect (rrsigSignerName org r) "RRSIG has illegal signer name"
@@ -105,7 +111,7 @@ rrsigSignerName = Tr.allNamed checkData
           in case _typeCovered sig of
             T.SOA -> signer == owner
             T.DNSKEY -> signer == owner
-            T.DS -> signer /= owner &&  isSubDomain owner signer
+            T.DS -> signer /= owner && isSubDomain owner signer
             _ -> isSubDomain owner signer
         checkRRSIG _ = True
 
@@ -116,8 +122,8 @@ rrsigLabelCount = Tr.allNamed checkData
     checkData owner = all checkRRSIG
       where
         checkRRSIG :: RData -> Bool
-        -- length - 1 to exclude root label
-        checkRRSIG (rtype -> RRSIG sig) = labelCount owner == _labels sig
+        -- NOTE: >= because I may receive signatures on synthesized responses
+        checkRRSIG (rtype -> RRSIG sig) = labelCount owner >= _labels sig
         checkRRSIG _ = True
 
 noDNSKEY :: Tr.Node String RRSet.RDataSet -> Bool
