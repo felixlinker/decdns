@@ -15,7 +15,6 @@ import Resolvable.Resolvability
 import DNS.ZoneFile
 import NameConstraint
 import qualified Util.PartialOrder as PO
-import Data.Maybe (fromMaybe)
 
 canRollout :: RecordDependencies -> Name String -> ConstrainedName -> Bool
 canRollout deps ns n = PO.minimal deps $ ResolvableAt (ns, n)
@@ -27,14 +26,8 @@ diffServers old new = MM.merge
   (MM.mapMissing (\_ -> fmap deleted))
   (MM.mapMissing (\_ -> fmap added))
   (MM.zipWithMatched (const diff))
-  (M.fromList $ map (fmap toSingleZone) old)
-  (M.fromList $ map (fmap toSingleZone) new)
-  where
-    def :: Zone ConstrainedLabel
-    def = emptyZone DNS.Name.root
-
-    toSingleZone :: [Zone ConstrainedLabel] -> Zone ConstrainedLabel
-    toSingleZone = foldr (mergeZones . fromMaybe def . fromList . allData) def
+  (M.fromList old)
+  (M.fromList new)
 
 updateDeps :: NSDiffs -> RecordDependencies -> RecordDependencies
 updateDeps diffs = PO.filter changed

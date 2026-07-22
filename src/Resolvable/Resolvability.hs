@@ -225,16 +225,13 @@ allResolvable =
 dropApexNSes :: Zone ConstrainedLabel -> Zone ConstrainedLabel
 dropApexNSes z@(Zone _ r@(Tr.Node apexData _)) = z { DNS.ZoneFile.root = r { item = dropType T.NS apexData } }
 
-fromZoneFile :: [Name String] -> Name String -> [Zone ConstrainedLabel] -> Fresh (S.Set (Rule (Maybe RComp)))
-fromZoneFile rootServers ns rs = mconcat <$> mapM zoneToRules rs
+fromZoneFile :: [Name String] -> Name String -> Zone ConstrainedLabel -> Fresh (S.Set (Rule (Maybe RComp)))
+fromZoneFile rootServers ns z =  mconcat <$> mapM rrsetToRules (allRRSets (dropApexNSes z))
   where
-    zoneToRules :: Zone ConstrainedLabel -> Fresh (S.Set (Rule (Maybe RComp)))
-    zoneToRules z = mconcat <$> mapM rrsetToRules (allRRSets (dropApexNSes z))
-
     rrsetToRules :: ConstrainedRRSet -> Fresh (S.Set (Rule (Maybe RComp)))
     rrsetToRules r = (<>) <$> resolvableBase rootServers ns r <*> resolvableStep rootServers ns r
 
-type NameServersConfig = [(Name String, [Zone ConstrainedLabel])]
+type NameServersConfig = [(Name String, Zone ConstrainedLabel)]
 
 compileConfig :: [Name String] -> NameServersConfig -> Fresh (S.Set (Rule (Maybe RComp)))
 compileConfig rootServers = (mconcat <$>) . mapM (uncurry (fromZoneFile rootServers))

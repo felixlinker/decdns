@@ -22,6 +22,7 @@ import Test.Tasty.QuickCheck
 import Text.Parsec (runParserT)
 import Control.Monad (foldM)
 import Data.List (unsnoc)
+import qualified Data.List.NonEmpty as NE
 
 tests :: TestTree
 tests =
@@ -71,13 +72,10 @@ parsesOmittedOwnerStartingWithClass = do
         , "IN AAAA 2001:db8::1"
         ]
 
-  zones <- either (fail . show) fromRecordList <$> parseRecords "<test>" input
-  case zones of
-    [z] -> do
-      let recs = allRecords z
-      length recs @?= 3
-      name (recs !! 1) @?= name (recs !! 2)
-    zs -> assertFailure ("expected 1 zone, got " ++ show (length zs))
+  z <- either (fail . show) (pure . fromRecordList . NE.fromList) =<< parseRecords "<test>" input
+  let recs = allRecords z
+  length recs @?= 3
+  name (recs !! 1) @?= name (recs !! 2)
 
 parsesExplicitOwnerNamedIN :: Assertion
 parsesExplicitOwnerNamedIN = do
@@ -87,10 +85,8 @@ parsesExplicitOwnerNamedIN = do
         , "IN 300 IN A 192.0.2.10"
         ]
 
-  zones <- either (fail . show) fromRecordList <$> parseRecords "<test>" input
-  case zones of
-    [z] -> length (allRecords z) @?= 2
-    zs -> assertFailure ("expected 1 zone, got " ++ show (length zs))
+  z <- either (fail . show) (pure . fromRecordList . NE.fromList) =<< parseRecords "<test>" input
+  length (allRecords z) @?= 2
 
 parsesMultilineRecordWithInlineComment :: Assertion
 parsesMultilineRecordWithInlineComment = do

@@ -26,14 +26,12 @@ module DNS.ZoneFile
   , partition ) where
 
 import qualified Data.Map as M
-import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE
 import qualified Control.Monad.Trans.State as St
 
 import DNS.Name as N
 import DNS.Record
 import qualified DNS.RRSet as RRSet
-import qualified DNS.RecordType as Ty
 import qualified Util.Tree as T
 import Data.Bifunctor (Bifunctor(bimap))
 import Data.Foldable (Foldable(toList))
@@ -71,27 +69,11 @@ singleton (Named n d) = Zone n (T.leaf d)
 isEmpty :: Foldable t => AZone a t b -> Bool
 isEmpty (Zone _ r) = T.null r
 
-fromRecordList :: forall a. (Label a, Ord a) => [Record a] -> [Zone a]
-fromRecordList rList =
-  let (soas, other) = L.partition ((== Ty.SOA) . toType . rtype . value) rList
-  in  maybe [] (\z -> toZones (foldr insertRecord z other)) (fromList (map namedRec soas))
+fromRecordList :: forall a. (Label a, Ord a) => NE.NonEmpty (Record a) -> Zone a
+fromRecordList = fromList . NE.map namedRec
   where
-    toZones :: AZone a [] (Record a) -> [Zone a]
-    toZones (Zone _ rn) = go rn []
-      where
-        go :: T.Node a [Record a] -> [Zone a] -> [Zone a]
-        go (T.Node rs cs) acc =
-          let rec = foldr go acc cs
-          in  maybe rec (:rec) (fromList (map (fmap RRSet.singleton) rs))
-
-    namedRec :: Record a -> Named a [Record a]
-    namedRec r@(Named n _) = Named n [r]
-
-    insertRecord :: Record a -> AZone a [] (Record a) -> AZone a [] (Record a)
-    insertRecord r@(Named n _) z@(Zone org rn) = z { root = T.adjust (const (T.mapItems (r:))) p rn }
-      where
-        p :: [a]
-        (Path _ _ p) = pathInZone org n
+    namedRec :: Record a -> Named a (RRSet.RTypedSet RData)
+    namedRec (Named n d) = Named n (RRSet.singleton d)
 
 data Path a = Path
   -- New origin of the zone; longest common ancestor between new and old name
@@ -128,8 +110,8 @@ insert (Zone norg zroot) (Named n d) = case pathInZone norg n of
     $ T.insert rp d
     $ T.insertNode zp zroot T.emptyNode
 
-fromList :: (Label a, Ord a, Monoid (t b)) => [Named a (t b)] -> Maybe (AZone a t b)
-fromList = fmap (uncurry (foldl insert . singleton)) . L.uncons
+fromList :: (Label a, Ord a, Monoid (t b)) => NE.NonEmpty (Named a (t b)) -> AZone a t b
+fromList (r0 NE.:| rs) = foldr (flip insert) (singleton r0) rs
 
 get :: (Label a, Ord a) => Name a -> AZone a t b -> Maybe (t b)
 get n (Zone org r) = case pathInZone org n of

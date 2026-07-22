@@ -85,7 +85,7 @@ main = do
         (putStrLn "% Dependencies cyclic")
       print deps
     "parse-only" -> do
-      parsed <- concatMap (map toStandardRecord . concatMap allRecords . snd) . concat <$> mapM parseZoneFileZones args
+      parsed <- concatMap (map toStandardRecord . allRecords . snd) . concat <$> mapM parseZoneFileZones args
       mapM_ print parsed
     "query" -> do
       (roots, [qnameString, qtypeString]) <- sepBy "--" args

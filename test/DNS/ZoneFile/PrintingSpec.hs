@@ -3,6 +3,7 @@ module DNS.ZoneFile.PrintingSpec
   ) where
 
 import Data.Functor.Identity (runIdentity)
+import qualified Data.List.NonEmpty as NE
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck
 
@@ -18,11 +19,9 @@ tests =
 
 propPrintParseRoundTrip :: ZS.ArbZone -> Property
 propPrintParseRoundTrip (ZS.ArbZone z printed) =
-  let parsed = fromRecordList <$> runIdentity (parseRecords "<quickcheck>" printed)
+  let parsed = fromRecordList . NE.fromList <$> runIdentity (parseRecords "<quickcheck>" printed)
   in case parsed of
       Left err ->
         counterexample (show err) False
-      Right [z'] ->
+      Right z' ->
         ZS.normalizeZone z' === ZS.normalizeZone z
-      Right zs ->
-        counterexample ("expected 1 zone, got " ++ show (length zs)) False

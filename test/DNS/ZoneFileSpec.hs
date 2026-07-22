@@ -53,7 +53,7 @@ named :: Name a -> RData -> Named a RRSet.RDataSet
 named a = Named a . RRSet.singleton
 
 zoneFromList :: (Label a, Ord a) => [Named a RRSet.RDataSet] -> IO (AZone a RRSet.RTypedSet RData)
-zoneFromList = maybe (fail "could not create zone") return . fromList
+zoneFromList = maybe (fail "could not create zone") (return . fromList) . NE.nonEmpty
 
 getEmptyIsNothing :: Assertion
 getEmptyIsNothing = get ("a" <| N.root) (emptyZone N.root :: Zone String) @?= Nothing
@@ -104,8 +104,8 @@ propAllDataFromListRoundtrip =
     forAll (shuffle (allRecords z)) $ \rs ->
       maybe
       (counterexample "could not construct zone" (property False))
-      ((normalizeZone z ===) . normalizeZone . fst)
-      (L.uncons (fromRecordList rs))
+      ((normalizeZone z ===) . normalizeZone . fromRecordList)
+      (NE.nonEmpty rs)
 
 propPathComputation :: Property
 propPathComputation =

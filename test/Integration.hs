@@ -1,6 +1,7 @@
 module Integration (tests) where
 
 import Control.Monad (forM_)
+import qualified Data.List.NonEmpty as NE
 import Control.Monad.Trans.Except (runExceptT)
 import qualified Data.Map as M
 import Data.Maybe (isJust, mapMaybe)
@@ -277,12 +278,11 @@ rootServers = [nsCom]
 exampleFileTest :: ExampleFile -> TestTree
 exampleFileTest example =
   testCase (examplePath example) $ do
-    (ns, records, zones) <- loadExampleFile (examplePath example)
+    (ns, records, zone) <- loadExampleFile (examplePath example)
     length records @?= expectedRecordCount example
-    map zoneName zones @?= [expectedOrigin example]
-    forM_ zones $ \zone ->
-      assertWellformed (examplePath example) ns zone
-    length (concatMap allRecords zones) @?= expectedRecordCount example
+    zoneName zone @?= expectedOrigin example
+    assertWellformed (examplePath example) ns zone
+    length (allRecords zone) @?= expectedRecordCount example
 
 exampleConfigTest :: ExampleConfig -> TestTree
 exampleConfigTest example =
@@ -453,18 +453,18 @@ resolvableQueries files = do
 loadConfig :: [FilePath] -> IO NameServersConfig
 loadConfig = mapM loadConfigEntry
   where
-    loadConfigEntry :: FilePath -> IO (Name String, [Zone ConstrainedLabel])
+    loadConfigEntry :: FilePath -> IO (Name String, Zone ConstrainedLabel)
     loadConfigEntry path = do
-      (ns, _, zones) <- loadExampleFile path
-      forM_ zones $ assertWellformed path ns
-      return (ns, map compileWildcards zones)
+      (ns, _, zone) <- loadExampleFile path
+      assertWellformed path ns zone
+      return (ns, compileWildcards zone)
 
-loadExampleFile :: FilePath -> IO (Name String, [StandardRecord], [Zone String])
+loadExampleFile :: FilePath -> IO (Name String, [StandardRecord], Zone String)
 loadExampleFile path = do
   content <- readFile path
   records <- assertRight =<< parseRecords path content
   ns <- assertRight =<< parseName path
-  return (ns, records, fromRecordList records)
+  return (ns, records, fromRecordList (NE.fromList records))
 
 assertWellformed :: FilePath -> Name String -> Zone String -> Assertion
 assertWellformed path ns zone =

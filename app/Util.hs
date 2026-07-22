@@ -8,6 +8,7 @@ module Util
 import Control.Monad ((<=<))
 import Control.Monad.Trans.Except (Except, throwE, runExcept)
 import Data.List (uncons)
+import qualified Data.List.NonEmpty as NE
 import GHC.Base (failIO)
 import Text.Parsec (ParseError, SourceName)
 
@@ -32,15 +33,16 @@ parseZoneFileContents :: SourceName -> String -> IO NameServersConfig
 parseZoneFileContents s content = do
   exceptZones <- map (runExcept . toZone) <$> (handleParser =<< parseZoneFile s content)
   zones <- mapM (either failIO return) exceptZones
-  return $ map (fmap (map compileWildcards)) zones
+  return $ map (fmap compileWildcards) zones
   where
     wf :: Name String -> Zone String -> Except String ()
     wf ns zone = maybe (return ()) throwE (wellformed ns zone)
 
-    toZone :: ServedZone -> Except String (Name String, [Zone String])
-    toZone (ns, fromRecordList -> zs) = do
-      mapM_ (wf ns) zs
-      return (ns, zs)
+    toZone :: ServedZone -> Except String (Name String, Zone String)
+    toZone (ns, rs) = do
+      z <- maybe (throwE "no records") (return . fromRecordList) (NE.nonEmpty rs)
+      wf ns z
+      return (ns, z)
 
 parseStdin :: IO NameServersConfig
 parseStdin = do

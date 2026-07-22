@@ -36,7 +36,7 @@ propDistinctRuleVariables (ArbZone z _) =
     , let shared = variables r1 `S.intersection` variables r2
     ]
   where
-    rules = runFresh $ fromZoneFile [zoneName z] (zoneName z) [compileWildcards z]
+    rules = runFresh $ fromZoneFile [zoneName z] (zoneName z) (compileWildcards z)
 
 variables :: Rule a -> S.Set String
 variables (Rule _ h b) = S.unions $ map termVariables (h : b)

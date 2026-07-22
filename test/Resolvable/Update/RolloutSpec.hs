@@ -47,4 +47,4 @@ immediateTxtDelete = do
 
 dependencies :: Zone String -> RecordDependencies
 dependencies z =
-  runFresh $ fromRules <$> compileConfig [zoneName z] [(zoneName z, [compileWildcards z])]
+  runFresh $ fromRules <$> compileConfig [zoneName z] [(zoneName z, compileWildcards z)]
