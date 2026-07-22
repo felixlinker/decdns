@@ -1,6 +1,7 @@
 module DNS.RRSet
   ( RTypedSet(..)
   , empty
+  , DNS.RRSet.null
   , apply
   , modify
   , modifyL
@@ -34,6 +35,9 @@ instance Show a => Show (RTypedSet a) where
 empty :: RTypedSet a
 empty = RDS M.empty
 
+null :: RTypedSet a -> Bool
+null = M.null . rds
+
 instance Functor RTypedSet where
   fmap f (RDS m) = RDS $ fmap (fmap f) m
 
@@ -56,7 +60,7 @@ modify :: (M.Map T.Type (NE.NonEmpty a) -> M.Map T.Type (NE.NonEmpty b)) -> RTyp
 modify f = RDS . apply f
 
 toNE :: M.Map T.Type [a] -> M.Map T.Type (NE.NonEmpty a)
-toNE = runIdentity . M.traverseMaybeWithKey (const $ return . NE.nonEmpty) . M.filter (not . null)
+toNE = runIdentity . M.traverseMaybeWithKey (const $ return . NE.nonEmpty) . M.filter (not . Prelude.null)
 
 modifyL :: (M.Map T.Type (NE.NonEmpty a) -> M.Map T.Type [b]) -> RTypedSet a -> RTypedSet b
 modifyL f rd = RDS $ toNE $ apply f rd

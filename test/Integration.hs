@@ -281,7 +281,7 @@ exampleFileTest example =
     (ns, records, zone) <- loadExampleFile (examplePath example)
     length records @?= expectedRecordCount example
     zoneName zone @?= expectedOrigin example
-    assertWellformed (examplePath example) ns zone
+    assertWellformed (examplePath example) zone
     length (allRecords zone) @?= expectedRecordCount example
 
 exampleConfigTest :: ExampleConfig -> TestTree
@@ -456,19 +456,20 @@ loadConfig = mapM loadConfigEntry
     loadConfigEntry :: FilePath -> IO (Name String, Zone ConstrainedLabel)
     loadConfigEntry path = do
       (ns, _, zone) <- loadExampleFile path
-      assertWellformed path ns zone
+      assertWellformed path zone
       return (ns, compileWildcards zone)
 
 loadExampleFile :: FilePath -> IO (Name String, [StandardRecord], Zone String)
 loadExampleFile path = do
   content <- readFile path
+  -- TODO: Use parseZone for name server name
   records <- assertRight =<< parseRecords path content
   ns <- assertRight =<< parseName path
   return (ns, records, fromRecordList (NE.fromList records))
 
-assertWellformed :: FilePath -> Name String -> Zone String -> Assertion
-assertWellformed path ns zone =
-  case wellformed ns zone of
+assertWellformed :: FilePath -> Zone String -> Assertion
+assertWellformed path zone =
+  case wellformed zone of
     Nothing -> return ()
     Just err -> assertFailure (path ++ ": " ++ err)
 

@@ -19,7 +19,7 @@ import qualified Data.Map as M
 import DNS.ZoneFile
 import DNS.Name
 import DNS.Record
-import DNS.RRSet
+import qualified DNS.RRSet as RRSet
 import Data.Maybe (fromMaybe)
 
 import qualified Util.Tree as T
@@ -44,7 +44,7 @@ instance Show ConstrainedLabel where
 type ConstrainedLabel = LabelConstraint String
 type ConstrainedName = Name ConstrainedLabel
 type ConstrainedRecord = Record ConstrainedLabel
-type ConstrainedRRSet = RRSet ConstrainedLabel
+type ConstrainedRRSet = RRSet.RRSet ConstrainedLabel
 
 toStandardRecord :: ConstrainedRecord -> StandardRecord
 toStandardRecord (Named n d) = Named (toName n) d
@@ -68,7 +68,7 @@ compileWildcards (Zone (Name n) r) = Zone (Name (NE.map Exactly n)) (go r)
     mapLabel exist "*" = Wildcard exist
     mapLabel _ x   = Exactly x
 
-    go :: T.Node String RDataSet -> T.Node ConstrainedLabel RDataSet
+    go :: T.Node String RRSet.RDataSet -> T.Node ConstrainedLabel RRSet.RDataSet
     go n_@(T.Node _ ch) = n_ { T.children = M.map go $ M.mapKeys (mapLabel (existIn n_)) ch }
 
 match :: Name String -> ConstrainedName -> Maybe (Name String)

@@ -35,13 +35,13 @@ parseZoneFileContents s content = do
   zones <- mapM (either failIO return) exceptZones
   return $ map (fmap compileWildcards) zones
   where
-    wf :: Name String -> Zone String -> Except String ()
-    wf ns zone = maybe (return ()) throwE (wellformed ns zone)
+    wf :: Zone String -> Except String ()
+    wf zone = maybe (return ()) throwE (wellformed zone)
 
     toZone :: ServedZone -> Except String (Name String, Zone String)
     toZone (ns, rs) = do
       z <- maybe (throwE "no records") (return . fromRecordList) (NE.nonEmpty rs)
-      wf ns z
+      wf z
       return (ns, z)
 
 parseStdin :: IO NameServersConfig

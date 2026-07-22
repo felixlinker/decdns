@@ -28,15 +28,14 @@ expectNot p err = if p then Just err else Nothing
 -- TODO: Enforce NSEC3 consistency according to RFC 5155, Sec. 7.2.
 -- TODO: Enforce tautologies on NSEC(3) bitmaps
 -- TODO: Enforce that there is the corresponding data for every RRSIG
-wellformed :: Name String -> Zone String -> Maybe String
-wellformed ns (Zone org r@(Tr.Node apexData rcs)) =
+wellformed :: Zone String -> Maybe String
+wellformed (Zone org r@(Tr.Node apexData rcs)) =
   asum  [ expectNot wildcardOrigin "zone origin has wildcard"
-        , expect (hasType T.SOA apexData) "zone misses SOA record"
-        , expectNot (any (hasType T.SOA) dataNoApex) "zone has non-apex SOA"
+        , expect (checkDataAboveApex r) "zone misses SOA record"
         -- See: https://datatracker.ietf.org/doc/html/rfc4035#section-2.4
         , expectNot (hasType T.DS apexData) "DS record at zone apex"
         -- TODO: Rather ignore this
-        , expect dnskeyFlags "DNSKEY flags miss zone key bit"
+        , expect (all checkKeyFlags r) "DNSKEY flags miss zone key bit"
         , expect (checkCNAME org r) "CNAME record accompanied by records other than NSEC or RRSIG"
         -- TODO: Below check is too restrictive. A name server serving this zone
         -- may be the delegated name server, in which case there may be records
@@ -44,8 +43,6 @@ wellformed ns (Zone org r@(Tr.Node apexData rcs)) =
         -- Ignore records at apex. Other records next to NSes are legal there.
         , expect (checkZoneCuts org dataNoApex) "illegal record at or below zone cut"
         , expect (checkDNAME r) "CNAME next to DNAME or records below DNAME"
-        -- TODO: Address as limitation
-        , expectNot (any (selfDelegation ns) dataNoApex) "NS record is self-delegation"
         -- TODO: Add NSEC, SOA as singleton types (maybe also NSEC3?)
         , expect (singletonTypes r) "more than one DNAME or CNAME record at owner name"
         , expect (wildcardRestrictions orgLabel r) "DNAME, DS or NS wildcard record"
@@ -62,32 +59,6 @@ wellformed ns (Zone org r@(Tr.Node apexData rcs)) =
     wildcardOrigin :: Bool
     wildcardOrigin = "*" == orgLabel
 
-    dnskeyFlags :: Bool
-    dnskeyFlags = all (all (checkFlag . rtype)) r
-      where
-        checkFlag :: Type -> Bool
-        checkFlag (DNSKEY (DNSKEYData fs _ _)) = ZoneKey `elem` fs
-        checkFlag _ = True
-
-    -- See: https://datatracker.ietf.org/doc/html/rfc4034#section-3; third paragraph
-    -- This also covers that a CNAME must not be at zone apex (apex will have SOA record).
-    checkCNAME :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
-    checkCNAME = Tr.allNamed (const checkData)
-      where
-        checkData :: RRSet.RDataSet -> Bool
-        checkData rs = hasType T.CNAME rs ==> typesAllIn rs [T.CNAME, T.NSEC, T.RRSIG]
-
-    checkZoneCuts :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
-    checkZoneCuts n (Tr.Node rs cs) = if hasType T.NS rs
-        then typesAllIn rs [T.NS, T.DS, T.NSEC, T.RRSIG, T.A, T.AAAA] && all (`typesAllIn` [T.A, T.AAAA]) (Tr.Node RRSet.empty cs)
-        else and $ M.mapWithKey (\k -> checkZoneCuts (k <| n)) cs
-
-    singletonTypes :: Tr.Node String RRSet.RDataSet -> Bool
-    singletonTypes = all (\rs -> checkOne T.CNAME rs && checkOne T.DNAME rs)
-      where
-        checkOne :: T.Type -> RRSet.RDataSet -> Bool
-        checkOne t = maybe True (null . NE.tail) . getType t
-
 getType :: T.Type -> RRSet.RDataSet -> Maybe (NE.NonEmpty RData)
 getType t = M.lookup t . RRSet.rds
 
@@ -96,6 +67,27 @@ hasType t = M.member t . RRSet.rds
 
 typesAllIn :: RRSet.RTypedSet a -> [T.Type] -> Bool
 typesAllIn rd = RRSet.apply M.null . foldr (RRSet.modify . M.delete) rd
+
+checkKeyFlags :: RRSet.RDataSet -> Bool
+checkKeyFlags = all (checkFlag . rtype)
+  where
+    checkFlag :: Type -> Bool
+    checkFlag (DNSKEY (DNSKEYData fs _ _)) = ZoneKey `elem` fs
+    checkFlag _ = True
+
+-- See: https://datatracker.ietf.org/doc/html/rfc4034#section-3; third paragraph
+-- This also covers that a CNAME must not be at zone apex (apex will have SOA record).
+checkCNAME :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
+checkCNAME = Tr.allNamed (const checkData)
+  where
+    checkData :: RRSet.RDataSet -> Bool
+    checkData rs = hasType T.CNAME rs ==> typesAllIn rs [T.CNAME, T.NSEC, T.RRSIG]
+
+singletonTypes :: Tr.Node String RRSet.RDataSet -> Bool
+singletonTypes = all (\rs -> checkOne T.CNAME rs && checkOne T.DNAME rs)
+  where
+    checkOne :: T.Type -> RRSet.RDataSet -> Bool
+    checkOne t = maybe True (null . NE.tail) . getType t
 
 wildcardRestrictions :: String -> Tr.Node String RRSet.RDataSet -> Bool
 wildcardRestrictions label (Tr.Node rs cs)
@@ -135,11 +127,26 @@ noDNSKEY = Tr.allNamed checkData N.root  -- Use N.root because implementation ig
     checkData :: Name String -> RRSet.RDataSet -> Bool
     checkData _ = not . hasType T.DNSKEY
 
-selfDelegation :: Name String -> RRSet.RDataSet -> Bool
-selfDelegation ns = maybe False (any ((== NS ns) . rtype)) . getType T.NS
-
 -- See: https://datatracker.ietf.org/doc/html/rfc6672#section-2.4
 checkDNAME :: Tr.Node String RRSet.RDataSet -> Bool
 checkDNAME (Tr.Node rs cs)
   | hasType T.DNAME rs = not (hasType T.CNAME rs) && M.null cs
   | otherwise = all checkDNAME cs
+
+checkZoneCuts :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
+checkZoneCuts n (Tr.Node rs cs) = if hasType T.NS rs
+  then typesAllIn rs [T.SOA, T.NS, T.DS, T.NSEC, T.RRSIG, T.A, T.AAAA]
+    && (not hasSOA ==> all (`typesAllIn` [T.A, T.AAAA]) (Tr.Node RRSet.empty cs))
+    && (hasSOA ==> rec)
+  else rec
+  where
+    hasSOA :: Bool
+    hasSOA = hasType T.SOA rs
+
+    rec :: Bool
+    rec = and $ M.mapWithKey (\k -> checkZoneCuts (k <| n)) cs
+
+checkDataAboveApex :: Tr.Node String RRSet.RDataSet -> Bool
+checkDataAboveApex (Tr.Node rs cs)
+  | RRSet.null rs = all checkDataAboveApex cs
+  | otherwise = hasType T.SOA rs
