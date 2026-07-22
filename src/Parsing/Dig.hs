@@ -13,17 +13,13 @@ import Parsing.Name
 received :: Stream s m Char => ParsecT s u m (Name String)
 received = do
   spaces
-  _ <- string ";; Received "
-  _ <- many digit
-  _ <- string " bytes from "
+  _ <- string ";; SERVER: "
   try (void ipv4) <|> void ipv6
   _ <- char '#'
   _ <- many digit
   _ <- char '('
   n <- relName
-  _ <- string ") in "
-  _ <- many1 digit
-  _ <- string " ms"
+  _ <- string ") (UDP)"
   -- Make absolute because names in dig are expressed relatively
   return $ n |> ""
 

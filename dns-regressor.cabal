@@ -37,6 +37,7 @@ source-repository head
 library
   exposed-modules:
       DNS.Diff
+      DNS.Dig
       DNS.Name
       DNS.Record
       DNS.RecordType
@@ -60,6 +61,7 @@ library
       Resolvable.ConstrainedUnification
       Resolvable.Dependencies
       Resolvable.Prolog.Core
+      Resolvable.Prolog.Reverse
       Resolvable.Prolog.Symbols
       Resolvable.Prolog.TermView
       Resolvable.Resolvability

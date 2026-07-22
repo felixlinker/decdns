@@ -3,7 +3,7 @@ module Query
   ( queryStep ) where
 
 import Control.Monad.Trans.Except (ExceptT)
-import Data.Maybe (catMaybes)
+import Data.Maybe (mapMaybe)
 import qualified Data.Set as S
 
 import DNS.Name
@@ -21,14 +21,11 @@ queryT (nameTerm -> n) (ttypeTerm -> t) = do
 
 queryStep :: (Monad m) => Name String -> T.Type -> Fresh (S.Set (Rule (Maybe RComp))) -> ExceptT String m (S.Set (Rule (Maybe RComp)))
 queryStep n t rs =
-  let kb = fmap (S.fromList . catMaybes) . mapM refine . S.toList =<< rs
-  in  computeResolvable False $ runFresh kb
+  let (kb, q) = runFresh $ do
+        kb' <- computeResolvable False <$> rs
+        q' <- queryT n t
+        return (kb', q')
+  in S.fromList . mapMaybe (refine q) . S.toList <$> kb
   where
-    q :: Fresh Term
-    q = queryT n t
-
-    refine :: Rule a -> Fresh (Maybe (Rule a))
-    refine r@(Rule _ rh _) = do
-      fq <- q
-      let u = U.unify fq rh
-      return $ fmap (`U.apply` r) u
+    refine :: Term -> Rule a -> Maybe (Rule a)
+    refine q r@(Rule _ rh _) = fmap (`U.apply` r) (U.unify q rh)

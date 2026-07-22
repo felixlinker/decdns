@@ -13,28 +13,27 @@ module Resolvable.Dependencies
   , computeResolvable ) where
 
 import Control.Monad (when, filterM, guard)
-import qualified Data.ByteString as BS
+import Control.Monad.Trans.Except (ExceptT, Except, runExcept, throwE)
+import qualified Control.Monad.Trans.State as St
+import Data.Bifunctor (Bifunctor(bimap))
 import Data.Either (fromRight)
 import Data.Functor (($>))
 import qualified Data.Set as S
 import Data.List (uncons)
-import qualified Data.List.NonEmpty as NE
 import Data.Maybe (mapMaybe)
 
-import Resolvable.Prolog.Core
-import Resolvable.Prolog.TermView
-import Resolvable.Unification
 import DNS.Name
 import DNS.Record
-import qualified Resolvable.ConstrainedUnification as CU
-import qualified Util.PartialOrder as PO
-import Resolvable.Resolvability (RComp (RComp))
-import NameConstraint (ConstrainedName)
-import Control.Monad.Trans.Except (ExceptT, Except, runExcept, throwE)
-import Util.Monad (exceptMaybe)
 import DNS.SEC.Verification (verifySignature, verifyDigest, nsecUnsignedSubzone, nsec3UnsignedSubzone, verifyClosestEncloserProof)
-import Data.Bifunctor (Bifunctor(bimap))
-import qualified Control.Monad.Trans.State as St
+import NameConstraint (ConstrainedName)
+import qualified Resolvable.ConstrainedUnification as CU
+import Resolvable.Prolog.Core
+import Resolvable.Prolog.Reverse
+import Resolvable.Prolog.TermView
+import Resolvable.Resolvability (RComp (RComp))
+import Resolvable.Unification
+import qualified Util.PartialOrder as PO
+import Util.Monad (exceptMaybe)
 
 class FromRule t where
   fromRule :: Rule (Maybe RComp) -> Maybe t
@@ -134,46 +133,6 @@ matchHead t (Rule _ h b) cu = do
   cu' <- CU.extendUnifier t h cu
   (b', cu'') <- grabNeqs b cu'
   return (cu'', CU.apply cu'' b')
-
-asName :: Term -> Except String (Name String)
-asName t = do
-  ts <- exceptMaybe ("name term is not a list: " ++ show t) $ collectList t
-  ls <- exceptMaybe ("label not ground: " ++ show t) $ mapM asAtom ts
-  -- Add empty label was we do not represent it in Prolog
-  return $ Name (NE.reverse $ "" NE.:| ls)
-  where
-    asAtom :: Term -> Maybe String
-    asAtom (TAtom a) = Just a
-    asAtom _ = Nothing
-
-asType :: Term -> Except String Type
-asType (TComplex d) = return d
-asType t = throwE ("data not ground: " ++ show t)
-
-asTypes :: Term -> Except String [Type]
-asTypes t = do
-  l <- exceptMaybe ("data not ground: " ++ show t) $ collectList t
-  mapM asType l
-
-asDNSKEYData :: Type -> Except String DNSKEYData
-asDNSKEYData (DNSKEY dat) = return dat
-asDNSKEYData t = throwE $ "expected DNSKEY got: " ++ show t
-
-asDSData :: Type -> Except String DSData
-asDSData (DS dat) = return dat
-asDSData t = throwE $ "expected DS got: " ++ show t
-
-asRRSigData :: Type -> Except String (RRSIGData BS.ByteString)
-asRRSigData (RRSIG dat) = return dat
-asRRSigData t = throwE $ "expected RRSIG got: " ++ show t
-
-asNSECData :: Type -> Except String NSECData
-asNSECData (NSEC dat) = return dat
-asNSECData t = throwE $ "expected NSEC got: " ++ show t
-
-asNSEC3Data :: Type -> Except String NSEC3Data
-asNSEC3Data (NSEC3 dat) = return dat
-asNSEC3Data t = throwE $ "expected NSEC3 got: " ++ show t
 
 solveBody :: Ord a => Bool -> S.Set (Rule a) -> Rule a -> S.Set (Rule a)
 solveBody keepGround rs (Rule ann h b) = S.fromList $ map (\(u, b') -> CU.apply u $ Rule ann h b') $ foldl solvePredicate [(CU.identity, [])] b

@@ -2,6 +2,7 @@ module PrologCompiler (main) where
 
 import DNS.ZoneFile (allRecords)
 import DNS.Diff
+import DNS.Dig (followUpQueries)
 import DNS.Wellformedness
 import NameConstraint (toStandardRecord, ConstrainedLabel)
 import Resolvable.Prolog.Core
@@ -95,7 +96,10 @@ main = do
       qtype <- parseTypeM qtypeString
       compiled <- compileConfig rootServers <$> parseResponse
       kb <- handleError $ runExcept $ queryStep qname qtype compiled
-      putStrLn $ showKnowledgeBase $ S.toList kb
+      let answers = filter isFact $ S.toList kb
+      if null answers
+        then mapM_ print $ followUpQueries kb
+        else putStrLn $ showKnowledgeBase answers
     _ -> fail "unknown command"
   where
     parseZone :: FilePath -> IO NameServersConfig

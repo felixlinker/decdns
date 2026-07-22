@@ -27,6 +27,7 @@ module Resolvable.Prolog.Core
   , subterm
   , Rule(..)
   , fact
+  , isFact
   , mapRule
   , (Resolvable.Prolog.Core.^)
 
@@ -326,6 +327,9 @@ instance Show (Rule a) where
 
 fact :: a -> Term -> Rule a
 fact ann h = Rule ann h []
+
+isFact :: Rule a -> Bool
+isFact = null . rbody
 
 mapRule :: (Term -> Term) -> Rule a -> Rule a
 mapRule f (Rule a h b) = Rule a (f h) (map f b)
