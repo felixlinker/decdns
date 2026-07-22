@@ -20,6 +20,6 @@ computeRegressions (toExcept -> oldf) (toExcept -> newf) = do
   oldRs <- oldf
   newRs <- newf
   -- TODO: Guard that nothing is dropped
-  resOld <- mapMaybe queryFromRule . S.toList <$> computeResolvable oldRs
-  resNew <- mapMaybe queryFromRule . S.toList <$> computeResolvable newRs
+  resOld <- mapMaybe queryFromRule . S.toList <$> computeResolvable True oldRs
+  resNew <- mapMaybe queryFromRule . S.toList <$> computeResolvable True newRs
   return $ concatMap (`withouts` resNew) resOld

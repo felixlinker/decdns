@@ -22,7 +22,7 @@ queryT (nameTerm -> n) (ttypeTerm -> t) = do
 queryStep :: (Monad m) => Name String -> T.Type -> Fresh (S.Set (Rule (Maybe RComp))) -> ExceptT String m (S.Set (Rule (Maybe RComp)))
 queryStep n t rs =
   let kb = fmap (S.fromList . catMaybes) . mapM refine . S.toList =<< rs
-  in  computeResolvable $ runFresh kb
+  in  computeResolvable False $ runFresh kb
   where
     q :: Fresh Term
     q = queryT n t

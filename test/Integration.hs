@@ -447,7 +447,7 @@ resolvableQueries :: [FilePath] -> IO (S.Set ConstrainedQuery)
 resolvableQueries files = do
   cfg <- loadConfig files
   let rules = runFresh $ plResolvable =<< compileConfig rootServers cfg
-  resolvable <- assertRight (runFresh $ runExceptT $ computeResolvable rules)
+  resolvable <- assertRight (runFresh $ runExceptT $ computeResolvable True rules)
   return $ S.fromList $ mapMaybe queryFromRule $ S.toList resolvable
 
 loadConfig :: [FilePath] -> IO NameServersConfig

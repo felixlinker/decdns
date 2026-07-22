@@ -175,11 +175,14 @@ asNSEC3Data :: Type -> Except String NSEC3Data
 asNSEC3Data (NSEC3 dat) = return dat
 asNSEC3Data t = throwE $ "expected NSEC3 got: " ++ show t
 
-solveBody :: Ord a => S.Set (Rule a) -> Rule a -> S.Set (Rule a)
-solveBody rs (Rule ann h b) = S.fromList $ map (\(u, b') -> CU.apply u $ Rule ann h b') $ foldl solvePredicate [(CU.identity, [])] b
+solveBody :: Ord a => Bool -> S.Set (Rule a) -> Rule a -> S.Set (Rule a)
+solveBody keepGround rs (Rule ann h b) = S.fromList $ map (\(u, b') -> CU.apply u $ Rule ann h b') $ foldl solvePredicate [(CU.identity, [])] b
   where
+    groundP :: (CU.ConstrainedUnifier, [Term]) -> Bool
+    groundP = if keepGround then null . snd else const True
+
     solvePredicate :: [(CU.ConstrainedUnifier, [Term])] -> Term -> [(CU.ConstrainedUnifier, [Term])]
-    solvePredicate choices p = case toView p of
+    solvePredicate choices p = filter groundP $ case toView p of
       TVNeq t1 t2 -> mapMaybe (\(u, accB) -> (,accB) <$> CU.addConstraint t1 t2 u) choices
       TVResolves {} -> concatMap
         (\(u, accB) -> foldr
@@ -249,8 +252,8 @@ solveBody rs (Rule ann h b) = S.fromList $ map (\(u, b') -> CU.apply u $ Rule an
             returnWhen :: a -> Bool -> Maybe a
             returnWhen a = ($> a) . guard
 
-computeResolvable :: Monad m => S.Set (Rule (Maybe RComp)) -> ExceptT String m (S.Set (Rule (Maybe RComp)))
-computeResolvable (S.filter (isResolves . rhead) -> rs) = do
+computeResolvable :: Monad m => Bool -> S.Set (Rule (Maybe RComp)) -> ExceptT String m (S.Set (Rule (Maybe RComp)))
+computeResolvable keepGround (S.filter (isResolves . rhead) -> rs) = do
   ord <- exceptMaybe "cyclic dependencies" $ PO.transitiveClosure $ fromRules rs
   rec ord rs S.empty
   where
@@ -261,5 +264,5 @@ computeResolvable (S.filter (isResolves . rhead) -> rs) = do
         let (mins, recArg) = S.partition (maybe False (PO.minimal ord) . fromRule) toSolve
         in do
           when (S.null mins) (throwE "non-termination")
-          let acc' = foldr (\r -> (solveBody acc r <>)) acc mins
+          let acc' = foldr (\r -> (solveBody keepGround acc r <>)) acc mins
           rec (foldr (maybe id PO.remove . fromRule) ord mins) recArg (acc' <> mins)

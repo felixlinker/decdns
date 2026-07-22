@@ -50,7 +50,7 @@ main = do
       rootServers <- parseNames roots
       cfg <- concat <$> mapM parseZone zones
       let compiled = runFresh $ plResolvable =<< compileConfig rootServers cfg
-      res <- handleError $ runExcept (computeResolvable compiled)
+      res <- handleError $ runExcept (computeResolvable True compiled)
       putStrLn $ showKnowledgeBase $ S.toList res
     "diff" -> do
       (old, new) <- sepBy "--" args
