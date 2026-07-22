@@ -21,7 +21,7 @@ import NameConstraint
   )
 import Parsing (parseName)
 import Parsing.ZoneFile (parseRecords)
-import DNS.Wellformedness (wellformed)
+import DNS.Wellformedness (zoneWellformed)
 import Resolvable.Dependencies (ConstrainedQuery (CQuery), computeResolvable, queryFromRule)
 import Resolvable.Prolog.Core (Term (TWildcard), ad, nameTerm, resolves, top, ttypeTerm)
 import Resolvable.Resolvability (NameServersConfig, compileConfig, plResolvable)
@@ -469,7 +469,7 @@ loadExampleFile path = do
 
 assertWellformed :: FilePath -> Zone String -> Assertion
 assertWellformed path zone =
-  case wellformed zone of
+  case zoneWellformed zone of
     Nothing -> return ()
     Just err -> assertFailure (path ++ ": " ++ err)
 

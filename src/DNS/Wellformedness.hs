@@ -1,6 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module DNS.Wellformedness
-  ( wellformed ) where
+  ( responseWellformed
+  , zoneWellformed ) where
 
 import Control.Applicative (asum)
 import qualified Data.Map as M
@@ -16,9 +17,6 @@ import qualified Util.Tree as Tr
 expect :: Bool -> String -> Maybe String
 expect p err = if p then Nothing else Just err
 
-expectNot :: Bool -> String -> Maybe String
-expectNot p err = if p then Just err else Nothing
-
 (==>) :: Bool -> Bool -> Bool
 (==>) p q = not p || q
 
@@ -29,35 +27,36 @@ expectNot p err = if p then Just err else Nothing
 -- TODO: Enforce tautologies on NSEC(3) bitmaps
 -- TODO: Enforce that there is the corresponding data for every RRSIG
 wellformed :: Zone String -> Maybe String
-wellformed (Zone org r@(Tr.Node apexData rcs)) =
-  asum  [ expectNot wildcardOrigin "zone origin has wildcard"
-        , expect (checkDataAboveApex r) "zone misses SOA record"
+wellformed z@(Zone org r) =
         -- See: https://datatracker.ietf.org/doc/html/rfc4035#section-2.4
-        , expectNot (hasType T.DS apexData) "DS record at zone apex"
         -- TODO: Rather ignore this
-        , expect (all checkKeyFlags r) "DNSKEY flags miss zone key bit"
-        , expect (checkCNAME org r) "CNAME record accompanied by records other than NSEC or RRSIG"
-        -- TODO: Below check is too restrictive. A name server serving this zone
-        -- may be the delegated name server, in which case there may be records
-        -- at or below the NS record.
-        -- Ignore records at apex. Other records next to NSes are legal there.
-        , expect (checkZoneCuts org dataNoApex) "illegal record at or below zone cut"
-        , expect (checkDNAME r) "CNAME next to DNAME or records below DNAME"
-        -- TODO: Add NSEC, SOA as singleton types (maybe also NSEC3?)
+  asum  [ expect (all checkKeyFlags r) "DNSKEY flags miss zone key bit"
+        , expect (checkCNAME z) "CNAME record accompanied by records other than NSEC or RRSIG"
+        , expect (checkZoneCuts r) "illegal record at or below zone cut"
         , expect (singletonTypes r) "more than one DNAME or CNAME record at owner name"
-        , expect (wildcardRestrictions orgLabel r) "DNAME, DS or NS wildcard record"
-        , expect (rrsigSignerName org r) "RRSIG has illegal signer name"
-        , expect (rrsigLabelCount org r) "RRSIG has illegal label count"
+        , expect (wildcardRestrictions z) "DNAME, DS or NS wildcard record"
+        , expect (rrsigSignerName org r) "RRSIG has illegal signer name" ]
+
+responseWellformed :: Zone String -> Maybe String
+responseWellformed z@(Zone _ r) =
+  asum  [ wellformed z
+        , expect (checkDNAME True r) "CNAME next to DNAME or records below DNAME"
+        , expect (rrsigLabelCount True z) "RRSIG has illegal label count" ]
+
+-- NOTE: I do not enforce that there must not be any DS records at the zone
+-- apex, because I do not distinguish whether the data is at the parent or child
+-- side of the delegation for a name server that also serves the child zone. For
+-- the rule, see: https://datatracker.ietf.org/doc/html/rfc4035#section-2.4
+zoneWellformed :: Zone String -> Maybe String
+zoneWellformed z@(Zone _ r@(Tr.Node _ rcs)) =
+  asum  [ wellformed z
+        , expect (checkNoDataAboveApex r) "zone misses SOA record"
+        , expect (checkDNAME False r) "CNAME next to DNAME or records below DNAME"
+        , expect (rrsigLabelCount False z) "RRSIG has illegal label count"
         , expect (noDNSKEY dataNoApex) "DNSKEY with non-apex owner name" ]
   where
     dataNoApex :: Tr.Node String (RRSet.RTypedSet RData)
     dataNoApex = Tr.Node RRSet.empty rcs
-
-    orgLabel :: String
-    orgLabel = NE.head $ labels org
-
-    wildcardOrigin :: Bool
-    wildcardOrigin = "*" == orgLabel
 
 getType :: T.Type -> RRSet.RDataSet -> Maybe (NE.NonEmpty RData)
 getType t = M.lookup t . RRSet.rds
@@ -77,22 +76,24 @@ checkKeyFlags = all (checkFlag . rtype)
 
 -- See: https://datatracker.ietf.org/doc/html/rfc4034#section-3; third paragraph
 -- This also covers that a CNAME must not be at zone apex (apex will have SOA record).
-checkCNAME :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
-checkCNAME = Tr.allNamed (const checkData)
+checkCNAME :: Zone String -> Bool
+checkCNAME = allNamed (const checkData)
   where
     checkData :: RRSet.RDataSet -> Bool
     checkData rs = hasType T.CNAME rs ==> typesAllIn rs [T.CNAME, T.NSEC, T.RRSIG]
 
+-- TODO: What about SOA?
 singletonTypes :: Tr.Node String RRSet.RDataSet -> Bool
-singletonTypes = all (\rs -> checkOne T.CNAME rs && checkOne T.DNAME rs)
+singletonTypes = all (\rs -> all (`checkOne` rs) [T.CNAME, T.DNAME, T.NSEC, T.SOA])
   where
     checkOne :: T.Type -> RRSet.RDataSet -> Bool
     checkOne t = maybe True (null . NE.tail) . getType t
 
-wildcardRestrictions :: String -> Tr.Node String RRSet.RDataSet -> Bool
-wildcardRestrictions label (Tr.Node rs cs)
-  | label == "*" && M.null cs = all (`M.notMember` RRSet.rds rs) [T.DNAME, T.DS, T.NS]
-  | otherwise = all (uncurry wildcardRestrictions) (M.toList cs)
+wildcardRestrictions :: (Label a, Eq a) => Zone a -> Bool
+wildcardRestrictions = allNamed f
+  where
+    f :: (Label a, Eq a) => Name a -> RRSet.RDataSet -> Bool
+    f (labels -> (label NE.:| _)) rs = any (`hasType` rs) [T.DNAME, T.DS, T.NS] ==> (label /= lwildcard)
 
 rrsigSignerName :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
 rrsigSignerName = Tr.allNamed checkData
@@ -110,15 +111,17 @@ rrsigSignerName = Tr.allNamed checkData
             _ -> isSubDomain owner signer
         checkRRSIG _ = True
 
-rrsigLabelCount :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
-rrsigLabelCount = Tr.allNamed checkData
+rrsigLabelCount :: Bool -> Zone String -> Bool
+rrsigLabelCount considerSynthesis = allNamed checkData
   where
     checkData :: Name String -> RRSet.RDataSet -> Bool
     checkData owner = all checkRRSIG
       where
         checkRRSIG :: RData -> Bool
         -- NOTE: >= because I may receive signatures on synthesized responses
-        checkRRSIG (rtype -> RRSIG sig) = labelCount owner >= _labels sig
+        checkRRSIG (rtype -> RRSIG sig)
+          | considerSynthesis = labelCount owner >= _labels sig
+          | otherwise         = labelCount owner == _labels sig
         checkRRSIG _ = True
 
 noDNSKEY :: Tr.Node String RRSet.RDataSet -> Bool
@@ -128,15 +131,18 @@ noDNSKEY = Tr.allNamed checkData N.root  -- Use N.root because implementation ig
     checkData _ = not . hasType T.DNSKEY
 
 -- See: https://datatracker.ietf.org/doc/html/rfc6672#section-2.4
-checkDNAME :: Tr.Node String RRSet.RDataSet -> Bool
-checkDNAME (Tr.Node rs cs)
-  | hasType T.DNAME rs = not (hasType T.CNAME rs) && M.null cs
-  | otherwise = all checkDNAME cs
+checkDNAME :: Bool -> Tr.Node String RRSet.RDataSet -> Bool
+checkDNAME allowCNAME (Tr.Node rs cs)
+  | hasType T.DNAME rs = not (hasType T.CNAME rs) && (M.null cs || all onlyCNAME cs)
+  | otherwise = all (checkDNAME allowCNAME) cs
+  where
+    onlyCNAME :: Tr.Node String RRSet.RDataSet -> Bool
+    onlyCNAME = all (`typesAllIn` [T.CNAME])
 
-checkZoneCuts :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
-checkZoneCuts n (Tr.Node rs cs) = if hasType T.NS rs
+checkZoneCuts :: Tr.Node String RRSet.RDataSet -> Bool
+checkZoneCuts (Tr.Node rs cs) = if hasType T.NS rs
   then typesAllIn rs [T.SOA, T.NS, T.DS, T.NSEC, T.RRSIG, T.A, T.AAAA]
-    && (not hasSOA ==> all (`typesAllIn` [T.A, T.AAAA]) (Tr.Node RRSet.empty cs))
+    && (not hasSOA ==> all (all (`typesAllIn` [T.A, T.AAAA])) cs)
     && (hasSOA ==> rec)
   else rec
   where
@@ -144,9 +150,9 @@ checkZoneCuts n (Tr.Node rs cs) = if hasType T.NS rs
     hasSOA = hasType T.SOA rs
 
     rec :: Bool
-    rec = and $ M.mapWithKey (\k -> checkZoneCuts (k <| n)) cs
+    rec = all checkZoneCuts cs
 
-checkDataAboveApex :: Tr.Node String RRSet.RDataSet -> Bool
-checkDataAboveApex (Tr.Node rs cs)
-  | RRSet.null rs = all checkDataAboveApex cs
+checkNoDataAboveApex :: Tr.Node String RRSet.RDataSet -> Bool
+checkNoDataAboveApex (Tr.Node rs cs)
+  | RRSet.null rs = all checkNoDataAboveApex cs
   | otherwise = hasType T.SOA rs

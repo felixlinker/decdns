@@ -23,7 +23,8 @@ module DNS.ZoneFile
   , allRecords
   , mergeZones
   , noMatching
-  , partition ) where
+  , partition
+  , allNamed ) where
 
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
@@ -156,3 +157,6 @@ noMatching (Named n d) (Zone org z) = case pathInZone org n of
 
 partition :: (Name a -> b -> Bool) -> AZone a RRSet.RTypedSet b -> (AZone a RRSet.RTypedSet b, AZone a RRSet.RTypedSet b)
 partition p (Zone org r) = bimap (Zone org) (Zone org) (T.partition (RRSet.partition . p . (`prependLabels` org)) r)
+
+allNamed :: (Name a -> RRSet.RDataSet -> Bool) -> Zone a -> Bool
+allNamed f (Zone org r) = T.allNamed f org r

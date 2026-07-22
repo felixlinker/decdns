@@ -1,4 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
 module Util
   ( sepBy
   , parseZoneFileZones
@@ -16,7 +15,6 @@ import NameConstraint (compileWildcards)
 import Parsing (parseName, parseZoneFile, ServedZone)
 import DNS.ZoneFile (Zone, fromRecordList)
 import DNS.Name (Name)
-import DNS.Wellformedness (wellformed)
 import Resolvable.Resolvability (NameServersConfig)
 
 sepBy :: String -> [String] -> IO ([String], [String])
@@ -29,14 +27,14 @@ handleParser :: Either ParseError a -> IO a
 handleParser = either (failIO . show) return
 
 -- | Parse a zone file and return its origin together with compiled zones.
-parseZoneFileContents :: SourceName -> String -> IO NameServersConfig
-parseZoneFileContents s content = do
+parseZoneFileContents :: (Zone String -> Maybe String) -> SourceName -> String -> IO NameServersConfig
+parseZoneFileContents wfc s content = do
   exceptZones <- map (runExcept . toZone) <$> (handleParser =<< parseZoneFile s content)
   zones <- mapM (either failIO return) exceptZones
   return $ map (fmap compileWildcards) zones
   where
     wf :: Zone String -> Except String ()
-    wf zone = maybe (return ()) throwE (wellformed zone)
+    wf zone = maybe (return ()) throwE (wfc zone)
 
     toZone :: ServedZone -> Except String (Name String, Zone String)
     toZone (ns, rs) = do
@@ -44,16 +42,16 @@ parseZoneFileContents s content = do
       wf z
       return (ns, z)
 
-parseStdin :: IO NameServersConfig
-parseStdin = do
+parseStdin :: (Zone String -> Maybe String) -> IO NameServersConfig
+parseStdin wfc = do
   content <- getContents
-  parseZoneFileContents "<stdin>" content
+  parseZoneFileContents wfc "<stdin>" content
 
 -- | Parse a zone file and return its origin together with compiled zones.
-parseZoneFileZones :: FilePath -> IO NameServersConfig
-parseZoneFileZones path = do
+parseZoneFileZones :: (Zone String -> Maybe String) -> FilePath -> IO NameServersConfig
+parseZoneFileZones wfc path = do
   content <- readFile path
-  parseZoneFileContents path content
+  parseZoneFileContents wfc path content
 
 parseNames :: [String] -> IO [Name String]
 parseNames = mapM (handleParser <=< parseName)
