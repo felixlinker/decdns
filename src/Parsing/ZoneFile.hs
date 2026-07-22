@@ -96,12 +96,12 @@ nameTtlCatType = do
   return $ Named n (RData c t ty)
 
 line :: Stream s m Char => Parser s m (Maybe StandardRecord)
-line = do
-  skipSepNewLine -- to skip leading comments and new lines
-  asum $ map try
-    [ origin $> Nothing
-    , setTTL $> Nothing
-    , Just <$> record ]
+line = asum $ map try
+  [ skipMany hspace >> comment $> Nothing
+  , skipMany hspace >> eol $> Nothing
+  , origin $> Nothing
+  , setTTL $> Nothing
+  , Just <$> record ]
 
 nsHintOrLine :: Stream s m Char => Parser s m (Maybe (Either StandardRecord (Name String)))
 nsHintOrLine = choice [right (try received), right (try served), left line]
