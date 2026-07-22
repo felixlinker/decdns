@@ -138,6 +138,7 @@ test-suite dns-regressor-test
       DNS.ZoneFile.PrintingSpec
       DNS.ZoneFileSpec
       Integration
+      Parsing.NameSpec
       Parsing.WellformednessSpec
       Parsing.ZoneFileSpec
       Resolvable.ConstrainedUnificationSpec

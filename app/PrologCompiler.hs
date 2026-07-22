@@ -17,7 +17,7 @@ import Data.List (uncons)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Resolvable.Update.Dependencies (computeRegressions)
-import Control.Monad (unless, when, void)
+import Control.Monad (unless, when)
 import DNS.Name (Name)
 import Data.Maybe (isNothing)
 import Control.Monad.Trans.Except (runExceptT, runExcept)

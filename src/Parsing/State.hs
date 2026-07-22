@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell, Rank2Types, NoMonomorphismRestriction #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Parsing.State
   ( Parser
   , ParserState
@@ -48,6 +49,9 @@ instance OriginProvider ParserState where
 -- For parsers that don't use state
 instance OriginProvider () where
   getOrigin _ = Nothing
+
+instance OriginProvider (Maybe (Name String)) where
+  getOrigin = id
 
 emptyState :: ParserState
 emptyState = ParserState Nothing Nothing Nothing Nothing False

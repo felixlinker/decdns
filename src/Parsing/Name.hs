@@ -68,7 +68,7 @@ skipPath = do
   when (isJust m) skipPath
 
 parseName :: Monad m => String -> m (Either ParseError (Name String))
-parseName = runParserT (skipPath >> name) () "parseName function"
+parseName = runParserT (skipPath >> name) (Just (root :: Name String)) "parseName function"
 
 parseNameM :: MonadPlus m => String -> m (Name String)
 parseNameM s = parseName s >>= either (const mzero) return
