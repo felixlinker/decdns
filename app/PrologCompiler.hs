@@ -1,6 +1,6 @@
 module PrologCompiler (main) where
 
-import DNS.ZoneFile (allRecords, Zone)
+import DNS.ZoneFile (allRecords)
 import DNS.Diff
 import DNS.Wellformedness
 import NameConstraint (toStandardRecord, ConstrainedLabel)
