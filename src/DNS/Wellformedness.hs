@@ -1,5 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
-module Parsing.Wellformedness
+module DNS.Wellformedness
   ( wellformed ) where
 
 import Control.Applicative (asum)

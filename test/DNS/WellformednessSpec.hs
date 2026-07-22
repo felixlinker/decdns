@@ -1,4 +1,4 @@
-module Parsing.WellformednessSpec (tests) where
+module DNS.WellformednessSpec (tests) where
 
 import qualified Data.ByteString as BS
 import Test.Tasty (TestTree, testGroup)
@@ -11,13 +11,13 @@ import qualified DNS.RecordType as T
 import DNS.SEC.Crypto (AlgorithmType (RSASHA256))
 import DNS.ZoneFileSpec (named, zoneFromList)
 import DNS.NameSpec (mkName)
-import Parsing.Wellformedness (wellformed)
+import DNS.Wellformedness (wellformed)
 import Data.Maybe (isJust)
 
 tests :: TestTree
 tests =
   testGroup
-    "Parsing.Wellformedness"
+    "DNS.Wellformedness"
     [ testCase "allows DNSSEC records alongside CNAME" allowsDNSSECAlongsideCNAME
     , testCase "rejects non-DNSSEC records alongside CNAME" rejectsOtherRecordsAlongsideCNAME
     , testCase "allows glue below NS zone cut" allowsGlueBelowNSZoneCut

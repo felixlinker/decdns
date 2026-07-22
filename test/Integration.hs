@@ -21,7 +21,7 @@ import NameConstraint
   )
 import Parsing (parseName)
 import Parsing.ZoneFile (parseRecords)
-import Parsing.Wellformedness (wellformed)
+import DNS.Wellformedness (wellformed)
 import Resolvable.Dependencies (ConstrainedQuery (CQuery), computeResolvable, queryFromRule)
 import Resolvable.Prolog.Core (Term (TWildcard), ad, nameTerm, resolves, top, ttypeTerm)
 import Resolvable.Resolvability (NameServersConfig, compileConfig, plResolvable)

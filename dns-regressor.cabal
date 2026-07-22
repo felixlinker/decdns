@@ -44,6 +44,7 @@ library
       DNS.SEC.Crypto
       DNS.SEC.Keys
       DNS.SEC.Verification
+      DNS.Wellformedness
       DNS.ZoneFile
       DNS.ZoneFile.Printing
       NameConstraint
@@ -54,7 +55,6 @@ library
       Parsing.Name
       Parsing.State
       Parsing.Tokens
-      Parsing.Wellformedness
       Parsing.ZoneFile
       Query
       Resolvable.ConstrainedUnification
@@ -135,11 +135,11 @@ test-suite dns-regressor-test
       DNS.NameSpec
       DNS.RecordSpec
       DNS.SEC.VerificationSpec
+      DNS.WellformednessSpec
       DNS.ZoneFile.PrintingSpec
       DNS.ZoneFileSpec
       Integration
       Parsing.NameSpec
-      Parsing.WellformednessSpec
       Parsing.ZoneFileSpec
       Resolvable.ConstrainedUnificationSpec
       Resolvable.ResolvabilitySpec

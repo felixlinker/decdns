@@ -16,7 +16,7 @@ import NameConstraint (compileWildcards)
 import Parsing (parseName, parseZoneFile, ServedZone)
 import DNS.ZoneFile (Zone, fromRecordList)
 import DNS.Name (Name)
-import Parsing.Wellformedness (wellformed)
+import DNS.Wellformedness (wellformed)
 import Resolvable.Resolvability (NameServersConfig)
 
 sepBy :: String -> [String] -> IO ([String], [String])
