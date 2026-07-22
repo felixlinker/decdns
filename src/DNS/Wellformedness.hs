@@ -33,7 +33,7 @@ wellformed z@(Zone org r) =
   asum  [ expect (all checkKeyFlags r) "DNSKEY flags miss zone key bit"
         , expect (checkCNAME z) "CNAME record accompanied by records other than NSEC or RRSIG"
         , expect (checkZoneCuts r) "illegal record at or below zone cut"
-        , expect (singletonTypes r) "more than one DNAME or CNAME record at owner name"
+        , expect (singletonTypes r) "more than one CNAME, DNAME, NSEC or SOA record at owner name"
         , expect (wildcardRestrictions z) "DNAME, DS or NS wildcard record"
         , expect (rrsigSignerName org r) "RRSIG has illegal signer name" ]
 
@@ -82,7 +82,6 @@ checkCNAME = allNamed (const checkData)
     checkData :: RRSet.RDataSet -> Bool
     checkData rs = hasType T.CNAME rs ==> typesAllIn rs [T.CNAME, T.NSEC, T.RRSIG]
 
--- TODO: What about SOA?
 singletonTypes :: Tr.Node String RRSet.RDataSet -> Bool
 singletonTypes = all (\rs -> all (`checkOne` rs) [T.CNAME, T.DNAME, T.NSEC, T.SOA])
   where
@@ -133,24 +132,19 @@ noDNSKEY = Tr.allNamed checkData N.root  -- Use N.root because implementation ig
 -- See: https://datatracker.ietf.org/doc/html/rfc6672#section-2.4
 checkDNAME :: Bool -> Tr.Node String RRSet.RDataSet -> Bool
 checkDNAME allowCNAME (Tr.Node rs cs)
-  | hasType T.DNAME rs = not (hasType T.CNAME rs) && (M.null cs || all onlyCNAME cs)
+  | hasType T.DNAME rs = not (hasType T.CNAME rs)
+      && (M.null cs || (allowCNAME && all onlyCNAME cs))
   | otherwise = all (checkDNAME allowCNAME) cs
   where
     onlyCNAME :: Tr.Node String RRSet.RDataSet -> Bool
     onlyCNAME = all (`typesAllIn` [T.CNAME])
 
 checkZoneCuts :: Tr.Node String RRSet.RDataSet -> Bool
-checkZoneCuts (Tr.Node rs cs) = if hasType T.NS rs
-  then typesAllIn rs [T.SOA, T.NS, T.DS, T.NSEC, T.RRSIG, T.A, T.AAAA]
-    && (not hasSOA ==> all (all (`typesAllIn` [T.A, T.AAAA])) cs)
-    && (hasSOA ==> rec)
-  else rec
-  where
-    hasSOA :: Bool
-    hasSOA = hasType T.SOA rs
-
-    rec :: Bool
-    rec = all checkZoneCuts cs
+checkZoneCuts (Tr.Node rs cs)
+  | hasType T.NS rs && not (hasType T.SOA rs) =
+      typesAllIn rs [T.NS, T.DS, T.NSEC, T.RRSIG, T.A, T.AAAA]
+        && all (all (`typesAllIn` [T.A, T.AAAA])) cs
+  | otherwise = all checkZoneCuts cs
 
 checkNoDataAboveApex :: Tr.Node String RRSet.RDataSet -> Bool
 checkNoDataAboveApex (Tr.Node rs cs)
