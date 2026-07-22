@@ -21,8 +21,8 @@ received = do
   _ <- many digit
   _ <- char '('
   n <- relName
-  _ <- string ") in"
-  _ <- many digit
+  _ <- string ") in "
+  _ <- many1 digit
   _ <- string " ms"
   -- Make absolute because names in dig are expressed relatively
   return $ n |> ""
