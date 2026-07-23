@@ -8,7 +8,8 @@ module Parsing.Tokens
   , category
   , ipv4
   , ipv6
-  , time ) where
+  , time
+  , maybeFail ) where
 
 import Data.Functor (($>), void)
 import Data.IP (IPv4, IPv6)
@@ -55,3 +56,6 @@ time = do
   digits <- many1 digit
   utc <- parseTimeM False defaultTimeLocale "%Y%m%d%H%M%S" digits
   return $ floor $ utcTimeToPOSIXSeconds utc
+
+maybeFail :: String -> Maybe a -> ParsecT s u m a
+maybeFail err = maybe (fail err) return

@@ -15,7 +15,7 @@ import DNS.SEC.Crypto (AlgorithmType (RSASHA256), DigestType (SHA256))
 import DNS.ZoneFile (allRecords, fromRecordList)
 import Parsing.Data (recordTypeData)
 import Parsing.State (emptyState)
-import Parsing.ZoneFile (parseRecords)
+import Parsing.ZoneFile (parseRecords, parseZoneFile)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
