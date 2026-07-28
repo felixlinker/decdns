@@ -36,7 +36,7 @@ import Util.Fresh (runFresh)
 tests :: TestTree
 tests =
   testGroup
-    "Examples.CName"
+    "Examples"
     [ testGroup "Parsing/DNS.ZoneFile/Wellformedness" $
         map exampleFileTest exampleFiles
     , testGroup "Resolvable.Resolvability" $
@@ -123,7 +123,8 @@ exampleFiles =
   , ExampleFile "examples/cname/partially-signed-nsec3-oo/ns.com." com 18
   , ExampleFile "examples/cname/partially-signed-nsec3-oo/ns.b.com." bCom 4
   , ExampleFile "examples/cname/signed-nsec3/ns.com." com 22
-  , ExampleFile "examples/cname/signed-nsec3/ns.b.com." bCom 18 ]
+  , ExampleFile "examples/cname/signed-nsec3/ns.b.com." bCom 18
+  , ExampleFile "examples/ns/self-deleg/ns.com." com 6 ]
 
 data ExampleConfig = ExampleConfig
   { configName :: String
@@ -210,9 +211,19 @@ exampleConfigs =
       , Query nsCom RT.DNSKEY bCom
       , Query nsCom RT.DS bCom
       , Query nsCom RT.NSEC3PARAM com ]
-      [Query nsCom RT.TXT aCom] ]
+      [Query nsCom RT.TXT aCom]
+  , ExampleConfig
+      "ns/self-deleg"
+      selfDelegFiles
+      [ Query nsCom RT.NS com
+      , Query nsCom RT.SOA com
+      , Query nsCom RT.A nsCom
+      , Query nsCom RT.NS subACom
+      , Query nsCom RT.SOA subACom
+      , Query nsCom RT.A subACom ]
+      [Query nsCom RT.TXT subACom] ]
 
-baseFiles, newFiles, brokenFiles, partiallySignedFiles, signedFiles :: [FilePath]
+baseFiles, newFiles, brokenFiles, partiallySignedFiles, signedFiles, selfDelegFiles :: [FilePath]
 partiallySignedNsec3Files, partiallySignedNsec3OOFiles, signedNsec3Files :: [FilePath]
 baseFiles =
   [ "examples/cname/base/ns.com."
@@ -242,6 +253,8 @@ signedNsec3Files =
   [ "examples/cname/signed-nsec3/ns.com."
   , "examples/cname/signed-nsec3/ns.b.com." ]
 
+selfDelegFiles = ["examples/ns/self-deleg/ns.com."]
+
 data Query = Query (Name String) RT.Type (Name String)
   deriving Eq
 
@@ -264,11 +277,12 @@ authenticatedUnsigned :: Name String -> RT.Type -> Name String -> Resolution
 authenticatedUnsigned ns rtype qname =
   Resolution (Query ns rtype qname) top (ad 0)
 
-com, net, aCom, bCom, nsCom, nsBCom :: Name String
+com, net, aCom, bCom, subACom, nsCom, nsBCom :: Name String
 com = mkName ["com", ""]
 net = mkName ["net", ""]
 aCom = mkName ["a", "com", ""]
 bCom = mkName ["b", "com", ""]
+subACom = mkName ["sub", "a", "com", ""]
 nsCom = mkName ["ns", "com", ""]
 nsBCom = mkName ["ns", "b", "com", ""]
 
