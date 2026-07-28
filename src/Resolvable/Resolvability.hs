@@ -1,7 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Resolvability
   ( RComp(..)
-  , fromZoneFile
+  , fromZone
   , NameServersConfig
   , compileConfig
   , plResolvable ) where
@@ -14,7 +14,6 @@ import Resolvable.Prolog.Core
 import Resolvable.Prolog.TermView
 import DNS.Name
 import DNS.Record
-import DNS.RRSet (dropType)
 import qualified DNS.RecordType as T
 import DNS.ZoneFile
 
@@ -229,11 +228,8 @@ allResolvable =
     bagof :: Term -> Term -> Term -> Term
     bagof x y z = TFunctor "bagof" [ x, y, z ]
 
-dropApexNSes :: Zone ConstrainedLabel -> Zone ConstrainedLabel
-dropApexNSes z@(Zone _ r@(Tr.Node apexData _)) = z { DNS.ZoneFile.root = r { item = dropType T.NS apexData } }
-
-fromZoneFile :: [Name String] -> Name String -> Zone ConstrainedLabel -> Fresh (S.Set (Rule (Maybe RComp)))
-fromZoneFile rootServers ns z =  mconcat <$> mapM rrsetToRules (allRRSets (dropApexNSes z))
+fromZone :: [Name String] -> Name String -> Zone ConstrainedLabel -> Fresh (S.Set (Rule (Maybe RComp)))
+fromZone rootServers ns z = mconcat <$> mapM rrsetToRules (allRRSets z)
   where
     rrsetToRules :: ConstrainedRRSet -> Fresh (S.Set (Rule (Maybe RComp)))
     rrsetToRules r = (<>) <$> resolvableBase rootServers ns r <*> resolvableStep rootServers ns r
@@ -241,7 +237,7 @@ fromZoneFile rootServers ns z =  mconcat <$> mapM rrsetToRules (allRRSets (dropA
 type NameServersConfig = [(Name String, Zone ConstrainedLabel)]
 
 compileConfig :: [Name String] -> NameServersConfig -> Fresh (S.Set (Rule (Maybe RComp)))
-compileConfig rootServers = (mconcat <$>) . mapM (uncurry (fromZoneFile rootServers))
+compileConfig rootServers = (mconcat <$>) . mapM (uncurry (fromZone rootServers))
 
 plResolvable :: S.Set (Rule (Maybe RComp)) -> Fresh (S.Set (Rule (Maybe RComp)))
 plResolvable compiled = do

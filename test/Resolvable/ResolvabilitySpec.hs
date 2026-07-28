@@ -10,7 +10,7 @@ import DNS.ZoneFileSpec (ArbZone(..))
 import DNS.ZoneFile (zoneName)
 import NameConstraint (compileWildcards)
 import Resolvable.Prolog.Core
-import Resolvable.Resolvability (fromZoneFile)
+import Resolvable.Resolvability (fromZone)
 import Util.Fresh (runFresh)
 
 tests :: TestTree
@@ -36,7 +36,7 @@ propDistinctRuleVariables (ArbZone z _) =
     , let shared = variables r1 `S.intersection` variables r2
     ]
   where
-    rules = runFresh $ fromZoneFile [zoneName z] (zoneName z) (compileWildcards z)
+    rules = runFresh $ fromZone [zoneName z] (zoneName z) (compileWildcards z)
 
 variables :: Rule a -> S.Set String
 variables (Rule _ h b) = S.unions $ map termVariables (h : b)

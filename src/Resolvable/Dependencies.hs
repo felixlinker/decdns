@@ -224,4 +224,5 @@ computeResolvable keepGround (S.filter (isResolves . rhead) -> rs) = do
         in do
           when (S.null mins) (throwE "non-termination")
           let acc' = foldr (\r -> (solveBody keepGround acc r <>)) acc mins
-          rec (foldr (maybe id PO.remove . fromRule) ord mins) recArg (acc' <> mins)
+          let acc'' = if keepGround then acc' else acc' <> mins
+          rec (foldr (maybe id PO.remove . fromRule) ord mins) recArg acc''

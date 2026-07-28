@@ -37,7 +37,7 @@ instance Show Dig where
     ++  map show os )
 
 opts :: [Opt]
-opts = [ OptNo "recurse", OptNo "answer", Opt "authority" ]
+opts = [ OptNo "recurse", Opt "authority" ]
 
 followUpQueries :: S.Set (Rule a) -> S.Set Dig
 followUpQueries = S.fromList . concatMap fromBody . S.toList
@@ -47,7 +47,7 @@ followUpQueries = S.fromList . concatMap fromBody . S.toList
 
     fromResolves :: Term -> Maybe Dig
     fromResolves t = case toView t of
-      TVResolves nsT qnT qtT _ _ _ _ -> maybeExcept $ do
+      TVResolves nsT qtT qnT _ _ _ _ -> maybeExcept $ do
         ns <- asName nsT
         qn <- asName qnT
         qt <- asTType qtT
