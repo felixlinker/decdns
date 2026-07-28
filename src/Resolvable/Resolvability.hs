@@ -19,8 +19,6 @@ import DNS.ZoneFile
 
 import Util.Fresh (Fresh)
 import Util.Monad
-import qualified Util.Tree as Tr
-import Util.Tree (Node(item))
 
 injectLast :: Term -> Term -> Term
 injectLast newLast t = case toView t of
