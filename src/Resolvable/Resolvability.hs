@@ -68,9 +68,6 @@ resolvableBase rootServers ns s@(Named n rds@((RData _ _ ty) NE.:| _)) =
       rann :: Maybe RComp
       rann = Just (RComp ns s)
 
-when' :: (Monad m, Monoid a) => Bool -> a -> m a
-when' p a = if p then return a else return mempty
-
 resolvableStep :: [Name String] -> Name String -> ConstrainedRRSet -> Fresh (S.Set (Rule (Maybe RComp)))
 resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) =
   foreachM (NE.toList rs) (\r -> foreachM rootServers (`go` rtype r))
@@ -88,57 +85,56 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) =
             expectGlue = isSubDomain s' (toName n)
             glueS = if expectGlue then nameServer else rootServer
             glueRec = if expectGlue then bot else top
-        in  mconcat <$> sequence
-        [ foreachM [aType, aaaaType] $ \glueType -> do  -- Unauthenticated
-            (nTail, t, d, dIp, rec) <- freshVars5 ("N", "T", "D", "D_IP", "R")
-            -- Do not expect wildcard neq constraints on NS records
-            let (captureListTail nTail -> n') = nameWithoutSynthesis n
-            when' (nameServer /= delegatedNs)
-              (S.singleton $ Rule rannot (resolves nameServer t n' d top bot (ad 0))
-                [ resolves delegatedNs t n' d rec bot (ad 0)
-                , resolves glueS glueType delegatedNs dIp glueRec bot (ad 0) ])
-        , do  -- NSEC for unsigned subzone
-            (nTail, t, d, dNSEC, rec) <- freshVars5 ("N", "T", "D", "D_NSEC", "R")
-            let n' = nameWithoutSynthesis n
-            let n'' = captureListTail nTail n'
-            return $ S.singleton $ Rule rannot (resolves nameServer t n'' d top top (ad 0))
-              [ t \= dsType
-              , resolves nameServer nsecType n' (list [dNSEC]) bot top (ad 1)
-              , nsecUnsigned n' dNSEC
-              , resolves nameServer t n'' d rec bot (ad 0) ]
-        , do  -- NSEC3 for owner for unsigned subzone
-            (nTail, t, d, nNSEC, dNSEC, rec) <- freshVars6 ("N", "T", "D", "N_NSEC", "D_NSEC", "R")
-            let owner = nameWithoutSynthesis n
-            let n'' = captureListTail nTail owner
-            return $ S.singleton $ Rule rannot (resolves nameServer t n'' d top top (ad 0))
-              [ t \= dsType
-              , resolves nameServer nsec3Type nNSEC (list [dNSEC]) bot top (ad 1)
-              , nsec3Unsigned owner nNSEC dNSEC
-              , resolves nameServer t n'' d rec bot (ad 0) ]
-        , do  -- NSEC3 closest encloser proof for unsigned subzone
-          (nTail, t, d, nNSEC, nNSEC', dNSEC, dNSEC', rec) <- freshVars8 ("N", "T", "D", "N_NSEC", "N_NSEC", "D_NSEC", "D_NSEC", "R")
-          let owner = nameWithoutSynthesis n
-          let n'' = captureListTail nTail owner
-          return $ S.singleton $ Rule rannot (resolves nameServer t n'' d top top (ad 0))
-            [ t \= dsType
-            , resolves nameServer nsec3Type nNSEC (list [dNSEC]) bot top (ad 1)
-            , resolves nameServer nsec3Type nNSEC' (list [dNSEC']) bot top (ad 1)
-            , closestEncloser owner nNSEC dNSEC nNSEC' dNSEC'
-            , resolves nameServer t n'' d rec bot (ad 0) ]
-        , do  -- Authenticated not-DS
-            (nTail, t, d, rec) <- freshVars4 ("N", "T", "D", "R")
-            let (captureListTail nTail -> n') = nameWithoutSynthesis n
-            when' (nameServer /= delegatedNs)
-              (S.singleton $ Rule rannot (resolves nameServer t n' d top top (ad 1))
+        in if nameServer == delegatedNs
+          then return S.empty
+          else mconcat <$> sequence
+            [ foreachM [aType, aaaaType] $ \glueType -> do  -- Unauthenticated
+                (nTail, t, d, dIp, rec) <- freshVars5 ("N", "T", "D", "D_IP", "R")
+                -- Do not expect wildcard neq constraints on NS records
+                let (captureListTail nTail -> n') = nameWithoutSynthesis n
+                return (S.singleton $ Rule rannot (resolves nameServer t n' d top bot (ad 0))
+                  [ resolves delegatedNs t n' d rec bot (ad 0)
+                  , resolves glueS glueType delegatedNs dIp glueRec bot (ad 0) ])
+            , do  -- NSEC for unsigned subzone
+                (nTail, t, d, dNSEC, rec) <- freshVars5 ("N", "T", "D", "D_NSEC", "R")
+                let n' = nameWithoutSynthesis n
+                let n'' = captureListTail nTail n'
+                return $ S.singleton $ Rule rannot (resolves nameServer t n'' d top top (ad 0))
+                  [ t \= dsType
+                  , resolves nameServer nsecType n' (list [dNSEC]) bot top (ad 1)
+                  , nsecUnsigned n' dNSEC
+                  , resolves nameServer t n'' d rec bot (ad 0) ]
+            , do  -- NSEC3 for owner for unsigned subzone
+                (nTail, t, d, nNSEC, dNSEC, rec) <- freshVars6 ("N", "T", "D", "N_NSEC", "D_NSEC", "R")
+                let owner = nameWithoutSynthesis n
+                let n'' = captureListTail nTail owner
+                return $ S.singleton $ Rule rannot (resolves nameServer t n'' d top top (ad 0))
+                  [ t \= dsType
+                  , resolves nameServer nsec3Type nNSEC (list [dNSEC]) bot top (ad 1)
+                  , nsec3Unsigned owner nNSEC dNSEC
+                  , resolves nameServer t n'' d rec bot (ad 0) ]
+            , do  -- NSEC3 closest encloser proof for unsigned subzone
+              (nTail, t, d, nNSEC, nNSEC', dNSEC, dNSEC', rec) <- freshVars8 ("N", "T", "D", "N_NSEC", "N_NSEC", "D_NSEC", "D_NSEC", "R")
+              let owner = nameWithoutSynthesis n
+              let n'' = captureListTail nTail owner
+              return $ S.singleton $ Rule rannot (resolves nameServer t n'' d top top (ad 0))
                 [ t \= dsType
-                , resolves delegatedNs t n' d rec top (ad 1) ])
-        , do  -- Authenticated DS
-            (l, nTail, d, rec) <- freshVars4 ("L", "N", "D", "R")
-            let (injectLast l . captureListTail nTail -> n') = nameWithoutSynthesis n
-            when' (nameServer /= delegatedNs)
-              (S.singleton $ Rule rannot (resolves nameServer dsType n' d top top (ad 1))
-                [ resolves delegatedNs dsType n' d rec top (ad 1) ])
-        ]
+                , resolves nameServer nsec3Type nNSEC (list [dNSEC]) bot top (ad 1)
+                , resolves nameServer nsec3Type nNSEC' (list [dNSEC']) bot top (ad 1)
+                , closestEncloser owner nNSEC dNSEC nNSEC' dNSEC'
+                , resolves nameServer t n'' d rec bot (ad 0) ]
+            , do  -- Authenticated not-DS
+                (nTail, t, d, rec) <- freshVars4 ("N", "T", "D", "R")
+                let (captureListTail nTail -> n') = nameWithoutSynthesis n
+                return (S.singleton $ Rule rannot (resolves nameServer t n' d top top (ad 1))
+                  [ t \= dsType
+                  , resolves delegatedNs t n' d rec top (ad 1) ])
+            , do  -- Authenticated DS
+                (l, nTail, d, rec) <- freshVars4 ("L", "N", "D", "R")
+                let (injectLast l . captureListTail nTail -> n') = nameWithoutSynthesis n
+                return (S.singleton $ Rule rannot (resolves nameServer dsType n' d top top (ad 1))
+                  [ resolves delegatedNs dsType n' d rec top (ad 1) ])
+            ]
       CNAME (nameTerm -> cname) -> foreachM synthesisCases $ \synth -> S.fromList <$> sequence
         [ do  -- Unauthenticated
           (n', cs) <- synth n
