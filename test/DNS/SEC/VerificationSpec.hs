@@ -96,14 +96,14 @@ testSignedZones = mapM_ verifyVector signatureVectors
     verifyVector (owner, rrset, sig, key) =
       assertBool
         ("signature verification failed for " ++ show owner ++ " " ++ show (_typeCovered sig))
-        (verifySignature owner rrset sig (_publicKey key))
+        (verifySignature owner rrset sig key)
 
 propRejectsMutatedVector :: Property
 propRejectsMutatedVector =
   forAll (elements signatureVectors) $ \original ->
     forAll (mutateSignatureVector original) $ \(owner, rrset, sig, key) ->
       counterexample ("mutated vector still verified: " ++ show (owner, rrset, sig, key)) $
-        not (verifySignature owner rrset sig (_publicKey key))
+        not (verifySignature owner rrset sig key)
 
 mutateSignatureVector :: SignatureVector -> Gen SignatureVector
 mutateSignatureVector (owner, rrset, sig, key) =

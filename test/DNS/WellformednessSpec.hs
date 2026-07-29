@@ -4,7 +4,7 @@ import qualified Data.ByteString as BS
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit
 
-import DNS.Name (Name, Named, (<|), labelCount, root)
+import DNS.Name (Name, Named, (<|), labelCount)
 import DNS.Record
 import qualified DNS.RRSet as RRSet
 import qualified DNS.RecordType as T
@@ -27,7 +27,6 @@ tests =
     , testCase "rejects multiple DNAME records at one owner" rejectsMultipleDNAMEs
     , testCase "rejects NS records at wildcard leaves" rejectsWildcardNS
     , testCase "rejects DNAME records at wildcard leaves" rejectsWildcardDNAME
-    , testCase "rejects DNSKEY records without the zone-key flag" rejectsNonZoneDNSKEY
     , testCase "allows an ancestor signer for ordinary RRSIG records" allowsAncestorSigner
     , testCase "rejects a signer below the owner for ordinary RRSIG records" rejectsSignerBelowOwner
     , testCase "requires an SOA RRSIG signer to equal its owner" requiresSOASignerAtOwner
@@ -135,14 +134,6 @@ rejectsWildcardDNAME = do
     org = mkName ["example", "com", ""]
     wildcard = "*" <| org
     target = mkName ["target", "example", "net", ""]
-
-
-rejectsNonZoneDNSKEY :: Assertion
-rejectsNonZoneDNSKEY = do
-  zone <- zoneFromList [soa org, named org (dnskey [])]
-  isJust (zoneWellformed zone) @?= True
-  where
-    org = mkName ["example", "com", ""]
 
 allowsAncestorSigner :: Assertion
 allowsAncestorSigner = do

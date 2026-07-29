@@ -28,10 +28,7 @@ expect p err = if p then Nothing else Just err
 -- TODO: Enforce that there is the corresponding data for every RRSIG
 wellformed :: Zone String -> Maybe String
 wellformed z@(Zone org r) =
-        -- See: https://datatracker.ietf.org/doc/html/rfc4035#section-2.4
-        -- TODO: Rather ignore this
-  asum  [ expect (all checkKeyFlags r) "DNSKEY flags miss zone key bit"
-        , expect (checkCNAME z) "CNAME record accompanied by records other than NSEC or RRSIG"
+  asum  [ expect (checkCNAME z) "CNAME record accompanied by records other than NSEC or RRSIG"
         , expect (checkZoneCuts r) "illegal record at or below zone cut"
         , expect (singletonTypes r) "more than one CNAME, DNAME, NSEC or SOA record at owner name"
         , expect (wildcardRestrictions z) "DNAME, DS or NS wildcard record"
@@ -66,13 +63,6 @@ hasType t = M.member t . RRSet.rds
 
 typesAllIn :: RRSet.RTypedSet a -> [T.Type] -> Bool
 typesAllIn rd = RRSet.apply M.null . foldr (RRSet.modify . M.delete) rd
-
-checkKeyFlags :: RRSet.RDataSet -> Bool
-checkKeyFlags = all (checkFlag . rtype)
-  where
-    checkFlag :: Type -> Bool
-    checkFlag (DNSKEY (DNSKEYData fs _ _)) = ZoneKey `elem` fs
-    checkFlag _ = True
 
 -- See: https://datatracker.ietf.org/doc/html/rfc4034#section-3; third paragraph
 -- This also covers that a CNAME must not be at zone apex (apex will have SOA record).

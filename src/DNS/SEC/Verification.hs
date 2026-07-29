@@ -29,12 +29,17 @@ import DNS.SEC.Crypto
 import Data.Maybe (fromMaybe)
 import Data.Functor (void)
 
-verifySignature :: Name String -> [Type] -> RRSIGData BS.ByteString -> BS.ByteString -> Bool
-verifySignature (canonicalName -> owner) (map canonicalType -> rrset) (canonicalRRSIGData -> sig) key = fromMaybe False $
+-- See: https://datatracker.ietf.org/doc/html/rfc4035#section-2.4
+isDNSSECKey :: DNSKEYData -> Bool
+isDNSSECKey (DNSKEYData { _flags = fs }) = ZoneKey `elem` fs
+
+verifySignature :: Name String -> [Type] -> RRSIGData BS.ByteString -> DNSKEYData -> Bool
+verifySignature (canonicalName -> owner) (map canonicalType -> rrset) (canonicalRRSIGData -> sig) pk@(DNSKEYData _ _ pkBytes) = fromMaybe False $
   case _signatureAlgorithm sig of
     ECDSAP256SHA256 -> do
+      guard (isDNSSECKey pk)
       cSig <- ecdsaSig (_signature sig)
-      cPk <- ecdsaPk key
+      cPk <- ecdsaPk pkBytes
       return $ ECDSA.verify Hash.SHA256 cPk cSig (BS.concat (serialize (void sig) : serializedRRSet))
     _ -> Nothing
   where
@@ -83,6 +88,7 @@ verifyDigest ownerName (DSData tag alg typ dig) k =
       tag == fromIntegral (keyTag k)
   &&  alg == _keyAlgorithm k
   &&  keyDigest ownerName typ k == dig
+  &&  isDNSSECKey k
 
 -- See: https://datatracker.ietf.org/doc/html/rfc5155#autoid-29
 nsec3Hash :: NSEC3Data -> Name String -> BS.ByteString

@@ -23,7 +23,6 @@ import Data.List (uncons)
 import Data.Maybe (mapMaybe)
 
 import DNS.Name
-import DNS.Record
 import DNS.SEC.Verification (verifySignature, verifyDigest, nsecUnsignedSubzone, nsec3UnsignedSubzone, verifyClosestEncloserProof)
 import NameConstraint (ConstrainedName)
 import qualified Resolvable.ConstrainedUnification as CU
@@ -174,7 +173,7 @@ solveBody keepGround rs (Rule ann h b) = S.fromList $ map (\(u, b') -> CU.apply 
           n' <- asName (app n)
           rrset <- asTypes (app dat)
           sigDat <- asRRSigData =<< asType (app sig)
-          DNSKEYData _ _ k' <- asDNSKEYData =<< asType (app k)
+          k' <- asDNSKEYData =<< asType (app k)
           return (verifySignature n' rrset sigDat k'))
         choices
       TVNSECUnsigned n nsecDat -> mapMaybe
