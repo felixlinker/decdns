@@ -1,6 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module DNS.SEC.Verification
-  ( verifySignature
+  ( isDNSSECKey
+  , verifySignature
   , keyTag
   , keyDigest
   , verifyDigest

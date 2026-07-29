@@ -1,4 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 module DNS.Wellformedness
   ( responseWellformed
   , zoneWellformed ) where
@@ -13,6 +14,8 @@ import qualified DNS.RRSet as RRSet
 import DNS.Record
 import qualified DNS.RecordType as T
 import qualified Util.Tree as Tr
+import Data.List (uncons)
+import DNS.SEC.Verification (isDNSSECKey)
 
 expect :: Bool -> String -> Maybe String
 expect p err = if p then Nothing else Just err
@@ -21,8 +24,6 @@ expect p err = if p then Nothing else Just err
 (==>) p q = not p || q
 
 -- TODO: Enforce limits on NSEC3 iterations
--- TODO: Wellformedness cannot address synthesized CNAME responses for DNAMEs;
--- or drop and check that they have been correctly synthesized
 -- TODO: Enforce NSEC3 consistency according to RFC 5155, Sec. 7.2.
 -- TODO: Enforce tautologies on NSEC(3) bitmaps
 -- TODO: Enforce that there is the corresponding data for every RRSIG
@@ -50,13 +51,13 @@ zoneWellformed z@(Zone _ r@(Tr.Node _ rcs)) =
         , expect (checkNoDataAboveApex r) "zone misses SOA record"
         , expect (checkDNAME False r) "CNAME next to DNAME or records below DNAME"
         , expect (rrsigLabelCount False z) "RRSIG has illegal label count"
-        , expect (noDNSKEY dataNoApex) "DNSKEY with non-apex owner name" ]
+        , expect (noDNSSECKey dataNoApex) "DNSKEY with non-apex owner name" ]
   where
     dataNoApex :: Tr.Node String (RRSet.RTypedSet RData)
     dataNoApex = Tr.Node RRSet.empty rcs
 
-getType :: T.Type -> RRSet.RDataSet -> Maybe (NE.NonEmpty RData)
-getType t = M.lookup t . RRSet.rds
+getType :: T.Type -> RRSet.RDataSet -> [RData]
+getType t = maybe [] NE.toList . M.lookup t . RRSet.rds
 
 hasType :: T.Type -> RRSet.RDataSet -> Bool
 hasType t = M.member t . RRSet.rds
@@ -76,7 +77,7 @@ singletonTypes :: Tr.Node String RRSet.RDataSet -> Bool
 singletonTypes = all (\rs -> all (`checkOne` rs) [T.CNAME, T.DNAME, T.NSEC, T.SOA])
   where
     checkOne :: T.Type -> RRSet.RDataSet -> Bool
-    checkOne t = maybe True (null . NE.tail) . getType t
+    checkOne t = (maybe True (null . snd) . uncons) . getType t
 
 wildcardRestrictions :: (Label a, Eq a) => Zone a -> Bool
 wildcardRestrictions = allNamed f
@@ -88,14 +89,13 @@ rrsigSignerName :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
 rrsigSignerName = Tr.allNamed checkData
   where
     checkData :: Name String -> RRSet.RDataSet -> Bool
-    checkData owner rs = all checkRRSIG $ maybe [] NE.toList (getType T.RRSIG rs)
+    checkData owner rs = all checkRRSIG (getType T.RRSIG rs)
       where
         checkRRSIG :: RData -> Bool
         checkRRSIG (rtype -> RRSIG sig) =
           let signer = _signersName sig
           in case _typeCovered sig of
             T.SOA -> signer == owner
-            T.DNSKEY -> signer == owner
             T.DS -> signer /= owner && isSubDomain owner signer
             _ -> isSubDomain owner signer
         checkRRSIG _ = True
@@ -113,11 +113,12 @@ rrsigLabelCount considerSynthesis = allNamed checkData
           | otherwise         = labelCount owner == _labels sig
         checkRRSIG _ = True
 
-noDNSKEY :: Tr.Node String RRSet.RDataSet -> Bool
-noDNSKEY = Tr.allNamed checkData N.root  -- Use N.root because implementation ignores name
+noDNSSECKey :: Tr.Node String RRSet.RDataSet -> Bool
+noDNSSECKey = all checkData
   where
-    checkData :: Name String -> RRSet.RDataSet -> Bool
-    checkData _ = not . hasType T.DNSKEY
+    checkData :: RRSet.RDataSet -> Bool
+    checkData (getType T.DNSKEY -> keys) =
+      all ((\case { DNSKEY k -> isDNSSECKey k; _ -> True}) . rtype) keys
 
 -- See: https://datatracker.ietf.org/doc/html/rfc6672#section-2.4
 checkDNAME :: Bool -> Tr.Node String RRSet.RDataSet -> Bool
