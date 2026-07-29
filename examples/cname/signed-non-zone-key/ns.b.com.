@@ -1,0 +1,70 @@
+; File written on Wed Jul 29 10:33:20 2026
+; dnssec-signzone version 9.20.23
+b.com.			1200	IN SOA	ns.b.com. example.com. (
+					0          ; serial
+					0          ; refresh (0 seconds)
+					0          ; retry (0 seconds)
+					0          ; expire (0 seconds)
+					0          ; minimum (0 seconds)
+					)
+			1200	RRSIG	SOA 13 2 1200 (
+					20260828073320 20260729073320 28529 b.com.
+					mO3e2xcNGxKZqDgU6nikBBb4MVEzVDDqfGKq
+					JpxIlrgJmdKAqszl2RBrAiRi5HyRNcxQ4vS6
+					1opgJuoHlClSgg== )
+			1200	NS	ns.b.com.
+			1200	RRSIG	NS 13 2 1200 (
+					20260828073320 20260729073320 28529 b.com.
+					Cb3h/2tarxMjE8fDEgk9qD7o+s59wyzBzIZ1
+					LHcHAysL5X1yASyuQvNHRr60vSBCvW3FfUdb
+					DAZniCHNhnWDPA== )
+			1200	A	1.2.3.4
+			1200	RRSIG	A 13 2 1200 (
+					20260828073320 20260729073320 28529 b.com.
+					2276yli4/Je9gOoPIioxAS4zRys5GtQyO+Mu
+					lIywRFrcwXCkFOp3fG8I6fHpr4xG/frEU1zY
+					Lbsq1e/DulVcJg== )
+			0	NSEC	ns.b.com. A NS SOA RRSIG NSEC DNSKEY
+			0	RRSIG	NSEC 13 2 0 (
+					20260828073320 20260729073320 28529 b.com.
+					M7wVQ22hg/4kFlwdnQjuWjLcUmx+LacWMRMz
+					gYXMYW97HjwkRE/d6CWllBLFMnAERDnAnHlH
+					UvWzlg19zWqqPg== )
+			1200	DNSKEY	0 3 13 (
+					Rn1OFgbeZf94TUx8Lqmd0NMfBbnc1WF1YQG2
+					VDk0cBLbVZatAHDPMizuoxtusTFw8mmrJShN
+					uelhuaI39qvUuQ==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 28273
+			1200	DNSKEY	256 3 13 (
+					Rn1OFgbeZf94TUx8Lqmd0NMfBbnc1WF1YQG2
+					VDk0cBLbVZatAHDPMizuoxtusTFw8mmrJShN
+					uelhuaI39qvUuQ==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 28529
+			1200	DNSKEY	257 3 13 (
+					F35S9z+WCMRZkfcC/wRnYcuNwB8gGMZU/R95
+					dyWQ4reQVauBL9arOpwj0TX+uzo3k2vS4d1q
+					y0qY+usLo8mTeQ==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 58963
+			1200	RRSIG	DNSKEY 13 2 1200 (
+					20260828073320 20260729073320 28529 b.com.
+					eNdW3s246FgOXLsJli7HvXvWsh/taNcMpjS9
+					ve3Jjgg3Qey11esTTfvuMW+NM/nhduLOenCn
+					YIkcJX66E85vPA== )
+			1200	RRSIG	DNSKEY 13 2 1200 (
+					20260828073320 20260729073320 58963 b.com.
+					TEGmVhE69UiQdlamxXFg/8lYgWDtnDI1IIWH
+					6bOCDswRUgRRGPJZCWfqSgEQEEcujnpzI/qC
+					rIyMKJPgMKh/bw== )
+ns.b.com.		1200	IN A	1.2.3.4
+			1200	RRSIG	A 13 3 1200 (
+					20260828073320 20260729073320 28529 b.com.
+					LLsw7yTe0QaKflbbWn5EV3QMHj4BsdMZdcX8
+					O6XxO/znL+q062BuGpyZNpIiJOtxdkfUMVfp
+					OnNjG76/dvBb0A== )
+			0	NSEC	b.com. A RRSIG NSEC
+			0	RRSIG	NSEC 13 3 0 (
+					20260828073320 20260729073320 28529 b.com.
+					BcyPmbqxpbvjyE8w+MWe1fGaE/OzvoOYRTwa
+					XAwRigHynq1VIcDYr44sDV/NPBTj1EFhCM/P
+					JYqEYJBTV4cgng== )
+;; Served by ns.b.com.

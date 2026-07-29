@@ -1,0 +1,75 @@
+; File written on Wed Jul 29 10:33:20 2026
+; dnssec-signzone version 9.20.23
+com.			1200	IN SOA	ns.com. example.com. (
+					0          ; serial
+					0          ; refresh (0 seconds)
+					0          ; retry (0 seconds)
+					0          ; expire (0 seconds)
+					0          ; minimum (0 seconds)
+					)
+			1200	RRSIG	SOA 13 1 1200 (
+					20260828073320 20260729073320 41614 com.
+					LtOgTiC+HH3Xy4HBzmuv5CRcPo/LUYawMUSP
+					ko4p9mQgQbh/5p+FYgfjAjSxHVeUhnu2RuSN
+					GghK9wUEeTOo/A== )
+			1200	NS	ns.com.
+			1200	RRSIG	NS 13 1 1200 (
+					20260828073320 20260729073320 41614 com.
+					XPz2iLxXIIg4tt2jUPdEnspci9gbdG8hSn1h
+					MK+RPj6mUXwwwTiB8QOoENwQkK1Vu8Gu2F6E
+					n0Su5AzunrvCJA== )
+			0	NSEC	a.com. NS SOA RRSIG NSEC DNSKEY
+			0	RRSIG	NSEC 13 1 0 (
+					20260828073320 20260729073320 41614 com.
+					TnkZdnwB5ZRbZJykW2riOzDe7m7hOF9uq2Mh
+					1PCnMxaou9p5/U1t+XXqQHMuoAZM3YlYgdM0
+					/KC8MbFzvOMP8A== )
+			1200	DNSKEY	256 3 13 (
+					cfv6ncp5V9WCnZxFneqBeCCwGV6SOWKC2gv1
+					LOR4Bx+GVub/DTtRwziMxVE2a6KAXXzyI3tq
+					jg03cDpOFZVkLQ==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 41614
+			1200	DNSKEY	257 3 13 (
+					Da76+K3tttBBWB0v9OvYHw/7ijVmdVppHErw
+					dWflMlDHYUTuA701YVvjfLu0iLQnTRHZsrsu
+					SoETOl43q1KE4g==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 62435
+			1200	RRSIG	DNSKEY 13 1 1200 (
+					20260828073320 20260729073320 41614 com.
+					kuWErrq6fP7D1qgk2eWjoLBcJhJdfyBnFBwW
+					yj5kZ9vxCL3vVC/2YhRIZoCR/yt+s8fTRRGc
+					isc6+yQcBuv2Ww== )
+			1200	RRSIG	DNSKEY 13 1 1200 (
+					20260828073320 20260729073320 62435 com.
+					Un2xztnIv4zVrNzaYDw9mLvglOfEatYnY0Gn
+					BM1M5aByL/MsWtJdO1uYgIzgl7at0Ole9pXQ
+					WV9wFXRNXDiutg== )
+a.com.			1200	IN CNAME b.com.
+			1200	RRSIG	CNAME 13 2 1200 (
+					20260828073320 20260729073320 41614 com.
+					nK0W81P4ptv9P6e2EMN08p2YD3279LbJJY4f
+					eQZX5/4jOANoaXEikd297dj8aPXwHikWUnIj
+					N5d7RavDJ908Tw== )
+			0	NSEC	b.com. CNAME RRSIG NSEC
+			0	RRSIG	NSEC 13 2 0 (
+					20260828073320 20260729073320 41614 com.
+					PJdc6j1IG3d4xk0mSfuOvaXHMHn5Yvp7TKE9
+					PSQLkHI206f0bPwBIVCnNkibfGfgmpDNOgBI
+					f4mXrySPkP7hvw== )
+b.com.			1200	IN NS	ns.b.com.
+			1200	DS	58963 13 2 (
+					F9B843B8553DE2C8822FB8CDF11449808137
+					C1CED551BBCC85E60E4FB9CC62E8 )
+			1200	RRSIG	DS 13 2 1200 (
+					20260828073320 20260729073320 41614 com.
+					2dChICJZUsRnf7BVW6EGXI/R1KFdv9tictYU
+					i6/5HtWs9x3Ogx3IL+yPUU2TwAUob5AjO+0Z
+					rHW6dafB10PAgA== )
+			0	NSEC	com. NS DS RRSIG NSEC
+			0	RRSIG	NSEC 13 2 0 (
+					20260828073320 20260729073320 41614 com.
+					UIR6bijI2tIzt1wj8sKvghuL9cWlpwti0+vj
+					ZLWOvzMPpWPS6ccbGMvIU1wy6lPvf6zTTCFT
+					p6yXBK9OW7zRcQ== )
+ns.b.com.		1200	IN A	1.2.3.4
+;; Served by ns.com.

@@ -25,6 +25,8 @@ extra-source-files:
     examples/cname/partially-signed-nsec3/ns.com.
     examples/cname/partially-signed/ns.b.com.
     examples/cname/partially-signed/ns.com.
+    examples/cname/signed-non-zone-key/ns.b.com.
+    examples/cname/signed-non-zone-key/ns.com.
     examples/cname/signed-nsec3/ns.b.com.
     examples/cname/signed-nsec3/ns.com.
     examples/cname/signed/ns.b.com.
@@ -52,6 +54,7 @@ library
       NameConstraint
       Parsing
       Parsing.Bytes
+      Parsing.Config
       Parsing.Data
       Parsing.Dig
       Parsing.Name

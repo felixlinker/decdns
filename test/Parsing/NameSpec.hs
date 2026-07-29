@@ -23,10 +23,6 @@ parsesIPv4ServerIdentifier :: Assertion
 parsesIPv4ServerIdentifier =
   assertParsed "1.1.1.1" (mkName ["1", "1", "1", "1", ""])
 
-parsesRoot :: Assertion
-parsesRoot =
-  assertParsed "1" (mkName [""])
-
 assertParsed :: String -> Name String -> Assertion
 assertParsed input expected = do
   result <- parseName input

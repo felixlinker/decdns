@@ -1,7 +1,6 @@
 module Integration (tests) where
 
 import Control.Monad (forM_)
-import qualified Data.List.NonEmpty as NE
 import Control.Monad.Trans.Except (runExceptT)
 import qualified Data.Map as M
 import Data.Maybe (isJust, mapMaybe)
@@ -10,17 +9,14 @@ import qualified Data.Set as S
 import DNS.Diff (hasChanges)
 import DNS.Name (Name, (<|))
 import DNS.NameSpec (mkName)
-import DNS.Record (StandardRecord)
 import qualified DNS.RecordType as RT
-import DNS.ZoneFile (Zone, allRecords, fromRecordList, isEmpty, zoneName)
+import DNS.ZoneFile (allRecords, isEmpty, zoneName)
 import NameConstraint
   ( ConstrainedLabel
   , LabelConstraint (Wildcard)
-  , compileWildcards
   , exactly
   )
-import Parsing (parseName)
-import Parsing.ZoneFile (parseRecords)
+import Parsing.Config (parseZoneFileZones)
 import DNS.Wellformedness (zoneWellformed)
 import Resolvable.Dependencies (ConstrainedQuery (CQuery), computeResolvable, queryFromRule)
 import Resolvable.Prolog.Core (Term (TWildcard), ad, nameTerm, resolves, top, ttypeTerm)
@@ -118,6 +114,8 @@ exampleFiles =
   , ExampleFile "examples/cname/partially-signed/ns.b.com." bCom 4
   , ExampleFile "examples/cname/signed/ns.com." com 20
   , ExampleFile "examples/cname/signed/ns.b.com." bCom 16
+  , ExampleFile "examples/cname/signed-non-zone-key/ns.com." com 20
+  , ExampleFile "examples/cname/signed-non-zone-key/ns.b.com." bCom 17
   , ExampleFile "examples/cname/partially-signed-nsec3/ns.com." com 20
   , ExampleFile "examples/cname/partially-signed-nsec3/ns.b.com." bCom 4
   , ExampleFile "examples/cname/partially-signed-nsec3-oo/ns.com." com 18
@@ -184,6 +182,16 @@ exampleConfigs =
       , Query nsCom RT.DS bCom ]
       [Query nsCom RT.TXT aCom]
   , ExampleConfig
+      "signed-non-zone-key"
+      signedNonZoneKeyFiles
+      [ Query nsCom RT.A aCom
+      , Query nsCom RT.A bCom
+      , Query nsCom RT.CNAME aCom
+      , Query nsCom RT.DNSKEY com
+      , Query nsCom RT.DNSKEY bCom
+      , Query nsCom RT.DS bCom ]
+      [Query nsCom RT.TXT aCom]
+  , ExampleConfig
       "partially-signed-nsec3"
       partiallySignedNsec3Files
       [ Query nsCom RT.A aCom
@@ -223,7 +231,7 @@ exampleConfigs =
       , Query nsCom RT.A subACom ]
       [Query nsCom RT.TXT subACom] ]
 
-baseFiles, newFiles, brokenFiles, partiallySignedFiles, signedFiles, selfDelegFiles :: [FilePath]
+baseFiles, newFiles, brokenFiles, partiallySignedFiles, signedFiles, signedNonZoneKeyFiles, selfDelegFiles :: [FilePath]
 partiallySignedNsec3Files, partiallySignedNsec3OOFiles, signedNsec3Files :: [FilePath]
 baseFiles =
   [ "examples/cname/base/ns.com."
@@ -240,6 +248,10 @@ partiallySignedFiles =
 signedFiles =
   [ "examples/cname/signed/ns.com."
   , "examples/cname/signed/ns.b.com." ]
+
+signedNonZoneKeyFiles =
+  [ "examples/cname/signed-non-zone-key/ns.com."
+  , "examples/cname/signed-non-zone-key/ns.b.com." ]
 
 partiallySignedNsec3Files =
   [ "examples/cname/partially-signed-nsec3/ns.com."
@@ -292,10 +304,11 @@ rootServers = [nsCom]
 exampleFileTest :: ExampleFile -> TestTree
 exampleFileTest example =
   testCase (examplePath example) $ do
-    (ns, records, zone) <- loadExampleFile (examplePath example)
-    length records @?= expectedRecordCount example
-    zoneName zone @?= expectedOrigin example
-    assertWellformed (examplePath example) zone
+    config <- parseZoneFileZones zoneWellformed (examplePath example)
+    zone <- case config of
+      [(_, parsedZone)] -> return parsedZone
+      _ -> assertFailure (examplePath example ++ ": expected exactly one served zone")
+    zoneName zone @?= exactly (expectedOrigin example)
     length (allRecords zone) @?= expectedRecordCount example
 
 exampleConfigTest :: ExampleConfig -> TestTree
@@ -461,31 +474,11 @@ resolvableQueries :: [FilePath] -> IO (S.Set ConstrainedQuery)
 resolvableQueries files = do
   cfg <- loadConfig files
   let rules = runFresh $ plResolvable =<< compileConfig rootServers cfg
-  resolvable <- assertRight (runFresh $ runExceptT $ computeResolvable True rules)
-  return $ S.fromList $ mapMaybe queryFromRule $ S.toList resolvable
+  resolvableRules <- assertRight (runFresh $ runExceptT $ computeResolvable True rules)
+  return $ S.fromList $ mapMaybe queryFromRule $ S.toList resolvableRules
 
 loadConfig :: [FilePath] -> IO NameServersConfig
-loadConfig = mapM loadConfigEntry
-  where
-    loadConfigEntry :: FilePath -> IO (Name String, Zone ConstrainedLabel)
-    loadConfigEntry path = do
-      (ns, _, zone) <- loadExampleFile path
-      assertWellformed path zone
-      return (ns, compileWildcards zone)
-
-loadExampleFile :: FilePath -> IO (Name String, [StandardRecord], Zone String)
-loadExampleFile path = do
-  content <- readFile path
-  -- TODO: Use parseZone for name server name
-  records <- assertRight =<< parseRecords path content
-  ns <- assertRight =<< parseName path
-  return (ns, records, fromRecordList (NE.fromList records))
-
-assertWellformed :: FilePath -> Zone String -> Assertion
-assertWellformed path zone =
-  case zoneWellformed zone of
-    Nothing -> return ()
-    Just err -> assertFailure (path ++ ": " ++ err)
+loadConfig = fmap concat . mapM (parseZoneFileZones zoneWellformed)
 
 assertRight :: Show e => Either e a -> IO a
 assertRight = either (assertFailure . show) return
