@@ -78,7 +78,6 @@ data DependencyMatch = DependencyMatch
 dependencyMatch :: Rule (Maybe RComp) -> Rule (Maybe RComp) -> Maybe DependencyMatch
 dependencyMatch dependent@(Rule _ (toView -> TVResolves {}) b) dependency@(Rule _ h'@(toView -> TVResolves {}) _) = do
   (predicate, u) <- findUnifier
-  guard $ nonTrivial u
   _ <- CU.applyRule (CU.fromUnifier u) dependency
   return $ DependencyMatch dependent dependency predicate u
   where
