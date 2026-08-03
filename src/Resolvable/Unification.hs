@@ -6,6 +6,7 @@ module Resolvable.Unification
   , toList
   , restrict
   , isRenaming
+  , nonTrivial
   , filterRenamings
   , unify
   , unifies
@@ -61,6 +62,9 @@ isRenaming (Unifier (M.elems -> ts)) = all isVar ts && not (hasDuplicates ts)
     insertP :: Bool -> Maybe Bool
     insertP False = Just True  -- Insert if not found
     insertP True = Nothing     -- Abort if found
+
+nonTrivial :: Unifier -> Bool
+nonTrivial (Unifier m) = not $ all isVar m
 
 -- Remove all renamings from the unifier.
 -- For example, [X -> Z, Y -> Z] becomes [Y -> X].

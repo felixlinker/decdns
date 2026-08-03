@@ -84,6 +84,7 @@ dependencyMatch lrg@(Rule _ (toView -> TVResolves {}) b) sml@(Rule _ h@(toView -
     unifyBodyPredicate :: Term -> Maybe (Term, Unifier)
     unifyBodyPredicate p = do
       u <- unify p h
+      guard $ nonTrivial u
       return (p, u)
 dependencyMatch _ _ = Nothing
 
