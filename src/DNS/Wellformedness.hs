@@ -21,10 +21,13 @@ import Util.Bool ((==>))
 expect :: Bool -> String -> Maybe String
 expect p err = if p then Nothing else Just err
 
--- TODO: Enforce limits on NSEC3 iterations
--- TODO: Enforce NSEC3 consistency according to RFC 5155, Sec. 7.2.
--- TODO: Enforce tautologies on NSEC(3) bitmaps
--- TODO: Enforce that there is the corresponding data for every RRSIG
+-- NOTE: Following well-formedness checks where not implemented yet, but could
+-- be implemented. I believe I do not need them for my tool to work, but they
+-- may be useful feedback nonetheless.
+-- * Limits on NSEC3 iterations
+-- * NSEC3 consistency according to RFC 5155, Sec. 7.2.
+-- * Enfore tautologies on NSEC(3) bitmaps
+-- * There must be the corresponding data for every RRSIG
 wellformed :: Zone String -> Maybe String
 wellformed z@(Zone org r) =
   asum  [ expect (checkCNAME z) "CNAME record accompanied by records other than NSEC or RRSIG"

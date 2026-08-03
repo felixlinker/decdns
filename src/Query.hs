@@ -21,7 +21,6 @@ queryT (nameTerm -> n) (ttypeTerm -> t) = do
 
 queryStep :: (Monad m) => Name String -> T.Type -> Fresh (S.Set (Rule (Maybe RComp))) -> ExceptT String m (S.Set (Rule (Maybe RComp)))
 queryStep n t rs =
-  -- TODO: I must employ a top-down solving strategy here
   let (kb, q) = runFresh $ do
         kb' <- computeResolvable False <$> rs
         q' <- queryT n t
