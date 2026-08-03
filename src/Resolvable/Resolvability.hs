@@ -3,10 +3,12 @@ module Resolvable.Resolvability
   ( RComp(..)
   , fromZone
   , NameServersConfig
+  , mergeConfig
   , compileConfig
   , plResolvable ) where
 
 import qualified Data.List.NonEmpty as NE
+import qualified Data.Map as M
 import qualified Data.Set as S
 
 import NameConstraint
@@ -230,6 +232,9 @@ fromZone rootServers ns z = mconcat <$> mapM rrsetToRules (allRRSets z)
     rrsetToRules r = (<>) <$> resolvableBase rootServers ns r <*> resolvableStep rootServers ns r
 
 type NameServersConfig = [(Name String, Zone ConstrainedLabel)]
+
+mergeConfig :: NameServersConfig -> NameServersConfig
+mergeConfig = M.toList . foldr (uncurry (M.insertWith mergeZones)) M.empty
 
 compileConfig :: [Name String] -> NameServersConfig -> Fresh (S.Set (Rule (Maybe RComp)))
 compileConfig rootServers = (mconcat <$>) . mapM (uncurry (fromZone rootServers))

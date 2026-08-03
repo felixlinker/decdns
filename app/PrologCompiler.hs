@@ -25,6 +25,7 @@ import Data.Maybe (isNothing)
 import Control.Monad.Trans.Except (runExceptT, runExcept)
 import GHC.Base (failIO)
 import Parsing (parseNameM, parseTypeM)
+import Parsing.Config (parseZoneFiles)
 import Query (queryStep)
 
 indent :: String -> String
@@ -37,34 +38,34 @@ main = do
     "pl-resolvable" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
-      cfg <- concat <$> mapM parseZone zones
+      cfg <- parseZones zones
       putStr (showKnowledgeBase $ S.toList $ runFresh $ plResolvable =<< compileConfig rootServers cfg)
     "pl-regressions" -> do
       (roots, args') <- sepBy "--" args
       rootServers <- parseNames roots
       (old, new) <- sepBy "--" args'
-      oldCfg <- concat <$> mapM parseZone old
-      newCfg <- concat <$> mapM parseZone new
+      oldCfg <- parseZones old
+      newCfg <- parseZones new
       putStr (showKnowledgeBase $ S.toList $ plRegressions rootServers oldCfg newCfg)
     "resolvable" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
-      cfg <- concat <$> mapM parseZone zones
+      cfg <- parseZones zones
       let compiled = runFresh $ plResolvable =<< compileConfig rootServers cfg
       res <- handleError $ runExcept (computeResolvable True compiled)
       putStrLn $ showKnowledgeBase $ S.toList res
     "diff" -> do
       (old, new) <- sepBy "--" args
-      oldRecs <- concat <$> mapM parseZone old
-      newRecs <- concat <$> mapM parseZone new
+      oldRecs <- parseZones old
+      newRecs <- parseZones new
       let nsDiff = diffServers oldRecs newRecs
       mapM_ (\(ns, d) -> print ns >> print d) (M.toList nsDiff)
     "regressions" -> do
       (sroots, args') <- sepBy "--" args
       roots <- parseNames sroots
       (old, new) <- sepBy "--" args'
-      oldRecs <- concat <$> mapM parseZone old
-      newRecs <- concat <$> mapM parseZone new
+      oldRecs <- parseZones old
+      newRecs <- parseZones new
       let oldRecsC = compileConfig roots oldRecs
       let newRecsC = compileConfig roots newRecs
       regs <- handleError $ runFresh $ runExceptT $ computeRegressions (plResolvable =<< oldRecsC) (plResolvable =<< newRecsC)
@@ -81,13 +82,13 @@ main = do
     "dependencies" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
-      compiled <- runFresh . compileConfig rootServers . concat <$> mapM parseZone zones
+      compiled <- runFresh . compileConfig rootServers <$> parseZones zones
       let deps = fromRules compiled :: RuleDependencies
       when (isNothing $ PO.transitiveClosure deps)
         (putStrLn "% Dependencies cyclic")
       print deps
     "parse-only" -> do
-      parsed <- concatMap (map toStandardRecord . allRecords . snd) . concat <$> mapM parseZone args
+      parsed <- concatMap (map toStandardRecord . allRecords . snd) <$> parseZones args
       mapM_ print parsed
     "query" -> do
       (roots, [qnameString, qtypeString]) <- sepBy "--" args
@@ -102,8 +103,8 @@ main = do
         else putStrLn $ showKnowledgeBase answers
     _ -> fail "unknown command"
   where
-    parseZone :: FilePath -> IO NameServersConfig
-    parseZone = parseZoneFileZones zoneWellformed
+    parseZones :: [FilePath] -> IO NameServersConfig
+    parseZones = parseZoneFiles zoneWellformed
 
     parseResponse :: IO NameServersConfig
     parseResponse = parseStdin responseWellformed

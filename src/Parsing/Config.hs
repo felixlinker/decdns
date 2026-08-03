@@ -1,6 +1,7 @@
 module Parsing.Config
   ( parseZoneFileContents
   , parseZoneFileZones
+  , parseZoneFiles
   , parseStdin
   ) where
 
@@ -13,7 +14,7 @@ import DNS.Name (Name)
 import DNS.ZoneFile (Zone, fromRecordList)
 import NameConstraint (compileWildcards)
 import Parsing (ServedZone, parseZoneFile)
-import Resolvable.Resolvability (NameServersConfig)
+import Resolvable.Resolvability (NameServersConfig, mergeConfig)
 
 handleParser :: Either ParseError a -> IO a
 handleParser = either (failIO . show) return
@@ -22,7 +23,7 @@ parseZoneFileContents :: (Zone String -> Maybe String) -> SourceName -> String -
 parseZoneFileContents wfc source content = do
   exceptZones <- map (runExcept . toZone) <$> (handleParser =<< parseZoneFile source content)
   zones <- mapM (either failIO return) exceptZones
-  return $ map (fmap compileWildcards) zones
+  return $ mergeConfig $ map (fmap compileWildcards) zones
   where
     wellformed :: Zone String -> Except String ()
     wellformed zone = maybe (return ()) throwE (wfc zone)
@@ -42,3 +43,6 @@ parseZoneFileZones :: (Zone String -> Maybe String) -> FilePath -> IO NameServer
 parseZoneFileZones wfc path = do
   content <- readFile path
   parseZoneFileContents wfc path content
+
+parseZoneFiles :: (Zone String -> Maybe String) -> [FilePath] -> IO NameServersConfig
+parseZoneFiles wfc = fmap (mergeConfig . concat) . mapM (parseZoneFileZones wfc)

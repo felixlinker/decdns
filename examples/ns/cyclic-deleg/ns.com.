@@ -1,0 +1,13 @@
+$ORIGIN com.
+@ 1200 IN SOA ns.com. example.com. 0 0 0 0 0
+@ 1200 IN NS ns.com.
+ns 1200 IN A 1.2.3.4
+
+sub.a 1200 IN NS ns.sub.a.com.
+ns.sub.a 1200 IN A 1.2.3.5
+
+$ORIGIN sub.sub.a.com.
+@ 1200 IN SOA ns.com. example.com. 0 0 0 0 0
+@ 1200 IN NS ns.com.
+@ 1200 IN A 1.2.3.4
+;; Served by ns.com.

@@ -16,7 +16,7 @@ import NameConstraint
   , LabelConstraint (Wildcard)
   , exactly
   )
-import Parsing.Config (parseZoneFileZones)
+import Parsing.Config (parseZoneFileZones, parseZoneFiles)
 import DNS.Wellformedness (zoneWellformed)
 import Resolvable.Dependencies (ConstrainedQuery (CQuery), computeResolvable, queryFromRule)
 import Resolvable.Prolog.Core (Term, ad, nameTerm, resolves, top, ttypeTerm, wildcard, wildcards4)
@@ -122,7 +122,9 @@ exampleFiles =
   , ExampleFile "examples/cname/partially-signed-nsec3-oo/ns.b.com." bCom 4
   , ExampleFile "examples/cname/signed-nsec3/ns.com." com 22
   , ExampleFile "examples/cname/signed-nsec3/ns.b.com." bCom 18
-  , ExampleFile "examples/ns/self-deleg/ns.com." com 6 ]
+  , ExampleFile "examples/ns/self-deleg/ns.com." com 6
+  , ExampleFile "examples/ns/cyclic-deleg/ns.com." com 8
+  , ExampleFile "examples/ns/cyclic-deleg/ns.sub.a.com." subACom 5 ]
 
 data ExampleConfig = ExampleConfig
   { configName :: String
@@ -229,9 +231,26 @@ exampleConfigs =
       , Query nsCom RT.NS subACom
       , Query nsCom RT.SOA subACom
       , Query nsCom RT.A subACom ]
-      [Query nsCom RT.TXT subACom] ]
+      [Query nsCom RT.TXT subACom]
+  , ExampleConfig
+      "ns/cyclic-deleg"
+      cyclicDelegFiles
+      [ Query nsCom RT.NS com
+      , Query nsCom RT.SOA com
+      , Query nsCom RT.A nsCom
+      , Query nsCom RT.NS subACom
+      , Query nsCom RT.A nsSubACom
+      , Query nsSubACom RT.NS subACom
+      , Query nsSubACom RT.SOA subACom
+      , Query nsCom RT.A subACom
+      , Query nsSubACom RT.NS subSubACom
+      , Query nsCom RT.NS subSubACom
+      , Query nsCom RT.SOA subSubACom
+      , Query nsSubACom RT.A subSubACom ]
+      [Query nsCom RT.TXT subSubACom] ]
 
-baseFiles, newFiles, brokenFiles, partiallySignedFiles, signedFiles, signedNonZoneKeyFiles, selfDelegFiles :: [FilePath]
+baseFiles, newFiles, brokenFiles, partiallySignedFiles, signedFiles, signedNonZoneKeyFiles :: [FilePath]
+cyclicDelegFiles, selfDelegFiles :: [FilePath]
 partiallySignedNsec3Files, partiallySignedNsec3OOFiles, signedNsec3Files :: [FilePath]
 baseFiles =
   [ "examples/cname/base/ns.com."
@@ -267,6 +286,10 @@ signedNsec3Files =
 
 selfDelegFiles = ["examples/ns/self-deleg/ns.com."]
 
+cyclicDelegFiles =
+  [ "examples/ns/cyclic-deleg/ns.com."
+  , "examples/ns/cyclic-deleg/ns.sub.a.com." ]
+
 data Query = Query (Name String) RT.Type (Name String)
   deriving Eq
 
@@ -289,14 +312,17 @@ authenticatedUnsigned :: Name String -> RT.Type -> Name String -> Resolution
 authenticatedUnsigned ns rtype qname =
   Resolution (Query ns rtype qname) top (ad 0)
 
-com, net, aCom, bCom, subACom, nsCom, nsBCom :: Name String
+com, net, aCom, bCom, subACom, subSubACom :: Name String
+nsCom, nsBCom, nsSubACom :: Name String
 com = mkName ["com", ""]
 net = mkName ["net", ""]
 aCom = mkName ["a", "com", ""]
 bCom = mkName ["b", "com", ""]
 subACom = mkName ["sub", "a", "com", ""]
+subSubACom = mkName ["sub", "sub", "a", "com", ""]
 nsCom = mkName ["ns", "com", ""]
 nsBCom = mkName ["ns", "b", "com", ""]
+nsSubACom = mkName ["ns", "sub", "a", "com", ""]
 
 rootServers :: [Name String]
 rootServers = [nsCom]
@@ -307,7 +333,7 @@ exampleFileTest example =
     config <- parseZoneFileZones zoneWellformed (examplePath example)
     zone <- case config of
       [(_, parsedZone)] -> return parsedZone
-      _ -> assertFailure (examplePath example ++ ": expected exactly one served zone")
+      _ -> assertFailure (examplePath example ++ ": expected exactly one name server")
     zoneName zone @?= exactly (expectedOrigin example)
     length (allRecords zone) @?= expectedRecordCount example
 
@@ -467,7 +493,7 @@ resolvableQueries files = do
   return $ S.fromList $ mapMaybe queryFromRule $ S.toList resolvableRules
 
 loadConfig :: [FilePath] -> IO NameServersConfig
-loadConfig = fmap concat . mapM (parseZoneFileZones zoneWellformed)
+loadConfig = parseZoneFiles zoneWellformed
 
 assertRight :: Show e => Either e a -> IO a
 assertRight = either (assertFailure . show) return

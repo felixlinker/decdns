@@ -134,8 +134,15 @@ checkZoneCuts :: Tr.Node String RRSet.RDataSet -> Bool
 checkZoneCuts (Tr.Node rs cs)
   | hasType T.NS rs && not (hasType T.SOA rs) =
       typesAllIn rs [T.NS, T.DS, T.NSEC, T.RRSIG, T.A, T.AAAA]
-        && all (all (`typesAllIn` [T.A, T.AAAA])) cs
+        && all checkBelowZoneCut cs
   | otherwise = all checkZoneCuts cs
+
+checkBelowZoneCut :: Tr.Node String RRSet.RDataSet -> Bool
+checkBelowZoneCut node@(Tr.Node rs cs)
+  | hasType T.SOA rs = checkZoneCuts node
+  | otherwise =
+      typesAllIn rs [T.A, T.AAAA]
+        && all checkBelowZoneCut cs
 
 checkNoDataAboveApex :: Tr.Node String RRSet.RDataSet -> Bool
 checkNoDataAboveApex (Tr.Node rs cs)
