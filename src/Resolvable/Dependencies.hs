@@ -68,6 +68,7 @@ type RuleDependencies = PO.PartialOrder Resolves
 match :: FromRule a => Rule (Maybe RComp) -> Rule (Maybe RComp) -> Maybe (a, a)
 match rl@(Rule _ (toView -> TVResolves {}) b) rs@(Rule _ h'@(toView -> TVResolves {}) _) = do
   (u, _) <- uncons $ mapMaybe (`unify` h') b
+  guard (nonTrivial u)
   -- Check whether there are any inequalities that prevent unification immediately
   _ <- CU.applyRule (CU.fromUnifier u) rs
   larger <- fromRule rl
