@@ -7,7 +7,7 @@ import Data.Maybe (isJust, mapMaybe)
 import qualified Data.Set as S
 
 import DNS.Diff (hasChanges)
-import DNS.Name (Name, (<|))
+import DNS.Name (Name, root, (<|))
 import DNS.NameSpec (mkName)
 import qualified DNS.RecordType as RT
 import DNS.ZoneFile (allRecords, isEmpty, zoneName)
@@ -123,8 +123,8 @@ exampleFiles =
   , ExampleFile "examples/cname/signed-nsec3/ns.com." com 22
   , ExampleFile "examples/cname/signed-nsec3/ns.b.com." bCom 18
   , ExampleFile "examples/ns/self-deleg/ns.com." com 6
-  , ExampleFile "examples/ns/cyclic-deleg/ns.com." com 8
-  , ExampleFile "examples/ns/cyclic-deleg/ns.sub.a.com." subACom 5 ]
+  , ExampleFile "examples/ns/cyclic-deleg/root.net." dnsRoot 8
+  , ExampleFile "examples/ns/cyclic-deleg/ns.net." net 5 ]
 
 data ExampleConfig = ExampleConfig
   { configName :: String
@@ -235,19 +235,19 @@ exampleConfigs =
   , ExampleConfig
       "ns/cyclic-deleg"
       cyclicDelegFiles
-      [ Query nsCom RT.NS com
-      , Query nsCom RT.SOA com
-      , Query nsCom RT.A nsCom
-      , Query nsCom RT.NS subACom
-      , Query nsCom RT.A nsSubACom
-      , Query nsSubACom RT.NS subACom
-      , Query nsSubACom RT.SOA subACom
-      , Query nsCom RT.A subACom
-      , Query nsSubACom RT.NS subSubACom
-      , Query nsCom RT.NS subSubACom
-      , Query nsCom RT.SOA subSubACom
-      , Query nsSubACom RT.A subSubACom ]
-      [Query nsCom RT.TXT subSubACom] ]
+      [ Query rootNet RT.NS dnsRoot
+      , Query rootNet RT.SOA dnsRoot
+      , Query rootNet RT.NS net
+      , Query rootNet RT.A nsNet
+      , Query nsNet RT.NS net
+      , Query nsNet RT.SOA net
+      , Query nsNet RT.NS rootNet
+      , Query nsNet RT.A rootNet
+      , Query rootNet RT.NS rootNet
+      , Query rootNet RT.SOA rootNet
+      , Query rootNet RT.A rootNet
+      , Query nsNet RT.A subRootNet ]
+      [Query rootNet RT.TXT subRootNet] ]
 
 baseFiles, newFiles, brokenFiles, partiallySignedFiles, signedFiles, signedNonZoneKeyFiles :: [FilePath]
 cyclicDelegFiles, selfDelegFiles :: [FilePath]
@@ -287,8 +287,8 @@ signedNsec3Files =
 selfDelegFiles = ["examples/ns/self-deleg/ns.com."]
 
 cyclicDelegFiles =
-  [ "examples/ns/cyclic-deleg/ns.com."
-  , "examples/ns/cyclic-deleg/ns.sub.a.com." ]
+  [ "examples/ns/cyclic-deleg/root.net."
+  , "examples/ns/cyclic-deleg/ns.net." ]
 
 data Query = Query (Name String) RT.Type (Name String)
   deriving Eq
@@ -312,20 +312,22 @@ authenticatedUnsigned :: Name String -> RT.Type -> Name String -> Resolution
 authenticatedUnsigned ns rtype qname =
   Resolution (Query ns rtype qname) top (ad 0)
 
-com, net, aCom, bCom, subACom, subSubACom :: Name String
-nsCom, nsBCom, nsSubACom :: Name String
+dnsRoot, com, net, aCom, bCom, subACom :: Name String
+rootNet, subRootNet, nsCom, nsBCom, nsNet :: Name String
+dnsRoot = root
 com = mkName ["com", ""]
 net = mkName ["net", ""]
 aCom = mkName ["a", "com", ""]
 bCom = mkName ["b", "com", ""]
 subACom = mkName ["sub", "a", "com", ""]
-subSubACom = mkName ["sub", "sub", "a", "com", ""]
+rootNet = mkName ["root", "net", ""]
+subRootNet = mkName ["sub", "root", "net", ""]
 nsCom = mkName ["ns", "com", ""]
 nsBCom = mkName ["ns", "b", "com", ""]
-nsSubACom = mkName ["ns", "sub", "a", "com", ""]
+nsNet = mkName ["ns", "net", ""]
 
 rootServers :: [Name String]
-rootServers = [nsCom]
+rootServers = [nsCom, rootNet]
 
 exampleFileTest :: ExampleFile -> TestTree
 exampleFileTest example =
