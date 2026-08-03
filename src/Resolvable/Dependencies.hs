@@ -1,9 +1,9 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE InstanceSigs #-}
 module Resolvable.Dependencies
   ( ResolvableAt(..)
-  , Resolves(..)
   , matches
   , RecordDependencies
   , RuleDependencies
@@ -47,37 +47,23 @@ instance FromRule ResolvableAt where
 fromAnnot :: RComp -> ResolvableAt
 fromAnnot (RComp ns (name -> owner)) = ResolvableAt (ns, owner)
 
-newtype Resolves = Resolves (Term, Term, Term, Term, Term, Term)
-  deriving (Eq, Ord)
-
-instance Show Resolves where
-  show (Resolves trip) = show trip
-
 instance FromRule Resolves where
   fromRule r =
     let rh = rhead $ replaceSingletons (Rule Nothing (rhead r) []) (TFunctor "const" [])
     in fromTerm rh
     where
       fromTerm :: Term -> Maybe Resolves
-      fromTerm (toView -> TVResolves ns t n _ recurse verify auth) = Just $ Resolves (ns, t, n, recurse, verify, auth)
-      fromTerm _ = Nothing
+      fromTerm t = case toView t of
+        TVResolves resolvesArgs -> Just resolvesArgs
+        _ -> Nothing
 
 matches :: Resolves -> Name String -> Name String -> Bool
-matches (Resolves (nsT, nT, _, _, _, _)) ns n = unifies (list [nsT, nT]) (list [nameTerm ns, nameTerm n])
-
-canon :: Term -> Term
-canon = replace aux
-  where
-    aux :: Term -> Term
-    aux (TVar _) = TFunctor "const" []
-    aux t = t
+matches Resolves { resolvesNameServer = nsT, resolvesQueryName = nT } ns n =
+  unifies (list [nsT, nT]) (list [nameTerm ns, nameTerm n])
 
 type RecordDependencies = PO.PartialOrder ResolvableAt
 
 type RuleDependencies = PO.PartialOrder Resolves
-
-instance Show RuleDependencies where
-  show po = unlines (map (\(l, r) -> show l ++ " < " ++ show r) (PO.toFlatList po))
 
 match :: FromRule a => Rule (Maybe RComp) -> Rule (Maybe RComp) -> Maybe (a, a)
 match rl@(Rule _ (toView -> TVResolves {}) b) rs@(Rule _ h'@(toView -> TVResolves {}) _) = do
@@ -101,6 +87,7 @@ data ConstrainedQuery = CQuery Term CU.Neqs
   deriving (Eq, Ord)
 
 instance Apply (Maybe ConstrainedQuery) where
+  apply :: Unifier -> Maybe ConstrainedQuery -> Maybe ConstrainedQuery
   apply _ Nothing = Nothing
   apply u (Just (CQuery t neqs)) = do
     let app = apply u

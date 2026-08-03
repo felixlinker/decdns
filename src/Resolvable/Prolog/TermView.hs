@@ -1,7 +1,9 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Resolvable.Prolog.TermView
   -- TODO: Enforce usage of termView or exported constructors by hiding constructors of Term
-  ( TermView(..)
+  ( Resolves(..)
+  , TermView(..)
   , toView
   , fromView
   , isResolves
@@ -10,12 +12,30 @@ module Resolvable.Prolog.TermView
 import DNS.Record (Type)
 import Resolvable.Prolog.Symbols
 import Resolvable.Prolog.Core
+import qualified Util.PartialOrder as PO
+
+data Resolves = Resolves
+  { resolvesNameServer :: Term
+  , resolvesQueryType :: Term
+  , resolvesQueryName :: Term
+  , resolvesData :: Term
+  , resolvesRecurse :: Term
+  , resolvesVerify :: Term
+  , resolvesAuthenticatedData :: Term
+  }
+  deriving (Eq, Ord)
+
+instance Show Resolves where
+  show (Resolves ns qtype qname dat rec ver adb) = show $ resolves ns qtype qname dat rec ver adb
+
+instance Show (PO.PartialOrder Resolves) where
+  show po = unlines (map (\(l, r) -> show l ++ " < " ++ show r) (PO.toFlatList po))
 
 data TermView = TVList Term Term
               | TVMember Term Term
               | TVNeq Term Term
               | TVLeq Term Term
-              | TVResolves Term Term Term Term Term Term Term
+              | TVResolves Resolves
               | TVResolvable Term Term Term Term Term
               | TVRRSIGValid Term Term Term Term
               | TVDigestValid Term Term Term
@@ -48,7 +68,7 @@ toView (TFunctor n args)
     [ a, b ] -> TVLeq a b
     _ -> undefined
   | n == resolvesSym = case args of
-    [ ns, qtype, qname, d, rec, ver, adb ] -> TVResolves ns qtype qname d rec ver adb
+    [ ns, qtype, qname, d, rec, ver, adb ] -> TVResolves $ Resolves ns qtype qname d rec ver adb
     _ -> undefined
   | n == resolvableSym = case args of
     [ ns, qtype, qname, ver, auth ] -> TVResolvable ns qtype qname ver auth
@@ -89,7 +109,7 @@ fromView (TVList a b) = TFunctor listSym [ a, b ]
 fromView (TVMember a b) = member a b
 fromView (TVNeq a b) = a \= b
 fromView (TVLeq a b) = a =< b
-fromView (TVResolves ns qtype qname d rec ver adb) = resolves ns qtype qname d rec ver adb
+fromView (TVResolves (Resolves ns qtype qname d rec ver adb)) = resolves ns qtype qname d rec ver adb
 fromView (TVResolvable ns qtype qname ver auth) = resolvable ns qtype qname ver auth
 fromView (TVRRSIGValid nam dat sig key) = rrsigValid nam dat sig key
 fromView (TVDigestValid nam dsTerm dnskeyTerm) = digestValid nam dsTerm dnskeyTerm
