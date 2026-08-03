@@ -50,6 +50,9 @@ Available commands are:
 - `dependencies [names...] -- [zone files...]`:
   Arguments like for `pl-resolvable`.
   Computes resolution of which name at a specific name server can lead to resolution of a different name at a different name server.
+- `visualize [names...] -- [zone files...]`:
+  Export the record-to-rule compilation and dependencies as JSON for the browser-based compilation explorer in `visualizer/`.
+  Each dependency includes the matching body predicate and its unifier. The JSON is written to standard output.
 - `parse-only [zone files...]`:
   Parses the list of zone files and prints all records to stdout.
   This command is supposed to aid debugging.

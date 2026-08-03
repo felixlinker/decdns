@@ -7,6 +7,9 @@ module Resolvable.Dependencies
   , matches
   , RecordDependencies
   , RuleDependencies
+  , DependencyMatch(..)
+  , dependencyMatch
+  , dependencyMatches
   , ConstrainedQuery(..)
   , queryFromRule
   , fromRules
@@ -19,8 +22,7 @@ import Data.Bifunctor (Bifunctor(bimap))
 import Data.Either (fromRight)
 import Data.Functor (($>))
 import qualified Data.Set as S
-import Data.List (uncons)
-import Data.Maybe (mapMaybe)
+import Data.Maybe (listToMaybe, mapMaybe)
 
 import DNS.Name
 import DNS.SEC.Verification (verifySignature, verifyDigest, nsecUnsignedSubzone, nsec3UnsignedSubzone, verifyClosestEncloserProof)
@@ -65,18 +67,42 @@ type RecordDependencies = PO.PartialOrder ResolvableAt
 
 type RuleDependencies = PO.PartialOrder Resolves
 
+data DependencyMatch = DependencyMatch
+  { dependentRule :: Rule (Maybe RComp)
+  , dependencyRule :: Rule (Maybe RComp)
+  , dependencyPredicate :: Term
+  , dependencyUnifier :: Unifier
+  }
+  deriving Eq
+
+dependencyMatch :: Rule (Maybe RComp) -> Rule (Maybe RComp) -> Maybe DependencyMatch
+dependencyMatch dependent@(Rule _ (toView -> TVResolves {}) b) dependency@(Rule _ h'@(toView -> TVResolves {}) _) = do
+  (predicate, u) <- findUnifier
+  guard $ nonTrivial u
+  _ <- CU.applyRule (CU.fromUnifier u) dependency
+  return $ DependencyMatch dependent dependency predicate u
+  where
+    findUnifier :: Maybe (Term, Unifier)
+    findUnifier = listToMaybe $ mapMaybe unifyBodyPredicate b
+
+    unifyBodyPredicate :: Term -> Maybe (Term, Unifier)
+    unifyBodyPredicate predicate = do
+      u <- unify predicate h'
+      return (predicate, u)
+dependencyMatch _ _ = Nothing
+
+dependencyMatches :: S.Set (Rule (Maybe RComp)) -> [DependencyMatch]
+dependencyMatches rs = do
+  dependent <- S.toList rs
+  dependency <- S.toList rs
+  maybe [] return $ dependencyMatch dependent dependency
+
 match :: FromRule a => Rule (Maybe RComp) -> Rule (Maybe RComp) -> Maybe (a, a)
-match rl@(Rule _ (toView -> TVResolves {}) b) rs@(Rule _ h'@(toView -> TVResolves {}) _) = do
-  (u, _) <- uncons $ mapMaybe (`unify` h') b
-  guard (nonTrivial u)
-  -- TODO: Check whether looking at inequalities is required to make
-  -- dependencies non-cyclic or whether it's just an optimization
-  -- Check whether there are any inequalities that prevent unification immediately
-  _ <- CU.applyRule (CU.fromUnifier u) rs
+match rl rs = do
+  _ <- dependencyMatch rl rs
   larger <- fromRule rl
   smaller <- fromRule rs
   return (smaller, larger)
-match _ _ = Nothing
 
 fromRules :: (FromRule a, Ord a) => S.Set (Rule (Maybe RComp)) -> PO.PartialOrder a
 fromRules rs = foldr go PO.empty rs

@@ -9,9 +9,8 @@ import Resolvable.Prolog.Core
 import Resolvable.Resolvability
 import Resolvable.Update.Resolvability
 import Resolvable.Update.Rollout (diffServers, Rollout, rollout)
-import Resolvable.Dependencies ( computeResolvable, fromRules, RuleDependencies )
+import Resolvable.Dependencies (computeResolvable, fromRules)
 import Util.Fresh (runFresh)
-import qualified Util.PartialOrder as PO
 
 import System.Environment (getArgs)
 import Util
@@ -19,14 +18,14 @@ import Data.List (uncons)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Resolvable.Update.Dependencies (computeRegressions)
-import Control.Monad (unless, when)
+import Control.Monad (unless)
 import DNS.Name (Name)
-import Data.Maybe (isNothing)
 import Control.Monad.Trans.Except (runExceptT, runExcept)
 import GHC.Base (failIO)
 import Parsing (parseNameM, parseTypeM)
 import Parsing.Config (parseZoneFiles)
 import Query (queryStep)
+import Visualizer (renderVisualization)
 
 indent :: String -> String
 indent s = if null s then "" else "  " ++ s
@@ -79,14 +78,12 @@ main = do
           "Update introduces resolution cycle"
           (unlines . ("\n% You can roll out updates as follow.":) . showRollOut)
           rolloutSeq
-    "dependencies" -> do
+    "visualize" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
-      compiled <- runFresh . compileConfig rootServers <$> parseZones zones
-      let deps = fromRules compiled :: RuleDependencies
-      when (isNothing $ PO.transitiveClosure deps)
-        (putStrLn "% Dependencies cyclic")
-      print deps
+      cfg <- parseZones zones
+      let compiled = runFresh $ compileConfig rootServers cfg
+      putStrLn $ renderVisualization rootServers zones cfg compiled
     "parse-only" -> do
       parsed <- concatMap (map toStandardRecord . allRecords . snd) <$> parseZones args
       mapM_ print parsed
