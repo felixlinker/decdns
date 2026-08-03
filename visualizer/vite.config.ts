@@ -1,8 +1,7 @@
 import vinext from "vinext";
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json";
 import { sites } from "./build/sites-vite-plugin";
-import { visualizationDirectory } from "./build/visualization-directory";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
@@ -34,7 +33,7 @@ const localBindingConfig = {
     : [],
 };
 
-export default defineConfig(async ({ mode }) => {
+export default defineConfig(async () => {
   // Keep Wrangler and Miniflare state project-local. These are non-secret tool
   // settings; application environment belongs in ignored `.env*` files.
   process.env.WRANGLER_WRITE_LOGS ??= "false";
@@ -43,16 +42,11 @@ export default defineConfig(async ({ mode }) => {
 
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
   const { cloudflare } = await import("@cloudflare/vite-plugin");
-  const fileEnvironment = loadEnv(mode, process.cwd(), "");
-  const visualizationPath = process.env.DNS_REGRESSOR_VISUALIZATION_DIR
-    ?? fileEnvironment.DNS_REGRESSOR_VISUALIZATION_DIR;
-
   return {
     server: isCodexSeatbeltSandbox
       ? { watch: { useFsEvents: false, usePolling: true } }
       : undefined,
     plugins: [
-      visualizationDirectory({ directory: visualizationPath }),
       vinext(),
       sites(),
       cloudflare({

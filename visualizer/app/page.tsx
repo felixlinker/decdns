@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { bodyToHeadEdge, groupSourcesByName, minimizeArrowLayout, ruleEdgePorts, visualColumnOrder } from "./graph";
+import { bodyToHeadEdge, groupSourcesByNameAndServer, minimizeArrowLayout, predicateFromOtherRule, ruleEdgePorts, sourceGroupKey, visualColumnOrder } from "./graph";
 import type { NameGroup } from "./graph";
 
 type Source = {
@@ -82,7 +82,7 @@ export default function Home() {
   const [isReloading, setIsReloading] = useState(false);
   const [directoryNotice, setDirectoryNotice] = useState("");
   const [loadError, setLoadError] = useState("");
-  const [selectedName, setSelectedName] = useState("");
+  const [selectedSourceKey, setSelectedSourceKey] = useState("");
   const [selectedRuleId, setSelectedRuleId] = useState("");
   const [search, setSearch] = useState("");
   const [serverFilter, setServerFilter] = useState("all");
@@ -103,7 +103,7 @@ export default function Home() {
     const focusSource = focusRule?.sourceId
       ? next.sources.find((source) => source.id === focusRule.sourceId)
       : next.sources.find((source) => source.recordType === "NS") ?? next.sources[0];
-    setSelectedName(focusSource?.owner ?? "");
+    setSelectedSourceKey(focusSource ? sourceGroupKey(focusSource.owner, focusSource.server) : "");
     setSelectedRuleId(focusRule?.id ?? "");
     setServerFilter("all");
     setSearch("");
@@ -121,7 +121,7 @@ export default function Home() {
     }
     setData(null);
     setDatasetName("");
-    setSelectedName("");
+    setSelectedSourceKey("");
     setSelectedRuleId("");
     setLoadError("");
   }, [installDataset]);
@@ -163,14 +163,14 @@ export default function Home() {
     () => new Map(cycles.flatMap((component, index) => component.map((ruleId) => [ruleId, index] as const))),
     [cycles],
   );
-  const sourceNames = useMemo(() => groupSourcesByName(data?.sources ?? []), [data]);
-  const selectedSourceName = selectedName ? sourceNames.find((group) => group.owner === selectedName) ?? null : null;
+  const sourceNames = useMemo(() => groupSourcesByNameAndServer(data?.sources ?? []), [data]);
+  const selectedSourceName = selectedSourceKey ? sourceNames.find((group) => group.key === selectedSourceKey) ?? null : null;
 
   const filteredSourceNames = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return sourceNames.filter((group) => {
-      const serverMatches = serverFilter === "all" || group.servers.includes(serverFilter);
-      const textMatches = !needle || [group.owner, ...group.recordTypes, ...group.servers, ...group.records]
+      const serverMatches = serverFilter === "all" || group.server === serverFilter;
+      const textMatches = !needle || [group.owner, group.server, ...group.recordTypes, ...group.records]
         .join(" ").toLowerCase().includes(needle) || group.ruleIds.some((id) => indexes.rules.get(id)?.text.toLowerCase().includes(needle));
       return serverMatches && textMatches;
     });
@@ -342,13 +342,13 @@ export default function Home() {
           <div className="source-list">
             {filteredSourceNames.map((group) => (
               <button
-                key={group.owner}
-                className={`source-card name-card ${selectedName === group.owner ? "selected" : ""}`}
-                onClick={() => { setSelectedName(group.owner); setSelectedRuleId(""); setViewport(defaultViewport); }}
+                key={group.key}
+                className={`source-card name-card ${selectedSourceKey === group.key ? "selected" : ""}`}
+                onClick={() => { setSelectedSourceKey(group.key); setSelectedRuleId(""); setViewport(defaultViewport); }}
               >
                 <span className="source-copy">
                   <strong>{group.owner}</strong>
-                  <span>{group.recordTypes.join(" · ")} — {group.servers.join(", ")}</span>
+                  <span>{group.server} — {group.recordTypes.join(" · ")}</span>
                 </span>
                 <span className="rule-count">{group.ruleIds.length}<small>rules</small></span>
               </button>
@@ -361,7 +361,7 @@ export default function Home() {
           <div className="graph-toolbar">
             <div>
               <p className="eyebrow">COMPILATION + REASONING</p>
-              <h2>{selectedSourceName ? <span>{selectedSourceName.owner}</span> : "Rule graph"}</h2>
+              <h2>{selectedSourceName ? <span>{selectedSourceName.owner} · {selectedSourceName.server}</span> : "Rule graph"}</h2>
               <p>{selectedSourceName ? `${selectedSourceName.sources.length} record set${selectedSourceName.sources.length === 1 ? "" : "s"} across ${selectedSourceName.recordTypes.length} type${selectedSourceName.recordTypes.length === 1 ? "" : "s"} compile to ${selectedSourceName.ruleIds.length} rules` : "Select a name to focus its compiled rules."}</p>
             </div>
           </div>
@@ -464,10 +464,10 @@ export default function Home() {
             <div className="inspector-content">
               {selectedRuleSource && (
                 <section className="detail-section source-detail">
-                  <p className="section-label">Compiled from</p>
-                  <strong>{selectedRuleSource.owner} <span>{selectedRuleSource.recordType}</span></strong>
-                  <small>served by {selectedRuleSource.server}</small>
-                  {selectedRuleSource.records.map((record) => <code key={record}>{record}</code>)}
+                  <p className="section-label">Compiled from <span>{selectedRuleSource.recordType}</span></p>
+                  <code title={`${selectedRuleSource.owner} · ${selectedRuleSource.server}`}>
+                    {selectedRuleSource.owner} · {selectedRuleSource.server}
+                  </code>
                 </section>
               )}
               <section className="detail-section">
@@ -482,16 +482,17 @@ export default function Home() {
                   </div>
                 )) : <p className="muted">Fact: no body predicates.</p>}
               </section>
-              <section className="detail-section">
+              <section className="detail-section matches-section">
                 <p className="section-label">Dependency matches <span>{selectedMatches.length}</span></p>
                 <div className="match-list">
                   {selectedMatches.map((match, index) => {
                     const incoming = match.dependentRuleId === selectedRule.id;
                     const otherId = incoming ? match.dependencyRuleId : match.dependentRuleId;
+                    const matchingPredicate = predicateFromOtherRule(match, selectedRule.id, indexes.rules);
                     return (
                       <button key={`${otherId}-${index}`} className="match-card" onClick={() => setSelectedRuleId(otherId)}>
                         <span className="match-topline"><strong>{incoming ? "depends on" : "used by"} {otherId.toUpperCase()}</strong><em>Dependency</em></span>
-                        <code>{match.predicate}</code>
+                        <code>{matchingPredicate}</code>
                         <span className="unifier-label">Unifier</span>
                         <code>{match.unifier}</code>
                         <span className="binding-list">
@@ -556,7 +557,7 @@ function buildGraph(
   const placements = minimizeArrowLayout(
     { dependency: dependencies, compiled, dependent: dependents },
     layoutEdges,
-    { top: 68, nodeHeight, minimumGap: rowGap, ingressPortY, egressPortY },
+    { top: 68, maximumTopOffset: rowGap, nodeHeight, minimumGap: rowGap, ingressPortY, egressPortY },
   ).map(({ id, column, y }) => ({ id, column, y, x: columnXs[column] }));
   const byId = new Map(placements.map((placement) => [placement.id, placement]));
   const edges = relevantMatches.map((match) => {

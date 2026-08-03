@@ -18,7 +18,7 @@ From this directory:
 DNS_REGRESSOR_VISUALIZATION_DIR=/tmp/dns-regressor-visualizations npm run dev
 ```
 
-Open the displayed local URL. The development server scans the configured directory for version 2 JSON exports. You can also put the setting in an ignored `.env.local` file; `.env.example` shows the format.
+Use `npm run dev` while editing the visualizer; it automatically reloads when source files change. Use `npm run start` to build and run a production server that remains unchanged until it is restarted. Open the displayed local URL. Both servers scan the configured directory for version 2 JSON exports. You can also put the setting in an ignored `.env.local` file; `.env.example` shows the format.
 
 ## Export visualizations
 

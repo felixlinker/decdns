@@ -3,6 +3,8 @@ type DependencyMatch = {
   dependencyRuleId: string;
 };
 
+type PredicateMatch = DependencyMatch & { predicate: string };
+
 type NamedSource = {
   owner: string;
   server: string;
@@ -12,9 +14,10 @@ type NamedSource = {
 };
 
 export type NameGroup<T extends NamedSource> = {
+  key: string;
   owner: string;
+  server: string;
   sources: T[];
-  servers: string[];
   recordTypes: string[];
   records: string[];
   ruleIds: string[];
@@ -26,6 +29,7 @@ export type LayoutPlacement = { id: string; column: LayoutColumn; y: number };
 type LayoutColumns = Record<LayoutColumn, string[]>;
 type LayoutOptions = {
   top: number;
+  maximumTopOffset: number;
   nodeHeight: number;
   minimumGap: number;
   ingressPortY: number;
@@ -34,17 +38,36 @@ type LayoutOptions = {
 
 export const visualColumnOrder: LayoutColumn[] = ["dependent", "compiled", "dependency"];
 
-export function groupSourcesByName<T extends NamedSource>(sources: readonly T[]): NameGroup<T>[] {
+export function sourceGroupKey(owner: string, server: string) {
+  return `${owner}\u0000${server}`;
+}
+
+export function groupSourcesByNameAndServer<T extends NamedSource>(sources: readonly T[]): NameGroup<T>[] {
   const grouped = new Map<string, T[]>();
-  for (const source of sources) grouped.set(source.owner, [...(grouped.get(source.owner) ?? []), source]);
-  return [...grouped].map(([owner, members]) => ({
-    owner,
+  for (const source of sources) {
+    const key = sourceGroupKey(source.owner, source.server);
+    grouped.set(key, [...(grouped.get(key) ?? []), source]);
+  }
+  return [...grouped].map(([key, members]) => ({
+    key,
+    owner: members[0].owner,
+    server: members[0].server,
     sources: members,
-    servers: unique(members.map((source) => source.server)),
     recordTypes: unique(members.map((source) => source.recordType)),
     records: members.flatMap((source) => source.records),
     ruleIds: unique(members.flatMap((source) => source.ruleIds)),
   }));
+}
+
+export function predicateFromOtherRule(
+  match: PredicateMatch,
+  selectedRuleId: string,
+  rules: ReadonlyMap<string, { head: string }>,
+) {
+  if (match.dependentRuleId === selectedRuleId) {
+    return rules.get(match.dependencyRuleId)?.head ?? match.predicate;
+  }
+  return match.predicate;
 }
 
 export function bodyToHeadEdge<T>(match: DependencyMatch, placements: ReadonlyMap<string, T>) {
@@ -84,13 +107,24 @@ export function minimizeArrowLayout(
         target: preferredTop(id, edges, positions, options),
         previous: positions.get(id) ?? options.top,
       })).sort((left, right) => left.target - right.target || left.previous - right.previous || left.id.localeCompare(right.id));
-      const packed = packTargets(ranked.map(({ target }) => target), spacing, options.top);
+      const packed = packTargets(
+        ranked.map(({ target }) => target),
+        spacing,
+        options.top,
+        options.top + options.maximumTopOffset,
+      );
       columns[column] = ranked.map(({ id }) => id);
       ranked.forEach(({ id }, index) => positions.set(id, packed[index]));
     }
   }
 
-  return visualColumnOrder.flatMap((column) => columns[column].map((id) => ({ id, column, y: positions.get(id)! })));
+  const minimumY = Math.min(...positions.values());
+  const topCorrection = Number.isFinite(minimumY) ? options.top - minimumY : 0;
+  return visualColumnOrder.flatMap((column) => columns[column].map((id) => ({
+    id,
+    column,
+    y: positions.get(id)! + topCorrection,
+  })));
 }
 
 function preferredTop(
@@ -112,7 +146,7 @@ function preferredTop(
   return suggestions.reduce((sum, value) => sum + value, 0) / suggestions.length;
 }
 
-function packTargets(targets: number[], spacing: number, top: number) {
+function packTargets(targets: number[], spacing: number, top: number, maximumTop: number) {
   const blocks: { start: number; end: number; total: number; count: number }[] = [];
   targets.forEach((target, index) => {
     blocks.push({ start: index, end: index, total: target - index * spacing, count: 1 });
@@ -133,7 +167,9 @@ function packTargets(targets: number[], spacing: number, top: number) {
     const average = block.total / block.count;
     for (let index = block.start; index <= block.end; index += 1) packed[index] = average + index * spacing;
   }
-  const shift = packed.length ? Math.max(0, top - packed[0]) : 0;
+  const shift = packed.length
+    ? Math.max(top - packed[0], Math.min(0, maximumTop - packed[0]))
+    : 0;
   return packed.map((value) => value + shift);
 }
 
