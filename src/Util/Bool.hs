@@ -1,7 +1,11 @@
 module Util.Bool
-  ( bool
+  ( (==>)
+  , bool
   , Or(..)
   , And(..) ) where
+
+(==>) :: Bool -> Bool -> Bool
+a ==> b = not a || b
 
 class Boolean t where
   bool :: t -> Bool

@@ -15,13 +15,13 @@ import Resolvable.Prolog.Core
 import qualified Util.PartialOrder as PO
 
 data Resolves = Resolves
-  { resolvesNameServer :: Term
-  , resolvesQueryType :: Term
-  , resolvesQueryName :: Term
+  { resolvesNS :: Term
+  , resolvesQType :: Term
+  , resolvesQName :: Term
   , resolvesData :: Term
   , resolvesRecurse :: Term
   , resolvesVerify :: Term
-  , resolvesAuthenticatedData :: Term
+  , resolvesAD :: Term
   }
   deriving (Eq, Ord)
 

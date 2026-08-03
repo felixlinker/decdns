@@ -60,7 +60,7 @@ instance FromRule Resolves where
         _ -> Nothing
 
 matches :: Resolves -> Name String -> Name String -> Bool
-matches Resolves { resolvesNameServer = nsT, resolvesQueryName = nT } ns n =
+matches Resolves { resolvesNS = nsT, resolvesQName = nT } ns n =
   unifies (list [nsT, nT]) (list [nameTerm ns, nameTerm n])
 
 type RecordDependencies = PO.PartialOrder ResolvableAt
@@ -76,18 +76,15 @@ data DependencyMatch = DependencyMatch
   deriving Eq
 
 dependencyMatch :: Rule (Maybe RComp) -> Rule (Maybe RComp) -> Maybe DependencyMatch
-dependencyMatch dependent@(Rule _ (toView -> TVResolves {}) b) dependency@(Rule _ h'@(toView -> TVResolves {}) _) = do
-  (predicate, u) <- findUnifier
-  _ <- CU.applyRule (CU.fromUnifier u) dependency
-  return $ DependencyMatch dependent dependency predicate u
+dependencyMatch lrg@(Rule _ (toView -> TVResolves {}) b) sml@(Rule _ h@(toView -> TVResolves {}) _) = do
+  (predicate, u) <- listToMaybe $ mapMaybe unifyBodyPredicate b
+  _ <- CU.applyRule (CU.fromUnifier u) sml
+  return $ DependencyMatch lrg sml predicate u
   where
-    findUnifier :: Maybe (Term, Unifier)
-    findUnifier = listToMaybe $ mapMaybe unifyBodyPredicate b
-
     unifyBodyPredicate :: Term -> Maybe (Term, Unifier)
-    unifyBodyPredicate predicate = do
-      u <- unify predicate h'
-      return (predicate, u)
+    unifyBodyPredicate p = do
+      u <- unify p h
+      return (p, u)
 dependencyMatch _ _ = Nothing
 
 dependencyMatches :: S.Set (Rule (Maybe RComp)) -> [DependencyMatch]

@@ -16,12 +16,10 @@ import qualified DNS.RecordType as T
 import qualified Util.Tree as Tr
 import Data.List (uncons)
 import DNS.SEC.Verification (isDNSSECKey)
+import Util.Bool ((==>))
 
 expect :: Bool -> String -> Maybe String
 expect p err = if p then Nothing else Just err
-
-(==>) :: Bool -> Bool -> Bool
-(==>) p q = not p || q
 
 -- TODO: Enforce limits on NSEC3 iterations
 -- TODO: Enforce NSEC3 consistency according to RFC 5155, Sec. 7.2.

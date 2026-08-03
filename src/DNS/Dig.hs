@@ -48,9 +48,9 @@ followUpQueries = S.fromList . concatMap fromBody . S.toList
     fromResolves :: Term -> Maybe Dig
     fromResolves t = case toView t of
       TVResolves res -> maybeExcept $ do
-        ns <- asName (resolvesNameServer res)
-        qn <- asName (resolvesQueryType res)
-        qt <- asTType (resolvesQueryName res)
+        ns <- asName (resolvesNS res)
+        qn <- asName (resolvesQType res)
+        qt <- asTType (resolvesQName res)
         return $ dig ns qn qt
       _ -> Nothing
 
