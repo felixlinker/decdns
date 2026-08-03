@@ -25,7 +25,6 @@ tests =
         , testCase "rejects unification that violates a stored constraint" rejectsConstraintViolation
         , testCase "rejects when constraint becomes equal after chained bindings" rejectsChainedViolation
         , testCase "keeps constraints after unrelated bindings" keepsConstraintsAfterBinding
-        , testCase "simplify drops constraints involving wildcards" simplifyDropsWildcardConstraints
         , testCase "simplify rejects equal ground terms" simplifyRejectsEqualGroundTerms
         , testCase "simplify keeps variable constraints" simplifyKeepsVariableConstraints
         , testCase "simplify decomposes matching functors" simplifyDecomposesMatchingFunctors
@@ -70,11 +69,6 @@ keepsConstraintsAfterBinding =
       case extendUnifier (TVar "Y") (TAtom "a") u2 of
         Nothing -> pure ()
         Just _ -> assertFailure "expected constraint to still block equality"
-
-simplifyDropsWildcardConstraints :: Assertion
-simplifyDropsWildcardConstraints =
-  simplify (mkNeqs [(TWildcard, TAtom "a"), (TVar "X", TWildcard)])
-    @?= Just (mkNeqs [])
 
 simplifyRejectsEqualGroundTerms :: Assertion
 simplifyRejectsEqualGroundTerms =

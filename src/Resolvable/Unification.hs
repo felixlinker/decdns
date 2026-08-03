@@ -81,7 +81,6 @@ instance Apply Term where
   apply u (TFunctor op (map (apply u) -> args)) = TFunctor op args
   apply _ TEmptyList = TEmptyList
   apply (Unifier m) v@(TVar _) = fromMaybe v (M.lookup v m)
-  apply _ TWildcard = TWildcard
   apply _ t@(TAtomQuoted _) = t
   apply _ t@(TAtom _) = t
   apply _ t@(TString _) = t
@@ -114,8 +113,6 @@ extendUnifier from to u@(Unifier m) = unif (apply u from) (apply u to)
     unifVar _ _ = undefined
 
     unif :: Term -> Term -> Maybe Unifier
-    unif TWildcard _ = Just u
-    unif _ TWildcard = Just u
     unif v@(TVar _) t = unifVar v t
     unif t v@(TVar _) = unifVar v t
     unif (TFunctor op1 args1) (TFunctor op2 args2)

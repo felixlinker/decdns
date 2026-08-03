@@ -53,12 +53,14 @@ newtype Resolves = Resolves (Term, Term, Term, Term, Term, Term)
 instance Show Resolves where
   show (Resolves trip) = show trip
 
-fromTerm :: Term -> Maybe Resolves
-fromTerm (toView -> TVResolves ns t n _ recurse verify auth) = Just $ Resolves (canon ns, canon t, canon n, canon recurse, canon verify, auth)
-fromTerm _ = Nothing
-
 instance FromRule Resolves where
-  fromRule = fromTerm . rhead
+  fromRule r =
+    let rh = rhead $ replaceSingletons (Rule Nothing (rhead r) []) (TFunctor "const" [])
+    in fromTerm rh
+    where
+      fromTerm :: Term -> Maybe Resolves
+      fromTerm (toView -> TVResolves ns t n _ recurse verify auth) = Just $ Resolves (ns, t, n, recurse, verify, auth)
+      fromTerm _ = Nothing
 
 matches :: Resolves -> Name String -> Name String -> Bool
 matches (Resolves (nsT, nT, _, _, _, _)) ns n = unifies (list [nsT, nT]) (list [nameTerm ns, nameTerm n])
@@ -67,7 +69,7 @@ canon :: Term -> Term
 canon = replace aux
   where
     aux :: Term -> Term
-    aux (TVar _) = TWildcard
+    aux (TVar _) = TFunctor "const" []
     aux t = t
 
 type RecordDependencies = PO.PartialOrder ResolvableAt

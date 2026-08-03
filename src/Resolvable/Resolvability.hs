@@ -206,7 +206,8 @@ resolvableStep (map nameTerm -> rootServers) ns s@(Named n rs) =
 resolvableR :: Fresh (Rule (Maybe RComp))
 resolvableR = do
   (s, q, n, rec, v, a) <- freshVars6 ("S", "Q", "N", "R", "V", "A")
-  return $ Rule Nothing (resolvable s q n v a) [ resolves s q n TWildcard rec v a ]
+  wc <- wildcard
+  return $ Rule Nothing (resolvable s q n v a) [ resolves s q n wc rec v a ]
 
 allResolvable :: Rule (Maybe RComp)
 allResolvable =

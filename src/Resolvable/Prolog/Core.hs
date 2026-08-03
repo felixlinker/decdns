@@ -1,8 +1,14 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE InstanceSigs #-}
 module Resolvable.Prolog.Core
   -- TODO: Enforce usage of termView or exported constructors by hiding constructors of Term
   ( Term(..)
   , freshVar
+  , wildcard
+  , wildcards3
+  , wildcards4
+  , wildcards6
   , freshVars2
   , freshVars3
   , freshVars4
@@ -11,7 +17,6 @@ module Resolvable.Prolog.Core
   , freshVars7
   , freshVars8
   , replace
-  , equiv
   , emptyList
   , tList
   , list
@@ -29,6 +34,7 @@ module Resolvable.Prolog.Core
   , fact
   , isFact
   , mapRule
+  , replaceSingletons
   , (Resolvable.Prolog.Core.^)
 
   , (\=)
@@ -81,7 +87,7 @@ import Util.Bytes (toB64, toHex)
 import Util.Bool
 
 import qualified Data.ByteString as BS
-import Data.List (intercalate, groupBy, sortOn)
+import Data.List (intercalate, groupBy, sortOn, isPrefixOf)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.List.NonEmpty as NE
@@ -100,7 +106,6 @@ infixFunctors =
 data Term = TFunctor String [Term]
           | TEmptyList
           | TVar String
-          | TWildcard
           | TAtomQuoted String
           | TAtom String
           | TString String
@@ -110,6 +115,34 @@ data Term = TFunctor String [Term]
 
 freshVar :: String -> Fresh Term
 freshVar = fmap TVar . fresh
+
+wildcard :: Fresh Term
+wildcard = freshVar wildcardSym
+
+wildcards3 :: Fresh (Term, Term, Term)
+wildcards3 = do
+  wc1 <- wildcard
+  wc2 <- wildcard
+  wc3 <- wildcard
+  return (wc1, wc2, wc3)
+
+wildcards4 :: Fresh (Term, Term, Term, Term)
+wildcards4 = do
+  wc1 <- wildcard
+  wc2 <- wildcard
+  wc3 <- wildcard
+  wc4 <- wildcard
+  return (wc1, wc2, wc3, wc4)
+
+wildcards6 :: Fresh (Term, Term, Term, Term, Term, Term)
+wildcards6 = do
+  wc1 <- wildcard
+  wc2 <- wildcard
+  wc3 <- wildcard
+  wc4 <- wildcard
+  wc5 <- wildcard
+  wc6 <- wildcard
+  return (wc1, wc2, wc3, wc4, wc5, wc6)
 
 freshVars2 :: (String, String) -> Fresh (Term, Term)
 freshVars2 (a, b) = do
@@ -213,11 +246,6 @@ listWithTail xs t = go xs
 member :: Term -> Term -> Term
 member a b = TFunctor memberSym [ a, b ]
 
-equiv :: Term -> Term -> Bool
-equiv TWildcard _ = True
-equiv _ TWildcard = True
-equiv t1 t2 = t1 == t2
-
 instance Show Term where
   show t@(TFunctor op args)
     | op `elem` infixFunctors =
@@ -231,8 +259,9 @@ instance Show Term where
     | otherwise = op ++ "(" ++ intercalate ", " (map show args) ++ ")"
   show TEmptyList = "[]"
   show (TVar "") = undefined
-  show (TVar (h:t)) = toUpper h : t
-  show TWildcard = "_"
+  show v@(TVar (h:t))
+    | isWildcard v = "_"
+    | otherwise = toUpper h : t
   show (TAtom "") = undefined
   show (TAtom (h:t)) = toLower h : t
   show (TAtomQuoted a) =  "'" ++ a ++ "'"
@@ -246,7 +275,6 @@ walk :: Semigroup a => (Term -> a) -> Term -> a
 walk f t@(TFunctor _ args) = sconcat (f t NE.:| map (walk f) args)
 walk f TEmptyList = f TEmptyList
 walk f t@(TVar _) = f t
-walk f TWildcard = f TWildcard
 walk f t@(TAtomQuoted _) = f t
 walk f t@(TAtom _) = f t
 walk f t@(TString _) = f t
@@ -257,8 +285,11 @@ isVar :: Term -> Bool
 isVar (TVar {}) = True
 isVar _ = False
 
+wildcardSym :: String
+wildcardSym = "wildcard"
+
 isWildcard :: Term -> Bool
-isWildcard TWildcard = True
+isWildcard (TVar n) = wildcardSym `isPrefixOf` n
 isWildcard _ = False
 
 ground :: Term -> Bool
@@ -280,7 +311,6 @@ replace f t = rec (f t)
     rec (TFunctor op ts) = TFunctor op (map (replace f) ts)
     rec u@TEmptyList = u
     rec u@(TVar _) = u
-    rec u@TWildcard = u
     rec u@(TAtomQuoted _) = u
     rec u@(TAtom _) = u
     rec u@(TString _) = u
@@ -320,8 +350,13 @@ data Rule a = Rule
 instance Functor Rule where
   fmap f (Rule a h b) = Rule (f a) h b
 
-instance Show (Rule a) where
-  show r = case singletonsToWildcards r of
+instance forall a. Show (Rule a) where
+  show :: Rule a -> String
+  -- NOTE: Below, we replace all variables that occur only once with wildcard
+  -- variables. All these variables have technically the same variable name,
+  -- i.e., that compilation is unsound w.r.t. rule equivalance. But as the
+  -- compilation is only used to for showing, it is fine here.
+  show r = case replaceSingletons r (TVar wildcardSym) of
     Rule _ h [] -> show h ++ "."
     Rule _ h b -> show h ++ " :- " ++ intercalate ", " (map show b) ++ "."
 
@@ -334,19 +369,19 @@ isFact = null . rbody
 mapRule :: (Term -> Term) -> Rule a -> Rule a
 mapRule f (Rule a h b) = Rule a (f h) (map f b)
 
-varCount :: Rule a -> (String -> Int)
+varCount :: Rule a -> String -> Int
 varCount (Rule _ (varNames -> hvs) (concatMap varNames -> bvs)) =
   let vs = foldr (M.alter (Just . maybe 1 (+1))) M.empty (hvs ++ bvs)
   in fromMaybe 0 . (`M.lookup` vs)
 
-singletonsToWildcards :: Rule a -> Rule a
-singletonsToWildcards r = mapRule (replace repF) r
+replaceSingletons :: Rule a -> Term -> Rule a
+replaceSingletons r with = mapRule (replace repF) r
   where
     vc :: String -> Int
     vc = varCount r
 
     repF :: Term -> Term
-    repF v@(TVar n) = if vc n == 1 then TWildcard else v
+    repF v@(TVar n) = if vc n == 1 then with else v
     repF t = t
 
 showKnowledgeBase :: [Rule a] -> String

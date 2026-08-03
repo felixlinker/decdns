@@ -1,5 +1,5 @@
 module Resolvable.Util
-  ( genTermNoWildcard ) where
+  ( genTerm ) where
 
 import Test.Tasty.QuickCheck
 import Resolvable.Prolog.Core (Term(..))
@@ -12,8 +12,8 @@ names = elements (runFresh $ mapM (const $ fresh "v") ([0..4] :: [Int]))
 functors :: Gen String
 functors = oneof [ return ".", names ]
 
-genTermNoWildcard :: Gen Term
-genTermNoWildcard = do
+genTerm :: Gen Term
+genTerm = do
   n <- chooseInt (0, 6)
   go n
   where

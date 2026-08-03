@@ -7,7 +7,7 @@ import qualified Data.Map.Strict as M
 
 import Resolvable.Prolog.Core
 import Resolvable.Unification (Unifier(..), apply, unify, unifies)
-import Resolvable.Util (genTermNoWildcard)
+import Resolvable.Util (genTerm)
 
 tests :: TestTree
 tests =
@@ -22,8 +22,6 @@ tests =
         , testCase "propagates substitutions through bindings" propagatesBindings
         , testCase "list tail unifies against longer list" listTailUnifies
         , testCase "fails on different arity" mismatchedArityFails
-        , testCase "wildcard unifies without binding" wildcardKeepsIdentity
-        , testCase "wildcard unification is symmetric" wildcardUnificationSymmetric
         ]
     ]
 
@@ -51,39 +49,22 @@ mismatchedArityFails :: Assertion
 mismatchedArityFails =
   unify (TFunctor "p" [TAtom "a"]) (TFunctor "p" [TAtom "a", TAtom "b"]) @?= Nothing
 
-wildcardKeepsIdentity :: Assertion
-wildcardKeepsIdentity =
-  case unify TWildcard (TAtom "a") of
-    Nothing -> assertFailure "expected a unifier"
-    Just u -> apply u (TVar "X") @?= TVar "X"
-
-wildcardUnificationSymmetric :: Assertion
-wildcardUnificationSymmetric = do
-  let t = TFunctor "p" [TVar "X", TAtom "a"]
-  let assertIdentity u = apply u (TVar "X")
-  case unify TWildcard t of
-    Nothing -> assertFailure "expected wildcard on lhs to unify"
-    Just u -> assertIdentity u @?= TVar "X"
-  case unify t TWildcard of
-    Nothing -> assertFailure "expected wildcard on rhs to unify"
-    Just u -> assertIdentity u @?= TVar "X"
-
 prop_unify_apply_agrees :: Property
 prop_unify_apply_agrees =
-  forAll genTermNoWildcard $ \t1 ->
-    forAll genTermNoWildcard $ \t2 ->
+  forAll genTerm $ \t1 ->
+    forAll genTerm $ \t2 ->
       maybe (property True) (\u -> apply u t1 === apply u t2) (unify t1 t2)
 
 prop_unify_symmetric :: Property
 prop_unify_symmetric =
-  forAll genTermNoWildcard $ \t1 ->
-    forAll genTermNoWildcard $ \t2 ->
+  forAll genTerm $ \t1 ->
+    forAll genTerm $ \t2 ->
       unifies t1 t2 === unifies t2 t1
 
 prop_unify_normal :: Property
 prop_unify_normal =
-  forAll genTermNoWildcard $ \t1 ->
-    forAll genTermNoWildcard $ \t2 ->
+  forAll genTerm $ \t1 ->
+    forAll genTerm $ \t2 ->
       maybe (property True) (\u -> counterexample (show u) (isNormalUnifier u)) (unify t1 t2)
 
 isNormalUnifier :: Unifier -> Bool

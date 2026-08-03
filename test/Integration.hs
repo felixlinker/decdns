@@ -19,7 +19,7 @@ import NameConstraint
 import Parsing.Config (parseZoneFileZones)
 import DNS.Wellformedness (zoneWellformed)
 import Resolvable.Dependencies (ConstrainedQuery (CQuery), computeResolvable, queryFromRule)
-import Resolvable.Prolog.Core (Term (TWildcard), ad, nameTerm, resolves, top, ttypeTerm)
+import Resolvable.Prolog.Core (Term, ad, nameTerm, resolves, top, ttypeTerm, wildcard, wildcards4)
 import Resolvable.Resolvability (NameServersConfig, compileConfig, plResolvable)
 import Resolvable.Update.Dependencies (computeRegressions)
 import Resolvable.Update.Rollout (NSDiffs, diffServers)
@@ -449,26 +449,15 @@ coversTerm expected (CQuery actual constraints) =
       (CU.CUnifier U.identity constraints)
 
 queryTerm :: Query -> Term
-queryTerm (Query ns rtype qname) =
-  resolves
-    (nameTerm ns)
-    (ttypeTerm rtype)
-    (nameTerm qname)
-    TWildcard
-    TWildcard
-    TWildcard
-    TWildcard
+queryTerm (Query ns rtype qname) = runFresh $ do
+  (wc1, wc2, wc3, wc4) <- wildcards4
+  return $ resolves (nameTerm ns) (ttypeTerm rtype) (nameTerm qname) wc1 wc2 wc3 wc4
 
 resolutionTerm :: Resolution -> Term
-resolutionTerm (Resolution (Query ns rtype qname) verification auth) =
-  resolves
-    (nameTerm ns)
-    (ttypeTerm rtype)
-    (nameTerm qname)
-    TWildcard
-    TWildcard
-    verification
-    auth
+resolutionTerm (Resolution (Query ns rtype qname) verification auth) = runFresh $ do
+  wc1 <- wildcard
+  wc2 <- wildcard
+  return $ resolves (nameTerm ns) (ttypeTerm rtype) (nameTerm qname) wc1 wc2 verification auth
 
 resolvableQueries :: [FilePath] -> IO (S.Set ConstrainedQuery)
 resolvableQueries files = do

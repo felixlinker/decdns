@@ -90,8 +90,6 @@ simplifyL :: [(Term, Term)] -> Maybe [(String, Term)]
 simplifyL = fmap concat . mapM (uncurry simplifyNeq)
 
 simplifyNeq :: Term -> Term -> Maybe [(String, Term)]
-simplifyNeq TWildcard _ = Just []
-simplifyNeq _ TWildcard = Just []
 simplifyNeq a@(TVar vn) b = guard (a /= b) $> [(vn, b)]
 -- NOTE: a below cannot be a variable
 simplifyNeq a b@(TVar _) = simplifyNeq b a
