@@ -4,7 +4,9 @@ module Util.Monad
   , exceptMaybe
   , maybeExcept
   , failLeft
-  , handleError ) where
+  , failLeftS
+  , handleError
+  , handleErrorS ) where
 
 import Control.Monad.Trans.Except (Except, ExceptT, throwE, runExcept)
 
@@ -23,5 +25,11 @@ maybeExcept = either (const Nothing) Just . runExcept
 failLeft :: (MonadFail m, Show e) => Either e a -> m a
 failLeft = either (fail . show) return
 
+failLeftS :: (MonadFail m) => Either String a -> m a
+failLeftS = either fail return
+
 handleError :: (MonadFail m, Show e) => Except e a -> m a
 handleError = failLeft . runExcept
+
+handleErrorS :: (MonadFail m) => Except String a -> m a
+handleErrorS = failLeftS . runExcept

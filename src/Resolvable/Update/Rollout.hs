@@ -3,6 +3,7 @@ module Resolvable.Update.Rollout
   ( NSDiffs
   , diffServers
   , Rollout
+  , showRollOut
   , rollout ) where
 
 import Control.Monad (when)
@@ -24,6 +25,18 @@ canRollout deps ns n = PO.minimal deps $ ResolvableAt (ns, n)
 
 type NSDiffs = M.Map (Name String) (ZoneDiff ConstrainedLabel)
 
+showZoneDiff :: Name String -> ZoneDiff ConstrainedLabel -> [String]
+showZoneDiff ns d =
+    map indent
+  $ ("on server " ++ show ns ++ ":")
+    : map indent (lines (show d))
+  where
+    indent :: String -> String
+    indent s = if null s then "" else "  " ++ s
+
+showNSDiffs :: NSDiffs -> [String]
+showNSDiffs = M.foldrWithKey (\ns d -> (showZoneDiff ns d ++)) []
+
 diffServers :: NameServersConfig -> NameServersConfig -> NSDiffs
 diffServers old new = MM.merge
   (MM.mapMissing (\_ -> fmap deleted))
@@ -40,6 +53,11 @@ updateDeps diffs = PO.filter changed
 
 type Rollout = [NSDiffs]
 
+showRollOut :: Rollout -> [String]
+showRollOut r = do
+  (i, diffs) <- zip [(1 :: Int)..] r
+  ("step " ++ show i ++ "; roll out:") : showNSDiffs diffs
+
 rollout :: NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
 rollout diffs old new = do
   old' <- exceptMaybe "old dependencies cyclic" $ PO.transitiveClosure $ PO.invert $ PO.irreflexive old
@@ -51,7 +69,7 @@ rollout' acc (normalize -> diffs) (updateDeps diffs -> old) (updateDeps diffs ->
   | M.null diffs = return $ acc []
   | otherwise = do
     let (changes, next) = partitionDiffs diffs
-    when (null changes) (throwE "no changes")
+    when (null changes) (throwE $ unlines $ "no changes; rolled out so far:" : showRollOut (acc []) ++ ["remaining changes:"] ++ showNSDiffs next)
     rollout' (acc . (changes :)) next old new
   where
     partitionDiffs :: NSDiffs -> (NSDiffs, NSDiffs)
