@@ -47,20 +47,23 @@ rollout diffs old new = do
   rollout' id diffs old' new'
 
 rollout' :: (Rollout -> Rollout) -> NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
-rollout' acc (dropEmpty . M.map prune -> diffs) (updateDeps diffs -> old) (updateDeps diffs -> new)
+rollout' acc (normalize -> diffs) (updateDeps diffs -> old) (updateDeps diffs -> new)
   | M.null diffs = return $ acc []
   | otherwise = do
-    let (M.map prune -> changes, next) = partitionDiffs diffs
+    let (changes, next) = partitionDiffs diffs
     when (null changes) (throwE "no changes")
     rollout' (acc . (changes :)) next old new
   where
     partitionDiffs :: NSDiffs -> (NSDiffs, NSDiffs)
     partitionDiffs ds =
       let diffs' = M.mapWithKey partitionDiff ds
-      in (dropEmpty (M.map fst diffs'), dropEmpty (M.map snd diffs'))
+      in (normalize (M.map fst diffs'), normalize (M.map snd diffs'))
 
     partitionDiff :: Name String -> ZoneDiff ConstrainedLabel -> (ZoneDiff ConstrainedLabel, ZoneDiff ConstrainedLabel)
     partitionDiff ns = partition (\n _ -> canRollout new ns n && canRollout old ns n)
 
 dropEmpty :: NSDiffs -> NSDiffs
 dropEmpty = M.filter (not . isEmpty)
+
+normalize :: NSDiffs -> NSDiffs
+normalize = dropEmpty . M.map prune
