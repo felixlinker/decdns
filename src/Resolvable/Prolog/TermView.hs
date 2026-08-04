@@ -1,7 +1,6 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
 module Resolvable.Prolog.TermView
-  -- TODO: Enforce usage of termView or exported constructors by hiding constructors of Term
   ( Resolves(..)
   , TermView(..)
   , toView

@@ -2,7 +2,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE InstanceSigs #-}
 module Resolvable.Prolog.Core
-  -- TODO: Enforce usage of termView or exported constructors by hiding constructors of Term
   ( Term(..)
   , freshVar
   , wildcard
