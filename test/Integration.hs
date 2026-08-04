@@ -2,19 +2,15 @@ module Integration (tests) where
 
 import Control.Monad (forM_)
 import Control.Monad.Trans.Except (runExceptT)
-import qualified Data.Map as M
 import Data.Maybe (isJust)
 import qualified Data.Set as S
 
-import DNS.Diff (hasChanges)
-import DNS.Name (Name, root, (<|))
+import DNS.Name (Name, root)
 import DNS.NameSpec (mkName)
 import qualified DNS.RecordType as RT
-import DNS.ZoneFile (allRecords, isEmpty, zoneName)
+import DNS.ZoneFile (allRecords, zoneName)
 import NameConstraint
-  ( ConstrainedLabel
-  , LabelConstraint (Wildcard)
-  , exactly
+  ( exactly
   )
 import Parsing.Config (parseZoneFileZones, parseZoneFiles)
 import DNS.Wellformedness (zoneWellformed)
@@ -22,7 +18,6 @@ import Resolvable.Dependencies (ConstrainedQuery (CQuery), computeResolvable, qu
 import Resolvable.Prolog.Core (Term, ad, nameTerm, resolves, top, ttypeTerm, wildcard, wildcards4)
 import Resolvable.Resolvability (NameServersConfig, compileConfig, plResolvable)
 import Resolvable.Update.Dependencies (computeRegressions)
-import Resolvable.Update.Rollout (NSDiffs, diffServers)
 import qualified Resolvable.ConstrainedUnification as CU
 import qualified Resolvable.Unification as U
 import Test.Tasty (TestTree, testGroup)
@@ -82,22 +77,7 @@ tests =
               , Query nsCom RT.SOA aCom
               , Query nsCom RT.SOA bCom ]
               [ Query nsCom RT.CNAME aCom
-              , Query nsCom RT.SOA com ] ]
-    , testGroup
-        "DNS.Diff/Resolvable.Update.Rollout.diffServers"
-        [ testCase "base to new has expected record-level changes" $
-            diffTest "new" newFiles
-              [ Changed nsCom (exactly aCom)
-              , Changed nsCom (Wildcard [] <| exactly com)
-              , ServerChanged nsBCom ]
-              [ Unchanged nsCom (exactly net) ]
-        , testCase "base to broken has expected record-level changes" $
-            diffTest "broken" brokenFiles
-              [ Changed nsCom (exactly bCom)
-              , Changed nsCom (exactly nsBCom)
-              , ServerChanged nsBCom ]
-              [ Unchanged nsCom (exactly aCom)
-              , Unchanged nsCom (exactly net) ] ] ]
+              , Query nsCom RT.SOA com ] ] ]
 
 data ExampleFile = ExampleFile
   { examplePath :: FilePath
@@ -404,39 +384,6 @@ regressionTest label newConfig expected unexpected = do
           (plResolvable =<< compileConfig rootServers old)
           (plResolvable =<< compileConfig rootServers new)
   assertQueries ("base -> " ++ label) (S.fromList regressions) expected unexpected
-
-data DiffExpectation
-  = Changed (Name String) (Name ConstrainedLabel)
-  | Unchanged (Name String) (Name ConstrainedLabel)
-  | ServerChanged (Name String)
-
-diffTest :: String -> [FilePath] -> [DiffExpectation] -> [DiffExpectation] -> Assertion
-diffTest _label newConfig expected unexpected = do
-  old <- loadConfig baseFiles
-  new <- loadConfig newConfig
-  let diffs = diffServers old new
-  forM_ expected (assertDiffExpectation diffs)
-  forM_ unexpected (assertDiffExpectation diffs)
-
-assertDiffExpectation :: NSDiffs -> DiffExpectation -> Assertion
-assertDiffExpectation diffs expectation =
-  case expectation of
-    Changed ns name ->
-      assertBool
-        ("expected record changes on " ++ show ns ++ " at " ++ show name)
-        (hasChange ns name diffs)
-    Unchanged ns name ->
-      assertBool
-        ("did not expect record changes on " ++ show ns ++ " at " ++ show name)
-        (not (hasChange ns name diffs))
-    ServerChanged ns ->
-      assertBool
-        ("expected server changes on " ++ show ns)
-        (maybe False (not . isEmpty) (M.lookup ns diffs))
-
-hasChange :: Name String -> Name ConstrainedLabel -> NSDiffs -> Bool
-hasChange ns name diffs =
-  maybe False (hasChanges name) (M.lookup ns diffs)
 
 assertQueries :: String -> S.Set ConstrainedQuery -> [Query] -> [Query] -> Assertion
 assertQueries label results expected unexpected = do

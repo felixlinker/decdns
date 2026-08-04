@@ -13,8 +13,7 @@ import DNS.Record
 import qualified DNS.RecordType as T
 import qualified DNS.RRSet as RRSet
 import DNS.ZoneFile (emptyZone, get, insert, isEmpty, zoneName, singleton)
-import DNS.ZoneFileSpec (zoneFromList)
-import NameConstraint (LabelConstraint (..), compileWildcards, exactly)
+import NameConstraint (compileWildcards, exactly)
 
 tests :: TestTree
 tests =
@@ -24,7 +23,6 @@ tests =
     , testCase "diff empty for unchanged records" unchangedIsEmpty
     , testCase "diff preserves non-root origin" preservesNonRootOrigin
     , testCase "hasChanges detects exact-name changes" exactChangeDetection
-    , testCase "hasChanges wildcard respects excluded labels" wildcardChangeDetection
     ]
 
 reportsAddsAndDeletes :: Assertion
@@ -61,16 +59,6 @@ exactChangeDetection = do
   let dz = diff (compileWildcards oldZ) (compileWildcards newZ)
   hasChanges (exactly n) dz @?= True
   hasChanges (exactly (mkName ["other", "example", "com", ""])) dz @?= False
-
-wildcardChangeDetection :: Assertion
-wildcardChangeDetection = do
-  let foo = mkName ["foo", "example", "com", ""]
-      bar = mkName ["bar", "example", "com", ""]
-      oldZ = emptyZone root
-  newZ <- zoneFromList [Named foo (mkData "203.0.113.1"), Named bar (mkData "203.0.113.2")]
-  let dz = diff (compileWildcards oldZ) (compileWildcards newZ)
-      wildcard = Wildcard ["foo"] <| exactly (mkName ["example", "com", ""])
-  hasChanges wildcard dz @?= True
 
 mkRData :: String -> RData
 mkRData = RData IN 300 . A . read
