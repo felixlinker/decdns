@@ -1,5 +1,6 @@
 module Resolvable.Update.RolloutSpec (tests) where
 
+import Control.Monad.Trans.Except (runExcept)
 import qualified Data.Map as M
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertBool, (@?=), testCase)
@@ -32,7 +33,7 @@ immediateTxtAdd = do
       diffs = M.singleton (zoneName z) (diff (compileWildcards z) (compileWildcards z'))
   assertBool "expected TXT add diff to be non-empty" $
     maybe False (not . isEmpty) (M.lookup (zoneName z) diffs)
-  rollout diffs (dependencies z) (dependencies z') @?= Just [diffs]
+  runExcept (rollout diffs (dependencies z) (dependencies z')) @?= Right [diffs]
 
 immediateTxtDelete :: Assertion
 immediateTxtDelete = do
@@ -43,7 +44,7 @@ immediateTxtDelete = do
       diffs = M.singleton (zoneName zWithTxt) (diff (compileWildcards zWithTxt) (compileWildcards z))
   assertBool "expected TXT delete diff to be non-empty" $
     maybe False (not . isEmpty) (M.lookup (zoneName zWithTxt) diffs)
-  rollout diffs (dependencies zWithTxt) (dependencies z) @?= Just [diffs]
+  runExcept (rollout diffs (dependencies zWithTxt) (dependencies z)) @?= Right [diffs]
 
 dependencies :: Zone String -> RecordDependencies
 dependencies z =

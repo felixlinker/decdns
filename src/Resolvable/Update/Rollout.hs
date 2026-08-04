@@ -5,6 +5,8 @@ module Resolvable.Update.Rollout
   , Rollout
   , rollout ) where
 
+import Control.Monad (when)
+import Control.Monad.Trans.Except (Except, throwE)
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
 
@@ -15,6 +17,7 @@ import Resolvable.Resolvability
 import DNS.ZoneFile
 import NameConstraint
 import qualified Util.PartialOrder as PO
+import Util.Monad (exceptMaybe)
 
 canRollout :: RecordDependencies -> Name String -> ConstrainedName -> Bool
 canRollout deps ns n = PO.minimal deps $ ResolvableAt (ns, n)
@@ -37,20 +40,19 @@ updateDeps diffs = PO.filter changed
 
 type Rollout = [NSDiffs]
 
-rollout :: NSDiffs -> RecordDependencies -> RecordDependencies -> Maybe Rollout
+rollout :: NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
 rollout diffs old new = do
-  old' <- PO.transitiveClosure $ PO.invert old
-  new' <- PO.transitiveClosure new
-  return $ rollout' id diffs old' new'
+  old' <- exceptMaybe "old dependencies cyclic" $ PO.transitiveClosure $ PO.invert old
+  new' <- exceptMaybe "new dependencies cyclic" $ PO.transitiveClosure new
+  rollout' id diffs old' new'
 
-rollout' :: (Rollout -> Rollout) -> NSDiffs -> RecordDependencies -> RecordDependencies -> Rollout
+rollout' :: (Rollout -> Rollout) -> NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
 rollout' acc (dropEmpty . M.map prune -> diffs) (updateDeps diffs -> old) (updateDeps diffs -> new)
-  | M.null diffs = acc []
-  | otherwise = let (M.map prune -> changes, next) = partitionDiffs diffs
-                in  if null changes
-                    -- TODO: Gracefully fail should no rollout be possible
-                    then error "no changes"
-                    else rollout' (acc . (changes :)) next old new
+  | M.null diffs = return $ acc []
+  | otherwise = do
+    let (M.map prune -> changes, next) = partitionDiffs diffs
+    when (null changes) (throwE "no changes")
+    rollout' (acc . (changes :)) next old new
   where
     partitionDiffs :: NSDiffs -> (NSDiffs, NSDiffs)
     partitionDiffs ds =

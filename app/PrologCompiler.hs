@@ -72,12 +72,9 @@ main = do
       let nsDiff = diffServers oldRecs newRecs
       let oldDeps = runFresh $ fromRules <$> oldRecsC
       let newDeps = runFresh $ fromRules <$> newRecsC
-      let rolloutSeq = rollout nsDiff oldDeps newDeps
-      unless (null rolloutSeq) $ do
-        putStrLn $ maybe
-          "Update introduces resolution cycle"
-          (unlines . ("\n% You can roll out updates as follow.":) . showRollOut)
-          rolloutSeq
+      rolloutSeq <- handleError $ runExcept (rollout nsDiff oldDeps newDeps)
+      unless (null rolloutSeq) $
+        putStrLn $ unlines $ "\n% You can roll out updates as follow." : showRollOut rolloutSeq
     "visualize" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
