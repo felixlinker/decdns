@@ -42,6 +42,12 @@ export function sourceGroupKey(owner: string, server: string) {
   return `${owner}\u0000${server}`;
 }
 
+export function ruleNodeSourceLines(source: Pick<NamedSource, "owner" | "server" | "recordType"> | null) {
+  return source
+    ? { record: `${source.owner} ${source.recordType}`, server: `served by ${source.server}` }
+    : { record: "synthetic", server: "" };
+}
+
 export function groupSourcesByNameAndServer<T extends NamedSource>(sources: readonly T[]): NameGroup<T>[] {
   const grouped = new Map<string, T[]>();
   for (const source of sources) {

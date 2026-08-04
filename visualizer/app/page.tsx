@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { bodyToHeadEdge, groupSourcesByNameAndServer, minimizeArrowLayout, predicateFromOtherRule, ruleEdgePorts, sourceGroupKey, visualColumnOrder } from "./graph";
+import { bodyToHeadEdge, groupSourcesByNameAndServer, minimizeArrowLayout, predicateFromOtherRule, ruleEdgePorts, ruleNodeSourceLines, sourceGroupKey, visualColumnOrder } from "./graph";
 import type { NameGroup } from "./graph";
 
 type Source = {
@@ -426,6 +426,7 @@ export default function Home() {
                     const source = rule?.sourceId ? indexes.sources.get(rule.sourceId) : null;
                     if (!rule) return null;
                     const isCycle = cycleNodes.has(rule.id);
+                    const sourceLines = ruleNodeSourceLines(source);
                     return (
                       <g
                         key={rule.id}
@@ -433,15 +434,16 @@ export default function Home() {
                         className={`rule-node ${activeRuleId === rule.id ? "selected" : ""} ${isCycle ? "in-cycle" : ""}`}
                         role="button"
                         tabIndex={0}
-                        aria-label={`Inspect ${rule.id}`}
+                        aria-label={`Inspect ${rule.id}${source ? ` served by ${source.server}` : ""}`}
                         onClick={() => setSelectedRuleId(rule.id)}
                         onKeyDown={(event: KeyboardEvent<SVGGElement>) => { if (event.key === "Enter" || event.key === " ") setSelectedRuleId(rule.id); }}
                       >
                         <rect width={nodeWidth} height={nodeHeight} rx="10" />
                         <text x="15" y="25" className="node-id">{rule.id.toUpperCase()}</text>
                         {isCycle && <text x={nodeWidth - 16} y="25" textAnchor="end" className="cycle-label">CYCLE</text>}
-                        <text x="15" y="54" className="node-source">{truncate(`${source?.owner ?? "synthetic"} ${source?.recordType ?? ""}`, 47)}</text>
-                        <text x="15" y="81" className="node-head">{truncate(rule.head, 54)}</text>
+                        <text x="15" y="48" className="node-source">{truncate(sourceLines.record, 47)}</text>
+                        {sourceLines.server && <text x="15" y="64" className="node-server">{truncate(sourceLines.server, 55)}</text>}
+                        <text x="15" y="84" className="node-head">{truncate(rule.head, 54)}</text>
                         <text x={nodeWidth - 15} y="99" textAnchor="end" className="node-body-count">{rule.body.length} body</text>
                       </g>
                     );

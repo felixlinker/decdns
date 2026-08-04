@@ -111,9 +111,10 @@ button { color: inherit; }
 .rule-node.selected rect { fill: #f3f0ff; stroke: var(--purple); stroke-width: 2; }
 .rule-node.in-cycle rect { stroke: var(--red); stroke-width: 1.6; }
 .rule-node.selected.in-cycle rect { stroke-width: 2.4; }
-.node-id, .node-head, .node-source, .node-body-count, .cycle-label { pointer-events: none; }
+.node-id, .node-head, .node-source, .node-server, .node-body-count, .cycle-label { pointer-events: none; }
 .node-id { fill: #75858e; font: 700 9px var(--mono); letter-spacing: .06em; }
 .node-source { fill: var(--ink); font: 700 11px var(--mono); }
+.node-server { fill: #71818a; font: 8px var(--mono); }
 .node-head { fill: #5d6d76; font: 9px var(--mono); }
 .node-body-count { fill: #a0aba6; font: 8px var(--sans); }
 .cycle-label { fill: var(--red); font: 800 8px var(--sans); letter-spacing: .08em; }

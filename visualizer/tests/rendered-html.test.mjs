@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { bodyToHeadEdge, groupSourcesByNameAndServer, minimizeArrowLayout, predicateFromOtherRule, ruleEdgePorts, visualColumnOrder } from "../app/graph.ts";
+import { bodyToHeadEdge, groupSourcesByNameAndServer, minimizeArrowLayout, predicateFromOtherRule, ruleEdgePorts, ruleNodeSourceLines, visualColumnOrder } from "../app/graph.ts";
 import { readVisualizationCatalog, readVisualizationFile } from "../build/visualization-directory.ts";
 
 async function render() {
@@ -117,6 +117,14 @@ test("left-column sources are grouped by name and name server, not record type",
   assert.deepEqual(groups[0].ruleIds, ["r1", "r2"]);
   assert.equal(groups[1].server, "ns2.");
   assert.deepEqual(groups[1].ruleIds, ["r3"]);
+});
+
+test("rule nodes identify the name server serving their source record", () => {
+  assert.deepEqual(
+    ruleNodeSourceLines({ owner: "example.", server: "ns1.example.", recordType: "A" }),
+    { record: "example. A", server: "served by ns1.example." },
+  );
+  assert.deepEqual(ruleNodeSourceLines(null), { record: "synthetic", server: "" });
 });
 
 test("dependency cards show the unchanged predicate from the other rule", () => {
