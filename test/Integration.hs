@@ -3,7 +3,7 @@ module Integration (tests) where
 import Control.Monad (forM_)
 import Control.Monad.Trans.Except (runExceptT)
 import qualified Data.Map as M
-import Data.Maybe (isJust, mapMaybe)
+import Data.Maybe (isJust)
 import qualified Data.Set as S
 
 import DNS.Diff (hasChanges)
@@ -28,6 +28,7 @@ import qualified Resolvable.Unification as U
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertBool, assertFailure, testCase, (@?=))
 import Util.Fresh (runFresh)
+import Util.Monad (failLeft, handleError)
 
 tests :: TestTree
 tests =
@@ -396,7 +397,7 @@ regressionTest :: String -> [FilePath] -> [Query] -> [Query] -> Assertion
 regressionTest label newConfig expected unexpected = do
   old <- loadConfig baseFiles
   new <- loadConfig newConfig
-  regressions <- assertRight $
+  regressions <- failLeft $
     runFresh $
       runExceptT $
         computeRegressions
@@ -491,11 +492,9 @@ resolvableQueries :: [FilePath] -> IO (S.Set ConstrainedQuery)
 resolvableQueries files = do
   cfg <- loadConfig files
   let rules = runFresh $ plResolvable =<< compileConfig rootServers cfg
-  resolvableRules <- assertRight (runFresh $ runExceptT $ computeResolvable True rules)
-  return $ S.fromList $ mapMaybe queryFromRule $ S.toList resolvableRules
+  resolvableRules <- handleError (computeResolvable True rules)
+  qs <- handleError (traverse queryFromRule $ S.toList resolvableRules)
+  return $ S.fromList qs
 
 loadConfig :: [FilePath] -> IO NameServersConfig
 loadConfig = parseZoneFiles zoneWellformed
-
-assertRight :: Show e => Either e a -> IO a
-assertRight = either (assertFailure . show) return

@@ -11,6 +11,7 @@ import Resolvable.Update.Resolvability
 import Resolvable.Update.Rollout (diffServers, Rollout, rollout)
 import Resolvable.Dependencies (computeResolvable, fromRules)
 import Util.Fresh (runFresh)
+import Util.Monad (failLeft, handleError)
 
 import System.Environment (getArgs)
 import Util
@@ -20,8 +21,7 @@ import qualified Data.Set as S
 import Resolvable.Update.Dependencies (computeRegressions)
 import Control.Monad (unless)
 import DNS.Name (Name)
-import Control.Monad.Trans.Except (runExceptT, runExcept)
-import GHC.Base (failIO)
+import Control.Monad.Trans.Except (runExceptT)
 import Parsing (parseNameM, parseTypeM)
 import Parsing.Config (parseZoneFiles)
 import Query (queryStep)
@@ -51,7 +51,7 @@ main = do
       rootServers <- parseNames roots
       cfg <- parseZones zones
       let compiled = runFresh $ plResolvable =<< compileConfig rootServers cfg
-      res <- handleError $ runExcept (computeResolvable True compiled)
+      res <- handleError (computeResolvable True compiled)
       putStrLn $ showKnowledgeBase $ S.toList res
     "diff" -> do
       (old, new) <- sepBy "--" args
@@ -67,12 +67,12 @@ main = do
       newRecs <- parseZones new
       let oldRecsC = compileConfig roots oldRecs
       let newRecsC = compileConfig roots newRecs
-      regs <- handleError $ runFresh $ runExceptT $ computeRegressions (plResolvable =<< oldRecsC) (plResolvable =<< newRecsC)
+      regs <- failLeft $ runFresh $ runExceptT $ computeRegressions (plResolvable =<< oldRecsC) (plResolvable =<< newRecsC)
       mapM_ print regs
       let nsDiff = diffServers oldRecs newRecs
       let oldDeps = runFresh $ fromRules <$> oldRecsC
       let newDeps = runFresh $ fromRules <$> newRecsC
-      rolloutSeq <- handleError $ runExcept (rollout nsDiff oldDeps newDeps)
+      rolloutSeq <- handleError (rollout nsDiff oldDeps newDeps)
       unless (null rolloutSeq) $
         putStrLn $ unlines $ "\n% You can roll out updates as follow." : showRollOut rolloutSeq
     "visualize" -> do
@@ -90,7 +90,7 @@ main = do
       qname <- parseNameM qnameString
       qtype <- parseTypeM qtypeString
       compiled <- compileConfig rootServers <$> parseResponse
-      kb <- handleError $ runExcept $ queryStep qname qtype compiled
+      kb <- handleError $ queryStep qname qtype compiled
       let answers = filter isFact $ S.toList kb
       if null answers
         then mapM_ print $ followUpQueries kb
@@ -102,9 +102,6 @@ main = do
 
     parseResponse :: IO NameServersConfig
     parseResponse = parseStdin responseWellformed
-
-    handleError :: Show a => Either a b -> IO b
-    handleError = either (failIO . show) return
 
     popArg :: [String] -> IO (String, [String])
     popArg = maybe (fail "too few arguments") return . uncons
