@@ -15,7 +15,7 @@ module Resolvable.Dependencies
   , fromRules
   , computeResolvable ) where
 
-import Control.Monad (when, filterM, guard)
+import Control.Monad (when, filterM, guard, unless)
 import Control.Monad.Trans.Except (ExceptT, Except, runExcept, throwE)
 import qualified Control.Monad.Trans.State as St
 import Data.Bifunctor (Bifunctor(bimap))
@@ -125,10 +125,10 @@ instance Apply (Maybe ConstrainedQuery) where
 toRule :: ConstrainedQuery -> Rule ()
 toRule (CQuery q neqs) = Rule () q (CU.asPredicates neqs)
 
-queryFromRule :: Rule a -> Maybe ConstrainedQuery
+queryFromRule :: Monad m => Rule a -> ExceptT String m ConstrainedQuery
 queryFromRule (Rule _ h b) = do
-  (rest, cu) <- grabNeqs b CU.identity
-  guard (null rest)
+  (rest, cu) <- exceptMaybe "contradictory body" $ grabNeqs b CU.identity
+  unless (null rest) (throwE "predicate other than inequality in body")
   return $ CQuery h (CU.constraints cu)
 
 grabNeqs :: [Term] -> CU.ConstrainedUnifier -> Maybe ([Term], CU.ConstrainedUnifier)
