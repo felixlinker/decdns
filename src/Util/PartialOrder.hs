@@ -12,6 +12,7 @@ module Util.PartialOrder
   , minima
   , minimal
   , transitiveClosure
+  , irreflexive
   , invert
   , insert
   , remove
@@ -74,6 +75,9 @@ transitiveClosure (PartialOrder d) =
     foldf (k, vs) acc =
       let vs' = foldr (\v s -> maybe s (<> s) (M.lookup v acc)) vs vs
       in M.insert k vs' acc
+
+irreflexive :: Eq a => PartialOrder a -> PartialOrder a
+irreflexive (PartialOrder m) = PartialOrder $ M.mapWithKey (\k -> S.filter (/= k)) m
 
 invert :: Ord a => PartialOrder a -> PartialOrder a
 invert (PartialOrder m) = foldr (uncurry foldF) empty (M.toList m)

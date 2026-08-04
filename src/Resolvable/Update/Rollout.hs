@@ -42,8 +42,8 @@ type Rollout = [NSDiffs]
 
 rollout :: NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
 rollout diffs old new = do
-  old' <- exceptMaybe "old dependencies cyclic" $ PO.transitiveClosure $ PO.invert old
-  new' <- exceptMaybe "new dependencies cyclic" $ PO.transitiveClosure new
+  old' <- exceptMaybe "old dependencies cyclic" $ PO.transitiveClosure $ PO.invert $ PO.irreflexive old
+  new' <- exceptMaybe "new dependencies cyclic" $ PO.transitiveClosure $ PO.irreflexive new
   rollout' id diffs old' new'
 
 rollout' :: (Rollout -> Rollout) -> NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
