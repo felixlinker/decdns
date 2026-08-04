@@ -20,6 +20,8 @@ import DNS.ZoneFile
 import qualified Util.Tree as T
 import Data.Bifunctor (Bifunctor(bimap))
 import NameConstraint
+import Data.Bifoldable (Bifoldable(bifoldr))
+import Data.Bitraversable (Bitraversable(bitraverse))
 
 -- Left is deleted, Right is added
 newtype Diff a = Diff
@@ -28,6 +30,12 @@ newtype Diff a = Diff
 
 instance Functor Diff where
   fmap f (Diff e) = Diff $ bimap f f e
+
+instance Foldable Diff where
+  foldr f acc (Diff e) = bifoldr f f acc e
+
+instance Traversable Diff where
+  traverse f (Diff e) = Diff <$> bitraverse f f e
 
 instance Show a => Show (Diff a) where
   show (Diff (Left a)) = "delete: " ++ show a

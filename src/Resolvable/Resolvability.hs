@@ -4,6 +4,7 @@ module Resolvable.Resolvability
   , fromZone
   , NameServersConfig
   , mergeConfig
+  , compileRRSet
   , compileConfig
   , plResolvable ) where
 
@@ -225,11 +226,11 @@ allResolvable =
     bagof :: Term -> Term -> Term -> Term
     bagof x y z = TFunctor "bagof" [ x, y, z ]
 
+compileRRSet :: [Name String] -> Name String -> ConstrainedRRSet -> Fresh (S.Set (Rule (Maybe RComp)))
+compileRRSet rootServers ns rs = (<>) <$> resolvableBase rootServers ns rs <*> resolvableStep rootServers ns rs
+
 fromZone :: [Name String] -> Name String -> Zone ConstrainedLabel -> Fresh (S.Set (Rule (Maybe RComp)))
-fromZone rootServers ns z = mconcat <$> mapM rrsetToRules (allRRSets z)
-  where
-    rrsetToRules :: ConstrainedRRSet -> Fresh (S.Set (Rule (Maybe RComp)))
-    rrsetToRules r = (<>) <$> resolvableBase rootServers ns r <*> resolvableStep rootServers ns r
+fromZone rootServers ns z = mconcat <$> mapM (compileRRSet rootServers ns) (allRRSets z)
 
 type NameServersConfig = [(Name String, Zone ConstrainedLabel)]
 

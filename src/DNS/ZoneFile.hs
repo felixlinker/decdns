@@ -24,7 +24,8 @@ module DNS.ZoneFile
   , mergeZones
   , noMatching
   , partition
-  , allNamed ) where
+  , allNamed
+  , traverseNamed ) where
 
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
@@ -160,3 +161,6 @@ partition p (Zone org r) = bimap (Zone org) (Zone org) (T.partition (RRSet.parti
 
 allNamed :: (Name a -> RRSet.RDataSet -> Bool) -> Zone a -> Bool
 allNamed f (Zone org r) = T.allNamed f org r
+
+traverseNamed :: Applicative f => (Name a -> t1 u -> f (t2 v)) -> AZone a t1 u -> f (AZone a t2 v)
+traverseNamed f (Zone org r) = Zone org <$> T.traverseNamed f org r

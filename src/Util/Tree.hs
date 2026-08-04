@@ -15,6 +15,8 @@ module Util.Tree
   , fmerge
   , merge
   , partition
+  , mapNamed
+  , traverseNamed
   , allNamed ) where
 
 import qualified Data.Map as M
@@ -113,5 +115,11 @@ partition p = go []
           rec = M.mapWithKey (go . (:path)) cs
       in (Node top (M.map fst rec), Node bot (M.map snd rec))
 
+mapNamed :: (Name a -> u -> v) -> Name a -> Node a u -> Node a v
+mapNamed f owner (Node d cs) = Node (f owner d) (M.mapWithKey (\k -> mapNamed f (k <| owner)) cs)
+
+traverseNamed :: Applicative f => (Name a -> u -> f v) -> Name a -> Node a u -> f (Node a v)
+traverseNamed f owner (Node d cs) = Node <$> f owner d <*> M.traverseWithKey (\k -> traverseNamed f (k <| owner)) cs
+
 allNamed :: (Name a -> v -> Bool) -> Name a -> Node a v -> Bool
-allNamed f owner (Node d cs) = f owner d && and (M.mapWithKey (\k -> allNamed f (k <| owner)) cs)
+allNamed f owner n = and (mapNamed f owner n)
