@@ -68,7 +68,8 @@ prop_unify_normal =
       maybe (property True) (\u -> counterexample (show u) (isNormalUnifier u)) (unify t1 t2)
 
 isNormalUnifier :: Unifier -> Bool
-isNormalUnifier (Unifier m) = all noVarInOtherTerms (M.keys m)
+isNormalUnifier (Unifier m) = all noVarInOtherTerms (M.keys m) && all isVar (M.keys m)
   where
+    -- Substituted term does not occur in image of unifier
     noVarInOtherTerms :: Term -> Bool
     noVarInOtherTerms v = not $ any (subterm v) (M.elems m)
