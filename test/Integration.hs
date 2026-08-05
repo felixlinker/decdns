@@ -104,8 +104,8 @@ exampleFiles =
   , ExampleFile "examples/cname/signed-nsec3/ns.com." com 22
   , ExampleFile "examples/cname/signed-nsec3/ns.b.com." bCom 18
   , ExampleFile "examples/ns/self-deleg/ns.com." com 6
-  , ExampleFile "examples/ns/cyclic-deleg/root.net." dnsRoot 8
-  , ExampleFile "examples/ns/cyclic-deleg/ns.net." net 5 ]
+  , ExampleFile "examples/ns/sub-self-deleg/root.net." dnsRoot 8
+  , ExampleFile "examples/ns/sub-self-deleg/ns.net." net 5 ]
 
 data ExampleConfig = ExampleConfig
   { configName :: String
@@ -214,7 +214,7 @@ exampleConfigs =
       , Query nsCom RT.A subACom ]
       [Query nsCom RT.TXT subACom]
   , ExampleConfig
-      "ns/cyclic-deleg"
+      "ns/sub-self-deleg"
       cyclicDelegFiles
       [ Query rootNet RT.NS dnsRoot
       , Query rootNet RT.SOA dnsRoot
@@ -268,8 +268,8 @@ signedNsec3Files =
 selfDelegFiles = ["examples/ns/self-deleg/ns.com."]
 
 cyclicDelegFiles =
-  [ "examples/ns/cyclic-deleg/root.net."
-  , "examples/ns/cyclic-deleg/ns.net." ]
+  [ "examples/ns/sub-self-deleg/root.net."
+  , "examples/ns/sub-self-deleg/ns.net." ]
 
 data Query = Query (Name String) RT.Type (Name String)
   deriving Eq
