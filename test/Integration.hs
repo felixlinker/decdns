@@ -15,7 +15,7 @@ import NameConstraint
 import Parsing.Config (parseZoneFileZones, parseZoneFiles)
 import DNS.Wellformedness (zoneWellformed)
 import Resolvable.Dependencies (ConstrainedQuery (CQuery), computeResolvable, queryFromRule)
-import Resolvable.Prolog.Core (Term, ad, nameTerm, resolves, top, ttypeTerm, wildcard, wildcards4)
+import Resolvable.Prolog.Core (Term, ad, nameTerm, resolvable, resolves, top, ttypeTerm, wildcard, wildcards4)
 import Resolvable.Resolvability (NameServersConfig, compileConfig, plResolvable)
 import Resolvable.Update.Dependencies (computeRegressions)
 import qualified Resolvable.ConstrainedUnification as CU
@@ -383,18 +383,24 @@ regressionTest label newConfig expected unexpected = do
         computeRegressions
           (plResolvable =<< compileConfig rootServers old)
           (plResolvable =<< compileConfig rootServers new)
-  assertQueries ("base -> " ++ label) (S.fromList regressions) expected unexpected
+  assertResolvableQueries ("base -> " ++ label) (S.fromList regressions) expected unexpected
 
 assertQueries :: String -> S.Set ConstrainedQuery -> [Query] -> [Query] -> Assertion
-assertQueries label results expected unexpected = do
+assertQueries = assertQueriesWith queryTerm
+
+assertResolvableQueries :: String -> S.Set ConstrainedQuery -> [Query] -> [Query] -> Assertion
+assertResolvableQueries = assertQueriesWith resolvableQueryTerm
+
+assertQueriesWith :: (Query -> Term) -> String -> S.Set ConstrainedQuery -> [Query] -> [Query] -> Assertion
+assertQueriesWith toTerm label results expected unexpected = do
   forM_ expected $ \query ->
     assertBool
       (label ++ " should include " ++ show query ++ "\n" ++ showResults results)
-      (any (coversQuery query) results)
+      (any (coversTerm (toTerm query)) results)
   forM_ unexpected $ \query ->
     assertBool
       (label ++ " should not include " ++ show query ++ "\n" ++ showResults results)
-      (not (any (coversQuery query) results))
+      (not (any (coversTerm (toTerm query)) results))
 
 assertResolutions :: String -> S.Set ConstrainedQuery -> [Resolution] -> [Resolution] -> Assertion
 assertResolutions label results expected unexpected = do
@@ -409,9 +415,6 @@ assertResolutions label results expected unexpected = do
 
 showResults :: S.Set ConstrainedQuery -> String
 showResults = unlines . map show . S.toList
-
-coversQuery :: Query -> ConstrainedQuery -> Bool
-coversQuery = coversTerm . queryTerm
 
 coversResolution :: Resolution -> ConstrainedQuery -> Bool
 coversResolution = coversTerm . resolutionTerm
@@ -428,6 +431,9 @@ queryTerm :: Query -> Term
 queryTerm (Query ns rtype qname) = runFresh $ do
   (wc1, wc2, wc3, wc4) <- wildcards4
   return $ resolves (nameTerm ns) (ttypeTerm rtype) (nameTerm qname) wc1 wc2 wc3 wc4
+
+resolvableQueryTerm :: Query -> Term
+resolvableQueryTerm (Query ns rtype qname) = runFresh $ resolvable (nameTerm ns) (ttypeTerm rtype) (nameTerm qname) <$> wildcard <*> wildcard
 
 resolutionTerm :: Resolution -> Term
 resolutionTerm (Resolution (Query ns rtype qname) verification auth) = runFresh $ do
