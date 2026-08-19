@@ -31,8 +31,9 @@ tests =
     "Examples"
     [ testGroup "Parsing/DNS.ZoneFile/Wellformedness" $
         map exampleFileTest exampleFiles
-    , testGroup "Resolvable.Resolvability" $
-        map exampleConfigTest exampleConfigs
+    , testGroup "Resolvable.Resolvability"
+        ( testCase "ns/cyclic-deleg has cyclic dependencies" (cyclicDependenciesTest cyclicDelegFiles)
+        : map exampleConfigTest exampleConfigs)
     , testGroup
         "Resolvable.Resolvability authentication"
         [ testCase "signed authenticates the CNAME chain and child zone" $
@@ -66,7 +67,10 @@ tests =
               , Query nsCom RT.NS bCom
               , Query nsCom RT.SOA aCom
               , Query nsCom RT.SOA bCom ]
-              [ Query nsCom RT.SOA com ]
+              [ Query nsCom RT.A aCom
+              , Query nsCom RT.A bCom
+              , Query nsCom RT.A nsBCom
+              , Query nsCom RT.SOA com ]
         , testCase "base to broken has expected unsigned regression facts" $
             regressionTest "broken" brokenFiles
               [ Query nsCom RT.A aCom
@@ -105,7 +109,10 @@ exampleFiles =
   , ExampleFile "examples/cname/signed-nsec3/ns.b.com." bCom 18
   , ExampleFile "examples/ns/self-deleg/ns.com." com 6
   , ExampleFile "examples/ns/sub-self-deleg/root.net." dnsRoot 8
-  , ExampleFile "examples/ns/sub-self-deleg/ns.net." net 5 ]
+  , ExampleFile "examples/ns/sub-self-deleg/ns.net." net 5
+  , ExampleFile "examples/ns/cyclic-deleg/root.net." dnsRoot 6
+  , ExampleFile "examples/ns/cyclic-deleg/ns.net." net 5
+  , ExampleFile "examples/ns/cyclic-deleg/root.com." dnsRoot 7 ]
 
 data ExampleConfig = ExampleConfig
   { configName :: String
@@ -215,7 +222,7 @@ exampleConfigs =
       [Query nsCom RT.TXT subACom]
   , ExampleConfig
       "ns/sub-self-deleg"
-      cyclicDelegFiles
+      subSelfDelegFiles
       [ Query rootNet RT.NS dnsRoot
       , Query rootNet RT.SOA dnsRoot
       , Query rootNet RT.NS net
@@ -231,7 +238,7 @@ exampleConfigs =
       [Query rootNet RT.TXT subRootNet] ]
 
 baseFiles, newFiles, brokenFiles, partiallySignedFiles, signedFiles, signedNonZoneKeyFiles :: [FilePath]
-cyclicDelegFiles, selfDelegFiles :: [FilePath]
+cyclicDelegFiles, selfDelegFiles, subSelfDelegFiles :: [FilePath]
 partiallySignedNsec3Files, partiallySignedNsec3OOFiles, signedNsec3Files :: [FilePath]
 baseFiles =
   [ "examples/cname/base/ns.com."
@@ -267,9 +274,14 @@ signedNsec3Files =
 
 selfDelegFiles = ["examples/ns/self-deleg/ns.com."]
 
-cyclicDelegFiles =
+subSelfDelegFiles =
   [ "examples/ns/sub-self-deleg/root.net."
   , "examples/ns/sub-self-deleg/ns.net." ]
+
+cyclicDelegFiles =
+  [ "examples/ns/cyclic-deleg/root.net."
+  , "examples/ns/cyclic-deleg/ns.net."
+  , "examples/ns/cyclic-deleg/root.com." ]
 
 data Query = Query (Name String) RT.Type (Name String)
   deriving Eq
@@ -329,6 +341,15 @@ exampleConfigTest example =
       results
       (expectedQueries example)
       (unexpectedQueries example)
+
+cyclicDependenciesTest :: [FilePath] -> Assertion
+cyclicDependenciesTest files = do
+  cfg <- loadConfig files
+  let rules = runFresh $ plResolvable =<< compileConfig rootServers cfg
+  result <- runExceptT $ computeResolvable True rules
+  case result of
+    Left err -> err @?= "cyclic dependencies"
+    Right _ -> assertFailure "expected cyclic dependencies"
 
 authenticatedResolutionTest :: String -> [FilePath] -> Assertion
 authenticatedResolutionTest label files = do

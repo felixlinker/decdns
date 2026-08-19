@@ -31,6 +31,9 @@ extra-source-files:
     examples/cname/signed-nsec3/ns.com.
     examples/cname/signed/ns.b.com.
     examples/cname/signed/ns.com.
+    examples/ns/cyclic-deleg/ns.net.
+    examples/ns/cyclic-deleg/root.com.
+    examples/ns/cyclic-deleg/root.net.
     examples/ns/self-deleg/ns.com.
     examples/ns/sub-self-deleg/ns.net.
     examples/ns/sub-self-deleg/root.net.
