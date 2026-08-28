@@ -84,8 +84,8 @@ dependencyMatch lrg@(Rule _ (toView -> TVResolves {}) b) sml@(Rule _ h@(toView -
     unifyBodyPredicate :: Term -> Maybe (Term, Unifier)
     unifyBodyPredicate p = do
       u <- unify p h
-      -- TODO: Use Maybe as MonadFail
-      let (TVResolves (Resolves { resolvesQName = qn })) = toView p
+      -- Use return so that failures in pattern matching result in Nothing
+      (TVResolves (Resolves { resolvesQName = qn })) <- return $ toView p
       let vs = vars qn
       guard (S.null vs || nonTrivial (restrict vs u))
       return (p, u)
