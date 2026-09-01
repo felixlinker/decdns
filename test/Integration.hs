@@ -32,8 +32,7 @@ tests =
     [ testGroup "Parsing/DNS.ZoneFile/Wellformedness" $
         map exampleFileTest exampleFiles
     , testGroup "Resolvable.Resolvability"
-        ( testCase "ns/cyclic-deleg has cyclic dependencies" (cyclicDependenciesTest cyclicDelegFiles)
-        : map exampleConfigTest exampleConfigs)
+        (map exampleConfigTest exampleConfigs)
     , testGroup
         "Resolvable.Resolvability authentication"
         [ testCase "signed authenticates the CNAME chain and child zone" $
@@ -342,15 +341,6 @@ exampleConfigTest example =
       (expectedQueries example)
       (unexpectedQueries example)
 
-cyclicDependenciesTest :: [FilePath] -> Assertion
-cyclicDependenciesTest files = do
-  cfg <- loadConfig files
-  let rules = runFresh $ plResolvable =<< compileConfig rootServers cfg
-  result <- runExceptT $ computeResolvable True rules
-  case result of
-    Left err -> err @?= "cyclic dependencies"
-    Right _ -> assertFailure "expected cyclic dependencies"
-
 authenticatedResolutionTest :: String -> [FilePath] -> Assertion
 authenticatedResolutionTest label files = do
   results <- resolvableQueries files
@@ -466,7 +456,7 @@ resolvableQueries :: [FilePath] -> IO (S.Set ConstrainedQuery)
 resolvableQueries files = do
   cfg <- loadConfig files
   let rules = runFresh $ plResolvable =<< compileConfig rootServers cfg
-  resolvableRules <- handleError (computeResolvable True rules)
+  let resolvableRules = computeResolvable True rules
   qs <- handleError (traverse queryFromRule $ S.toList resolvableRules)
   return $ S.fromList qs
 

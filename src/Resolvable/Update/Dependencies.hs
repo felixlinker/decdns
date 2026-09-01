@@ -19,8 +19,8 @@ computeRegressions :: Fresh (S.Set (Rule (Maybe RComp))) -> Fresh (S.Set (Rule (
 computeRegressions (toExcept -> oldf) (toExcept -> newf) = do
   oldRs <- oldf
   newRs <- newf
-  resOld <- traverse queryFromRule . S.toList =<< computeResolvable True oldRs
-  resNew <- traverse queryFromRule . S.toList =<< computeResolvable True newRs
+  resOld <- traverse queryFromRule $ S.toList $ computeResolvable True oldRs
+  resNew <- traverse queryFromRule $ S.toList $ computeResolvable True newRs
   return $ concatMap ((`withouts` map resolvableQuery resNew) . resolvableQuery) resOld
 
 -- TODO: Restrict neqs to variables that occur in new head term

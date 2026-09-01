@@ -16,7 +16,7 @@ module Resolvable.Dependencies
   , fromRules
   , computeResolvable ) where
 
-import Control.Monad (when, filterM, guard, unless)
+import Control.Monad (filterM, guard, unless, foldM)
 import Control.Monad.Trans.Except (ExceptT, Except, runExcept, throwE)
 import qualified Control.Monad.Trans.State as St
 import Data.Bifunctor (Bifunctor(bimap))
@@ -35,6 +35,7 @@ import Resolvable.Prolog.TermView
 import Resolvable.Resolvability (RComp (RComp))
 import Resolvable.Unification
 import qualified Util.Graph as G
+import qualified Util.CondensationGraph as CG
 import Util.Monad (exceptMaybe)
 
 class FromRule t where
@@ -85,10 +86,6 @@ dependencyMatch lrg@(Rule _ (toView -> TVResolves {}) b) sml@(Rule _ h@(toView -
     unifyBodyPredicate :: Term -> Maybe (Term, Unifier)
     unifyBodyPredicate p = do
       u <- unify p h
-      -- Use return so that failures in pattern matching result in Nothing
-      (TVResolves (Resolves { resolvesQName = qn })) <- return $ toView p
-      let vs = vars qn
-      guard (S.null vs || nonTrivial (restrict vs u))
       return (p, u)
 dependencyMatch _ _ = Nothing
 
@@ -105,6 +102,12 @@ fromRules rs = foldr go G.empty rs
     go r acc =
       let smaller = foldr (maybe id S.insert . fromRule) S.empty $ S.filter (isJust . dependencyMatch r) rs  :: S.Set a
       in  maybe acc (\r' -> G.insert r' smaller acc) (fromRule r)
+
+resolutionOrder :: S.Set (Rule (Maybe RComp)) -> G.Graph (Rule (Maybe RComp))
+resolutionOrder rs = foldr go G.empty rs
+  where
+    go :: Rule (Maybe RComp) -> G.Graph (Rule (Maybe RComp)) -> G.Graph (Rule (Maybe RComp))
+    go r = G.insert r (S.filter (isJust . dependencyMatch r) rs)
 
 -- TODO: Refactor
 data ConstrainedQuery = CQuery Term CU.Neqs
@@ -223,18 +226,30 @@ solveBody keepGround rs (Rule ann h b) = S.fromList $ map (\(u, b') -> CU.apply 
             returnWhen :: a -> Bool -> Maybe a
             returnWhen a = ($> a) . guard
 
-computeResolvable :: Monad m => Bool -> S.Set (Rule (Maybe RComp)) -> ExceptT String m (S.Set (Rule (Maybe RComp)))
+type Changed = St.State Bool
+
+fixpoint :: (Foldable t, Ord a) => Bool -> t (Rule a) -> S.Set (Rule a) -> S.Set (Rule a)
+fixpoint keepGround addFrom acc =
+  let (rs, changed) = St.runState (foldM (flip aux) acc addFrom) False
+  in  if changed then fixpoint keepGround addFrom acc else rs
+  where
+    checkInsert :: Ord a => a -> S.Set a -> Changed (S.Set a)
+    checkInsert = S.alterF (\found -> St.modify (not found ||) >> return True)
+
+    aux :: Ord a => Rule a -> S.Set (Rule a) -> Changed (S.Set (Rule a))
+    aux r acc' = foldM (flip checkInsert) acc' (solveBody keepGround acc' r)
+
+computeResolvable :: Bool -> S.Set (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp))
 computeResolvable keepGround (S.filter (isResolves . rhead) -> rs) = do
-  ord <- exceptMaybe "cyclic dependencies" $ G.transitiveClosure $ fromRules rs
+  let ord = CG.fromGraph $ resolutionOrder rs
   rec ord rs S.empty
   where
-    rec :: Monad m => RuleDependencies -> S.Set (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp)) -> ExceptT String m (S.Set (Rule (Maybe RComp)))
+    rec :: CG.CondensationGraph (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp))
     rec ord toSolve acc
-      | S.null toSolve = return acc
-      | otherwise =
-        let (mins, recArg) = S.partition (maybe False (G.leaf ord) . fromRule) toSolve
-        in do
-          when (S.null mins) (throwE "non-termination")
-          let acc' = foldr (\r -> (solveBody keepGround acc r <>)) acc mins
-          let acc'' = if keepGround then acc' else acc' <> mins
-          rec (foldr (maybe id G.remove . fromRule) ord mins) recArg acc''
+      | S.null toSolve = acc
+      | otherwise = foldr (fixpoint keepGround) acc (G.leaves ord)
+          -- do
+          -- when (S.null mins) (throwE "non-termination")
+          -- let acc' = foldr (\r -> (solveBody keepGround acc r <>)) acc mins
+          -- let acc'' = if keepGround then acc' else acc' <> mins
+          -- rec (foldr (maybe id G.remove . fromRule) ord mins) recArg acc''

@@ -1,6 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Util.CondensationGraph
-  ( fromGraph ) where
+  ( CondensationGraph
+  , fromGraph ) where
 
 import qualified Data.Set as S
 

@@ -46,7 +46,7 @@ main = do
       rootServers <- parseNames roots
       cfg <- parseZones zones
       let compiled = runFresh $ plResolvable =<< compileConfig rootServers cfg
-      res <- handleErrorS (computeResolvable True compiled)
+      let res = computeResolvable True compiled
       putStrLn $ showKnowledgeBase $ S.toList res
     "diff" -> do
       (old, new) <- sepBy "--" args
@@ -85,7 +85,7 @@ main = do
       qname <- parseNameM qnameString
       qtype <- parseTypeM qtypeString
       compiled <- compileConfig rootServers <$> parseResponse
-      kb <- handleErrorS $ queryStep qname qtype compiled
+      let kb = queryStep qname qtype compiled
       let answers = filter isFact $ S.toList kb
       if null answers
         then mapM_ print $ followUpQueries kb

@@ -23,8 +23,8 @@ tests =
         let order = relations [('b', "ac")]
         G.next order 'b' @?= S.fromList "ac"
         G.next order 'x' @?= S.empty
-    , testCase "leafs returns present elements with no incoming edges" $
-        G.leafs (relations [('c', "b"), ('a', ""), ('b', "a")]) @?= S.fromList "a"
+    , testCase "leaves returns present elements with no incoming edges" $
+        G.leaves (relations [('c', "b"), ('a', ""), ('b', "a")]) @?= S.fromList "a"
     , testCase "transitiveClosure adds all correct elements" $
         fmap G.toAscList (G.transitiveClosure acyclicOrder)
           @?= Just

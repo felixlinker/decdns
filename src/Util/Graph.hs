@@ -10,7 +10,7 @@ module Util.Graph
   , toAscList
   , fromList
   , next
-  , leafs
+  , leaves
   , leaf
   , transitiveClosure
   , irreflexive
@@ -56,8 +56,8 @@ fromList = foldr (uncurry insert . swap . first S.singleton) empty
 next :: Ord a => Graph a -> a -> S.Set a
 next po a = fromMaybe S.empty $ M.lookup a (edges po)
 
-leafs :: Ord a => Graph a -> S.Set a
-leafs = S.fromAscList . map fst . Prelude.filter (S.null . snd) . M.toAscList . edges
+leaves :: Ord a => Graph a -> S.Set a
+leaves = S.fromAscList . map fst . Prelude.filter (S.null . snd) . M.toAscList . edges
 
 leaf :: Ord a => Graph a -> a -> Bool
 leaf po = S.null . next po
