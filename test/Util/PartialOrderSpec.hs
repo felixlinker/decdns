@@ -50,7 +50,16 @@ tests =
     , testCase "filter" $
         (PO.toAscList . PO.filter (/= 'b') <$> PO.transitiveClosure (relations [("", 'a'), ("a", 'b'), ("ab", 'c')]))
           @?= Just [(S.empty, 'a'), (S.singleton 'a', 'c')]
+    , testCase "triangle SCC" (PO.tarjan triangle @?= [PO.elems triangle])
+    , testCase "twoTriangle SCC" (PO.tarjan twoTriangle @?= [S.fromList "abc", S.fromList "def"])
+    , testCase "acyclic order SCCs" (PO.tarjan acyclicOrder @?= map S.singleton (S.toList $ PO.elems acyclicOrder))
     ]
+
+triangle :: PO.PartialOrder Char
+triangle = relations [("a", 'b'), ("b", 'c'), ("c", 'a')]
+
+twoTriangle :: PO.PartialOrder Char
+twoTriangle = relations [("a", 'b'), ("b", 'c'), ("c", 'a'), ("d", 'e'), ("e", 'f'), ("fa", 'd')]
 
 acyclicOrder :: PO.PartialOrder Char
 acyclicOrder = relations [("", 'a'), ("a", 'b'), ("b", 'c'), ("bcx", 'd')]

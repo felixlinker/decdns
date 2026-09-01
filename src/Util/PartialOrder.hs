@@ -4,6 +4,7 @@ module Util.PartialOrder
   ( PartialOrder
   , empty
   , Util.PartialOrder.null
+  , elems
   , toList
   , toFlatList
   , toAscList
@@ -16,8 +17,11 @@ module Util.PartialOrder
   , invert
   , insert
   , remove
-  , Util.PartialOrder.filter ) where
+  , Util.PartialOrder.filter
+  , tarjan ) where
 
+import qualified Control.Monad.Trans.State as St
+import Control.Monad (foldM)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe (fromMaybe)
@@ -33,6 +37,9 @@ empty = PartialOrder M.empty
 
 null :: PartialOrder a -> Bool
 null = M.null . toSmaller
+
+elems :: Ord a => PartialOrder a -> S.Set a
+elems (PartialOrder m) = foldr S.union (M.keysSet m) (M.elems m)
 
 toList :: PartialOrder a -> [(S.Set a, a)]
 toList = toAscList
@@ -93,3 +100,72 @@ remove key (PartialOrder m) = PartialOrder $ M.map (S.delete key) $ M.delete key
 
 filter :: (a -> Bool) -> PartialOrder a -> PartialOrder a
 filter p = PartialOrder . M.map (S.filter p) . M.filterWithKey (\k _ -> p k) . toSmaller
+
+type Stack = []
+type Index = Int
+type LowLink = Int
+type NodesMap a = M.Map a (Index, LowLink)
+
+index :: (Index, LowLink) -> Index
+index = fst
+
+lowLink :: (Index, LowLink) -> LowLink
+lowLink = snd
+
+type TarjanSt a = St.State (Stack a, NodesMap a)
+
+getsWith :: (s -> b) -> (b -> c) -> St.State s c
+getsWith f g = St.gets (g . f)
+
+getsNodes :: (NodesMap a -> v) -> St.State (x, NodesMap a) v
+getsNodes = getsWith snd
+
+modifyF :: Functor f => (b -> b) -> St.State (f b) ()
+modifyF = St.modify . fmap
+
+-- Following: https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
+tarjan :: forall a. Ord a => PartialOrder a -> [S.Set a]
+tarjan po = concat $ St.evalState (mapM go (S.toList $ elems po)) ([], M.empty)
+  where
+    go :: a -> TarjanSt a [S.Set a]
+    go v = do
+      mapped <- St.gets (M.member v . snd)
+      if mapped
+        then return []
+        else do
+          -- Insert v into state
+          St.modify (\(stack, ns) -> (v:stack, M.insert v (M.size ns, M.size ns) ns))
+          -- Prepare recursion
+          (unexplored, explored) <- getsNodes (\ns -> S.partition (`M.notMember` ns) (smaller po v))
+          -- Update lowLink for already explored nodes
+          St.modify (\(stack, ns) ->
+            let update = S.filter (`elem` stack) explored
+            in (stack, foldr (\w -> updateLowLinkWith v w index) ns update))
+          -- Recurse
+          sccs <- foldM (\ses w -> do
+            rec <- go w
+            modifyF (updateLowLinkWith v w lowLink)
+            return $ ses ++ rec
+            ) [] unexplored
+          -- SCC complete?
+          isComplete <- getsNodes (maybe False (uncurry (==)) . M.lookup v)
+          newSCC <- if isComplete then popStack v else return []
+          return (newSCC ++ sccs)
+
+    popStack :: a -> TarjanSt a [S.Set a]
+    popStack v = do
+      (stack, _) <- St.get
+      case span (/= v) stack of
+        (scc, v':rest) | v == v' -> do
+          St.modify (\(_, ns) -> (rest, ns))
+          return [S.fromList (v':scc)]
+        _ -> error "v was not on stack"
+
+    minMaybe :: Ord x => Maybe x -> x -> x
+    minMaybe Nothing x = x
+    minMaybe (Just x) y = min x y
+
+    updateLowLinkWith :: a -> a -> ((Index, LowLink) -> Int) -> M.Map a (Index, LowLink) -> M.Map a (Index, LowLink)
+    updateLowLinkWith v w with acc =
+      let wVal = with <$> M.lookup w acc
+      in  M.update (return . fmap (minMaybe wVal)) v acc
