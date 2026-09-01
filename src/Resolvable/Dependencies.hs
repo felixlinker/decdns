@@ -231,7 +231,7 @@ type Changed = St.State Bool
 fixpoint :: (Foldable t, Ord a) => Bool -> t (Rule a) -> S.Set (Rule a) -> S.Set (Rule a)
 fixpoint keepGround addFrom acc =
   let (rs, changed) = St.runState (foldM (flip aux) acc addFrom) False
-  in  if changed then fixpoint keepGround addFrom acc else rs
+  in  if changed then fixpoint keepGround addFrom rs else rs
   where
     checkInsert :: Ord a => a -> S.Set a -> Changed (S.Set a)
     checkInsert = S.alterF (\found -> St.modify (not found ||) >> return True)
@@ -240,16 +240,13 @@ fixpoint keepGround addFrom acc =
     aux r acc' = foldM (flip checkInsert) acc' (solveBody keepGround acc' r)
 
 computeResolvable :: Bool -> S.Set (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp))
-computeResolvable keepGround (S.filter (isResolves . rhead) -> rs) = do
-  let ord = CG.fromGraph $ resolutionOrder rs
-  rec ord rs S.empty
+computeResolvable keepGround (S.filter (isResolves . rhead) -> rs) =
+  rec (CG.fromGraph $ resolutionOrder rs) S.empty
   where
-    rec :: CG.CondensationGraph (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp))
-    rec ord toSolve acc
-      | S.null toSolve = acc
-      | otherwise = foldr (fixpoint keepGround) acc (G.leaves ord)
-          -- do
-          -- when (S.null mins) (throwE "non-termination")
-          -- let acc' = foldr (\r -> (solveBody keepGround acc r <>)) acc mins
-          -- let acc'' = if keepGround then acc' else acc' <> mins
-          -- rec (foldr (maybe id G.remove . fromRule) ord mins) recArg acc''
+    rec :: CG.CondensationGraph (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp))
+    rec ord acc
+      | G.null ord = acc
+      | otherwise =
+          let leaves = G.leaves ord
+              acc' = foldr (fixpoint keepGround) acc leaves
+          in rec (foldr G.remove ord leaves) acc'
