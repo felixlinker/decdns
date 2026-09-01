@@ -1,0 +1,10 @@
+. 1200 IN SOA ns.com. example.com. 0 0 0 0 0
+. 1200 IN NS ns.com.
+
+net. 1200 IN NS ns.net.
+ns.net. 1200 IN A 1.2.3.4
+root.net. 1200 IN A 1.2.3.4
+
+com. 1200 IN NS root.net.
+ns.com. 1200 IN A 1.2.3.4
+;; Served by ns.com.

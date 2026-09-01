@@ -237,7 +237,7 @@ exampleConfigs =
       [Query rootNet RT.TXT subRootNet] ]
 
 baseFiles, newFiles, brokenFiles, partiallySignedFiles, signedFiles, signedNonZoneKeyFiles :: [FilePath]
-cyclicDelegFiles, selfDelegFiles, subSelfDelegFiles :: [FilePath]
+selfDelegFiles, subSelfDelegFiles :: [FilePath]
 partiallySignedNsec3Files, partiallySignedNsec3OOFiles, signedNsec3Files :: [FilePath]
 baseFiles =
   [ "examples/cname/base/ns.com."
@@ -276,11 +276,6 @@ selfDelegFiles = ["examples/ns/self-deleg/ns.com."]
 subSelfDelegFiles =
   [ "examples/ns/sub-self-deleg/root.net."
   , "examples/ns/sub-self-deleg/ns.net." ]
-
-cyclicDelegFiles =
-  [ "examples/ns/cyclic-deleg/root.net."
-  , "examples/ns/cyclic-deleg/ns.net."
-  , "examples/ns/cyclic-deleg/root.com." ]
 
 data Query = Query (Name String) RT.Type (Name String)
   deriving Eq
