@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Resolvable.Dependencies
   ( ResolvableAt(..)
   , matches
@@ -22,7 +23,7 @@ import Data.Bifunctor (Bifunctor(bimap))
 import Data.Either (fromRight)
 import Data.Functor (($>))
 import qualified Data.Set as S
-import Data.Maybe (listToMaybe, mapMaybe)
+import Data.Maybe (listToMaybe, mapMaybe, isJust)
 
 import DNS.Name
 import DNS.SEC.Verification (verifySignature, verifyDigest, nsecUnsignedSubzone, nsec3UnsignedSubzone, verifyClosestEncloserProof)
@@ -97,19 +98,13 @@ dependencyMatches rs = do
   dependency <- S.toList rs
   maybe [] return $ dependencyMatch dependent dependency
 
-match :: FromRule a => Rule (Maybe RComp) -> Rule (Maybe RComp) -> Maybe (a, a)
-match rl rs = do
-  _ <- dependencyMatch rl rs
-  larger <- fromRule rl
-  smaller <- fromRule rs
-  return (smaller, larger)
-
-fromRules :: (FromRule a, Ord a) => S.Set (Rule (Maybe RComp)) -> G.Graph a
+fromRules :: forall a. (FromRule a, Ord a) => S.Set (Rule (Maybe RComp)) -> G.Graph a
 fromRules rs = foldr go G.empty rs
   where
-    go :: (FromRule a, Ord a) => Rule (Maybe RComp) -> G.Graph a -> G.Graph a
+    go :: Rule (Maybe RComp) -> G.Graph a -> G.Graph a
     go r acc =
-      foldr (\r' foldAcc -> maybe foldAcc (\(S.singleton -> sml, lrg) -> G.insert lrg sml foldAcc) (match r r')) acc rs
+      let smaller = foldr (maybe id S.insert . fromRule) S.empty $ S.filter (isJust . dependencyMatch r) rs  :: S.Set a
+      in  maybe acc (\r' -> G.insert r' smaller acc) (fromRule r)
 
 -- TODO: Refactor
 data ConstrainedQuery = CQuery Term CU.Neqs
