@@ -33,7 +33,7 @@ import Resolvable.Prolog.Reverse
 import Resolvable.Prolog.TermView
 import Resolvable.Resolvability (RComp (RComp))
 import Resolvable.Unification
-import qualified Util.PartialOrder as PO
+import qualified Util.Graph as G
 import Util.Monad (exceptMaybe)
 
 class FromRule t where
@@ -63,9 +63,9 @@ matches :: Resolves -> Name String -> Name String -> Bool
 matches Resolves { resolvesNS = nsT, resolvesQName = nT } ns n =
   unifies (list [nsT, nT]) (list [nameTerm ns, nameTerm n])
 
-type RecordDependencies = PO.PartialOrder ResolvableAt
+type RecordDependencies = G.Graph ResolvableAt
 
-type RuleDependencies = PO.PartialOrder Resolves
+type RuleDependencies = G.Graph Resolves
 
 data DependencyMatch = DependencyMatch
   { dependentRule :: Rule (Maybe RComp)
@@ -104,12 +104,12 @@ match rl rs = do
   smaller <- fromRule rs
   return (smaller, larger)
 
-fromRules :: (FromRule a, Ord a) => S.Set (Rule (Maybe RComp)) -> PO.PartialOrder a
-fromRules rs = foldr go PO.empty rs
+fromRules :: (FromRule a, Ord a) => S.Set (Rule (Maybe RComp)) -> G.Graph a
+fromRules rs = foldr go G.empty rs
   where
-    go :: (FromRule a, Ord a) => Rule (Maybe RComp) -> PO.PartialOrder a -> PO.PartialOrder a
+    go :: (FromRule a, Ord a) => Rule (Maybe RComp) -> G.Graph a -> G.Graph a
     go r acc =
-      foldr (\r' foldAcc -> maybe foldAcc (\(S.singleton -> sml, lrg) -> PO.insert sml lrg foldAcc) (match r r')) acc rs
+      foldr (\r' foldAcc -> maybe foldAcc (\(S.singleton -> sml, lrg) -> G.insert lrg sml foldAcc) (match r r')) acc rs
 
 -- TODO: Refactor
 data ConstrainedQuery = CQuery Term CU.Neqs
@@ -230,16 +230,16 @@ solveBody keepGround rs (Rule ann h b) = S.fromList $ map (\(u, b') -> CU.apply 
 
 computeResolvable :: Monad m => Bool -> S.Set (Rule (Maybe RComp)) -> ExceptT String m (S.Set (Rule (Maybe RComp)))
 computeResolvable keepGround (S.filter (isResolves . rhead) -> rs) = do
-  ord <- exceptMaybe "cyclic dependencies" $ PO.transitiveClosure $ fromRules rs
+  ord <- exceptMaybe "cyclic dependencies" $ G.transitiveClosure $ fromRules rs
   rec ord rs S.empty
   where
     rec :: Monad m => RuleDependencies -> S.Set (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp)) -> ExceptT String m (S.Set (Rule (Maybe RComp)))
     rec ord toSolve acc
       | S.null toSolve = return acc
       | otherwise =
-        let (mins, recArg) = S.partition (maybe False (PO.minimal ord) . fromRule) toSolve
+        let (mins, recArg) = S.partition (maybe False (G.leaf ord) . fromRule) toSolve
         in do
           when (S.null mins) (throwE "non-termination")
           let acc' = foldr (\r -> (solveBody keepGround acc r <>)) acc mins
           let acc'' = if keepGround then acc' else acc' <> mins
-          rec (foldr (maybe id PO.remove . fromRule) ord mins) recArg acc''
+          rec (foldr (maybe id G.remove . fromRule) ord mins) recArg acc''

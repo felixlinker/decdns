@@ -11,7 +11,7 @@ module Resolvable.Prolog.TermView
 import DNS.Record (Type)
 import Resolvable.Prolog.Symbols
 import Resolvable.Prolog.Core
-import qualified Util.PartialOrder as PO
+import qualified Util.Graph as G
 
 data Resolves = Resolves
   { resolvesNS :: Term
@@ -27,8 +27,8 @@ data Resolves = Resolves
 instance Show Resolves where
   show (Resolves ns qtype qname dat rec ver adb) = show $ resolves ns qtype qname dat rec ver adb
 
-instance Show (PO.PartialOrder Resolves) where
-  show po = unlines (map (\(l, r) -> show l ++ " < " ++ show r) (PO.toFlatList po))
+instance Show (G.Graph Resolves) where
+  show po = unlines (map (\(l, r) -> show r ++ " < " ++ show l) (G.toFlatList po))
 
 data TermView = TVList Term Term
               | TVMember Term Term

@@ -17,11 +17,11 @@ import Resolvable.Dependencies
 import Resolvable.Resolvability
 import DNS.ZoneFile
 import NameConstraint
-import qualified Util.PartialOrder as PO
+import qualified Util.Graph as G
 import Util.Monad (exceptMaybe)
 
 canRollout :: RecordDependencies -> Name String -> ConstrainedName -> Bool
-canRollout deps ns n = PO.minimal deps $ ResolvableAt (ns, n)
+canRollout deps ns n = G.leaf deps $ ResolvableAt (ns, n)
 
 type NSDiffs = M.Map (Name String) (ZoneDiff ConstrainedLabel)
 
@@ -46,7 +46,7 @@ diffServers old new = MM.merge
   (M.fromList new)
 
 updateDeps :: NSDiffs -> RecordDependencies -> RecordDependencies
-updateDeps diffs = PO.filter changed
+updateDeps diffs = G.filter changed
   where
     changed :: ResolvableAt -> Bool
     changed (ResolvableAt (ns, qn)) = maybe False (hasChanges qn) (M.lookup ns diffs)
@@ -60,8 +60,8 @@ showRollOut r = do
 
 rollout :: NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
 rollout diffs old new = do
-  old' <- exceptMaybe "old dependencies cyclic" $ PO.transitiveClosure $ PO.invert $ PO.irreflexive old
-  new' <- exceptMaybe "new dependencies cyclic" $ PO.transitiveClosure $ PO.irreflexive new
+  old' <- exceptMaybe "old dependencies cyclic" $ G.transitiveClosure $ G.invert $ G.irreflexive old
+  new' <- exceptMaybe "new dependencies cyclic" $ G.transitiveClosure $ G.irreflexive new
   rollout' id diffs old' new'
 
 rollout' :: (Rollout -> Rollout) -> NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout

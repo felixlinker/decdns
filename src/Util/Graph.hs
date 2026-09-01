@@ -1,23 +1,23 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
-module Util.PartialOrder
-  ( PartialOrder
+module Util.Graph
+  ( Graph
   , empty
-  , Util.PartialOrder.null
+  , Util.Graph.null
   , elems
   , toList
   , toFlatList
   , toAscList
   , fromList
-  , smaller
-  , minima
-  , minimal
+  , next
+  , leafs
+  , leaf
   , transitiveClosure
   , irreflexive
   , invert
   , insert
   , remove
-  , Util.PartialOrder.filter
+  , Util.Graph.filter
   , tarjan ) where
 
 import qualified Control.Monad.Trans.State as St
@@ -29,43 +29,43 @@ import Data.List (partition)
 import Data.Bifunctor (Bifunctor(first))
 import Data.Tuple (swap)
 
--- po maps a key to all elements that are smaller than the key
-newtype PartialOrder a = PartialOrder { toSmaller :: M.Map a (S.Set a) }
+-- po maps a key to all nodes that have an edge to the key
+newtype Graph a = Graph { edges :: M.Map a (S.Set a) }
 
-empty :: PartialOrder a
-empty = PartialOrder M.empty
+empty :: Graph a
+empty = Graph M.empty
 
-null :: PartialOrder a -> Bool
-null = M.null . toSmaller
+null :: Graph a -> Bool
+null = M.null . edges
 
-elems :: Ord a => PartialOrder a -> S.Set a
-elems (PartialOrder m) = foldr S.union (M.keysSet m) (M.elems m)
+elems :: Ord a => Graph a -> S.Set a
+elems (Graph m) = foldr S.union (M.keysSet m) (M.elems m)
 
-toList :: PartialOrder a -> [(S.Set a, a)]
+toList :: Graph a -> [(a, S.Set a)]
 toList = toAscList
 
-toFlatList :: PartialOrder a -> [(a, a)]
-toFlatList = concatMap (\(as, a) -> map (,a) (S.toList as)) . toList
+toFlatList :: Graph a -> [(a, a)]
+toFlatList = concatMap (\(a, as) -> map (a,) (S.toList as)) . toList
 
-toAscList :: PartialOrder a -> [(S.Set a, a)]
-toAscList = map swap . M.toAscList . toSmaller
+toAscList :: Graph a -> [(a, S.Set a)]
+toAscList = M.toAscList . edges
 
-fromList :: Ord a => [(a, a)] -> PartialOrder a
-fromList = foldr (uncurry insert . first S.singleton) empty
+fromList :: Ord a => [(a, a)] -> Graph a
+fromList = foldr (uncurry insert . swap . first S.singleton) empty
 
-smaller :: Ord a => PartialOrder a -> a -> S.Set a
-smaller po a = fromMaybe S.empty $ M.lookup a (toSmaller po)
+next :: Ord a => Graph a -> a -> S.Set a
+next po a = fromMaybe S.empty $ M.lookup a (edges po)
 
-minima :: Ord a => PartialOrder a -> S.Set a
-minima = S.fromAscList . map fst . Prelude.filter (S.null . snd) . M.toAscList . toSmaller
+leafs :: Ord a => Graph a -> S.Set a
+leafs = S.fromAscList . map fst . Prelude.filter (S.null . snd) . M.toAscList . edges
 
-minimal :: Ord a => PartialOrder a -> a -> Bool
-minimal po = S.null . smaller po
+leaf :: Ord a => Graph a -> a -> Bool
+leaf po = S.null . next po
 
-transitiveClosure :: forall a. Ord a => PartialOrder a -> Maybe (PartialOrder a)
-transitiveClosure (PartialOrder d) =
+transitiveClosure :: forall a. Ord a => Graph a -> Maybe (Graph a)
+transitiveClosure (Graph d) =
   let (mins, recArg) = M.partition S.null d
-  in PartialOrder <$> rec (M.toList recArg) mins
+  in Graph <$> rec (M.toList recArg) mins
   where
     rec :: [(a, S.Set a)] -> M.Map a (S.Set a) -> Maybe (M.Map a (S.Set a))
     rec [] acc = Just acc
@@ -83,23 +83,23 @@ transitiveClosure (PartialOrder d) =
       let vs' = foldr (\v s -> maybe s (<> s) (M.lookup v acc)) vs vs
       in M.insert k vs' acc
 
-irreflexive :: Eq a => PartialOrder a -> PartialOrder a
-irreflexive (PartialOrder m) = PartialOrder $ M.mapWithKey (\k -> S.filter (/= k)) m
+irreflexive :: Eq a => Graph a -> Graph a
+irreflexive (Graph m) = Graph $ M.mapWithKey (\k -> S.filter (/= k)) m
 
-invert :: Ord a => PartialOrder a -> PartialOrder a
-invert (PartialOrder m) = foldr (uncurry foldF) empty (M.toList m)
+invert :: Ord a => Graph a -> Graph a
+invert (Graph m) = foldr (uncurry foldF) empty (M.toList m)
   where
-    foldF :: Ord a => a -> S.Set a -> PartialOrder a -> PartialOrder a
-    foldF oldK oldVs d = foldr (insert (S.singleton oldK)) d oldVs
+    foldF :: Ord a => a -> S.Set a -> Graph a -> Graph a
+    foldF oldK oldVs d = foldr (`insert` S.singleton oldK) d oldVs
 
-insert :: Ord a => S.Set a -> a -> PartialOrder a -> PartialOrder a
-insert vs k (PartialOrder m) = PartialOrder (M.alter (Just . maybe vs (vs <>)) k m)
+insert :: Ord a => a -> S.Set a -> Graph a -> Graph a
+insert k vs (Graph m) = Graph (M.alter (Just . maybe vs (vs <>)) k m)
 
-remove :: Ord a => a -> PartialOrder a -> PartialOrder a
-remove key (PartialOrder m) = PartialOrder $ M.map (S.delete key) $ M.delete key m
+remove :: Ord a => a -> Graph a -> Graph a
+remove key (Graph m) = Graph $ M.map (S.delete key) $ M.delete key m
 
-filter :: (a -> Bool) -> PartialOrder a -> PartialOrder a
-filter p = PartialOrder . M.map (S.filter p) . M.filterWithKey (\k _ -> p k) . toSmaller
+filter :: (a -> Bool) -> Graph a -> Graph a
+filter p = Graph . M.map (S.filter p) . M.filterWithKey (\k _ -> p k) . edges
 
 type Stack = []
 type Index = Int
@@ -124,7 +124,7 @@ modifyF :: Functor f => (b -> b) -> St.State (f b) ()
 modifyF = St.modify . fmap
 
 -- Following: https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
-tarjan :: forall a. Ord a => PartialOrder a -> [S.Set a]
+tarjan :: forall a. Ord a => Graph a -> [S.Set a]
 tarjan po = concat $ St.evalState (mapM go (S.toList $ elems po)) ([], M.empty)
   where
     go :: a -> TarjanSt a [S.Set a]
@@ -136,7 +136,7 @@ tarjan po = concat $ St.evalState (mapM go (S.toList $ elems po)) ([], M.empty)
           -- Insert v into state
           St.modify (\(stack, ns) -> (v:stack, M.insert v (M.size ns, M.size ns) ns))
           -- Prepare recursion
-          (unexplored, explored) <- getsNodes (\ns -> S.partition (`M.notMember` ns) (smaller po v))
+          (unexplored, explored) <- getsNodes (\ns -> S.partition (`M.notMember` ns) (next po v))
           -- Update lowLink for already explored nodes
           St.modify (\(stack, ns) ->
             let update = S.filter (`elem` stack) explored

@@ -86,9 +86,9 @@ library
       Util.Debug.Stub
       Util.Fresh
       Util.Func
+      Util.Graph
       Util.List
       Util.Monad
-      Util.PartialOrder
       Util.Tree
   other-modules:
       Paths_dns_regressor
@@ -160,8 +160,8 @@ test-suite dns-regressor-test
       Resolvable.Update.RolloutSpec
       Resolvable.Util
       Util.FreshSpec
+      Util.GraphSpec
       Util.ListSpec
-      Util.PartialOrderSpec
       Util.TreeSpec
       Paths_dns_regressor
   autogen-modules:
