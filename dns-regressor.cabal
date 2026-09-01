@@ -82,6 +82,7 @@ library
       Resolvable.Update.Trivial
       Util.Bool
       Util.Bytes
+      Util.CondensationGraph
       Util.Debug
       Util.Debug.Stub
       Util.Fresh
