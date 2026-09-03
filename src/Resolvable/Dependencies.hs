@@ -89,6 +89,9 @@ dependencyMatch lrg@(Rule _ (toView -> TVResolves {}) b) sml@(Rule _ h@(toView -
       return (p, u)
 dependencyMatch _ _ = Nothing
 
+match :: Rule (Maybe RComp) -> Rule (Maybe RComp) -> Bool
+match r = isJust . dependencyMatch r
+
 dependencyMatches :: S.Set (Rule (Maybe RComp)) -> [DependencyMatch]
 dependencyMatches rs = do
   dependent <- S.toList rs
@@ -100,14 +103,14 @@ fromRules rs = foldr go G.empty rs
   where
     go :: Rule (Maybe RComp) -> G.Graph a -> G.Graph a
     go r acc =
-      let smaller = foldr (maybe id S.insert . fromRule) S.empty $ S.filter (isJust . dependencyMatch r) rs  :: S.Set a
+      let smaller = foldr (maybe id S.insert . fromRule) S.empty $ S.filter (match r) rs  :: S.Set a
       in  maybe acc (\r' -> G.insert r' smaller acc) (fromRule r)
 
 resolutionOrder :: S.Set (Rule (Maybe RComp)) -> G.Graph (Rule (Maybe RComp))
 resolutionOrder rs = foldr go G.empty rs
   where
     go :: Rule (Maybe RComp) -> G.Graph (Rule (Maybe RComp)) -> G.Graph (Rule (Maybe RComp))
-    go r = G.insert r (S.filter (isJust . dependencyMatch r) rs)
+    go r = G.insert r (S.filter (match r) rs)
 
 -- TODO: Refactor
 data ConstrainedQuery = CQuery Term CU.Neqs
