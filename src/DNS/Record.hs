@@ -17,7 +17,9 @@ module DNS.Record
   , Record
   , record
   , StandardRecord
-  , canonicalRData ) where
+  , canonicalRData
+  , hasSignersName
+  , coversSOA ) where
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as CBS
@@ -333,3 +335,11 @@ instance Serialize Type where
 
 canonicalRData :: RData -> RData
 canonicalRData d@(RData _ _ ty) = d { rtype = canonicalType ty }
+
+hasSignersName :: RData -> Name String -> Bool
+hasSignersName (rtype -> RRSIG sig) n = _signersName sig == n
+hasSignersName _ _ = False
+
+coversSOA :: RData -> Bool
+coversSOA (rtype -> NSEC nsec) = T.SOA `elem` _nsecTypeBitMaps nsec
+coversSOA _ = False

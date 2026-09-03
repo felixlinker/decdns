@@ -15,8 +15,8 @@ import Util.Fresh
 
 queryT :: Name String -> T.Type -> Fresh Term
 queryT (nameTerm -> n) (ttypeTerm -> t) = do
-  (ns, d, r, v, a) <- freshVars5 ("NS", "D", "REC", "V", "A")
-  return $ resolves ns t n d r v a
+  (ns, zone, d, r, v, a) <- freshVars6 ("NS", "Z", "D", "REC", "V", "A")
+  return $ resolves ns t zone n d r v a
 
 queryStep :: Name String -> T.Type -> Fresh (S.Set (Rule (Maybe RComp))) -> S.Set (Rule (Maybe RComp))
 queryStep n t rs =

@@ -1,6 +1,6 @@
+{-# LANGUAGE TupleSections #-}
 module Parsing.Config
-  ( parseZoneFileContents
-  , parseZoneFileZones
+  ( parseZoneFileZones
   , parseZoneFiles
   , parseStdin
   ) where
@@ -12,18 +12,22 @@ import Text.Parsec (ParseError, SourceName)
 
 import DNS.Name (Name)
 import DNS.ZoneFile (Zone, fromRecordList)
+import DNS.Zone (splitZone)
 import NameConstraint (compileWildcards)
 import Parsing (ServedZone, parseZoneFile)
-import Resolvable.Resolvability (NameServersConfig, mergeConfig)
+import Resolvable.Resolvability (NameServersConfig)
 
 handleParser :: Either ParseError a -> IO a
 handleParser = either (failIO . show) return
+
+splitZones :: NameServersConfig -> NameServersConfig
+splitZones = concatMap (\(s, z) -> map (s,) (splitZone z))
 
 parseZoneFileContents :: (Zone String -> Maybe String) -> SourceName -> String -> IO NameServersConfig
 parseZoneFileContents wfc source content = do
   exceptZones <- map (runExcept . toZone) <$> (handleParser =<< parseZoneFile source content)
   zones <- mapM (either failIO return) exceptZones
-  return $ mergeConfig $ map (fmap compileWildcards) zones
+  return $ splitZones $ map (fmap compileWildcards) zones
   where
     wellformed :: Zone String -> Except String ()
     wellformed zone = maybe (return ()) throwE (wfc zone)
@@ -45,4 +49,4 @@ parseZoneFileZones wfc path = do
   parseZoneFileContents wfc path content
 
 parseZoneFiles :: (Zone String -> Maybe String) -> [FilePath] -> IO NameServersConfig
-parseZoneFiles wfc = fmap (mergeConfig . concat) . mapM (parseZoneFileZones wfc)
+parseZoneFiles wfc = fmap concat . mapM (parseZoneFileZones wfc)

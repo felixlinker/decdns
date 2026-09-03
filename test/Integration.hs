@@ -455,17 +455,19 @@ coversTerm expected (CQuery actual constraints) =
 
 queryTerm :: Query -> Term
 queryTerm (Query ns rtype qname) = runFresh $ do
+  zone <- wildcard
   (wc1, wc2, wc3, wc4) <- wildcards4
-  return $ resolves (nameTerm ns) (ttypeTerm rtype) (nameTerm qname) wc1 wc2 wc3 wc4
+  return $ resolves (nameTerm ns) (ttypeTerm rtype) zone (nameTerm qname) wc1 wc2 wc3 wc4
 
 resolvableQueryTerm :: Query -> Term
 resolvableQueryTerm (Query ns rtype qname) = runFresh $ resolvable (nameTerm ns) (ttypeTerm rtype) (nameTerm qname) <$> wildcard <*> wildcard
 
 resolutionTerm :: Resolution -> Term
 resolutionTerm (Resolution (Query ns rtype qname) verification auth) = runFresh $ do
+  zone <- wildcard
   wc1 <- wildcard
   wc2 <- wildcard
-  return $ resolves (nameTerm ns) (ttypeTerm rtype) (nameTerm qname) wc1 wc2 verification auth
+  return $ resolves (nameTerm ns) (ttypeTerm rtype) zone (nameTerm qname) wc1 wc2 verification auth
 
 resolvableQueries :: [FilePath] -> IO (S.Set ConstrainedQuery)
 resolvableQueries files = do

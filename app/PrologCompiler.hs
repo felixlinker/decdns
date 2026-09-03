@@ -6,7 +6,6 @@ import DNS.Wellformedness ( zoneWellformed, responseWellformed )
 import NameConstraint (toStandardRecord)
 import Resolvable.Prolog.Core
 import Resolvable.Resolvability
-import Resolvable.Update.Resolvability
 import Resolvable.Update.Rollout (diffServers, showRollOut, rollout)
 import Resolvable.Dependencies (computeResolvable, fromRules)
 import Util.Fresh (runFresh)

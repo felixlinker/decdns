@@ -62,6 +62,7 @@ module Resolvable.Prolog.Core
   , dataTerm
   , resolves
   , resolvable
+  , glueZone
   , top
   , bot
   , ad
@@ -472,11 +473,14 @@ dataTerm t = TFunctor (ttypeSym $ toType t) $ case t of
   NSEC3PARAM alg flags iter salt -> [TInt (nsec3DigestToInt alg), TInt (nsec3FlagsToInt flags), TInt iter, hexTerm salt]
   DS (DSData tag alg digT dig) -> [TInt tag, algTerm alg, digestTerm digT, hexTerm dig]
 
-resolves :: Term -> Term -> Term -> Term -> Term -> Term -> Term -> Term
-resolves ns qtype qname d rec ver adb = TFunctor resolvesSym [ ns, qtype, qname, d, rec, ver, adb ]
+resolves :: Term -> Term -> Term -> Term -> Term -> Term -> Term -> Term -> Term
+resolves ns qtype zone qname d rec ver adb = TFunctor resolvesSym [ ns, qtype, zone, qname, d, rec, ver, adb ]
 
 resolvable :: Term -> Term -> Term -> Term -> Term -> Term
 resolvable ns qtype qname ver auth = TFunctor resolvableSym [ ns, qtype, qname, ver, auth ]
+
+glueZone :: Term
+glueZone = TAtom "glue"
 
 top :: Term
 top = TFunctor "top" []

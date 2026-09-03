@@ -13,6 +13,8 @@ module DNS.RRSet
   , StdRRSet
   , canonicalRRSet
   , toRecords
+  , hasType
+  , getType
   , dropType ) where
 
 import qualified Data.List.NonEmpty as NE
@@ -85,6 +87,12 @@ singleton rd = RDS $ M.singleton (toType $ rtype rd) (NE.singleton rd)
 
 toRecords :: RRSet a -> NE.NonEmpty (Record a)
 toRecords (Named n sets) = Named n <$> sets
+
+hasType :: T.Type -> RDataSet -> Bool
+hasType t = M.member t . rds
+
+getType :: T.Type -> RDataSet -> [RData]
+getType t = maybe [] NE.toList . M.lookup t . rds
 
 dropType :: T.Type -> RTypedSet a -> RTypedSet a
 dropType t = modify (M.delete t)

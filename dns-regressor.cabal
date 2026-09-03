@@ -57,6 +57,7 @@ library
       DNS.SEC.Keys
       DNS.SEC.Verification
       DNS.Wellformedness
+      DNS.Zone
       DNS.ZoneFile
       DNS.ZoneFile.Printing
       NameConstraint

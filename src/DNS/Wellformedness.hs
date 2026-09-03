@@ -57,12 +57,6 @@ zoneWellformed z@(Zone _ r@(Tr.Node _ rcs)) =
     dataNoApex :: Tr.Node String (RRSet.RTypedSet RData)
     dataNoApex = Tr.Node RRSet.empty rcs
 
-getType :: T.Type -> RRSet.RDataSet -> [RData]
-getType t = maybe [] NE.toList . M.lookup t . RRSet.rds
-
-hasType :: T.Type -> RRSet.RDataSet -> Bool
-hasType t = M.member t . RRSet.rds
-
 typesAllIn :: RRSet.RTypedSet a -> [T.Type] -> Bool
 typesAllIn rd = RRSet.apply M.null . foldr (RRSet.modify . M.delete) rd
 
@@ -72,25 +66,25 @@ checkCNAME :: Zone String -> Bool
 checkCNAME = allNamed (const checkData)
   where
     checkData :: RRSet.RDataSet -> Bool
-    checkData rs = hasType T.CNAME rs ==> typesAllIn rs [T.CNAME, T.NSEC, T.RRSIG]
+    checkData rs = RRSet.hasType T.CNAME rs ==> typesAllIn rs [T.CNAME, T.NSEC, T.RRSIG]
 
 singletonTypes :: Tr.Node String RRSet.RDataSet -> Bool
 singletonTypes = all (\rs -> all (`checkOne` rs) [T.CNAME, T.DNAME, T.NSEC, T.SOA])
   where
     checkOne :: T.Type -> RRSet.RDataSet -> Bool
-    checkOne t = (maybe True (null . snd) . uncons) . getType t
+    checkOne t = (maybe True (null . snd) . uncons) . RRSet.getType t
 
 wildcardRestrictions :: (Label a, Eq a) => Zone a -> Bool
 wildcardRestrictions = allNamed f
   where
     f :: (Label a, Eq a) => Name a -> RRSet.RDataSet -> Bool
-    f (labels -> (label NE.:| _)) rs = any (`hasType` rs) [T.DNAME, T.DS, T.NS] ==> (label /= lwildcard)
+    f (labels -> (label NE.:| _)) rs = any (`RRSet.hasType` rs) [T.DNAME, T.DS, T.NS] ==> (label /= lwildcard)
 
 rrsigSignerName :: Name String -> Tr.Node String RRSet.RDataSet -> Bool
 rrsigSignerName = Tr.allNamed checkData
   where
     checkData :: Name String -> RRSet.RDataSet -> Bool
-    checkData owner rs = all checkRRSIG (getType T.RRSIG rs)
+    checkData owner rs = all checkRRSIG (RRSet.getType T.RRSIG rs)
       where
         checkRRSIG :: RData -> Bool
         checkRRSIG (rtype -> RRSIG sig) =
@@ -118,13 +112,13 @@ noDNSSECKey :: Tr.Node String RRSet.RDataSet -> Bool
 noDNSSECKey = all checkData
   where
     checkData :: RRSet.RDataSet -> Bool
-    checkData (getType T.DNSKEY -> keys) =
+    checkData (RRSet.getType T.DNSKEY -> keys) =
       all ((\case { DNSKEY k -> isDNSSECKey k; _ -> True}) . rtype) keys
 
 -- See: https://datatracker.ietf.org/doc/html/rfc6672#section-2.4
 checkDNAME :: Bool -> Tr.Node String RRSet.RDataSet -> Bool
 checkDNAME allowCNAME (Tr.Node rs cs)
-  | hasType T.DNAME rs = not (hasType T.CNAME rs)
+  | RRSet.hasType T.DNAME rs = not (RRSet.hasType T.CNAME rs)
       && (M.null cs || (allowCNAME && all onlyCNAME cs))
   | otherwise = all (checkDNAME allowCNAME) cs
   where
@@ -133,14 +127,14 @@ checkDNAME allowCNAME (Tr.Node rs cs)
 
 checkZoneCuts :: Tr.Node String RRSet.RDataSet -> Bool
 checkZoneCuts (Tr.Node rs cs)
-  | hasType T.NS rs && not (hasType T.SOA rs) =
+  | RRSet.hasType T.NS rs && not (RRSet.hasType T.SOA rs) =
       typesAllIn rs [T.NS, T.DS, T.NSEC, T.RRSIG, T.A, T.AAAA]
         && all checkBelowZoneCut cs
   | otherwise = all checkZoneCuts cs
 
 checkBelowZoneCut :: Tr.Node String RRSet.RDataSet -> Bool
 checkBelowZoneCut node@(Tr.Node rs cs)
-  | hasType T.SOA rs = checkZoneCuts node
+  | RRSet.hasType T.SOA rs = checkZoneCuts node
   | otherwise =
       typesAllIn rs [T.A, T.AAAA]
         && all checkBelowZoneCut cs
@@ -148,4 +142,4 @@ checkBelowZoneCut node@(Tr.Node rs cs)
 checkNoDataAboveApex :: Tr.Node String RRSet.RDataSet -> Bool
 checkNoDataAboveApex (Tr.Node rs cs)
   | RRSet.null rs = all checkNoDataAboveApex cs
-  | otherwise = hasType T.SOA rs
+  | otherwise = RRSet.hasType T.SOA rs
