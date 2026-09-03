@@ -32,7 +32,16 @@ tests =
     [ testGroup "Parsing/DNS.ZoneFile/Wellformedness" $
         map exampleFileTest exampleFiles
     , testGroup "Resolvable.Resolvability"
-        (map exampleConfigTest exampleConfigs)
+        (map exampleConfigTest exampleConfigs ++
+          [ testCase "handles an NS delegation loop" $
+              misconfigurationLoopTest "NS delegation loop" nsLoopFiles
+                [Query nsCom RT.NS com, Query rootNet RT.NS com]
+                [Query nsCom RT.A aCom, Query rootNet RT.A aCom]
+          , testCase "handles a CNAME loop" $
+              misconfigurationLoopTest "CNAME loop" cnameLoopFiles
+                [Query nsCom RT.CNAME aCom, Query nsCom RT.CNAME bCom]
+                [Query nsCom RT.A aCom, Query nsCom RT.A bCom]
+          ])
     , testGroup
         "Resolvable.Resolvability authentication"
         [ testCase "signed authenticates the CNAME chain and child zone" $
@@ -237,7 +246,7 @@ exampleConfigs =
       [Query rootNet RT.TXT subRootNet] ]
 
 baseFiles, newFiles, brokenFiles, partiallySignedFiles, signedFiles, signedNonZoneKeyFiles :: [FilePath]
-selfDelegFiles, subSelfDelegFiles :: [FilePath]
+selfDelegFiles, subSelfDelegFiles, nsLoopFiles, cnameLoopFiles :: [FilePath]
 partiallySignedNsec3Files, partiallySignedNsec3OOFiles, signedNsec3Files :: [FilePath]
 baseFiles =
   [ "examples/cname/base/ns.com."
@@ -276,6 +285,12 @@ selfDelegFiles = ["examples/ns/self-deleg/ns.com."]
 subSelfDelegFiles =
   [ "examples/ns/sub-self-deleg/root.net."
   , "examples/ns/sub-self-deleg/ns.net." ]
+
+nsLoopFiles =
+  [ "examples/ns/loop/ns.com."
+  , "examples/ns/loop/root.net." ]
+
+cnameLoopFiles = ["examples/cname/loop/ns.com."]
 
 data Query = Query (Name String) RT.Type (Name String)
   deriving Eq
@@ -335,6 +350,11 @@ exampleConfigTest example =
       results
       (expectedQueries example)
       (unexpectedQueries example)
+
+misconfigurationLoopTest :: String -> [FilePath] -> [Query] -> [Query] -> Assertion
+misconfigurationLoopTest label files expected unexpected = do
+  results <- resolvableQueries files
+  assertQueries label results expected unexpected
 
 authenticatedResolutionTest :: String -> [FilePath] -> Assertion
 authenticatedResolutionTest label files = do
