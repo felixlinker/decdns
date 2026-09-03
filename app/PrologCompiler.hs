@@ -34,13 +34,6 @@ main = do
       rootServers <- parseNames roots
       cfg <- parseZones zones
       putStr (showKnowledgeBase $ S.toList $ runFresh $ plResolvable =<< compileConfig rootServers cfg)
-    "pl-regressions" -> do
-      (roots, args') <- sepBy "--" args
-      rootServers <- parseNames roots
-      (old, new) <- sepBy "--" args'
-      oldCfg <- parseZones old
-      newCfg <- parseZones new
-      putStr (showKnowledgeBase $ S.toList $ plRegressions rootServers oldCfg newCfg)
     "resolvable" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
