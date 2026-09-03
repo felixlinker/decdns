@@ -55,7 +55,7 @@ zshow printf initSt (Zone _ r) = St.evalState (go [] r) initSt
       showCs <- concat <$> mapM (\(l, n) -> go (l:nameAcc) n) (M.toAscList cs)
       return $ showD ++ showCs
 
-instance (Show (Name a), Traversable t, Show b) => Show (AZone a t b) where
+instance (Eq a, Label a, Traversable t, Show b) => Show (AZone a t b) where
   show = unlines . zshow printf ()
     where
       printf ls d = return $ maybe "@" (show . Name) (NE.nonEmpty ls) ++ " " ++ show d

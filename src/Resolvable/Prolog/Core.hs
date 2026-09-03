@@ -530,4 +530,4 @@ nameTerm :: Name String -> Term
 nameTerm (Name (NE.toList -> ls)) = list (reverse $ map TAtom $ filter (not . null) ls)
 
 nameWithoutSynthesis :: ConstrainedName -> Term
-nameWithoutSynthesis = nameTerm . toName
+nameWithoutSynthesis = nameTerm . toStringName

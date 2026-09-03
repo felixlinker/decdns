@@ -9,6 +9,7 @@ module DNS.Name
   , (<|)
   , (|>)
   , prependLabels
+  , toStringName
   , mapLabels
   , isSubDomain
   , intersection
@@ -28,10 +29,12 @@ import Util.Bytes (Serialize(..), withLength)
 class Label a where
   lwildcard :: a
   lempty :: a
+  lshow :: a -> String
 
 instance Label String where
   lwildcard = "*"
   lempty = ""
+  lshow = id
 
 newtype Name a = Name { labels :: NE.NonEmpty a }
   deriving (Eq, Ord)
@@ -63,11 +66,12 @@ instance Functor Name where
 instance Foldable Name where
   foldr f acc (Name ls) = foldr f acc ls
 
-instance Show (Name String) where
+instance (Eq a, Label a) => Show (Name a) where
+
   show (Name ls) =
     let l = NE.last ls
-        i = NE.init ls
-    in  if l == "" then intercalate "." i ++ "." else intercalate "." (i ++ [l])
+        i = map lshow $ NE.init ls
+    in  if l == lempty then intercalate "." i ++ "." else intercalate "." (i ++ [lshow l])
 
 instance Serialize (Name String) where
   serialize = foldr ((<>) . withLength . CBS.pack) BS.empty
@@ -85,6 +89,9 @@ instance Functor (Named a) where
 
 instance Serialize a => Serialize (Named String a) where
   serialize (Named n d) = serialize n <> serialize d
+
+toStringName :: Label a => Name a -> Name String
+toStringName (Name ls) = Name $ NE.map lshow ls
 
 mapLabels :: (a1 -> a2) -> Named a1 b -> Named a2 b
 mapLabels f (Named (Name ls) v) = Named (Name (NE.map f ls)) v

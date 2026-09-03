@@ -87,7 +87,7 @@ resolvableStep (map nameTerm -> rootServers) ns zone s@(Named n rs) =
     go rootServer r = case r of
       NS s' ->
         let delegatedNs = nameTerm s'
-            expectGlue = isSubDomain s' (toName n)
+            expectGlue = isSubDomain s' (toStringName n)
             glueS = if expectGlue then nameServer else rootServer
             glueRec = if expectGlue then bot else top
         in if nameServer == delegatedNs

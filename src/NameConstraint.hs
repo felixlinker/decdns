@@ -8,7 +8,6 @@ module NameConstraint
   , ConstrainedRecord
   , ConstrainedRRSet
   , toStandardRecord
-  , toName
   , exactly
   , compileWildcards
   , synthesize ) where
@@ -30,6 +29,8 @@ data LabelConstraint a = Wildcard [a] | Exactly a
 instance Label a => Label (LabelConstraint a) where
   lwildcard = Wildcard [lwildcard]
   lempty = Exactly lempty
+  lshow (Wildcard _) = "*"
+  lshow (Exactly l) = lshow l
 
 matches :: Ord a => LabelConstraint a -> LabelConstraint a -> Bool
 matches (Exactly l1) (Exactly l2) = l1 == l2
@@ -46,17 +47,11 @@ type ConstrainedName = Name ConstrainedLabel
 type ConstrainedRecord = Record ConstrainedLabel
 type ConstrainedRRSet = RRSet.RRSet ConstrainedLabel
 
-toStandardRecord :: ConstrainedRecord -> StandardRecord
-toStandardRecord (Named n d) = Named (toName n) d
-
-instance Show ConstrainedName where
-  show = show . toName
+toStandardRecord :: Label a => Record a -> StandardRecord
+toStandardRecord (Named n d) = Named (toStringName n) d
 
 exactly :: Name a -> Name (LabelConstraint a)
 exactly (Name ls) = Name (NE.map Exactly ls)
-
-toName :: ConstrainedName -> Name String
-toName (Name cs) = Name (NE.map show cs)
 
 existIn :: T.Node String v -> [String]
 existIn = M.keys . T.children
@@ -94,4 +89,4 @@ match (Name (NE.reverse -> ls)) (Name (NE.reverse -> cs)) = do
       match' (a NE.:| as) (c NE.:| ncs)
 
 synthesize :: Name String -> ConstrainedRecord -> StandardRecord
-synthesize qname (Named cs d) = Named (fromMaybe (toName cs) (match qname cs)) d
+synthesize qname (Named cs d) = Named (fromMaybe (toStringName cs) (match qname cs)) d
