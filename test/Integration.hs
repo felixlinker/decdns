@@ -294,14 +294,14 @@ data Query = Query (Name String) RT.Type (Name String)
 
 instance Show Query where
   show (Query ns rtype qname) =
-    show ns ++ " " ++ show rtype ++ " " ++ show qname
+    "query " ++ show rtype ++ " " ++ show qname ++ " at name server " ++ show ns
 
 data Resolution = Resolution Query Term Term
   deriving Eq
 
 instance Show Resolution where
   show (Resolution query verification auth) =
-    show query ++ " verified=" ++ show verification ++ " auth=" ++ show auth
+    show query ++ " with verified=" ++ show verification ++ " and auth=" ++ show auth
 
 authenticated :: Name String -> RT.Type -> Name String -> Resolution
 authenticated ns rtype qname =
