@@ -8,12 +8,10 @@ import qualified Data.Set as S
 import DNS.Name (Name, root)
 import DNS.NameSpec (mkName)
 import qualified DNS.RecordType as RT
-import DNS.ZoneFile (allRecords, zoneName)
-import NameConstraint
-  ( exactly
-  )
-import Parsing.Config (parseZoneFileZones, parseZoneFiles)
 import DNS.Wellformedness (zoneWellformed)
+import DNS.ZoneFile (zoneName)
+import NameConstraint (exactly)
+import Parsing.Config (parseZoneFileZones, parseZoneFiles)
 import Resolvable.Dependencies (ConstrainedQuery (CQuery), computeResolvable, queryFromRule)
 import Resolvable.Prolog.Core (Term, ad, nameTerm, resolvable, resolves, top, ttypeTerm, wildcard, wildcards4)
 import Resolvable.Resolvability (NameServersConfig, compileConfig, plResolvable)
@@ -21,7 +19,7 @@ import Resolvable.Update.Dependencies (computeRegressions)
 import qualified Resolvable.ConstrainedUnification as CU
 import qualified Resolvable.Unification as U
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (Assertion, assertBool, assertFailure, testCase, (@?=))
+import Test.Tasty.HUnit (Assertion, assertBool, testCase, (@?=))
 import Util.Fresh (runFresh)
 import Util.Monad (failLeft, handleError)
 
@@ -34,33 +32,33 @@ tests =
     , testGroup "Resolvable.Resolvability"
         (map exampleConfigTest exampleConfigs ++
           [ testCase "handles an NS delegation loop" $
-              misconfigurationLoopTest "NS delegation loop" nsLoopFiles
+              misconfigurationLoopTest nsLoopFiles
                 [Query nsCom RT.NS com, Query rootNet RT.NS com]
                 [Query nsCom RT.A aCom, Query rootNet RT.A aCom]
           , testCase "handles a CNAME loop" $
-              misconfigurationLoopTest "CNAME loop" cnameLoopFiles
+              misconfigurationLoopTest cnameLoopFiles
                 [Query nsCom RT.CNAME aCom, Query nsCom RT.CNAME bCom]
                 [Query nsCom RT.A aCom, Query nsCom RT.A bCom]
           ])
     , testGroup
         "Resolvable.Resolvability authentication"
         [ testCase "signed authenticates the CNAME chain and child zone" $
-            authenticatedResolutionTest "signed" signedFiles
+            authenticatedResolutionTest signedFiles
         , testCase "signed-nsec3 authenticates the CNAME chain and child zone" $
-            authenticatedResolutionTest "signed-nsec3" signedNsec3Files
+            authenticatedResolutionTest signedNsec3Files
         , testCase "partially-signed authenticates unsigned child zone through NSEC" $
-            authenticatedUnsignedDelegationTest "partially-signed" partiallySignedFiles
+            authenticatedUnsignedDelegationTest partiallySignedFiles
         , testCase "partially-signed-nsec3 authenticates unsigned child zone through NSEC3 owner proof" $
-            authenticatedUnsignedDelegationTest "partially-signed-nsec3" partiallySignedNsec3Files
+            authenticatedUnsignedDelegationTest partiallySignedNsec3Files
         , testCase "partially-signed-nsec3-oo filters invalid NSEC3 unsigned-delegation proof" $
-            doesNotAuthenticateUnsignedDelegationTest "partially-signed-nsec3-oo" partiallySignedNsec3OOFiles
+            doesNotAuthenticateUnsignedDelegationTest partiallySignedNsec3OOFiles
         , testCase "signed does not authenticate the child zone as unsigned through NSEC" $
-            signedDelegationDoesNotUseUnsignedProofTest "signed" signedFiles
+            signedDelegationDoesNotUseUnsignedProofTest signedFiles
         , testCase "signed-nsec3 does not authenticate the child zone as unsigned through NSEC3" $
-            signedDelegationDoesNotUseUnsignedProofTest "signed-nsec3" signedNsec3Files
+            signedDelegationDoesNotUseUnsignedProofTest signedNsec3Files
         , testCase "base does not authenticate unsigned answers" $ do
             results <- resolvableQueries baseFiles
-            assertResolutions "base" results []
+            assertResolutions baseFiles results []
               [ authenticated nsCom RT.A aCom
               , authenticated nsCom RT.A bCom
               , authenticated nsCom RT.CNAME aCom
@@ -69,7 +67,7 @@ tests =
     , testGroup
         "Resolvable.Update.Dependencies"
         [ testCase "base to new has expected unsigned regression facts" $
-            regressionTest "new" newFiles
+            regressionTest newFiles
               [ Query nsCom RT.CNAME aCom
               , Query nsCom RT.NS aCom
               , Query nsCom RT.NS bCom
@@ -80,7 +78,7 @@ tests =
               , Query nsCom RT.A nsBCom
               , Query nsCom RT.SOA com ]
         , testCase "base to broken has expected unsigned regression facts" $
-            regressionTest "broken" brokenFiles
+            regressionTest brokenFiles
               [ Query nsCom RT.A aCom
               , Query nsCom RT.A bCom
               , Query nsCom RT.A nsBCom
@@ -93,34 +91,33 @@ tests =
 
 data ExampleFile = ExampleFile
   { examplePath :: FilePath
-  , expectedOrigin :: Name String
-  , expectedRecordCount :: Int
+  , expectedZones :: [Name String]
   }
 
 exampleFiles :: [ExampleFile]
 exampleFiles =
-  [ ExampleFile "examples/cname/base/ns.com." com 5
-  , ExampleFile "examples/cname/base/ns.b.com." bCom 4
-  , ExampleFile "examples/cname/new/ns.com." com 3
-  , ExampleFile "examples/cname/broken/ns.com." com 3
-  , ExampleFile "examples/cname/partially-signed/ns.com." com 18
-  , ExampleFile "examples/cname/partially-signed/ns.b.com." bCom 4
-  , ExampleFile "examples/cname/signed/ns.com." com 20
-  , ExampleFile "examples/cname/signed/ns.b.com." bCom 16
-  , ExampleFile "examples/cname/signed-non-zone-key/ns.com." com 20
-  , ExampleFile "examples/cname/signed-non-zone-key/ns.b.com." bCom 17
-  , ExampleFile "examples/cname/partially-signed-nsec3/ns.com." com 20
-  , ExampleFile "examples/cname/partially-signed-nsec3/ns.b.com." bCom 4
-  , ExampleFile "examples/cname/partially-signed-nsec3-oo/ns.com." com 18
-  , ExampleFile "examples/cname/partially-signed-nsec3-oo/ns.b.com." bCom 4
-  , ExampleFile "examples/cname/signed-nsec3/ns.com." com 22
-  , ExampleFile "examples/cname/signed-nsec3/ns.b.com." bCom 18
-  , ExampleFile "examples/ns/self-deleg/ns.com." com 6
-  , ExampleFile "examples/ns/sub-self-deleg/root.net." dnsRoot 8
-  , ExampleFile "examples/ns/sub-self-deleg/ns.net." net 5
-  , ExampleFile "examples/ns/cyclic-deleg/root.net." dnsRoot 6
-  , ExampleFile "examples/ns/cyclic-deleg/ns.net." net 5
-  , ExampleFile "examples/ns/cyclic-deleg/root.com." dnsRoot 7 ]
+  [ ExampleFile "examples/cname/base/ns.com." [com]
+  , ExampleFile "examples/cname/base/ns.b.com." [bCom]
+  , ExampleFile "examples/cname/new/ns.com." [com]
+  , ExampleFile "examples/cname/broken/ns.com." [com]
+  , ExampleFile "examples/cname/partially-signed/ns.com." [com]
+  , ExampleFile "examples/cname/partially-signed/ns.b.com." [bCom]
+  , ExampleFile "examples/cname/signed/ns.com." [com]
+  , ExampleFile "examples/cname/signed/ns.b.com." [bCom]
+  , ExampleFile "examples/cname/signed-non-zone-key/ns.com." [com]
+  , ExampleFile "examples/cname/signed-non-zone-key/ns.b.com." [bCom]
+  , ExampleFile "examples/cname/partially-signed-nsec3/ns.com." [com]
+  , ExampleFile "examples/cname/partially-signed-nsec3/ns.b.com." [bCom]
+  , ExampleFile "examples/cname/partially-signed-nsec3-oo/ns.com." [com]
+  , ExampleFile "examples/cname/partially-signed-nsec3-oo/ns.b.com." [bCom]
+  , ExampleFile "examples/cname/signed-nsec3/ns.com." [com]
+  , ExampleFile "examples/cname/signed-nsec3/ns.b.com." [bCom]
+  , ExampleFile "examples/ns/self-deleg/ns.com." [com, subACom]
+  , ExampleFile "examples/ns/sub-self-deleg/root.net." [dnsRoot, rootNet]
+  , ExampleFile "examples/ns/sub-self-deleg/ns.net." [net]
+  , ExampleFile "examples/ns/cyclic-deleg/root.net." [dnsRoot]
+  , ExampleFile "examples/ns/cyclic-deleg/ns.net." [net]
+  , ExampleFile "examples/ns/cyclic-deleg/root.com." [dnsRoot] ]
 
 data ExampleConfig = ExampleConfig
   { configName :: String
@@ -335,31 +332,28 @@ exampleFileTest :: ExampleFile -> TestTree
 exampleFileTest example =
   testCase (examplePath example) $ do
     config <- parseZoneFileZones zoneWellformed (examplePath example)
-    zone <- case config of
-      [(_, parsedZone)] -> return parsedZone
-      _ -> assertFailure (examplePath example ++ ": expected exactly one name server")
-    zoneName zone @?= exactly (expectedOrigin example)
-    length (allRecords zone) @?= expectedRecordCount example
+    map (zoneName . snd) config
+      @?= map exactly (expectedZones example)
 
 exampleConfigTest :: ExampleConfig -> TestTree
 exampleConfigTest example =
   testCase (configName example) $ do
     results <- resolvableQueries (configFiles example)
     assertQueries
-      (configName example)
+      (configFiles example)
       results
       (expectedQueries example)
       (unexpectedQueries example)
 
-misconfigurationLoopTest :: String -> [FilePath] -> [Query] -> [Query] -> Assertion
-misconfigurationLoopTest label files expected unexpected = do
+misconfigurationLoopTest :: [FilePath] -> [Query] -> [Query] -> Assertion
+misconfigurationLoopTest files expected unexpected = do
   results <- resolvableQueries files
-  assertQueries label results expected unexpected
+  assertQueries files results expected unexpected
 
-authenticatedResolutionTest :: String -> [FilePath] -> Assertion
-authenticatedResolutionTest label files = do
+authenticatedResolutionTest :: [FilePath] -> Assertion
+authenticatedResolutionTest files = do
   results <- resolvableQueries files
-  assertResolutions label results
+  assertResolutions files results
     [ authenticated nsCom RT.A aCom
     , authenticated nsCom RT.A bCom
     , authenticated nsCom RT.A nsBCom
@@ -369,38 +363,38 @@ authenticatedResolutionTest label files = do
     , authenticated nsCom RT.DS bCom ]
     []
 
-authenticatedUnsignedDelegationTest :: String -> [FilePath] -> Assertion
-authenticatedUnsignedDelegationTest label files = do
+authenticatedUnsignedDelegationTest :: [FilePath] -> Assertion
+authenticatedUnsignedDelegationTest files = do
   results <- resolvableQueries files
-  assertResolutions label results
+  assertResolutions files results
     [ authenticatedUnsigned nsCom RT.A bCom
     , authenticatedUnsigned nsCom RT.A nsBCom ]
     [ authenticated nsCom RT.A bCom
     , authenticated nsCom RT.A nsBCom
     , authenticated nsCom RT.DS bCom ]
 
-signedDelegationDoesNotUseUnsignedProofTest :: String -> [FilePath] -> Assertion
-signedDelegationDoesNotUseUnsignedProofTest label files = do
+signedDelegationDoesNotUseUnsignedProofTest :: [FilePath] -> Assertion
+signedDelegationDoesNotUseUnsignedProofTest files = do
   results <- resolvableQueries files
-  assertResolutions label results
+  assertResolutions files results
     [ authenticated nsCom RT.A bCom
     , authenticated nsCom RT.A nsBCom
     , authenticated nsCom RT.DS bCom ]
     [ authenticatedUnsigned nsCom RT.A bCom
     , authenticatedUnsigned nsCom RT.A nsBCom ]
 
-doesNotAuthenticateUnsignedDelegationTest :: String -> [FilePath] -> Assertion
-doesNotAuthenticateUnsignedDelegationTest label files = do
+doesNotAuthenticateUnsignedDelegationTest :: [FilePath] -> Assertion
+doesNotAuthenticateUnsignedDelegationTest files = do
   results <- resolvableQueries files
-  assertResolutions label results []
+  assertResolutions files results []
     [ authenticatedUnsigned nsCom RT.A bCom
     , authenticatedUnsigned nsCom RT.A nsBCom
     , authenticated nsCom RT.A bCom
     , authenticated nsCom RT.A nsBCom
     , authenticated nsCom RT.DS bCom ]
 
-regressionTest :: String -> [FilePath] -> [Query] -> [Query] -> Assertion
-regressionTest label newConfig expected unexpected = do
+regressionTest :: [FilePath] -> [Query] -> [Query] -> Assertion
+regressionTest newConfig expected unexpected = do
   old <- loadConfig baseFiles
   new <- loadConfig newConfig
   regressions <- failLeft $
@@ -409,38 +403,38 @@ regressionTest label newConfig expected unexpected = do
         computeRegressions
           (plResolvable =<< compileConfig rootServers old)
           (plResolvable =<< compileConfig rootServers new)
-  assertResolvableQueries ("base -> " ++ label) (S.fromList regressions) expected unexpected
+  assertResolvableQueries (baseFiles ++ newConfig) (S.fromList regressions) expected unexpected
 
-assertQueries :: String -> S.Set ConstrainedQuery -> [Query] -> [Query] -> Assertion
+assertQueries :: [FilePath] -> S.Set ConstrainedQuery -> [Query] -> [Query] -> Assertion
 assertQueries = assertQueriesWith queryTerm
 
-assertResolvableQueries :: String -> S.Set ConstrainedQuery -> [Query] -> [Query] -> Assertion
+assertResolvableQueries :: [FilePath] -> S.Set ConstrainedQuery -> [Query] -> [Query] -> Assertion
 assertResolvableQueries = assertQueriesWith resolvableQueryTerm
 
-assertQueriesWith :: (Query -> Term) -> String -> S.Set ConstrainedQuery -> [Query] -> [Query] -> Assertion
-assertQueriesWith toTerm label results expected unexpected = do
+assertQueriesWith :: (Query -> Term) -> [FilePath] -> S.Set ConstrainedQuery -> [Query] -> [Query] -> Assertion
+assertQueriesWith toTerm files results expected unexpected = do
   forM_ expected $ \query ->
     assertBool
-      (label ++ " should include " ++ show query ++ "\n" ++ showResults results)
+      (show query ++ " was not resolvable for zones:\n" ++ showZoneFiles files)
       (any (coversTerm (toTerm query)) results)
   forM_ unexpected $ \query ->
     assertBool
-      (label ++ " should not include " ++ show query ++ "\n" ++ showResults results)
+      (show query ++ " was wrongly resolvable for zones:\n" ++ showZoneFiles files)
       (not (any (coversTerm (toTerm query)) results))
 
-assertResolutions :: String -> S.Set ConstrainedQuery -> [Resolution] -> [Resolution] -> Assertion
-assertResolutions label results expected unexpected = do
+assertResolutions :: [FilePath] -> S.Set ConstrainedQuery -> [Resolution] -> [Resolution] -> Assertion
+assertResolutions files results expected unexpected = do
   forM_ expected $ \resolution ->
     assertBool
-      (label ++ " should include " ++ show resolution ++ "\n" ++ showResults results)
+      (show resolution ++ " was not resolvable for zones:\n" ++ showZoneFiles files)
       (any (coversResolution resolution) results)
   forM_ unexpected $ \resolution ->
     assertBool
-      (label ++ " should not include " ++ show resolution ++ "\n" ++ showResults results)
+      (show resolution ++ " was wrongly resolvable for zones:\n" ++ showZoneFiles files)
       (not (any (coversResolution resolution) results))
 
-showResults :: S.Set ConstrainedQuery -> String
-showResults = unlines . map show . S.toList
+showZoneFiles :: [FilePath] -> String
+showZoneFiles = unlines . map ("  " ++)
 
 coversResolution :: Resolution -> ConstrainedQuery -> Bool
 coversResolution = coversTerm . resolutionTerm
