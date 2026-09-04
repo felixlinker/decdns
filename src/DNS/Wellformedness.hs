@@ -21,6 +21,9 @@ import Util.Bool ((==>))
 expect :: Bool -> String -> Maybe String
 expect p err = if p then Nothing else Just err
 
+dataNoApex :: Zone a -> Tr.Node a (RRSet.RTypedSet RData)
+dataNoApex (Zone _ (Tr.Node _ rcs)) = Tr.Node RRSet.empty rcs
+
 -- NOTE: Following well-formedness checks where not implemented yet, but could
 -- be implemented. I believe I do not need them for my tool to work, but they
 -- may be useful feedback nonetheless.
@@ -31,6 +34,7 @@ expect p err = if p then Nothing else Just err
 wellformed :: Zone String -> Maybe String
 wellformed z@(Zone org r) =
   asum  [ expect (checkCNAME z) "CNAME record accompanied by records other than NSEC or RRSIG"
+        , expect (not $ any (RRSet.hasType T.SOA) (dataNoApex z)) "zone SOA record below apex"
         , expect (checkZoneCuts r) "illegal record at or below zone cut"
         , expect (singletonTypes r) "more than one CNAME, DNAME, NSEC or SOA record at owner name"
         , expect (wildcardRestrictions z) "DNAME, DS or NS wildcard record"
@@ -47,15 +51,12 @@ responseWellformed z@(Zone _ r) =
 -- side of the delegation for a name server that also serves the child zone. For
 -- the rule, see: https://datatracker.ietf.org/doc/html/rfc4035#section-2.4
 zoneWellformed :: Zone String -> Maybe String
-zoneWellformed z@(Zone _ r@(Tr.Node _ rcs)) =
+zoneWellformed z@(Zone _ r@(Tr.Node rd _)) =
   asum  [ wellformed z
-        , expect (checkNoDataAboveApex r) "zone misses SOA record"
+        , expect (RRSet.hasType T.SOA rd) "zone misses SOA record"
         , expect (checkDNAME False r) "CNAME next to DNAME or records below DNAME"
         , expect (rrsigLabelCount False z) "RRSIG has illegal label count"
-        , expect (noDNSSECKey dataNoApex) "DNSKEY with non-apex owner name" ]
-  where
-    dataNoApex :: Tr.Node String (RRSet.RTypedSet RData)
-    dataNoApex = Tr.Node RRSet.empty rcs
+        , expect (noDNSSECKey (dataNoApex z)) "DNSKEY with non-apex owner name" ]
 
 typesAllIn :: RRSet.RTypedSet a -> [T.Type] -> Bool
 typesAllIn rd = RRSet.apply M.null . foldr (RRSet.modify . M.delete) rd
@@ -127,19 +128,7 @@ checkDNAME allowCNAME (Tr.Node rs cs)
 
 checkZoneCuts :: Tr.Node String RRSet.RDataSet -> Bool
 checkZoneCuts (Tr.Node rs cs)
-  | RRSet.hasType T.NS rs && not (RRSet.hasType T.SOA rs) =
+  | RRSet.hasType T.NS rs =
       typesAllIn rs [T.NS, T.DS, T.NSEC, T.RRSIG, T.A, T.AAAA]
-        && all checkBelowZoneCut cs
+        && all (all (`typesAllIn` [T.A, T.AAAA])) cs
   | otherwise = all checkZoneCuts cs
-
-checkBelowZoneCut :: Tr.Node String RRSet.RDataSet -> Bool
-checkBelowZoneCut node@(Tr.Node rs cs)
-  | RRSet.hasType T.SOA rs = checkZoneCuts node
-  | otherwise =
-      typesAllIn rs [T.A, T.AAAA]
-        && all checkBelowZoneCut cs
-
-checkNoDataAboveApex :: Tr.Node String RRSet.RDataSet -> Bool
-checkNoDataAboveApex (Tr.Node rs cs)
-  | RRSet.null rs = all checkNoDataAboveApex cs
-  | otherwise = RRSet.hasType T.SOA rs
