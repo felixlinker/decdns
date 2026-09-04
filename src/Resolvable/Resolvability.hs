@@ -137,20 +137,23 @@ resolvableStep (map nameTerm -> rootServers) ns zone s@(Named n rs) =
                 return (S.singleton $ Rule rannot (resolves nameServer dsType zone n' d top (ad 1))
                   [ resolves delegatedNs dsType ownerNoSynth n' d top (ad 1) ])
             ]
+      -- TODO: I forbid recursion on NSEC(3) records here. Implement that more
+      -- generally. Why only forbid this for CNAME redirections? Are there other
+      -- records for which we must forbid this?
       CNAME (nameTerm -> cname) -> foreachM synthesisCases $ \synth -> S.fromList <$> sequence
         [ do  -- Unauthenticated
           (n', cs) <- synth n
           (t, d) <- freshVars2 ("T", "D")
           targetZone <- wildcard
           return $ Rule rannot (resolves nameServer t zone n' d bot (ad 0))
-            (cs ++  [ t \= cnameType
+            (cs ++  [ t \= cnameType, t \= nsecType, t \= nsec3Type
                           , resolves rootServer t targetZone cname d bot (ad 0) ])
         , do  -- Authenticated
           (n', cs) <- synth n
           (t, d, a) <- freshVars3 ("T", "D", "A")
           targetZone <- wildcard
           return $ Rule rannot (resolves nameServer t zone n' d top a)
-            (cs ++  [ t \= cnameType
+            (cs ++  [ t \= cnameType, t \= nsecType, t \= nsec3Type
                           , resolves nameServer cnameType zone ownerNoSynth (list [TComplex r]) top (ad 1)
                           , resolves rootServer t targetZone cname d top a ]) ]
       DNAME (nameTerm -> dname) -> S.fromList <$> sequence
