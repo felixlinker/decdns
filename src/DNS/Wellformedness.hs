@@ -35,7 +35,7 @@ wellformed :: Zone String -> Maybe String
 wellformed z@(Zone org r) =
   asum  [ expect (checkCNAME z) "CNAME record accompanied by records other than NSEC or RRSIG"
         , expect (not $ any (RRSet.hasType T.SOA) (dataNoApex z)) "zone SOA record below apex"
-        , expect (checkZoneCuts r) "illegal record at or below zone cut"
+        , expect (checkZoneCuts $ dataNoApex z) "illegal record at or below zone cut"
         , expect (singletonTypes r) "more than one CNAME, DNAME, NSEC or SOA record at owner name"
         , expect (wildcardRestrictions z) "DNAME, DS or NS wildcard record"
         , expect (rrsigSignerName org r) "RRSIG has illegal signer name" ]
