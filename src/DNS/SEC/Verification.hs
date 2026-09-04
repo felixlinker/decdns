@@ -131,19 +131,25 @@ verifyClosestEncloserProof (canonicalName -> qname) hashedClosestEncloser closes
           n' <- Name <$> NE.nonEmpty (NE.tail $ labels n)
           findNonExHash (Just hn) n' hashed
 
+checkUnsigedDelegationBitMap :: [T.Type] -> Bool
+checkUnsigedDelegationBitMap ts =
+        T.DS `notElem` ts
+    &&  T.NS `elem` ts
+    &&  T.SOA `notElem` ts
+
 -- See: https://datatracker.ietf.org/doc/html/rfc5155#section-8.9
 nsec3UnsignedSubzone :: Name String -> Name String -> NSEC3Data -> Bool
 nsec3UnsignedSubzone originalOwner hashedOwner dat@(NSEC3Data { _nsec3TypeBitMaps = ts }) = fromMaybe False $ do
   let Name (b32 NE.:| _) = hashedOwner
   hashedOwnerHash <- fromB32 b32
   return $ nsec3Hash dat originalOwner == hashedOwnerHash
-    && T.DS `notElem` ts
-    && T.NS `elem` ts
-    && T.SOA `notElem` ts
+    && checkUnsigedDelegationBitMap ts
 
 -- TODO: Check an attacker could use NSEC data from the child to lie about the
 -- parent. This should be rejected due to an illegal signer's name. This also
 -- goes the other way around. The signer name length check should catch this.
+-- NOTE: I now use the check for T.SOA to enforce this. I should also check,
+-- though, whether there are issues with signer's name.
 nsecUnsignedSubzone :: Name String -> Name String -> NSECData -> Bool
 nsecUnsignedSubzone owner nsecOwner (NSECData { _nsecTypeBitMaps = ts }) =
-  owner == nsecOwner && T.DS `notElem` ts
+  owner == nsecOwner && checkUnsigedDelegationBitMap ts
