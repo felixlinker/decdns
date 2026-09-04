@@ -41,27 +41,28 @@ splitZone (Zone n r) = St.execState (rec n n True r) []
         cs' <- M.traverseWithKey (\l -> rec zn (l <| accN) retainParent') cs
         return (Tr.Node d cs')
 
-    splitData :: Label a => Name a -> RDataSet -> (RDataSet, RDataSet)
-    splitData childZoneName d@(RDS m) =
-      let baseParent  = M.filterWithKey (\k _ -> k `elem` [T.DS, T.NS]) m
-          baseChild   = M.delete T.DS m
-          (sigsParent, sigsChild) = L.partition (not . (`hasSignersName` toStringName childZoneName)) $ getType T.RRSIG d
-          (nsecParent, nsecChild) = L.partition (not . coversSOA) $ getType T.NSEC d
-          parentData  = inserts baseParent  [(T.NSEC, nsecParent),  (T.RRSIG, sigsParent)]
-          childData   = inserts baseChild   [(T.NSEC, nsecChild),   (T.RRSIG, sigsChild)]
-      in (RDS parentData, RDS childData)
+splitData :: Label a => Name a -> RDataSet -> (RDataSet, RDataSet)
+splitData childZoneName d@(RDS m) =
+  let baseParent  = M.filterWithKey (\k _ -> k `elem` [T.DS, T.NS]) m
+      baseChild   = M.delete T.DS m
+      (sigsParent, sigsChild) = L.partition (not . (`hasSignersName` toStringName childZoneName)) $ getType T.RRSIG d
+      (nsecParent, nsecChild) = L.partition (not . coversSOA) $ getType T.NSEC d
+      parentData  = inserts baseParent  [(T.NSEC, nsecParent),  (T.RRSIG, sigsParent)]
+      childData   = inserts baseChild   [(T.NSEC, nsecChild),   (T.RRSIG, sigsChild)]
+  in (RDS parentData, RDS childData)
 
-collectGlue :: Zone a -> (Zone a, [RRSet a])
+collectGlue :: Label a => Zone a -> (Zone a, [RRSet a])
 collectGlue (Zone zn (Tr.Node apexD apexCS)) =
   first (Zone zn . Tr.Node apexD) $
     St.runState (M.traverseWithKey (\l -> rec (l <| zn)) apexCS) []
   where
-    rec :: Name a -> ZNode a -> St.State [RRSet a] (ZNode a)
+    rec :: Label a => Name a -> ZNode a -> St.State [RRSet a] (ZNode a)
     rec accn (Tr.Node d cs)
       | hasType T.NS d = do
-        let glue = allRRSets (Zone accn (Tr.Node empty cs))
+        let (parentData, childData) = splitData accn d
+        let glue = allRRSets (Zone accn (Tr.Node childData cs))
         St.modify (glue ++)
-        return (Tr.Node d M.empty)
+        return (Tr.Node parentData M.empty)
       | otherwise = do
         cs' <- M.traverseWithKey (\l -> rec (l <| accn)) cs
         return (Tr.Node d cs')
