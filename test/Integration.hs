@@ -13,7 +13,7 @@ import DNS.ZoneFile (zoneName)
 import NameConstraint (exactly)
 import Parsing.Config (parseZoneFileZones, parseZoneFiles)
 import Resolvable.Dependencies (ConstrainedQuery (CQuery), computeResolvable, queryFromRule)
-import Resolvable.Prolog.Core (Term, ad, nameTerm, resolvable, resolves, top, ttypeTerm, wildcard, wildcards4)
+import Resolvable.Prolog.Core (Term, ad, nameTerm, resolvable, resolves, top, ttypeTerm, wildcard, wildcards3)
 import Resolvable.Resolvability (NameServersConfig, compileConfig, plResolvable)
 import Resolvable.Update.Dependencies (computeRegressions)
 import qualified Resolvable.ConstrainedUnification as CU
@@ -450,8 +450,8 @@ coversTerm expected (CQuery actual constraints) =
 queryTerm :: Query -> Term
 queryTerm (Query ns rtype qname) = runFresh $ do
   zone <- wildcard
-  (wc1, wc2, wc3, wc4) <- wildcards4
-  return $ resolves (nameTerm ns) (ttypeTerm rtype) zone (nameTerm qname) wc1 wc2 wc3 wc4
+  (wc1, wc2, wc3) <- wildcards3
+  return $ resolves (nameTerm ns) (ttypeTerm rtype) zone (nameTerm qname) wc1 wc2 wc3
 
 resolvableQueryTerm :: Query -> Term
 resolvableQueryTerm (Query ns rtype qname) = runFresh $ resolvable (nameTerm ns) (ttypeTerm rtype) (nameTerm qname) <$> wildcard <*> wildcard
@@ -459,9 +459,8 @@ resolvableQueryTerm (Query ns rtype qname) = runFresh $ resolvable (nameTerm ns)
 resolutionTerm :: Resolution -> Term
 resolutionTerm (Resolution (Query ns rtype qname) verification auth) = runFresh $ do
   zone <- wildcard
-  wc1 <- wildcard
-  wc2 <- wildcard
-  return $ resolves (nameTerm ns) (ttypeTerm rtype) zone (nameTerm qname) wc1 wc2 verification auth
+  wc <- wildcard
+  return $ resolves (nameTerm ns) (ttypeTerm rtype) zone (nameTerm qname) wc verification auth
 
 resolvableQueries :: [FilePath] -> IO (S.Set ConstrainedQuery)
 resolvableQueries files = do

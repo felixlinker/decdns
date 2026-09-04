@@ -58,7 +58,7 @@ resolvableBase rootServers ns zone s@(Named n rds@((RData _ _ ty) NE.:| _)) =
   foreachM synthesisCases $ \synth ->
   foreachM rootKeyCases   $ \(ver, adb) -> do
     (n', cs) <- synth n
-    return $ S.singleton $ Rule rann (resolves (nameTerm ns) (typeTerm ty) zone n' (rrsetTerm rds) bot ver adb) cs
+    return $ S.singleton $ Rule rann (resolves (nameTerm ns) (typeTerm ty) zone n' (rrsetTerm rds) ver adb) cs
     where
       -- TODO: Refine so that only root keys are trusted
       rootKeyCases :: [(Term, Term)]
@@ -89,87 +89,86 @@ resolvableStep (map nameTerm -> rootServers) ns zone s@(Named n rs) =
         let delegatedNs = nameTerm s'
             expectGlue = isSubDomain s' (toStringName n)
             glueS = if expectGlue then nameServer else rootServer
-            glueRec = if expectGlue then bot else top
         in if nameServer == delegatedNs
           then return S.empty
           else mconcat <$> sequence
             [ foreachM [aType, aaaaType] $ \glueType -> do  -- Unauthenticated
-                (nTail, t, d, dIp, rec) <- freshVars5 ("N", "T", "D", "D_IP", "R")
+                (nTail, t, d, dIp) <- freshVars4 ("N", "T", "D", "D_IP")
                 glueZ <- if expectGlue then return glueZone else wildcard
                 -- Do not expect wildcard neq constraints on NS records
                 let n' = captureListTail nTail ownerNoSynth
-                return (S.singleton $ Rule rannot (resolves nameServer t zone n' d top bot (ad 0))
-                  [ resolves delegatedNs t ownerNoSynth n' d rec bot (ad 0)
-                  , resolves glueS glueType glueZ delegatedNs dIp glueRec bot (ad 0) ])
+                return (S.singleton $ Rule rannot (resolves nameServer t zone n' d bot (ad 0))
+                  [ resolves delegatedNs t ownerNoSynth n' d bot (ad 0)
+                  , resolves glueS glueType glueZ delegatedNs dIp bot (ad 0) ])
             , do  -- NSEC for unsigned subzone
-                (nTail, t, d, dNSEC, rec) <- freshVars5 ("N", "T", "D", "D_NSEC", "R")
+                (nTail, t, d, dNSEC) <- freshVars4 ("N", "T", "D", "D_NSEC")
                 let n' = captureListTail nTail ownerNoSynth
-                return $ S.singleton $ Rule rannot (resolves nameServer t zone n' d top top (ad 0))
+                return $ S.singleton $ Rule rannot (resolves nameServer t zone n' d top (ad 0))
                   [ t \= dsType
-                  , resolves nameServer nsecType zone ownerNoSynth (list [dNSEC]) bot top (ad 1)
+                  , resolves nameServer nsecType zone ownerNoSynth (list [dNSEC]) top (ad 1)
                   , nsecUnsigned ownerNoSynth dNSEC
-                  , resolves nameServer t zone n' d rec bot (ad 0) ]
+                  , resolves nameServer t zone n' d bot (ad 0) ]
             , do  -- NSEC3 for owner for unsigned subzone
-                (nTail, t, d, nNSEC, dNSEC, rec) <- freshVars6 ("N", "T", "D", "N_NSEC", "D_NSEC", "R")
+                (nTail, t, d, nNSEC, dNSEC) <- freshVars5 ("N", "T", "D", "N_NSEC", "D_NSEC")
                 let n'' = captureListTail nTail ownerNoSynth
-                return $ S.singleton $ Rule rannot (resolves nameServer t zone n'' d top top (ad 0))
+                return $ S.singleton $ Rule rannot (resolves nameServer t zone n'' d top (ad 0))
                   [ t \= dsType
-                  , resolves nameServer nsec3Type zone nNSEC (list [dNSEC]) bot top (ad 1)
+                  , resolves nameServer nsec3Type zone nNSEC (list [dNSEC]) top (ad 1)
                   , nsec3Unsigned ownerNoSynth nNSEC dNSEC
-                  , resolves nameServer t zone n'' d rec bot (ad 0) ]
+                  , resolves nameServer t zone n'' d bot (ad 0) ]
             , do  -- NSEC3 closest encloser proof for unsigned subzone
-              (nTail, t, d, nNSEC, nNSEC', dNSEC, dNSEC', rec) <- freshVars8 ("N", "T", "D", "N_NSEC", "N_NSEC", "D_NSEC", "D_NSEC", "R")
+              (nTail, t, d, nNSEC, nNSEC', dNSEC, dNSEC') <- freshVars7 ("N", "T", "D", "N_NSEC", "N_NSEC", "D_NSEC", "D_NSEC")
               let n'' = captureListTail nTail ownerNoSynth
-              return $ S.singleton $ Rule rannot (resolves nameServer t zone n'' d top top (ad 0))
+              return $ S.singleton $ Rule rannot (resolves nameServer t zone n'' d top (ad 0))
                 [ t \= dsType
-                , resolves nameServer nsec3Type zone nNSEC (list [dNSEC]) bot top (ad 1)
-                , resolves nameServer nsec3Type zone nNSEC' (list [dNSEC']) bot top (ad 1)
+                , resolves nameServer nsec3Type zone nNSEC (list [dNSEC]) top (ad 1)
+                , resolves nameServer nsec3Type zone nNSEC' (list [dNSEC']) top (ad 1)
                 , closestEncloser ownerNoSynth nNSEC dNSEC nNSEC' dNSEC'
-                , resolves nameServer t zone n'' d rec bot (ad 0) ]
+                , resolves nameServer t zone n'' d bot (ad 0) ]
             , do  -- Authenticated not-DS
-                (nTail, t, d, rec) <- freshVars4 ("N", "T", "D", "R")
+                (nTail, t, d) <- freshVars3 ("N", "T", "D")
                 let n' = captureListTail nTail ownerNoSynth
-                return (S.singleton $ Rule rannot (resolves nameServer t zone n' d top top (ad 1))
+                return (S.singleton $ Rule rannot (resolves nameServer t zone n' d top (ad 1))
                   [ t \= dsType
-                  , resolves delegatedNs t ownerNoSynth n' d rec top (ad 1) ])
+                  , resolves delegatedNs t ownerNoSynth n' d top (ad 1) ])
             , do  -- Authenticated DS
-                (l, nTail, d, rec) <- freshVars4 ("L", "N", "D", "R")
+                (l, nTail, d) <- freshVars3 ("L", "N", "D")
                 let n' = injectLast l $ captureListTail nTail ownerNoSynth
-                return (S.singleton $ Rule rannot (resolves nameServer dsType zone n' d top top (ad 1))
-                  [ resolves delegatedNs dsType ownerNoSynth n' d rec top (ad 1) ])
+                return (S.singleton $ Rule rannot (resolves nameServer dsType zone n' d top (ad 1))
+                  [ resolves delegatedNs dsType ownerNoSynth n' d top (ad 1) ])
             ]
       CNAME (nameTerm -> cname) -> foreachM synthesisCases $ \synth -> S.fromList <$> sequence
         [ do  -- Unauthenticated
           (n', cs) <- synth n
-          (t, d, rec) <- freshVars3 ("T", "D", "R")
+          (t, d) <- freshVars2 ("T", "D")
           targetZone <- wildcard
-          return $ Rule rannot (resolves nameServer t zone n' d top bot (ad 0))
+          return $ Rule rannot (resolves nameServer t zone n' d bot (ad 0))
             (cs ++  [ t \= cnameType
-                          , resolves rootServer t targetZone cname d rec bot (ad 0) ])
+                          , resolves rootServer t targetZone cname d bot (ad 0) ])
         , do  -- Authenticated
           (n', cs) <- synth n
-          (t, d, rec1, rec2, a) <- freshVars5 ("T", "D", "R", "R", "A")
+          (t, d, a) <- freshVars3 ("T", "D", "A")
           targetZone <- wildcard
-          return $ Rule rannot (resolves nameServer t zone n' d top top a)
+          return $ Rule rannot (resolves nameServer t zone n' d top a)
             (cs ++  [ t \= cnameType
-                          , resolves nameServer cnameType zone ownerNoSynth (list [TComplex r]) rec1 top (ad 1)
-                          , resolves rootServer t targetZone cname d rec2 top a ]) ]
+                          , resolves nameServer cnameType zone ownerNoSynth (list [TComplex r]) top (ad 1)
+                          , resolves rootServer t targetZone cname d top a ]) ]
       DNAME (nameTerm -> dname) -> S.fromList <$> sequence
         [ do  -- Unauthenticated
-          (l, nTail, t, d, rec) <- freshVars5 ("L", "N", "T", "D", "R")
+          (l, nTail, t, d) <- freshVars4 ("L", "N", "T", "D")
           targetZone <- wildcard
           let rewrite = injectLast l . captureListTail nTail
           -- Do not expect wildcard neq constraints on DNAME records
-          return $ Rule rannot (resolves nameServer t zone (rewrite ownerNoSynth) d top bot (ad 0))
-            [ resolves rootServer t targetZone (rewrite dname) d rec bot (ad 0) ]
+          return $ Rule rannot (resolves nameServer t zone (rewrite ownerNoSynth) d bot (ad 0))
+            [ resolves rootServer t targetZone (rewrite dname) d bot (ad 0) ]
         , do  -- Authenticated
-          (l, nTail, t, d, rec1, rec2, a) <- freshVars7 ("L", "N", "T", "D", "R", "R", "A")
+          (l, nTail, t, d, a) <- freshVars5 ("L", "N", "T", "D", "A")
           targetZone <- wildcard
           let rewrite = injectLast l . captureListTail nTail
           -- Do not expect wildcard neq constraints on DNAME records
-          return $ Rule rannot (resolves nameServer t zone (rewrite ownerNoSynth) d top top a)
-            [ resolves nameServer dnameType zone ownerNoSynth (list [TComplex r]) rec1 top (ad 1)
-            , resolves rootServer t targetZone (rewrite dname) d rec2 top a ] ]
+          return $ Rule rannot (resolves nameServer t zone (rewrite ownerNoSynth) d top a)
+            [ resolves nameServer dnameType zone ownerNoSynth (list [TComplex r]) top (ad 1)
+            , resolves rootServer t targetZone (rewrite dname) d top a ] ]
       -- TODO: Check that sigName is the name of the zone containing the record;
       -- does that mean there ex. a corresponding SOA record? Could be, but seems
       -- technically wrong as there could be intermediate SOA records. It could be
@@ -178,12 +177,12 @@ resolvableStep (map nameTerm -> rootServers) ns zone s@(Named n rs) =
       sig@(RRSIG (RRSIGData cov _ _ _ _ _ _ (nameTerm -> sigName) _)) ->
         case cov of
           T.DNSKEY -> do
-            (d, d_DS, k, kRef, rec) <- freshVars5 ("D", "D_DS", "K", "K_REF", "R")
+            (d, d_DS, k, kRef) <- freshVars4 ("D", "D_DS", "K", "K_REF")
             parentZone <- wildcard
             return $ S.singleton $ Rule rannot
-              (resolves nameServer dnskeyType zone ownerNoSynth d bot top (ad 1))
-              [ resolves nameServer dnskeyType zone ownerNoSynth d bot bot (ad 0)
-                    , resolves rootServer dsType parentZone ownerNoSynth d_DS rec top (ad 1)
+              (resolves nameServer dnskeyType zone ownerNoSynth d top (ad 1))
+              [ resolves nameServer dnskeyType zone ownerNoSynth d bot (ad 0)
+                    , resolves rootServer dsType parentZone ownerNoSynth d_DS top (ad 1)
                     , member k d
                     , member kRef d_DS
                     , digestValid ownerNoSynth k kRef
@@ -192,9 +191,9 @@ resolvableStep (map nameTerm -> rootServers) ns zone s@(Named n rs) =
             (n', cs) <- synth n
             (d, d_KEY, k) <- freshVars3 ("D", "D_KEY", "K")
             return $ S.singleton $ Rule rannot
-              (resolves nameServer (ttypeTerm cov) zone n' d bot top (ad 1))
-              (cs ++  [ resolves nameServer (ttypeTerm cov) zone n' d bot bot (ad 0)
-                            , resolves nameServer dnskeyType zone sigName d_KEY bot top (ad 1)
+              (resolves nameServer (ttypeTerm cov) zone n' d top (ad 1))
+              (cs ++  [ resolves nameServer (ttypeTerm cov) zone n' d bot (ad 0)
+                            , resolves nameServer dnskeyType zone sigName d_KEY top (ad 1)
                             , member k d_KEY
                             , rrsigValid n' d (TComplex sig) k ])
       A {} -> return S.empty
@@ -210,10 +209,10 @@ resolvableStep (map nameTerm -> rootServers) ns zone s@(Named n rs) =
 
 resolvableR :: Fresh (Rule (Maybe RComp))
 resolvableR = do
-  (s, q, n, rec, v, a) <- freshVars6 ("S", "Q", "N", "R", "V", "A")
+  (s, q, n, v, a) <- freshVars5 ("S", "Q", "N", "V", "A")
   wc1 <- wildcard
   wc2 <- wildcard
-  return $ Rule Nothing (resolvable s q n v a) [ resolves s q wc1 n wc2 rec v a ]
+  return $ Rule Nothing (resolvable s q n v a) [ resolves s q wc1 n wc2 v a ]
 
 allResolvable :: Rule (Maybe RComp)
 allResolvable =
