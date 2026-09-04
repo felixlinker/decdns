@@ -60,7 +60,7 @@ collectGlue (Zone zn (Tr.Node apexD apexCS)) =
     rec accn (Tr.Node d cs)
       | hasType T.NS d = do
         let (parentData, childData) = splitData accn d
-        let glue = allRRSets (Zone accn (Tr.Node childData cs))
+        let glue = allRRSets (Zone accn (Tr.Node (dropType T.NS childData) cs))
         St.modify (glue ++)
         return (Tr.Node parentData M.empty)
       | otherwise = do
