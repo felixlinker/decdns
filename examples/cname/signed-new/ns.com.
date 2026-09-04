@@ -1,0 +1,59 @@
+; File written on Fri Sep  4 14:42:39 2026
+; dnssec-signzone version 9.20.23
+com.			1200	IN SOA	ns.com. example.com. (
+					0          ; serial
+					0          ; refresh (0 seconds)
+					0          ; retry (0 seconds)
+					0          ; expire (0 seconds)
+					0          ; minimum (0 seconds)
+					)
+			1200	RRSIG	SOA 13 1 1200 (
+					20261004114239 20260904114239 41614 com.
+					iFSyo0V2b7iy1CUyNevtmjBgZwKwHeTIeOI1
+					FMKpSpHqF7fmTMGppPIcED2h7RCH+wWQN7iL
+					J1+ajXuktFb2Bg== )
+			1200	NS	ns.com.
+			1200	RRSIG	NS 13 1 1200 (
+					20261004114239 20260904114239 41614 com.
+					Ocerpz2nfGLS21vF6HKElbLQtftyNRevNubf
+					sVWlCQD+b1sEJPQOi4N5bpyRwB30+Zs/ZN8N
+					QutQUxTp3VRkNw== )
+			0	NSEC	*.com. NS SOA RRSIG NSEC DNSKEY
+			0	RRSIG	NSEC 13 1 0 (
+					20261004114239 20260904114239 41614 com.
+					kvkGHezqTrIzqsf3ze4vbuZ5C+hhDnpttWlN
+					08xi5qD5bteOKZ+H1kX4LE8+mDFY3YuGCu1/
+					n55fxaawCgUmCA== )
+			1200	DNSKEY	256 3 13 (
+					cfv6ncp5V9WCnZxFneqBeCCwGV6SOWKC2gv1
+					LOR4Bx+GVub/DTtRwziMxVE2a6KAXXzyI3tq
+					jg03cDpOFZVkLQ==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 41614
+			1200	DNSKEY	257 3 13 (
+					Da76+K3tttBBWB0v9OvYHw/7ijVmdVppHErw
+					dWflMlDHYUTuA701YVvjfLu0iLQnTRHZsrsu
+					SoETOl43q1KE4g==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 62435
+			1200	RRSIG	DNSKEY 13 1 1200 (
+					20261004114239 20260904114239 41614 com.
+					7z+Us2iwk+ywfvwe2r2k8HNXeanzhTp92JpH
+					5UNEXCyVqXf5cjdZHSpqExE+0QliEHGinS1H
+					KUIgWbNsOwuSuA== )
+			1200	RRSIG	DNSKEY 13 1 1200 (
+					20261004114239 20260904114239 62435 com.
+					h0aEApUbREDtcAf7wfzR3Y/oK35LV7rLDOCR
+					ysJ1i18puP+W8ZSD9WD9Lms1zQ6BLHxpqReP
+					qxjKh8kbblHvRA== )
+*.com.			1200	IN A	1.2.3.4
+			1200	RRSIG	A 13 1 1200 (
+					20261004114239 20260904114239 41614 com.
+					Zwqxue+E9ujYeYkmZaJzj8+kfELfsdh6B3Tk
+					AsvS3odh0D1YzsRhaxZrG2bx0m/FCq8Ehigx
+					h5kyLU3Edvopkw== )
+			0	NSEC	com. A RRSIG NSEC
+			0	RRSIG	NSEC 13 1 0 (
+					20261004114239 20260904114239 41614 com.
+					3XpRR+dYTVeVrLAbAb5/pUkOWf9b/UGoSXl3
+					2xScrFwaFV1KmRUn+9J7ugdeQrlvjWZ1FVzi
+					wz4BV0JSZrrA0w== )
+;; Served by ns.com.

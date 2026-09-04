@@ -44,6 +44,8 @@ tests =
         "Resolvable.Resolvability authentication"
         [ testCase "signed authenticates the CNAME chain and child zone" $
             authenticatedResolutionTest signedFiles
+        , testCase "signed-new authenticates answers synthesized from a wildcard" $
+            authenticatedWildcardResolutionTest signedNewFiles
         , testCase "signed-nsec3 authenticates the CNAME chain and child zone" $
             authenticatedResolutionTest signedNsec3Files
         , testCase "partially-signed authenticates unsigned child zone through NSEC" $
@@ -104,6 +106,7 @@ exampleFiles =
   , ExampleFile "examples/cname/partially-signed/ns.b.com." [bCom]
   , ExampleFile "examples/cname/signed/ns.com." [com]
   , ExampleFile "examples/cname/signed/ns.b.com." [bCom]
+  , ExampleFile "examples/cname/signed-new/ns.com." [com]
   , ExampleFile "examples/cname/signed-non-zone-key/ns.com." [com]
   , ExampleFile "examples/cname/signed-non-zone-key/ns.b.com." [bCom]
   , ExampleFile "examples/cname/partially-signed-nsec3/ns.com." [com]
@@ -242,7 +245,7 @@ exampleConfigs =
       , Query nsNet RT.A subRootNet ]
       [Query rootNet RT.TXT subRootNet] ]
 
-baseFiles, newFiles, brokenFiles, partiallySignedFiles, signedFiles, signedNonZoneKeyFiles :: [FilePath]
+baseFiles, newFiles, brokenFiles, partiallySignedFiles, signedFiles, signedNewFiles, signedNonZoneKeyFiles :: [FilePath]
 selfDelegFiles, subSelfDelegFiles, nsLoopFiles, cnameLoopFiles :: [FilePath]
 partiallySignedNsec3Files, partiallySignedNsec3OOFiles, signedNsec3Files :: [FilePath]
 baseFiles =
@@ -260,6 +263,8 @@ partiallySignedFiles =
 signedFiles =
   [ "examples/cname/signed/ns.com."
   , "examples/cname/signed/ns.b.com." ]
+
+signedNewFiles = ["examples/cname/signed-new/ns.com."]
 
 signedNonZoneKeyFiles =
   [ "examples/cname/signed-non-zone-key/ns.com."
@@ -361,6 +366,16 @@ authenticatedResolutionTest files = do
     , authenticated nsCom RT.DNSKEY com
     , authenticated nsCom RT.DNSKEY bCom
     , authenticated nsCom RT.DS bCom ]
+    []
+
+authenticatedWildcardResolutionTest :: [FilePath] -> Assertion
+authenticatedWildcardResolutionTest files = do
+  results <- resolvableQueries files
+  assertResolutions files results
+    [ authenticated nsCom RT.A aCom
+    , authenticated nsCom RT.A bCom
+    , authenticated nsCom RT.A nsBCom
+    , authenticated nsCom RT.DNSKEY com ]
     []
 
 authenticatedUnsignedDelegationTest :: [FilePath] -> Assertion
