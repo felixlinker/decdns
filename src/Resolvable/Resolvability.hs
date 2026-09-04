@@ -195,7 +195,7 @@ resolvableStep (map nameTerm -> rootServers) ns zone s@(Named n rs) =
               (cs ++  [ resolves nameServer (ttypeTerm cov) zone n' d bot (ad 0)
                             , resolves nameServer dnskeyType zone sigName d_KEY top (ad 1)
                             , member k d_KEY
-                            , rrsigValid n' d (TComplex sig) k ])
+                            , rrsigValid ownerNoSynth d (TComplex sig) k ])
       A {} -> return S.empty
       AAAA {} -> return S.empty
       TXT {} -> return S.empty
