@@ -99,7 +99,7 @@ resolvableStep (map nameTerm -> rootServers) ns zone s@(Named n rs) =
                 -- Do not expect wildcard neq constraints on NS records
                 let n' = captureListTail nTail ownerNoSynth
                 return (S.singleton $ Rule rannot (resolves nameServer t zone n' d top bot (ad 0))
-                  [ resolves delegatedNs t n' n' d rec bot (ad 0)
+                  [ resolves delegatedNs t ownerNoSynth n' d rec bot (ad 0)
                   , resolves glueS glueType glueZ delegatedNs dIp glueRec bot (ad 0) ])
             , do  -- NSEC for unsigned subzone
                 (nTail, t, d, dNSEC, rec) <- freshVars5 ("N", "T", "D", "D_NSEC", "R")
