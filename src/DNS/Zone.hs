@@ -25,19 +25,20 @@ inserts :: Ord k => M.Map k (NE.NonEmpty a) -> [(k, [a])] -> M.Map k (NE.NonEmpt
 inserts = foldr (uncurry insertNonEmpty)
 
 splitZone :: Label a => Zone a -> [Zone a]
-splitZone (Zone n r) = St.execState (rec n n r) []
+splitZone (Zone n r) = St.execState (rec n n True r) []
   where
-    rec :: Label a => Name a -> Name a -> ZNode a -> St.State [Zone a] (ZNode a)
-    rec zn accN (Tr.Node d cs)
+    rec :: Label a => Name a -> Name a -> Bool -> ZNode a -> St.State [Zone a] (ZNode a)
+    rec zn accN retainParent (Tr.Node d cs)
       | hasType T.SOA d = do
         let (parentData, childData) = splitData zn d
-        let parentNode = Tr.Node parentData M.empty
-        childCs <- M.traverseWithKey (\l -> rec accN (l <| accN)) cs
+        let parentNode = Tr.Node (if retainParent then parentData else empty) M.empty
+        childCs <- M.traverseWithKey (\l -> rec accN (l <| accN) True) cs
         let childNode = Tr.Node childData childCs
         St.modify (Zone accN childNode:)
         return parentNode
       | otherwise = do
-        cs' <- M.traverseWithKey (\l -> rec zn (l <| accN)) cs
+        let retainParent' = retainParent && not (hasType T.NS d)
+        cs' <- M.traverseWithKey (\l -> rec zn (l <| accN) retainParent') cs
         return (Tr.Node d cs')
 
     splitData :: Label a => Name a -> RDataSet -> (RDataSet, RDataSet)
