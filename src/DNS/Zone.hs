@@ -42,17 +42,19 @@ splitZone (Zone n r) = St.execState (rec n n True r) []
         return (Tr.Node d cs')
 
     splitData :: Label a => Name a -> RDataSet -> (RDataSet, RDataSet)
-    splitData zn d@(RDS m) =
+    splitData childZoneName d@(RDS m) =
       let baseParent  = M.filterWithKey (\k _ -> k `elem` [T.DS, T.NS]) m
           baseChild   = M.delete T.DS m
-          (sigsParent, sigsChild) = L.partition (`hasSignersName` toStringName zn) $ getType T.RRSIG d
+          (sigsParent, sigsChild) = L.partition (not . (`hasSignersName` toStringName childZoneName)) $ getType T.RRSIG d
           (nsecParent, nsecChild) = L.partition (not . coversSOA) $ getType T.NSEC d
           parentData  = inserts baseParent  [(T.NSEC, nsecParent),  (T.RRSIG, sigsParent)]
           childData   = inserts baseChild   [(T.NSEC, nsecChild),   (T.RRSIG, sigsChild)]
       in (RDS parentData, RDS childData)
 
 collectGlue :: Zone a -> (Zone a, [RRSet a])
-collectGlue (Zone zn r) = first (Zone zn) $ St.runState (rec zn r) []
+collectGlue (Zone zn (Tr.Node apexD apexCS)) =
+  first (Zone zn . Tr.Node apexD) $
+    St.runState (M.traverseWithKey (\l -> rec (l <| zn)) apexCS) []
   where
     rec :: Name a -> ZNode a -> St.State [RRSet a] (ZNode a)
     rec accn (Tr.Node d cs)
