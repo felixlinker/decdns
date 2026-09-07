@@ -61,8 +61,8 @@ diffServers old new = MM.merge
   (MM.mapMissing (\_ -> fmap deleted))
   (MM.mapMissing (\_ -> fmap added))
   (MM.zipWithMatched (const diff))
-  (M.fromList old)
-  (M.fromList new)
+  (M.fromListWith mergeZones old)
+  (M.fromListWith mergeZones new)
 
 updateDeps :: NSDiffs -> RecordDependencies -> RecordDependencies
 updateDeps diffs = G.filter changed
