@@ -21,7 +21,6 @@ import Resolvable.Resolvability
 import DNS.ZoneFile
 import NameConstraint
 import qualified Util.Graph as G
-import Util.Monad (exceptMaybe)
 import Resolvable.Dependencies (ResolutionOrder)
 import Data.Maybe (isJust, fromJust)
 import DNS.RRSet (rrsetType)
@@ -33,6 +32,7 @@ type RecordDependencies = G.Graph RRSetID
 fromResolutionOrder :: ResolutionOrder -> Maybe RecordDependencies
 fromResolutionOrder =
     G.transitiveClosure
+  . G.irreflexive
   . G.map (fromAnnot . fromJust . rannotation)
   . G.filter (isJust . rannotation)
   where
@@ -79,10 +79,8 @@ showRollOut r = do
   ("step " ++ show i ++ "; roll out:") : showNSDiffs diffs
 
 rollout :: NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
-rollout diffs old new = do
-  old' <- exceptMaybe "old dependencies cyclic" $ G.transitiveClosure $ G.invert $ G.irreflexive old
-  new' <- exceptMaybe "new dependencies cyclic" $ G.transitiveClosure $ G.irreflexive new
-  rollout' id diffs old' new'
+rollout diffs (G.invert -> old) new = do
+  rollout' id diffs old new
 
 rollout' :: (Rollout -> Rollout) -> NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
 rollout' acc (normalize -> diffs) (updateDeps diffs -> old) (updateDeps diffs -> new)
