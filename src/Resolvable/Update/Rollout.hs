@@ -32,9 +32,9 @@ type RecordDependencies = G.Graph RRSetID
 
 fromResolutionOrder :: ResolutionOrder -> Maybe RecordDependencies
 fromResolutionOrder =
-  fmap (  G.map (fromAnnot . fromJust . rannotation)
-        . G.filter (isJust . rannotation))
-  . G.transitiveClosure
+    G.transitiveClosure
+  . G.map (fromAnnot . fromJust . rannotation)
+  . G.filter (isJust . rannotation)
   where
     fromAnnot :: RComp -> RRSetID
     fromAnnot (RComp ns rrs) = (ns, name rrs, rrsetType rrs)
