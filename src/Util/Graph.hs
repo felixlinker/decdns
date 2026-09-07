@@ -17,6 +17,7 @@ module Util.Graph
   , invert
   , insert
   , remove
+  , Util.Graph.map
   , Util.Graph.filter
   , tarjan ) where
 
@@ -45,7 +46,7 @@ toList :: Graph a -> [(a, S.Set a)]
 toList = toAscList
 
 toFlatList :: Graph a -> [(a, a)]
-toFlatList = concatMap (\(a, as) -> map (a,) (S.toList as)) . toList
+toFlatList = concatMap (\(a, as) -> Prelude.map (a,) (S.toList as)) . toList
 
 toAscList :: Graph a -> [(a, S.Set a)]
 toAscList = M.toAscList . edges
@@ -57,7 +58,7 @@ next :: Ord a => Graph a -> a -> S.Set a
 next po a = fromMaybe S.empty $ M.lookup a (edges po)
 
 leaves :: Ord a => Graph a -> S.Set a
-leaves = S.fromAscList . map fst . Prelude.filter (S.null . snd) . M.toAscList . edges
+leaves = S.fromAscList . Prelude.map fst . Prelude.filter (S.null . snd) . M.toAscList . edges
 
 leaf :: Ord a => Graph a -> a -> Bool
 leaf po = S.null . next po
@@ -97,6 +98,14 @@ insert k vs (Graph m) = Graph (M.alter (Just . maybe vs (vs <>)) k m)
 
 remove :: Ord a => a -> Graph a -> Graph a
 remove key (Graph m) = Graph $ M.map (S.delete key) $ M.delete key m
+
+map :: forall a b. (Ord a, Ord b) => (a -> b) -> Graph a -> Graph b
+map f (Graph m) = Graph $ foldr foldF M.empty (M.keys m)
+  where
+    foldF :: a -> M.Map b (S.Set b) -> M.Map b (S.Set b)
+    foldF k =
+      let img' = maybe S.empty (S.map f) (M.lookup k m)
+      in  M.alter (Just . maybe img' (<> img')) (f k)
 
 filter :: (a -> Bool) -> Graph a -> Graph a
 filter p = Graph . M.map (S.filter p) . M.filterWithKey (\k _ -> p k) . edges
