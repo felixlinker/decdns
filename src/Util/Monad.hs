@@ -6,6 +6,7 @@ module Util.Monad
   , failLeft
   , failLeftS
   , handleError
+  , handleMaybe
   , handleErrorS ) where
 
 import Control.Monad.Trans.Except (Except, ExceptT, throwE, runExcept)
@@ -30,6 +31,9 @@ failLeftS = either fail return
 
 handleError :: (MonadFail m, Show e) => Except e a -> m a
 handleError = failLeft . runExcept
+
+handleMaybe :: (MonadFail m, Show e) => e -> Maybe a -> m a
+handleMaybe e = handleError . exceptMaybe e
 
 handleErrorS :: (MonadFail m) => Except String a -> m a
 handleErrorS = failLeftS . runExcept

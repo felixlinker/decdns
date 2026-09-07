@@ -11,9 +11,9 @@ import DNS.Record (Cat (..), RData (..), Type (..))
 import qualified DNS.RRSet as RRSet
 import DNS.ZoneFile (Zone, insert, isEmpty, singleton, zoneName)
 import NameConstraint (compileWildcards)
-import Resolvable.Dependencies (RecordDependencies, fromRules)
+import Resolvable.Dependencies (resolutionOrder)
 import Resolvable.Resolvability (compileConfig)
-import Resolvable.Update.Rollout (rollout)
+import Resolvable.Update.Rollout (RecordDependencies, fromResolutionOrder, rollout)
 import Util.Fresh (runFresh)
 
 tests :: TestTree
@@ -33,7 +33,9 @@ immediateTxtAdd = do
       diffs = M.singleton (zoneName z) (diff (compileWildcards z) (compileWildcards z'))
   assertBool "expected TXT add diff to be non-empty" $
     maybe False (not . isEmpty) (M.lookup (zoneName z) diffs)
-  runExcept (rollout diffs (dependencies z) (dependencies z')) @?= Right [diffs]
+  dz <- dependencies z
+  dz' <- dependencies z'
+  runExcept (rollout diffs dz dz') @?= Right [diffs]
 
 immediateTxtDelete :: Assertion
 immediateTxtDelete = do
@@ -44,8 +46,11 @@ immediateTxtDelete = do
       diffs = M.singleton (zoneName zWithTxt) (diff (compileWildcards zWithTxt) (compileWildcards z))
   assertBool "expected TXT delete diff to be non-empty" $
     maybe False (not . isEmpty) (M.lookup (zoneName zWithTxt) diffs)
-  runExcept (rollout diffs (dependencies zWithTxt) (dependencies z)) @?= Right [diffs]
+  dzWithTxt <- dependencies zWithTxt
+  dz <- dependencies z
+  runExcept (rollout diffs dzWithTxt dz) @?= Right [diffs]
 
-dependencies :: Zone String -> RecordDependencies
+dependencies :: Zone String -> IO RecordDependencies
 dependencies z =
-  runFresh $ fromRules <$> compileConfig [zoneName z] [(zoneName z, compileWildcards z)]
+  let ord = runFresh $ fromResolutionOrder . resolutionOrder <$> compileConfig [zoneName z] [(zoneName z, compileWildcards z)]
+  in  maybe (fail "cyclic resolution order") return ord

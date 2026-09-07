@@ -1,6 +1,8 @@
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Update.Rollout
   ( NSDiffs
+  , RecordDependencies
+  , fromResolutionOrder
   , diffServers
   , Rollout
   , showRollOut
@@ -13,15 +15,32 @@ import qualified Data.Map.Merge.Lazy as MM
 
 import DNS.Diff
 import DNS.Name
-import Resolvable.Dependencies
+import qualified DNS.RecordType as T
+import Resolvable.Prolog.Core ( Rule(rannotation) )
 import Resolvable.Resolvability
 import DNS.ZoneFile
 import NameConstraint
 import qualified Util.Graph as G
 import Util.Monad (exceptMaybe)
+import Resolvable.Dependencies (ResolutionOrder)
+import Data.Maybe (isJust, fromJust)
+import DNS.RRSet (rrsetType)
 
-canRollout :: RecordDependencies -> Name String -> ConstrainedName -> Bool
-canRollout deps ns n = G.leaf deps $ ResolvableAt (ns, n)
+type RRSetID = (Name String, ConstrainedName, T.Type)
+
+type RecordDependencies = G.Graph RRSetID
+
+fromResolutionOrder :: ResolutionOrder -> Maybe RecordDependencies
+fromResolutionOrder =
+  fmap (  G.map (fromAnnot . fromJust . rannotation)
+        . G.filter (isJust . rannotation))
+  . G.transitiveClosure
+  where
+    fromAnnot :: RComp -> RRSetID
+    fromAnnot (RComp ns rrs) = (ns, name rrs, rrsetType rrs)
+
+canRollout :: RecordDependencies -> Name String -> ConstrainedName -> T.Type -> Bool
+canRollout deps ns n ty = G.leaf deps (ns, n, ty)
 
 type NSDiffs = M.Map (Name String) (ZoneDiff ConstrainedLabel)
 
@@ -48,8 +67,9 @@ diffServers old new = MM.merge
 updateDeps :: NSDiffs -> RecordDependencies -> RecordDependencies
 updateDeps diffs = G.filter changed
   where
-    changed :: ResolvableAt -> Bool
-    changed (ResolvableAt (ns, qn)) = maybe False (hasChanges qn) (M.lookup ns diffs)
+    -- TODO: Use type
+    changed :: RRSetID -> Bool
+    changed (ns, qn, ty) = maybe False (hasChanges qn ty) (M.lookup ns diffs)
 
 type Rollout = [NSDiffs]
 
@@ -78,7 +98,7 @@ rollout' acc (normalize -> diffs) (updateDeps diffs -> old) (updateDeps diffs ->
       in (normalize (M.map fst diffs'), normalize (M.map snd diffs'))
 
     partitionDiff :: Name String -> ZoneDiff ConstrainedLabel -> (ZoneDiff ConstrainedLabel, ZoneDiff ConstrainedLabel)
-    partitionDiff ns = partition (\n _ -> canRollout new ns n && canRollout old ns n)
+    partitionDiff ns = partition (\n ty _ -> canRollout new ns n ty && canRollout old ns n ty)
 
 dropEmpty :: NSDiffs -> NSDiffs
 dropEmpty = M.filter (not . isEmpty)

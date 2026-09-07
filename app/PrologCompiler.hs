@@ -6,10 +6,10 @@ import DNS.Wellformedness ( zoneWellformed, responseWellformed )
 import NameConstraint (toStandardRecord)
 import Resolvable.Prolog.Core
 import Resolvable.Resolvability
-import Resolvable.Update.Rollout (diffServers, showRollOut, rollout)
-import Resolvable.Dependencies (computeResolvable, fromRules)
+import Resolvable.Update.Rollout (diffServers, showRollOut, rollout, fromResolutionOrder)
+import Resolvable.Dependencies (computeResolvable, resolutionOrder)
 import Util.Fresh (runFresh)
-import Util.Monad (failLeftS, handleErrorS)
+import Util.Monad (failLeftS, handleErrorS, handleMaybe)
 
 import System.Environment (getArgs)
 import Util
@@ -57,8 +57,8 @@ main = do
       regs <- failLeftS $ runFresh $ runExceptT $ computeRegressions (plResolvable =<< oldRecsC) (plResolvable =<< newRecsC)
       mapM_ print regs
       let nsDiff = diffServers oldRecs newRecs
-      let oldDeps = runFresh $ fromRules <$> oldRecsC
-      let newDeps = runFresh $ fromRules <$> newRecsC
+      oldDeps <- handleMaybe "cyclic old resolution order" $ runFresh $ fromResolutionOrder . resolutionOrder <$> oldRecsC
+      newDeps <- handleMaybe "cyclic new resolution order" $ runFresh $ fromResolutionOrder . resolutionOrder <$> newRecsC
       rolloutSeq <- handleErrorS (rollout nsDiff oldDeps newDeps)
       unless (null rolloutSeq) $
         putStrLn $ unlines $ map ("% " ++) $ "You can roll out updates as follow." :  showRollOut rolloutSeq

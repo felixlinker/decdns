@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 module DNS.RRSet
   ( RTypedSet(..)
   , empty
@@ -13,6 +14,7 @@ module DNS.RRSet
   , StdRRSet
   , canonicalRRSet
   , toRecords
+  , rrsetType
   , hasType
   , getType
   , dropType ) where
@@ -67,10 +69,8 @@ toNE = runIdentity . M.traverseMaybeWithKey (const $ return . NE.nonEmpty) . M.f
 modifyL :: (M.Map T.Type (NE.NonEmpty a) -> M.Map T.Type [b]) -> RTypedSet a -> RTypedSet b
 modifyL f rd = RDS $ toNE $ apply f rd
 
-partition :: (a -> Bool) -> RTypedSet a -> (RTypedSet a, RTypedSet a)
-partition p rd =
-  let ps = apply (M.map $ NE.partition p) rd
-  in bimap (RDS . toNE) (RDS . toNE) (fmap fst ps, fmap snd ps)
+partition :: (T.Type -> NE.NonEmpty a -> Bool) -> RTypedSet a -> (RTypedSet a, RTypedSet a)
+partition p (rds -> d) = bimap RDS RDS (M.partitionWithKey p d)
 
 type RDataSet = RTypedSet RData
 type RRSet a = Named a (NE.NonEmpty RData)
@@ -88,7 +88,12 @@ singleton rd = RDS $ M.singleton (toType $ rtype rd) (NE.singleton rd)
 toRecords :: RRSet a -> NE.NonEmpty (Record a)
 toRecords (Named n sets) = Named n <$> sets
 
-hasType :: T.Type -> RDataSet -> Bool
+-- TODO: Write (quickcheck?) test invariant that RRSets only contain record of
+-- the same type
+rrsetType :: RRSet a -> T.Type
+rrsetType = toType . rtype . NE.head . value
+
+hasType :: T.Type -> RTypedSet a -> Bool
 hasType t = M.member t . rds
 
 getType :: T.Type -> RDataSet -> [RData]

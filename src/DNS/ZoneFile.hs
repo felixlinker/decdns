@@ -33,6 +33,7 @@ import qualified Control.Monad.Trans.State as St
 
 import DNS.Name as N
 import DNS.Record
+import qualified DNS.RecordType as T
 import qualified DNS.RRSet as RRSet
 import qualified Util.Tree as T
 import Data.Bifunctor (Bifunctor(bimap))
@@ -156,7 +157,7 @@ noMatching (Named n d) (Zone org z) = case pathInZone org n of
     go [] (T.Node is _) = all ((/= rtype d) . rtype) is
     go (h:t) (T.Node _ cs) = maybe True (go t) (M.lookup h cs)
 
-partition :: (Name a -> b -> Bool) -> AZone a RRSet.RTypedSet b -> (AZone a RRSet.RTypedSet b, AZone a RRSet.RTypedSet b)
+partition :: (Name a -> T.Type -> NE.NonEmpty b -> Bool) -> AZone a RRSet.RTypedSet b -> (AZone a RRSet.RTypedSet b, AZone a RRSet.RTypedSet b)
 partition p (Zone org r) = bimap (Zone org) (Zone org) (T.partition (RRSet.partition . p . (`prependLabels` org)) r)
 
 allNamed :: (Name a -> RRSet.RDataSet -> Bool) -> Zone a -> Bool

@@ -14,6 +14,7 @@ import qualified Data.List.NonEmpty as NE
 
 import DNS.Name as N
 import DNS.Record
+import qualified DNS.RecordType as T
 import qualified DNS.RRSet as RRSet
 import DNS.ZoneFile
 
@@ -76,13 +77,13 @@ diff (fmap deleted -> Zone oldOrg oldRs) (fmap added -> Zone newOrg newRs) =
     true :: a -> Bool
     true = const True
 
-hasChanges :: (Label a, Ord a) => Name (LabelConstraint a) -> ZoneDiff (LabelConstraint a) -> Bool
-hasChanges n (Zone org ns) = case pathInZone org n of
+hasChanges :: (Label a, Ord a) => Name (LabelConstraint a) -> T.Type -> ZoneDiff (LabelConstraint a) -> Bool
+hasChanges n ty (Zone org ns) = case pathInZone org n of
   Path _ [] p -> go p ns
   _ -> False
   where
     go :: (Label a, Ord a) => [LabelConstraint a] -> T.Node (LabelConstraint a) RDataSetDiff -> Bool
-    go [] (T.Node is _) = not $ null is
+    go [] (T.Node is _) = RRSet.hasType ty is
     go (l : t) node = rec l t node
 
     rec :: (Label a, Ord a) => LabelConstraint a -> [LabelConstraint a] -> T.Node (LabelConstraint a) RDataSetDiff -> Bool

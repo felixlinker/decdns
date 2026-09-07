@@ -4,16 +4,13 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Resolvable.Dependencies
-  ( ResolvableAt(..)
-  , matches
-  , RecordDependencies
-  , RuleDependencies
+  ( ResolutionOrder
+  , resolutionOrder
   , DependencyMatch(..)
   , dependencyMatch
   , dependencyMatches
   , ConstrainedQuery(..)
   , queryFromRule
-  , fromRules
   , computeResolvable ) where
 
 import Control.Monad (filterM, guard, unless, foldM)
@@ -25,49 +22,16 @@ import Data.Functor (($>))
 import qualified Data.Set as S
 import Data.Maybe (listToMaybe, mapMaybe, isJust)
 
-import DNS.Name
 import DNS.SEC.Verification (verifySignature, verifyDigest, nsecUnsignedSubzone, nsec3UnsignedSubzone, verifyClosestEncloserProof)
-import NameConstraint (ConstrainedName)
 import qualified Resolvable.ConstrainedUnification as CU
 import Resolvable.Prolog.Core
 import Resolvable.Prolog.Reverse
 import Resolvable.Prolog.TermView
-import Resolvable.Resolvability (RComp (RComp))
+import Resolvable.Resolvability (RComp)
 import Resolvable.Unification
 import qualified Util.Graph as G
 import qualified Util.CondensationGraph as CG
 import Util.Monad (exceptMaybe)
-
-class FromRule t where
-  fromRule :: Rule (Maybe RComp) -> Maybe t
-
-newtype ResolvableAt = ResolvableAt (Name String, ConstrainedName)
-  deriving (Eq, Ord)
-
-instance FromRule ResolvableAt where
-  fromRule = fmap fromAnnot . rannotation
-
--- TODO: I should be able to rely on the rule contents here too.
-fromAnnot :: RComp -> ResolvableAt
-fromAnnot (RComp ns (name -> owner)) = ResolvableAt (ns, owner)
-
-instance FromRule Resolves where
-  fromRule r =
-    let rh = rhead $ replaceSingletons (Rule Nothing (rhead r) []) (TFunctor "const" [])
-    in fromTerm rh
-    where
-      fromTerm :: Term -> Maybe Resolves
-      fromTerm t = case toView t of
-        TVResolves resolvesArgs -> Just resolvesArgs
-        _ -> Nothing
-
-matches :: Resolves -> Name String -> Name String -> Bool
-matches Resolves { resolvesNS = nsT, resolvesQName = nT } ns n =
-  unifies (list [nsT, nT]) (list [nameTerm ns, nameTerm n])
-
-type RecordDependencies = G.Graph ResolvableAt
-
-type RuleDependencies = G.Graph Resolves
 
 data DependencyMatch = DependencyMatch
   { dependentRule :: Rule (Maybe RComp)
@@ -98,18 +62,12 @@ dependencyMatches rs = do
   dependency <- S.toList rs
   maybe [] return $ dependencyMatch dependent dependency
 
-fromRules :: forall a. (FromRule a, Ord a) => S.Set (Rule (Maybe RComp)) -> G.Graph a
-fromRules rs = foldr go G.empty rs
-  where
-    go :: Rule (Maybe RComp) -> G.Graph a -> G.Graph a
-    go r acc =
-      let smaller = foldr (maybe id S.insert . fromRule) S.empty $ S.filter (match r) rs  :: S.Set a
-      in  maybe acc (\r' -> G.insert r' smaller acc) (fromRule r)
+type ResolutionOrder = G.Graph (Rule (Maybe RComp))
 
-resolutionOrder :: S.Set (Rule (Maybe RComp)) -> G.Graph (Rule (Maybe RComp))
+resolutionOrder :: S.Set (Rule (Maybe RComp)) -> ResolutionOrder
 resolutionOrder rs = foldr go G.empty rs
   where
-    go :: Rule (Maybe RComp) -> G.Graph (Rule (Maybe RComp)) -> G.Graph (Rule (Maybe RComp))
+    go :: Rule (Maybe RComp) -> ResolutionOrder -> ResolutionOrder
     go r = G.insert r (S.filter (match r) rs)
 
 -- TODO: Refactor
