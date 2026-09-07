@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { bodyToHeadEdge, groupSourcesByNameAndServer, minimizeArrowLayout, predicateFromOtherRule, ruleEdgePorts, ruleNodeSourceLines, sourceGroupKey, visualColumnOrder } from "./graph";
+import { bodyToHeadEdge, groupSourcesByNameAndServer, minimizeArrowLayout, predicateFromOtherRule, ruleEdgePorts, ruleNodeSourceLines, sourceGroupHasCycle, sourceGroupKey, visualColumnOrder } from "./graph";
 import type { NameGroup } from "./graph";
 
 type Source = {
@@ -311,15 +311,6 @@ export default function Home() {
       {loadError && <div className="error-banner" role="alert">{loadError}</div>}
       {directoryNotice && <div className="directory-notice" role="status">{directoryNotice}</div>}
 
-      <section className="summary-strip" aria-label="Dataset summary">
-        <Metric label="Name servers" value={servers.length} />
-        <Metric label="Record sets" value={data?.sources.length ?? 0} />
-        <Metric label="Compiled rules" value={data?.rules.length ?? 0} />
-        <Metric label="Dependency edges" value={data?.matches.length ?? 0} tone="green" />
-        <Metric label="Unifier bindings" value={data?.matches.reduce((count, match) => count + match.bindings.length, 0) ?? 0} />
-        <Metric label="Dependency cycles" value={cycles.length} tone={cycles.length ? "red" : "default"} />
-      </section>
-
       <div className="workspace">
         <aside className="source-panel">
           <div className="panel-heading">
@@ -340,32 +331,29 @@ export default function Home() {
             ))}
           </div>
           <div className="source-list">
-            {filteredSourceNames.map((group) => (
-              <button
-                key={group.key}
-                className={`source-card name-card ${selectedSourceKey === group.key ? "selected" : ""}`}
-                onClick={() => { setSelectedSourceKey(group.key); setSelectedRuleId(""); setViewport(defaultViewport); }}
-              >
-                <span className="source-copy">
-                  <strong>{group.owner}</strong>
-                  <span>{group.server} — {group.recordTypes.join(" · ")}</span>
-                </span>
-                <span className="rule-count">{group.ruleIds.length}<small>rules</small></span>
-              </button>
-            ))}
+            {filteredSourceNames.map((group) => {
+              const hasCycle = sourceGroupHasCycle(group, cycleNodes);
+              return (
+                <button
+                  key={group.key}
+                  className={`source-card name-card ${hasCycle ? "has-cycle" : ""} ${selectedSourceKey === group.key ? "selected" : ""}`}
+                  aria-label={`${group.owner} on ${group.server}, ${group.ruleIds.length} rules${hasCycle ? ", contains a dependency cycle" : ""}`}
+                  onClick={() => { setSelectedSourceKey(group.key); setSelectedRuleId(""); setViewport(defaultViewport); }}
+                >
+                  <span className="source-copy">
+                    <strong>{group.owner}</strong>
+                    <span>{group.server} — {group.recordTypes.join(" · ")}</span>
+                  </span>
+                  {hasCycle && <span className="source-cycle-label">Cycle</span>}
+                  <span className="rule-count">{group.ruleIds.length}<small>rules</small></span>
+                </button>
+              );
+            })}
             {!filteredSourceNames.length && <p className="empty-state">No names match the current filters.</p>}
           </div>
         </aside>
 
         <section className="graph-panel">
-          <div className="graph-toolbar">
-            <div>
-              <p className="eyebrow">COMPILATION + REASONING</p>
-              <h2>{selectedSourceName ? <span>{selectedSourceName.owner} · {selectedSourceName.server}</span> : "Rule graph"}</h2>
-              <p>{selectedSourceName ? `${selectedSourceName.sources.length} record set${selectedSourceName.sources.length === 1 ? "" : "s"} across ${selectedSourceName.recordTypes.length} type${selectedSourceName.recordTypes.length === 1 ? "" : "s"} compile to ${selectedSourceName.ruleIds.length} rules` : "Select a name to focus its compiled rules."}</p>
-            </div>
-          </div>
-
           <div className={`graph-scroll ${isPanning ? "is-panning" : ""}`}>
             <div className="graph-controls" aria-label="Graph zoom controls">
               <button type="button" onClick={() => zoomFromCenter(1 / 1.22)} aria-label="Zoom out">−</button>
@@ -452,9 +440,6 @@ export default function Home() {
               </svg>
             ) : <div className="graph-empty">No compiled rules match this focus and search.</div>}
           </div>
-          <div className="graph-footnote">
-            <span>Red outlines mark rules in a dependency cycle</span>
-          </div>
         </section>
 
         <aside className="inspector-panel">
@@ -516,10 +501,6 @@ export default function Home() {
       </div>
     </main>
   );
-}
-
-function Metric({ label, value, tone = "default" }: { label: string; value: number; tone?: string }) {
-  return <div className={`metric ${tone}`}><strong>{value.toLocaleString()}</strong><span>{label}</span></div>;
 }
 
 function GraphColumn({ x, label, sublabel }: { x: number; label: string; sublabel: string }) {

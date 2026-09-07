@@ -65,6 +65,10 @@ export function groupSourcesByNameAndServer<T extends NamedSource>(sources: read
   }));
 }
 
+export function sourceGroupHasCycle(group: Pick<NameGroup<NamedSource>, "ruleIds">, cycleRuleIds: ReadonlySet<string>) {
+  return group.ruleIds.some((ruleId) => cycleRuleIds.has(ruleId));
+}
+
 export function predicateFromOtherRule(
   match: PredicateMatch,
   selectedRuleId: string,

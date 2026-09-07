@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { bodyToHeadEdge, groupSourcesByNameAndServer, minimizeArrowLayout, predicateFromOtherRule, ruleEdgePorts, ruleNodeSourceLines, visualColumnOrder } from "../app/graph.ts";
+import { bodyToHeadEdge, groupSourcesByNameAndServer, minimizeArrowLayout, predicateFromOtherRule, ruleEdgePorts, ruleNodeSourceLines, sourceGroupHasCycle, visualColumnOrder } from "../app/graph.ts";
 import { readVisualizationCatalog, readVisualizationFile } from "../build/visualization-directory.ts";
 
 async function render() {
@@ -36,10 +36,11 @@ test("server-renders the compilation explorer shell", async () => {
   assert.match(html, /<title>DNS Regressor Compilation Explorer<\/title>/i);
   assert.match(html, /Compilation explorer/);
   assert.match(html, />Names</);
-  assert.match(html, /Record sets/);
+  assert.doesNotMatch(html, /Record sets|Compiled rules|Dependency edges|Unifier bindings|Dependency cycles/);
   assert.doesNotMatch(html, /retained by the compiler|Round lower port|matching-head ingress/i);
   assert.match(html, /aria-label="Zoom in"/);
   assert.match(html, /Drag canvas to pan.*Scroll to zoom/);
+  assert.doesNotMatch(html, /Red outlines mark rules in a dependency cycle/);
   assert.match(html, /Visualization file/);
   assert.match(html, />Reload</);
   assert.doesNotMatch(html, /Cycle example|Auth example|Open export/);
@@ -117,6 +118,13 @@ test("left-column sources are grouped by name and name server, not record type",
   assert.deepEqual(groups[0].ruleIds, ["r1", "r2"]);
   assert.equal(groups[1].server, "ns2.");
   assert.deepEqual(groups[1].ruleIds, ["r3"]);
+});
+
+test("left-column source groups identify whether any contained rule is cyclic", () => {
+  const group = { ruleIds: ["acyclic", "cyclic"] };
+
+  assert.equal(sourceGroupHasCycle(group, new Set(["cyclic"])), true);
+  assert.equal(sourceGroupHasCycle(group, new Set(["other"])), false);
 });
 
 test("rule nodes identify the name server serving their source record", () => {
