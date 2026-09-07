@@ -25,7 +25,7 @@ import Resolvable.Dependencies (ResolutionOrder)
 import Data.Maybe (isJust, fromJust)
 import DNS.RRSet (rrsetType)
 
-type RRSetID = (Name String, ConstrainedName, T.Type)
+type RRSetID = (Name String, Name String, T.Type)
 
 type RecordDependencies = G.Graph RRSetID
 
@@ -37,14 +37,14 @@ fromResolutionOrder =
   . G.filter (isJust . rannotation)
   where
     fromAnnot :: RComp -> RRSetID
-    fromAnnot (RComp ns rrs) = (ns, name rrs, rrsetType rrs)
+    fromAnnot (RComp ns rrs) = (ns, fmap show (name rrs), rrsetType rrs)
 
-canRollout :: RecordDependencies -> Name String -> ConstrainedName -> T.Type -> Bool
+canRollout :: RecordDependencies -> Name String -> Name String -> T.Type -> Bool
 canRollout deps ns n ty = G.leaf deps (ns, n, ty)
 
-type NSDiffs = M.Map (Name String) (ZoneDiff ConstrainedLabel)
+type NSDiffs = M.Map (Name String) (ZoneDiff String)
 
-showZoneDiff :: Name String -> ZoneDiff ConstrainedLabel -> [String]
+showZoneDiff :: Name String -> ZoneDiff String -> [String]
 showZoneDiff ns d =
     map indent
   $ ("on server " ++ show ns ++ ":")
@@ -61,8 +61,8 @@ diffServers old new = MM.merge
   (MM.mapMissing (\_ -> fmap deleted))
   (MM.mapMissing (\_ -> fmap added))
   (MM.zipWithMatched (const diff))
-  (M.fromListWith mergeZones old)
-  (M.fromListWith mergeZones new)
+  (M.fromListWith mergeZones $ map (fmap literalWildcards) old)
+  (M.fromListWith mergeZones $ map (fmap literalWildcards) new)
 
 updateDeps :: NSDiffs -> RecordDependencies -> RecordDependencies
 updateDeps diffs = G.filter changed
@@ -95,7 +95,7 @@ rollout' acc (normalize -> diffs) (updateDeps diffs -> old) (updateDeps diffs ->
       let diffs' = M.mapWithKey partitionDiff ds
       in (normalize (M.map fst diffs'), normalize (M.map snd diffs'))
 
-    partitionDiff :: Name String -> ZoneDiff ConstrainedLabel -> (ZoneDiff ConstrainedLabel, ZoneDiff ConstrainedLabel)
+    partitionDiff :: Name String -> ZoneDiff String -> (ZoneDiff String, ZoneDiff String)
     partitionDiff ns = partition (\n ty _ -> canRollout new ns n ty && canRollout old ns n ty)
 
 dropEmpty :: NSDiffs -> NSDiffs
