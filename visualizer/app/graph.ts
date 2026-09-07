@@ -9,38 +9,14 @@ type NamedSource = {
   owner: string;
   server: string;
   recordType: string;
-  records: string[];
-  ruleIds: string[];
 };
 
-export type NameGroup<T extends NamedSource> = {
-  key: string;
-  owner: string;
-  server: string;
-  sources: T[];
-  recordTypes: string[];
-  records: string[];
-  ruleIds: string[];
-};
-
-export type LayoutColumn = "dependency" | "compiled" | "dependent";
 export type LayoutEdge = { from: string; to: string };
-export type LayoutPlacement = { id: string; column: LayoutColumn; y: number };
-type LayoutColumns = Record<LayoutColumn, string[]>;
-type LayoutOptions = {
+type GraphLayerOptions = {
   top: number;
-  maximumTopOffset: number;
   nodeHeight: number;
   minimumGap: number;
-  ingressPortY: number;
-  egressPortY: number;
 };
-
-export const visualColumnOrder: LayoutColumn[] = ["dependent", "compiled", "dependency"];
-
-export function sourceGroupKey(owner: string, server: string) {
-  return `${owner}\u0000${server}`;
-}
 
 export function ruleNodeSourceLines(source: Pick<NamedSource, "owner" | "server" | "recordType"> | null) {
   return source
@@ -48,25 +24,19 @@ export function ruleNodeSourceLines(source: Pick<NamedSource, "owner" | "server"
     : { record: "synthetic", server: "" };
 }
 
-export function groupSourcesByNameAndServer<T extends NamedSource>(sources: readonly T[]): NameGroup<T>[] {
-  const grouped = new Map<string, T[]>();
-  for (const source of sources) {
-    const key = sourceGroupKey(source.owner, source.server);
-    grouped.set(key, [...(grouped.get(key) ?? []), source]);
-  }
-  return [...grouped].map(([key, members]) => ({
-    key,
-    owner: members[0].owner,
-    server: members[0].server,
-    sources: members,
-    recordTypes: unique(members.map((source) => source.recordType)),
-    records: members.flatMap((source) => source.records),
-    ruleIds: unique(members.flatMap((source) => source.ruleIds)),
-  }));
+export function sourceHasCycle(source: { ruleIds: readonly string[] }, cycleRuleIds: ReadonlySet<string>) {
+  return source.ruleIds.some((ruleId) => cycleRuleIds.has(ruleId));
 }
 
-export function sourceGroupHasCycle(group: Pick<NameGroup<NamedSource>, "ruleIds">, cycleRuleIds: ReadonlySet<string>) {
-  return group.ruleIds.some((ruleId) => cycleRuleIds.has(ruleId));
+export function ruleSelectionForSource(source: { ruleIds: readonly string[] } | null, activeRuleId: string) {
+  return new Set(source ? source.ruleIds : activeRuleId ? [activeRuleId] : []);
+}
+
+export function moveRuleSelection(ruleIds: readonly string[], activeRuleId: string, offset: -1 | 1) {
+  if (!ruleIds.length) return "";
+  const currentIndex = ruleIds.indexOf(activeRuleId);
+  const nextIndex = ((currentIndex < 0 ? 0 : currentIndex) + offset + ruleIds.length) % ruleIds.length;
+  return ruleIds[nextIndex];
 }
 
 export function predicateFromOtherRule(
@@ -90,99 +60,106 @@ export function ruleEdgePorts(nodeHeight: number) {
   return { ingress: nodeHeight * 0.28, egress: nodeHeight * 0.72 };
 }
 
-export function minimizeArrowLayout(
-  inputColumns: LayoutColumns,
+export function layoutGraphLayers(
+  ruleIds: readonly string[],
   edges: readonly LayoutEdge[],
-  options: LayoutOptions,
-): LayoutPlacement[] {
-  const columns: LayoutColumns = {
-    dependency: [...inputColumns.dependency],
-    compiled: [...inputColumns.compiled],
-    dependent: [...inputColumns.dependent],
-  };
-  const spacing = options.nodeHeight + options.minimumGap;
-  const maxCount = Math.max(1, ...Object.values(columns).map((ids) => ids.length));
-  const positions = new Map<string, number>();
-
-  for (const column of visualColumnOrder) {
-    const topOffset = (maxCount - columns[column].length) * spacing / 2;
-    columns[column].forEach((id, index) => positions.set(id, options.top + topOffset + index * spacing));
-  }
-
-  for (let iteration = 0; iteration < 16; iteration += 1) {
-    const sweep = iteration % 2 === 0 ? visualColumnOrder : [...visualColumnOrder].reverse();
-    for (const column of sweep) {
-      const ranked = columns[column].map((id) => ({
-        id,
-        target: preferredTop(id, edges, positions, options),
-        previous: positions.get(id) ?? options.top,
-      })).sort((left, right) => left.target - right.target || left.previous - right.previous || left.id.localeCompare(right.id));
-      const packed = packTargets(
-        ranked.map(({ target }) => target),
-        spacing,
-        options.top,
-        options.top + options.maximumTopOffset,
-      );
-      columns[column] = ranked.map(({ id }) => id);
-      ranked.forEach(({ id }, index) => positions.set(id, packed[index]));
-    }
-  }
-
-  const minimumY = Math.min(...positions.values());
-  const topCorrection = Number.isFinite(minimumY) ? options.top - minimumY : 0;
-  return visualColumnOrder.flatMap((column) => columns[column].map((id) => ({
-    id,
-    column,
-    y: positions.get(id)! + topCorrection,
-  })));
-}
-
-function preferredTop(
-  id: string,
-  edges: readonly LayoutEdge[],
-  positions: ReadonlyMap<string, number>,
-  options: LayoutOptions,
+  options: GraphLayerOptions,
 ) {
-  const suggestions: number[] = [];
+  const nodeSet = new Set(ruleIds);
+  const adjacency = new Map(ruleIds.map((id) => [id, [] as string[]]));
   for (const edge of edges) {
-    if (edge.from === edge.to) continue;
-    if (edge.from === id && positions.has(edge.to)) {
-      suggestions.push(positions.get(edge.to)! + options.ingressPortY - options.egressPortY);
-    } else if (edge.to === id && positions.has(edge.from)) {
-      suggestions.push(positions.get(edge.from)! + options.egressPortY - options.ingressPortY);
+    if (nodeSet.has(edge.from) && nodeSet.has(edge.to)) adjacency.get(edge.from)!.push(edge.to);
+  }
+
+  const components = stronglyConnectedComponents(ruleIds, adjacency);
+  const componentByNode = new Map(components.flatMap((members, component) => (
+    members.map((id) => [id, component] as const)
+  )));
+  const graphOrder = new Map(ruleIds.map((id, index) => [id, index]));
+  const componentOrder = components.map((members) => Math.min(...members.map((id) => graphOrder.get(id)!)));
+  const successors = components.map(() => new Set<number>());
+  const predecessors = components.map(() => new Set<number>());
+  for (const edge of edges) {
+    const from = componentByNode.get(edge.from);
+    const to = componentByNode.get(edge.to);
+    if (from === undefined || to === undefined || from === to) continue;
+    successors[from].add(to);
+    predecessors[to].add(from);
+  }
+
+  const indegrees = predecessors.map((incoming) => incoming.size);
+  const ready = components.map((_, component) => component)
+    .filter((component) => indegrees[component] === 0)
+    .sort((left, right) => componentOrder[left] - componentOrder[right]);
+  const topological: number[] = [];
+  while (ready.length) {
+    const component = ready.shift()!;
+    topological.push(component);
+    for (const successor of successors[component]) {
+      indegrees[successor] -= 1;
+      if (indegrees[successor] === 0) {
+        ready.push(successor);
+        ready.sort((left, right) => componentOrder[left] - componentOrder[right]);
+      }
     }
   }
-  if (!suggestions.length) return positions.get(id) ?? options.top;
-  return suggestions.reduce((sum, value) => sum + value, 0) / suggestions.length;
-}
 
-function packTargets(targets: number[], spacing: number, top: number, maximumTop: number) {
-  const blocks: { start: number; end: number; total: number; count: number }[] = [];
-  targets.forEach((target, index) => {
-    blocks.push({ start: index, end: index, total: target - index * spacing, count: 1 });
-    while (blocks.length > 1) {
-      const right = blocks[blocks.length - 1];
-      const left = blocks[blocks.length - 2];
-      if (left.total / left.count <= right.total / right.count) break;
-      blocks.splice(-2, 2, {
-        start: left.start,
-        end: right.end,
-        total: left.total + right.total,
-        count: left.count + right.count,
-      });
+  const layers = components.map(() => 0);
+  for (const component of topological) {
+    for (const successor of successors[component]) {
+      layers[successor] = Math.max(layers[successor], layers[component] + 1);
     }
+  }
+  const lastLayer = Math.max(0, ...layers);
+  components.forEach((_, component) => {
+    const isLeaf = successors[component].size === 0;
+    const isIsolated = isLeaf && predecessors[component].size === 0;
+    if (isLeaf && !isIsolated) layers[component] = lastLayer;
   });
-  const packed = new Array<number>(targets.length);
-  for (const block of blocks) {
-    const average = block.total / block.count;
-    for (let index = block.start; index <= block.end; index += 1) packed[index] = average + index * spacing;
-  }
-  const shift = packed.length
-    ? Math.max(top - packed[0], Math.min(0, maximumTop - packed[0]))
-    : 0;
-  return packed.map((value) => value + shift);
+
+  const spacing = options.nodeHeight + options.minimumGap;
+  const indexesWithinLayer = new Map<number, number>();
+  return ruleIds.map((id) => {
+    const layer = layers[componentByNode.get(id)!];
+    const index = indexesWithinLayer.get(layer) ?? 0;
+    indexesWithinLayer.set(layer, index + 1);
+    return { id, layer, y: options.top + index * spacing };
+  });
 }
 
-function unique<T>(values: T[]) {
-  return [...new Set(values)];
+function stronglyConnectedComponents(ruleIds: readonly string[], adjacency: ReadonlyMap<string, readonly string[]>) {
+  const indexes = new Map<string, number>();
+  const lowLinks = new Map<string, number>();
+  const stack: string[] = [];
+  const onStack = new Set<string>();
+  const components: string[][] = [];
+  let nextIndex = 0;
+
+  function visit(id: string) {
+    indexes.set(id, nextIndex);
+    lowLinks.set(id, nextIndex);
+    nextIndex += 1;
+    stack.push(id);
+    onStack.add(id);
+    for (const neighbor of adjacency.get(id) ?? []) {
+      if (!indexes.has(neighbor)) {
+        visit(neighbor);
+        lowLinks.set(id, Math.min(lowLinks.get(id)!, lowLinks.get(neighbor)!));
+      } else if (onStack.has(neighbor)) {
+        lowLinks.set(id, Math.min(lowLinks.get(id)!, indexes.get(neighbor)!));
+      }
+    }
+    if (lowLinks.get(id) !== indexes.get(id)) return;
+    const component: string[] = [];
+    let member: string;
+    do {
+      member = stack.pop()!;
+      onStack.delete(member);
+      component.push(member);
+    } while (member !== id);
+    components.push(component);
+  }
+
+  ruleIds.forEach((id) => { if (!indexes.has(id)) visit(id); });
+  return components;
 }

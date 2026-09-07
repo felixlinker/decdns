@@ -9,8 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { bodyToHeadEdge, groupSourcesByNameAndServer, minimizeArrowLayout, predicateFromOtherRule, ruleEdgePorts, ruleNodeSourceLines, sourceGroupHasCycle, sourceGroupKey, visualColumnOrder } from "./graph";
-import type { NameGroup } from "./graph";
+import { bodyToHeadEdge, layoutGraphLayers, moveRuleSelection, predicateFromOtherRule, ruleEdgePorts, ruleNodeSourceLines, ruleSelectionForSource, sourceHasCycle } from "./graph";
 
 type Source = {
   id: string;
@@ -20,8 +19,6 @@ type Source = {
   records: string[];
   ruleIds: string[];
 };
-type SourceName = NameGroup<Source>;
-
 type Predicate = { index: number; kind: string; text: string };
 type Rule = { id: string; sourceId: string | null; text: string; head: string; body: Predicate[] };
 type Binding = { variable: string; target: string; targetKind: string };
@@ -60,7 +57,7 @@ type DirectorySelection = {
   dataset: Dataset | null;
 };
 
-type Placement = { id: string; x: number; y: number; column: "dependency" | "compiled" | "dependent" };
+type Placement = { id: string; x: number; y: number };
 type Viewport = { x: number; y: number; scale: number };
 
 const nodeWidth = 360;
@@ -69,7 +66,7 @@ const { ingress: ingressPortY, egress: egressPortY } = ruleEdgePorts(nodeHeight)
 const rowGap = 66;
 const graphViewportWidth = 1040;
 const graphViewportHeight = 680;
-const graphContentWidth = 1768;
+const graphColumnSpacing = 640;
 const defaultViewport: Viewport = { x: 25, y: 24, scale: 0.56 };
 const minScale = 0.18;
 const maxScale = 2.4;
@@ -82,10 +79,12 @@ export default function Home() {
   const [isReloading, setIsReloading] = useState(false);
   const [directoryNotice, setDirectoryNotice] = useState("");
   const [loadError, setLoadError] = useState("");
-  const [selectedSourceKey, setSelectedSourceKey] = useState("");
+  const [selectedSourceId, setSelectedSourceId] = useState("");
   const [selectedRuleId, setSelectedRuleId] = useState("");
   const [search, setSearch] = useState("");
   const [serverFilter, setServerFilter] = useState("all");
+  const [showSourcePanel, setShowSourcePanel] = useState(true);
+  const [showInspectorPanel, setShowInspectorPanel] = useState(true);
   const [viewport, setViewport] = useState<Viewport>(defaultViewport);
   const [isPanning, setIsPanning] = useState(false);
   const graphSvg = useRef<SVGSVGElement>(null);
@@ -103,7 +102,7 @@ export default function Home() {
     const focusSource = focusRule?.sourceId
       ? next.sources.find((source) => source.id === focusRule.sourceId)
       : next.sources.find((source) => source.recordType === "NS") ?? next.sources[0];
-    setSelectedSourceKey(focusSource ? sourceGroupKey(focusSource.owner, focusSource.server) : "");
+    setSelectedSourceId(focusSource?.id ?? "");
     setSelectedRuleId(focusRule?.id ?? "");
     setServerFilter("all");
     setSearch("");
@@ -121,7 +120,7 @@ export default function Home() {
     }
     setData(null);
     setDatasetName("");
-    setSelectedSourceKey("");
+    setSelectedSourceId("");
     setSelectedRuleId("");
     setLoadError("");
   }, [installDataset]);
@@ -163,27 +162,28 @@ export default function Home() {
     () => new Map(cycles.flatMap((component, index) => component.map((ruleId) => [ruleId, index] as const))),
     [cycles],
   );
-  const sourceNames = useMemo(() => groupSourcesByNameAndServer(data?.sources ?? []), [data]);
-  const selectedSourceName = selectedSourceKey ? sourceNames.find((group) => group.key === selectedSourceKey) ?? null : null;
+  const selectedSource = selectedSourceId ? indexes.sources.get(selectedSourceId) ?? null : null;
 
-  const filteredSourceNames = useMemo(() => {
+  const filteredSources = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    return sourceNames.filter((group) => {
-      const serverMatches = serverFilter === "all" || group.server === serverFilter;
-      const textMatches = !needle || [group.owner, group.server, ...group.recordTypes, ...group.records]
-        .join(" ").toLowerCase().includes(needle) || group.ruleIds.some((id) => indexes.rules.get(id)?.text.toLowerCase().includes(needle));
+    return (data?.sources ?? []).filter((source) => {
+      const serverMatches = serverFilter === "all" || source.server === serverFilter;
+      const textMatches = !needle || [source.owner, source.server, source.recordType, ...source.records]
+        .join(" ").toLowerCase().includes(needle) || source.ruleIds.some((id) => indexes.rules.get(id)?.text.toLowerCase().includes(needle));
       return serverMatches && textMatches;
     });
-  }, [indexes.rules, search, serverFilter, sourceNames]);
+  }, [data, indexes.rules, search, serverFilter]);
 
-  const graph = useMemo(
-    () => buildGraph(data, indexes, selectedSourceName, search),
-    [data, indexes, search, selectedSourceName],
-  );
+  const graph = useMemo(() => buildGraph(data), [data]);
 
-  const activeRuleId = graph.placements.some((placement) => placement.id === selectedRuleId)
-    ? selectedRuleId
-    : graph.placements.find((placement) => placement.column === "compiled")?.id ?? graph.placements[0]?.id ?? "";
+  const selectedSourceRuleIds = selectedSource?.ruleIds.filter((id) => indexes.rules.has(id)) ?? [];
+  const activeRuleId = selectedSource
+    ? selectedSourceRuleIds.includes(selectedRuleId) ? selectedRuleId : selectedSourceRuleIds[0] ?? ""
+    : graph.placements.some((placement) => placement.id === selectedRuleId)
+      ? selectedRuleId
+      : graph.placements[0]?.id ?? "";
+  const selectedRuleIds = ruleSelectionForSource(selectedSource, activeRuleId);
+  const activeSourceRuleIndex = selectedSourceRuleIds.indexOf(activeRuleId);
   const selectedRule = activeRuleId ? indexes.rules.get(activeRuleId) ?? null : null;
   const selectedRuleSource = selectedRule?.sourceId ? indexes.sources.get(selectedRule.sourceId) ?? null : null;
   const selectedMatches = data?.matches.filter(
@@ -207,6 +207,11 @@ export default function Home() {
 
   function zoomFromCenter(factor: number) {
     zoomAround({ x: graphViewportWidth / 2, y: graphViewportHeight / 2 }, factor);
+  }
+
+  function selectRule(ruleId: string) {
+    if (!selectedSourceRuleIds.includes(ruleId)) setSelectedSourceId("");
+    setSelectedRuleId(ruleId);
   }
 
   function fitGraph() {
@@ -311,18 +316,18 @@ export default function Home() {
       {loadError && <div className="error-banner" role="alert">{loadError}</div>}
       {directoryNotice && <div className="directory-notice" role="status">{directoryNotice}</div>}
 
-      <div className="workspace">
-        <aside className="source-panel">
+      <div className={`workspace ${showSourcePanel ? "" : "hide-source-panel"} ${showInspectorPanel ? "" : "hide-inspector-panel"}`}>
+        <aside className="source-panel" hidden={!showSourcePanel}>
           <div className="panel-heading">
             <div>
               <p className="eyebrow">INPUT</p>
-              <h2>Names</h2>
+              <h2>RRSets</h2>
             </div>
-            <span className="count-badge">{filteredSourceNames.length}</span>
+            <span className="count-badge">{filteredSources.length}</span>
           </div>
           <label className="search-box">
             <span aria-hidden="true">⌕</span>
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find name or rule" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find RRSet or rule" />
           </label>
           <div className="server-filters" aria-label="Filter by name server">
             <button className={serverFilter === "all" ? "active" : ""} onClick={() => setServerFilter("all")}>All servers</button>
@@ -331,30 +336,46 @@ export default function Home() {
             ))}
           </div>
           <div className="source-list">
-            {filteredSourceNames.map((group) => {
-              const hasCycle = sourceGroupHasCycle(group, cycleNodes);
+            {filteredSources.map((source) => {
+              const hasCycle = sourceHasCycle(source, cycleNodes);
               return (
                 <button
-                  key={group.key}
-                  className={`source-card name-card ${hasCycle ? "has-cycle" : ""} ${selectedSourceKey === group.key ? "selected" : ""}`}
-                  aria-label={`${group.owner} on ${group.server}, ${group.ruleIds.length} rules${hasCycle ? ", contains a dependency cycle" : ""}`}
-                  onClick={() => { setSelectedSourceKey(group.key); setSelectedRuleId(""); setViewport(defaultViewport); }}
+                  key={source.id}
+                  className={`source-card rrset-card ${hasCycle ? "has-cycle" : ""} ${selectedSourceId === source.id ? "selected" : ""}`}
+                  aria-label={`${source.owner} ${source.recordType} on ${source.server}, ${source.ruleIds.length} rules${hasCycle ? ", contains a dependency cycle" : ""}`}
+                  onClick={() => { setSelectedSourceId(source.id); setSelectedRuleId(source.ruleIds[0] ?? ""); }}
                 >
                   <span className="source-copy">
-                    <strong>{group.owner}</strong>
-                    <span>{group.server} — {group.recordTypes.join(" · ")}</span>
+                    <strong>{source.owner} {source.recordType}</strong>
+                    <span>served by {source.server}</span>
                   </span>
                   {hasCycle && <span className="source-cycle-label">Cycle</span>}
-                  <span className="rule-count">{group.ruleIds.length}<small>rules</small></span>
+                  <span className="rule-count">{source.ruleIds.length}<small>rules</small></span>
                 </button>
               );
             })}
-            {!filteredSourceNames.length && <p className="empty-state">No names match the current filters.</p>}
+            {!filteredSources.length && <p className="empty-state">No RRSets match the current filters.</p>}
           </div>
         </aside>
 
         <section className="graph-panel">
           <div className={`graph-scroll ${isPanning ? "is-panning" : ""}`}>
+            <div className="panel-toggles" aria-label="Panel visibility controls">
+              <button
+                type="button"
+                className={showSourcePanel ? "active" : ""}
+                aria-label={`${showSourcePanel ? "Hide" : "Show"} RRSets panel`}
+                aria-pressed={showSourcePanel}
+                onClick={() => setShowSourcePanel((visible) => !visible)}
+              >☰ RRSets</button>
+              <button
+                type="button"
+                className={showInspectorPanel ? "active" : ""}
+                aria-label={`${showInspectorPanel ? "Hide" : "Show"} inspector panel`}
+                aria-pressed={showInspectorPanel}
+                onClick={() => setShowInspectorPanel((visible) => !visible)}
+              >Inspector ☰</button>
+            </div>
             <div className="graph-controls" aria-label="Graph zoom controls">
               <button type="button" onClick={() => zoomFromCenter(1 / 1.22)} aria-label="Zoom out">−</button>
               <span className="zoom-readout" aria-live="polite">{Math.round(viewport.scale * 100)}%</span>
@@ -390,13 +411,10 @@ export default function Home() {
                   </marker>
                 </defs>
                 <g transform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.scale})`}>
-                  <GraphColumn x={64} label="Body consumers" sublabel="bodies use selected heads" />
-                  <GraphColumn x={704} label="Compiled rules" sublabel="from selected records" />
-                  <GraphColumn x={1344} label="Head providers" sublabel="heads satisfy selected bodies" />
                   {graph.edges.map(({ match, from, to }, index) => {
                     const cyclic = cycleMembership.has(match.dependencyRuleId)
                       && cycleMembership.get(match.dependencyRuleId) === cycleMembership.get(match.dependentRuleId);
-                    const connected = match.dependencyRuleId === activeRuleId || match.dependentRuleId === activeRuleId;
+                    const connected = selectedRuleIds.has(match.dependencyRuleId) || selectedRuleIds.has(match.dependentRuleId);
                     return (
                       <path
                         key={`${match.dependencyRuleId}-${match.dependentRuleId}-${index}`}
@@ -419,12 +437,12 @@ export default function Home() {
                       <g
                         key={rule.id}
                         transform={`translate(${placement.x} ${placement.y})`}
-                        className={`rule-node ${activeRuleId === rule.id ? "selected" : ""} ${isCycle ? "in-cycle" : ""}`}
+                        className={`rule-node ${selectedRuleIds.has(rule.id) ? "selected" : ""} ${activeRuleId === rule.id ? "active" : ""} ${isCycle ? "in-cycle" : ""}`}
                         role="button"
                         tabIndex={0}
                         aria-label={`Inspect ${rule.id}${source ? ` served by ${source.server}` : ""}`}
-                        onClick={() => setSelectedRuleId(rule.id)}
-                        onKeyDown={(event: KeyboardEvent<SVGGElement>) => { if (event.key === "Enter" || event.key === " ") setSelectedRuleId(rule.id); }}
+                        onClick={() => selectRule(rule.id)}
+                        onKeyDown={(event: KeyboardEvent<SVGGElement>) => { if (event.key === "Enter" || event.key === " ") selectRule(rule.id); }}
                       >
                         <rect width={nodeWidth} height={nodeHeight} rx="10" />
                         <text x="15" y="25" className="node-id">{rule.id.toUpperCase()}</text>
@@ -438,14 +456,31 @@ export default function Home() {
                   })}
                 </g>
               </svg>
-            ) : <div className="graph-empty">No compiled rules match this focus and search.</div>}
+            ) : <div className="graph-empty">This visualization contains no compiled rules.</div>}
           </div>
         </section>
 
-        <aside className="inspector-panel">
+        <aside className="inspector-panel" hidden={!showInspectorPanel}>
           <div className="panel-heading inspector-heading">
             <div><p className="eyebrow">INSPECTOR</p><h2>{selectedRule?.id.toUpperCase() ?? "Select a rule"}</h2></div>
-            {selectedRule && <span className={`cycle-chip ${cycleNodes.has(selectedRule.id) ? "visible" : ""}`}>cycle</span>}
+            <div className="inspector-heading-actions">
+              {selectedSourceRuleIds.length > 1 && (
+                <div className="rule-navigation" aria-label="Selected RRSet rule navigation">
+                  <button
+                    type="button"
+                    aria-label="Previous rule from selected RRSet"
+                    onClick={() => setSelectedRuleId(moveRuleSelection(selectedSourceRuleIds, activeRuleId, -1))}
+                  >←</button>
+                  <span>{activeSourceRuleIndex + 1} / {selectedSourceRuleIds.length}</span>
+                  <button
+                    type="button"
+                    aria-label="Next rule from selected RRSet"
+                    onClick={() => setSelectedRuleId(moveRuleSelection(selectedSourceRuleIds, activeRuleId, 1))}
+                  >→</button>
+                </div>
+              )}
+              {selectedRule && <span className={`cycle-chip ${cycleNodes.has(selectedRule.id) ? "visible" : ""}`}>cycle</span>}
+            </div>
           </div>
           {selectedRule ? (
             <div className="inspector-content">
@@ -477,7 +512,7 @@ export default function Home() {
                     const otherId = incoming ? match.dependencyRuleId : match.dependentRuleId;
                     const matchingPredicate = predicateFromOtherRule(match, selectedRule.id, indexes.rules);
                     return (
-                      <button key={`${otherId}-${index}`} className="match-card" onClick={() => setSelectedRuleId(otherId)}>
+                      <button key={`${otherId}-${index}`} className="match-card" onClick={() => selectRule(otherId)}>
                         <span className="match-topline"><strong>{incoming ? "depends on" : "used by"} {otherId.toUpperCase()}</strong><em>Dependency</em></span>
                         <code>{matchingPredicate}</code>
                         <span className="unifier-label">Unifier</span>
@@ -503,10 +538,6 @@ export default function Home() {
   );
 }
 
-function GraphColumn({ x, label, sublabel }: { x: number; label: string; sublabel: string }) {
-  return <g transform={`translate(${x} 0)`}><text y="23" className="column-label">{label}</text><text y="41" className="column-sublabel">{sublabel}</text></g>;
-}
-
 function makeIndexes(data: Dataset | null) {
   return {
     rules: new Map((data?.rules ?? []).map((rule) => [rule.id, rule])),
@@ -514,44 +545,28 @@ function makeIndexes(data: Dataset | null) {
   };
 }
 
-function buildGraph(
-  data: Dataset | null,
-  indexes: ReturnType<typeof makeIndexes>,
-  source: SourceName | null,
-  search: string,
-) {
-  if (!data) return { placements: [] as Placement[], edges: [] as { match: Match; from: Placement; to: Placement }[], width: graphContentWidth, height: 300 };
-  const needle = search.trim().toLowerCase();
-  const matchesSearch = (id: string) => !needle || indexes.rules.get(id)?.text.toLowerCase().includes(needle);
-  let compiled = (source?.ruleIds ?? data.rules.map((rule) => rule.id)).filter(matchesSearch);
-  if (!compiled.length && needle) compiled = data.rules.filter((rule) => rule.text.toLowerCase().includes(needle)).map((rule) => rule.id);
-  compiled = compiled.slice(0, 24);
-  const compiledSet = new Set(compiled);
-  const relevantMatches = data.matches.filter((match) => compiledSet.has(match.dependentRuleId) || compiledSet.has(match.dependencyRuleId));
-  const dependencies = unique(relevantMatches.filter((match) => compiledSet.has(match.dependentRuleId)).map((match) => match.dependencyRuleId))
-    .filter((id) => !compiledSet.has(id)).slice(0, 24);
-  const dependents = unique(relevantMatches.filter((match) => compiledSet.has(match.dependencyRuleId)).map((match) => match.dependentRuleId))
-    .filter((id) => !compiledSet.has(id) && !dependencies.includes(id)).slice(0, 24);
-  const visibleIds = new Set([...dependencies, ...compiled, ...dependents]);
-  const layoutEdges = relevantMatches
-    .filter((match) => visibleIds.has(match.dependentRuleId) && visibleIds.has(match.dependencyRuleId))
-    .map((match) => ({ from: match.dependentRuleId, to: match.dependencyRuleId }));
-  const columnXs = Object.fromEntries(visualColumnOrder.map((column, index) => [column, 64 + index * 640])) as Record<Placement["column"], number>;
-  const placements = minimizeArrowLayout(
-    { dependency: dependencies, compiled, dependent: dependents },
+function buildGraph(data: Dataset | null) {
+  if (!data) return { placements: [] as Placement[], edges: [] as { match: Match; from: Placement; to: Placement }[], width: 64 * 2 + nodeWidth, height: 300 };
+  const orderedIds = data.rules.map((rule) => rule.id);
+  const layoutEdges = data.matches.map((match) => ({ from: match.dependentRuleId, to: match.dependencyRuleId }));
+  const layered = layoutGraphLayers(
+    orderedIds,
     layoutEdges,
-    { top: 68, maximumTopOffset: rowGap, nodeHeight, minimumGap: rowGap, ingressPortY, egressPortY },
-  ).map(({ id, column, y }) => ({ id, column, y, x: columnXs[column] }));
+    { top: 24, nodeHeight, minimumGap: rowGap },
+  );
+  const placements: Placement[] = layered.map(({ id, layer, y }) => (
+    { id, y, x: 64 + layer * graphColumnSpacing }
+  ));
   const byId = new Map(placements.map((placement) => [placement.id, placement]));
-  const edges = relevantMatches.map((match) => {
+  const edges = data.matches.map((match) => {
     const endpoints = bodyToHeadEdge(match, byId);
     return endpoints ? { match, ...endpoints } : null;
   }).filter((edge): edge is { match: Match; from: Placement; to: Placement } => edge !== null);
   return {
     placements,
     edges,
-    width: graphContentWidth,
-    height: Math.max(390, ...placements.map((placement) => placement.y + nodeHeight + 68)),
+    width: 64 * 2 + nodeWidth + Math.max(0, ...layered.map(({ layer }) => layer)) * graphColumnSpacing,
+    height: Math.max(300, ...placements.map((placement) => placement.y + nodeHeight + 24)),
   };
 }
 
@@ -604,7 +619,6 @@ function findCycles(data: Dataset | null) {
   return components;
 }
 
-function unique<T>(values: T[]) { return [...new Set(values)]; }
 function clamp(value: number, minimum: number, maximum: number) { return Math.min(maximum, Math.max(minimum, value)); }
 function scaledViewport(current: Viewport, point: { x: number; y: number }, factor: number): Viewport {
   const scale = clamp(current.scale * factor, minScale, maxScale);

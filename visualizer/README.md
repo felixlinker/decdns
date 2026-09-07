@@ -6,7 +6,9 @@ An arrow runs from the rule containing the body predicate to the rule whose head
 
 Drag the canvas to pan and use the mouse wheel or the toolbar to zoom. **Fit** frames the entire focused graph, while **Reset** returns to the default readable scale.
 
-Within each column, nodes are reordered and vertically offset to reduce the total span of their dependency edges while preserving readable separation.
+Every rule is shown in graph order. DAG sources appear on the left and leaves on the right; cycles are kept together while the graph around them is layered the same way.
+
+The left pane lists individual RRSets at their serving name servers. Choose an RRSet to highlight every rule compiled from it without changing the graph layout.
 
 ## Run the app
 

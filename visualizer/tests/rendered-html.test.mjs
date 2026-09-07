@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { bodyToHeadEdge, groupSourcesByNameAndServer, minimizeArrowLayout, predicateFromOtherRule, ruleEdgePorts, ruleNodeSourceLines, sourceGroupHasCycle, visualColumnOrder } from "../app/graph.ts";
+import { bodyToHeadEdge, layoutGraphLayers, moveRuleSelection, predicateFromOtherRule, ruleEdgePorts, ruleNodeSourceLines, ruleSelectionForSource, sourceHasCycle } from "../app/graph.ts";
 import { readVisualizationCatalog, readVisualizationFile } from "../build/visualization-directory.ts";
 
 async function render() {
@@ -35,10 +35,13 @@ test("server-renders the compilation explorer shell", async () => {
   const html = await response.text();
   assert.match(html, /<title>DNS Regressor Compilation Explorer<\/title>/i);
   assert.match(html, /Compilation explorer/);
-  assert.match(html, />Names</);
+  assert.match(html, />RRSets</);
+  assert.doesNotMatch(html, />All nodes</);
   assert.doesNotMatch(html, /Record sets|Compiled rules|Dependency edges|Unifier bindings|Dependency cycles/);
   assert.doesNotMatch(html, /retained by the compiler|Round lower port|matching-head ingress/i);
   assert.match(html, /aria-label="Zoom in"/);
+  assert.match(html, /aria-label="Hide RRSets panel"/);
+  assert.match(html, /aria-label="Hide inspector panel"/);
   assert.match(html, /Drag canvas to pan.*Scroll to zoom/);
   assert.doesNotMatch(html, /Red outlines mark rules in a dependency cycle/);
   assert.match(html, /Visualization file/);
@@ -104,27 +107,25 @@ test("production build exposes the visualization directory API", async () => {
   }
 });
 
-test("left-column sources are grouped by name and name server, not record type", () => {
-  const groups = groupSourcesByNameAndServer([
-    { owner: "example.", server: "ns1.", recordType: "A", records: ["A record"], ruleIds: ["r1"] },
-    { owner: "example.", server: "ns1.", recordType: "NS", records: ["NS record"], ruleIds: ["r2"] },
-    { owner: "example.", server: "ns2.", recordType: "A", records: ["other server A"], ruleIds: ["r3"] },
-    { owner: "other.", server: "ns2.", recordType: "A", records: ["other A"], ruleIds: ["r4"] },
-  ]);
+test("an RRSet identifies whether any compiled rule is cyclic", () => {
+  const source = { ruleIds: ["acyclic", "cyclic"] };
 
-  assert.equal(groups.length, 3);
-  assert.equal(groups[0].server, "ns1.");
-  assert.deepEqual(groups[0].recordTypes, ["A", "NS"]);
-  assert.deepEqual(groups[0].ruleIds, ["r1", "r2"]);
-  assert.equal(groups[1].server, "ns2.");
-  assert.deepEqual(groups[1].ruleIds, ["r3"]);
+  assert.equal(sourceHasCycle(source, new Set(["cyclic"])), true);
+  assert.equal(sourceHasCycle(source, new Set(["other"])), false);
 });
 
-test("left-column source groups identify whether any contained rule is cyclic", () => {
-  const group = { ruleIds: ["acyclic", "cyclic"] };
+test("selecting an RRSet selects every rule compiled from it", () => {
+  assert.deepEqual(ruleSelectionForSource({ ruleIds: ["rule-1", "rule-3"] }, "rule-2"), new Set(["rule-1", "rule-3"]));
+  assert.deepEqual(ruleSelectionForSource(null, "rule-2"), new Set(["rule-2"]));
+});
 
-  assert.equal(sourceGroupHasCycle(group, new Set(["cyclic"])), true);
-  assert.equal(sourceGroupHasCycle(group, new Set(["other"])), false);
+test("RRSet rule navigation follows export order and wraps at its ends", () => {
+  const ruleIds = ["rule-3", "rule-1", "rule-2"];
+
+  assert.equal(moveRuleSelection(ruleIds, "rule-3", -1), "rule-2");
+  assert.equal(moveRuleSelection(ruleIds, "rule-3", 1), "rule-1");
+  assert.equal(moveRuleSelection(ruleIds, "rule-1", 1), "rule-2");
+  assert.equal(moveRuleSelection(ruleIds, "rule-2", 1), "rule-3");
 });
 
 test("rule nodes identify the name server serving their source record", () => {
@@ -150,53 +151,49 @@ test("dependency cards show the unchanged predicate from the other rule", () => 
   assert.equal(predicateFromOtherRule(match, "head-rule", rules), "resolves(BodyVariable)");
 });
 
-test("column layout reorders and offsets nodes to minimize vertical edge span", () => {
-  const ports = ruleEdgePorts(108);
+test("all-nodes layout follows DAG layers and preserves graph order within them", () => {
   const edges = [
-    { from: "body-1", to: "head-1" },
-    { from: "body-2", to: "head-2" },
-    { from: "body-3", to: "head-3" },
-    { from: "consumer", to: "body-2" },
+    { from: "root", to: "middle-b" },
+    { from: "root", to: "middle-a" },
+    { from: "middle-a", to: "leaf-a" },
+    { from: "other-root", to: "short-leaf" },
+    { from: "middle-b", to: "leaf-b" },
   ];
-  const placements = minimizeArrowLayout(
-    {
-      dependency: ["head-1", "head-2", "head-3"],
-      compiled: ["body-3", "body-1", "body-2"],
-      dependent: ["consumer"],
-    },
-    edges,
-    { top: 68, maximumTopOffset: 66, nodeHeight: 108, minimumGap: 66, ingressPortY: ports.ingress, egressPortY: ports.egress },
+  assert.deepEqual(
+    layoutGraphLayers(
+      ["middle-a", "root", "leaf-a", "middle-b", "leaf-b", "other-root", "short-leaf"],
+      edges,
+      { top: 24, nodeHeight: 108, minimumGap: 66 },
+    ),
+    [
+      { id: "middle-a", layer: 1, y: 24 },
+      { id: "root", layer: 0, y: 24 },
+      { id: "leaf-a", layer: 2, y: 24 },
+      { id: "middle-b", layer: 1, y: 198 },
+      { id: "leaf-b", layer: 2, y: 198 },
+      { id: "other-root", layer: 0, y: 198 },
+      { id: "short-leaf", layer: 2, y: 372 },
+    ],
   );
-  const byId = new Map(placements.map((placement) => [placement.id, placement]));
-  const verticalSpan = edges.reduce((total, edge) => (
-    total + Math.abs(byId.get(edge.from).y + ports.egress - byId.get(edge.to).y - ports.ingress)
-  ), 0);
-
-  assert.ok(verticalSpan < 121);
-  assert.equal(Math.min(...placements.map((placement) => placement.y)), 68);
-  assert.ok(byId.get("consumer").y > 68, "the shorter right column should not remain top-aligned");
-  for (const column of ["dependency", "compiled", "dependent"]) {
-    const ys = placements.filter((placement) => placement.column === column).map((placement) => placement.y).sort((a, b) => a - b);
-    assert.ok(ys[0] <= 134, `${column} nodes should remain close to their header`);
-    assert.ok(ys.every((value, index) => index === 0 || value - ys[index - 1] >= 174 - 1e-8));
-  }
 });
 
-test("a sparse column stays close to its header beside a tall column", () => {
-  const ports = ruleEdgePorts(108);
-  const placements = minimizeArrowLayout(
-    {
-      dependency: Array.from({ length: 24 }, (_, index) => `head-${index}`),
-      compiled: ["compiled"],
-      dependent: [],
-    },
-    [],
-    { top: 68, maximumTopOffset: 66, nodeHeight: 108, minimumGap: 66, ingressPortY: ports.ingress, egressPortY: ports.egress },
+test("all-nodes layout handles cycles as one layered component", () => {
+  assert.deepEqual(
+    layoutGraphLayers(
+      ["cycle-b", "root", "cycle-a", "leaf"],
+      [
+        { from: "root", to: "cycle-a" },
+        { from: "cycle-a", to: "cycle-b" },
+        { from: "cycle-b", to: "cycle-a" },
+        { from: "cycle-b", to: "leaf" },
+      ],
+      { top: 10, nodeHeight: 100, minimumGap: 20 },
+    ),
+    [
+      { id: "cycle-b", layer: 1, y: 10 },
+      { id: "root", layer: 0, y: 10 },
+      { id: "cycle-a", layer: 1, y: 130 },
+      { id: "leaf", layer: 2, y: 10 },
+    ],
   );
-
-  assert.ok(placements.find((placement) => placement.id === "compiled").y <= 134);
-});
-
-test("visual columns run from body consumers to head providers", () => {
-  assert.deepEqual(visualColumnOrder, ["dependent", "compiled", "dependency"]);
 });
