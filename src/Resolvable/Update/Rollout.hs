@@ -65,7 +65,6 @@ diffServers old new = MM.merge
 updateDeps :: NSDiffs -> RecordDependencies -> RecordDependencies
 updateDeps diffs = G.filter changed
   where
-    -- TODO: Use type
     changed :: RRSetID -> Bool
     changed (ns, qn) = maybe False (hasChanges qn) (M.lookup ns diffs)
 
