@@ -2,7 +2,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 module NameConstraint
   ( LabelConstraint(..)
-  , matches
   , ConstrainedLabel
   , ConstrainedName
   , ConstrainedRecord
@@ -10,6 +9,7 @@ module NameConstraint
   , toStandardRecord
   , exactly
   , compileWildcards
+  , overlap
   , synthesize ) where
 
 import qualified Data.List.NonEmpty as NE
@@ -22,6 +22,7 @@ import qualified DNS.RRSet as RRSet
 import Data.Maybe (fromMaybe)
 
 import qualified Util.Tree as T
+import Util.List (zipWithStrict)
 
 data LabelConstraint a = Wildcard [a] | Exactly a
   deriving (Eq, Ord)
@@ -32,7 +33,7 @@ instance Label a => Label (LabelConstraint a) where
   lshow (Wildcard _) = "*"
   lshow (Exactly l) = lshow l
 
-matches :: Ord a => LabelConstraint a -> LabelConstraint a -> Bool
+matches :: Eq a => LabelConstraint a -> LabelConstraint a -> Bool
 matches (Exactly l1) (Exactly l2) = l1 == l2
 matches (Wildcard ls) (Exactly l) = l `notElem` ls
 matches (Exactly l) (Wildcard ls) = l `notElem` ls
@@ -87,6 +88,10 @@ match (Name (NE.reverse -> ls)) (Name (NE.reverse -> cs)) = do
     rec [] _ = Nothing
     rec (a:as) (c:ncs) =
       match' (a NE.:| as) (c NE.:| ncs)
+
+overlap :: Eq a => Name (LabelConstraint a) -> Name (LabelConstraint a) -> Bool
+overlap (Name (h1 NE.:| t1)) (Name (h2 NE.:| t2)) =
+  matches h1 h2 && maybe False and (zipWithStrict (==) t1 t2)
 
 synthesize :: Name String -> ConstrainedRecord -> StandardRecord
 synthesize qname (Named cs d) = Named (fromMaybe (toStringName cs) (match qname cs)) d
