@@ -4,6 +4,8 @@ module Util.Bool
   , Or(..)
   , And(..) ) where
 
+infixr 1 ==>
+
 (==>) :: Bool -> Bool -> Bool
 a ==> b = not a || b
 

@@ -165,6 +165,7 @@ test-suite dns-regressor-test
       Resolvable.Update.DisunificationSpec
       Resolvable.Update.RolloutSpec
       Resolvable.Util
+      Util.BoolSpec
       Util.FreshSpec
       Util.GraphSpec
       Util.ListSpec

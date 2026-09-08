@@ -18,6 +18,7 @@ import qualified DNS.WellformednessSpec as WellformednessSpec
 import qualified Parsing.NameSpec as ParsingNameSpec
 import qualified Parsing.ZoneFileSpec as ParsingZoneFileSpec
 import qualified Util.ListSpec as ListSpec
+import qualified Util.BoolSpec as BoolSpec
 import qualified Util.GraphSpec as GraphSpec
 import qualified Util.TreeSpec as TreeSpec
 import qualified Util.FreshSpec as FreshSpec
@@ -42,6 +43,7 @@ main =
       , ParsingNameSpec.tests
       , ParsingZoneFileSpec.tests
       , ZoneFilePrintingSpec.tests
+      , BoolSpec.tests
       , ListSpec.tests
       , GraphSpec.tests
       , TreeSpec.tests
