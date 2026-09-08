@@ -21,8 +21,8 @@ tests =
           @?= S.fromList [('a', S.fromList "bd"), ('b', S.empty), ('c', S.singleton 'b'), ('d', S.empty)]
     , testCase "next returns only known relations" $ do
         let order = relations [('b', "ac")]
-        G.next order 'b' @?= Just (S.fromList "ac")
-        G.next order 'x' @?= Nothing
+        G.next order 'b' @?= S.fromList "ac"
+        G.next order 'x' @?= S.empty
     , testCase "leaves returns present elements with no incoming edges" $
         G.leaves (relations [('c', "b"), ('a', ""), ('b', "a")]) @?= S.fromList "a"
     , testCase "transitiveClosure adds all correct elements" $

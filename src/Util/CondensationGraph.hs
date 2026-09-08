@@ -6,7 +6,6 @@ module Util.CondensationGraph
 import qualified Data.Set as S
 
 import qualified Util.Graph as G
-import Data.Maybe (fromJust)
 
 type CondensationGraph a = G.Graph (S.Set a)
 
@@ -17,4 +16,4 @@ fromGraph g = foldr (\scc -> G.insert scc (S.delete scc $ S.fromList $ edges scc
     sccs = G.tarjan g
 
     edges :: S.Set a -> [S.Set a]
-    edges node = filter (any (\(f, t) -> t `S.member` fromJust (G.next g f)) . S.cartesianProduct node) sccs
+    edges node = filter (any (\(f, t) -> t `S.member` G.next g f) . S.cartesianProduct node) sccs

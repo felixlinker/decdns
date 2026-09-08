@@ -27,7 +27,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.List (partition)
 import Data.Tuple (swap)
-import Data.Maybe (fromMaybe, fromJust)
+import Data.Maybe (fromMaybe)
 
 -- edges maps a key to all nodes that have an edge from the key to one of the
 -- values. This datastructure maintains the invariant that all values that occur
@@ -58,14 +58,14 @@ toAscList = M.toAscList . edges
 fromList :: Ord a => [(a, a)] -> Graph a
 fromList = closeLeaves . foldr (\(k, v) -> insertUnsafe k (S.singleton v)) empty
 
-next :: Ord a => Graph a -> a -> Maybe (S.Set a)
-next po a = M.lookup a (edges po)
+next :: Ord a => Graph a -> a -> S.Set a
+next po a = fromMaybe S.empty $ M.lookup a (edges po)
 
 leaves :: Ord a => Graph a -> S.Set a
 leaves = S.fromAscList . Prelude.map fst . Prelude.filter (S.null . snd) . M.toAscList . edges
 
 leaf :: Ord a => Graph a -> a -> Bool
-leaf po = maybe False S.null . next po
+leaf po = S.null . next po
 
 transitiveClosure :: forall a. Ord a => Graph a -> Maybe (Graph a)
 transitiveClosure (Graph d) =
@@ -156,7 +156,7 @@ tarjan po = concat $ St.evalState (mapM go (S.toList $ elems po)) ([], M.empty)
           -- Insert v into state
           St.modify (\(stack, ns) -> (v:stack, M.insert v (M.size ns, M.size ns) ns))
           -- Prepare recursion
-          (unexplored, explored) <- getsNodes (\ns -> S.partition (`M.notMember` ns) (fromJust $ next po v))
+          (unexplored, explored) <- getsNodes (\ns -> S.partition (`M.notMember` ns) (next po v))
           -- Update lowLink for already explored nodes
           St.modify (\(stack, ns) ->
             let update = S.filter (`elem` stack) explored
