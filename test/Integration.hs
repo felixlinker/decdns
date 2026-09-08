@@ -418,7 +418,7 @@ regressionTest newConfig expected unexpected = do
         computeRegressions
           (plResolvable =<< compileConfig rootServers old)
           (plResolvable =<< compileConfig rootServers new)
-  assertResolvableQueries (baseFiles ++ newConfig) (S.fromList regressions) expected unexpected
+  assertResolvableQueries (baseFiles ++ newConfig) regressions expected unexpected
 
 assertQueries :: [FilePath] -> S.Set ConstrainedQuery -> [Query] -> [Query] -> Assertion
 assertQueries = assertQueriesWith queryTerm
