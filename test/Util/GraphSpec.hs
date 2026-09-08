@@ -3,6 +3,7 @@ module Util.GraphSpec (tests) where
 import qualified Data.Set as S
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit ((@?=), testCase)
+import Test.Tasty.QuickCheck (testProperty)
 
 import qualified Util.Graph as G
 
@@ -10,7 +11,8 @@ tests :: TestTree
 tests =
   testGroup
     "Util.PartialOrder"
-    [ testCase "toList exposes all relations" $
+    [ testProperty "Graphs contain every edge value as a key" prop_edgesInvariant
+    , testCase "toList exposes all relations" $
         S.fromList (G.toList (relations [('b', "a")]))
           @?= S.fromList [('a', S.empty), ('b', S.singleton 'a')]
     , testCase "toAscList orders relations by their right element" $
@@ -55,6 +57,13 @@ tests =
     , testCase "twoTriangle SCC" (G.tarjan twoTriangle @?= [S.fromList "abc", S.fromList "def"])
     , testCase "acyclic order SCCs" (G.tarjan acyclicOrder @?= map S.singleton (S.toList $ G.elems acyclicOrder))
     ]
+
+prop_edgesInvariant :: [(Char, Char)] -> Bool
+prop_edgesInvariant relationsList =
+  let graphEdges = G.toList (G.fromList relationsList)
+      keys = S.fromList (map fst graphEdges)
+      values = S.unions (map snd graphEdges)
+  in values `S.isSubsetOf` keys
 
 triangle :: G.Graph Char
 triangle = relations [('b', "a"), ('c', "b"), ('a', "c")]
