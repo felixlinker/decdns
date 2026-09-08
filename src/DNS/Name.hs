@@ -5,6 +5,7 @@ module DNS.Name
   , Name(..)
   , Named(..)
   , root
+  , isWildcardName
   , labelCount
   , (<|)
   , (|>)
@@ -28,11 +29,13 @@ import Util.Bytes (Serialize(..), withLength)
 
 class Label a where
   lwildcard :: a
+  lisWildcard :: a -> Bool
   lempty :: a
   lshow :: a -> String
 
 instance Label String where
   lwildcard = "*"
+  lisWildcard = (== lwildcard)
   lempty = ""
   lshow = id
 
@@ -41,6 +44,9 @@ newtype Name a = Name { labels :: NE.NonEmpty a }
 
 root :: Label a => Name a
 root = Name (NE.singleton lempty)
+
+isWildcardName :: Label a => Name a -> Bool
+isWildcardName = lisWildcard . NE.head . labels
 
 -- See: https://datatracker.ietf.org/doc/html/rfc4034#section-3.1.3
 labelCount :: (Eq a, Label a) => Name a -> Int

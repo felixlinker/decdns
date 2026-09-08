@@ -1,5 +1,6 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module NameConstraint
   ( LabelConstraint(..)
   , ConstrainedLabel
@@ -31,6 +32,8 @@ data LabelConstraint a = Wildcard [a] | Exactly a
 
 instance Label a => Label (LabelConstraint a) where
   lwildcard = Wildcard [lwildcard]
+  lisWildcard (Wildcard _) = True
+  lisWildcard (Exactly _) = False
   lempty = Exactly lempty
   lshow (Wildcard _) = "*"
   lshow (Exactly l) = lshow l
@@ -56,11 +59,11 @@ toStandardRecord (Named n d) = Named (toStringName n) d
 exactly :: Name a -> Name (LabelConstraint a)
 exactly (Name ls) = Name (NE.map Exactly ls)
 
-compileNoContext :: Name String -> Name ConstrainedLabel
+compileNoContext :: forall a. Label a => Name a -> Name (LabelConstraint a)
 compileNoContext (Name (leftMost NE.:| rest)) = Name $ withWC NE.:| map Exactly rest
   where
-    withWC :: ConstrainedLabel
-    withWC = if leftMost == lwildcard then Wildcard [] else Exactly leftMost
+    withWC :: LabelConstraint a
+    withWC = if lisWildcard leftMost then lwildcard else Exactly leftMost
 
 existIn :: T.Node String v -> [String]
 existIn = M.keys . T.children

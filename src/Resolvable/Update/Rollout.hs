@@ -22,7 +22,6 @@ import NameConstraint
 import qualified Util.Graph as G
 import Resolvable.Dependencies (ResolutionOrder)
 import Data.Maybe (isJust, fromJust)
-import Util.Bool ((==>))
 
 type RRSetID = (Name String, ConstrainedName)
 
@@ -39,10 +38,16 @@ fromResolutionOrder =
     fromAnnot (RComp ns rrs) = (ns, name rrs)
 
 canRollout :: RecordDependencies -> Name String -> Name String -> Bool
-canRollout deps ns n = all matchingWildcardIsLeaf deps
+canRollout deps ns (compileNoContext -> n)
+  | isWildcardName n = foldr matchingWildcardIsLeaf True deps
+  | otherwise = G.leaf deps (ns, n)
   where
-    matchingWildcardIsLeaf :: RRSetID -> Bool
-    matchingWildcardIsLeaf node@(ns', n') = (ns == ns' && overlap (compileNoContext n) n') ==> G.leaf deps node
+    -- Lazy in that if any RRSetID matches the name server and name in question,
+    -- we return whether that node is a leaf. Otherwise,
+    matchingWildcardIsLeaf :: RRSetID -> Bool -> Bool
+    matchingWildcardIsLeaf node@(ns', n') acc
+      | ns == ns' && isWildcardName n' && overlap n n' = G.leaf deps node
+      | otherwise = acc
 
 type NSDiffs = M.Map (Name String) (ZoneDiff String)
 
