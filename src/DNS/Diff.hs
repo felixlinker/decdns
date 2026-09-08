@@ -19,7 +19,6 @@ import DNS.ZoneFile
 
 import qualified Util.Tree as T
 import Data.Bifunctor (Bifunctor(bimap))
-import NameConstraint
 import Data.Bifoldable (Bifoldable(bifoldr))
 import Data.Bitraversable (Bitraversable(bitraverse))
 
@@ -76,14 +75,14 @@ diff (fmap deleted -> Zone oldOrg oldRs) (fmap added -> Zone newOrg newRs) =
     true :: a -> Bool
     true = const True
 
-hasChanges :: (Label a, Ord a) => Name (LabelConstraint a) -> ZoneDiff (LabelConstraint a) -> Bool
+hasChanges :: (Label a, Ord a) => Name a -> ZoneDiff a -> Bool
 hasChanges n (Zone org ns) = case pathInZone org n of
   Path _ [] p -> go p ns
   _ -> False
   where
-    go :: (Label a, Ord a) => [LabelConstraint a] -> T.Node (LabelConstraint a) RDataSetDiff -> Bool
+    go :: (Label a, Ord a) => [a] -> T.Node a RDataSetDiff -> Bool
     go [] (T.Node is _) = not $ null is
     go (l : t) node = rec l t node
 
-    rec :: (Label a, Ord a) => LabelConstraint a -> [LabelConstraint a] -> T.Node (LabelConstraint a) RDataSetDiff -> Bool
+    rec :: (Label a, Ord a) => a -> [a] -> T.Node a RDataSetDiff -> Bool
     rec l r (T.Node _ cs) = maybe False (go r) (M.lookup l cs)

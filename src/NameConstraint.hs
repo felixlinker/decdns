@@ -9,6 +9,7 @@ module NameConstraint
   , toStandardRecord
   , exactly
   , compileWildcards
+  , literalWildcards
   , overlap
   , synthesize ) where
 
@@ -66,6 +67,9 @@ compileWildcards (Zone (Name n) r) = Zone (Name (NE.map Exactly n)) (go r)
 
     go :: T.Node String RRSet.RDataSet -> T.Node ConstrainedLabel RRSet.RDataSet
     go n_@(T.Node _ ch) = n_ { T.children = M.map go $ M.mapKeys (mapLabel (existIn n_)) ch }
+
+literalWildcards :: Zone ConstrainedLabel -> Zone String
+literalWildcards (Zone n r) = Zone (fmap show n) (T.mapLabels show r)
 
 match :: Name String -> ConstrainedName -> Maybe (Name String)
 match (Name (NE.reverse -> ls)) (Name (NE.reverse -> cs)) = do

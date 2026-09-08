@@ -30,7 +30,7 @@ immediateTxtAdd = do
       txt = Named ("www" <| org) (RData IN 300 (TXT "hello"))
       z = singleton (Named org (RRSet.singleton (RData IN 300 (SOA org org 1 2 3 4 5))))
       z' = insert z (fmap RRSet.singleton txt)
-      diffs = M.singleton (zoneName z) (diff (compileWildcards z) (compileWildcards z'))
+      diffs = M.singleton (zoneName z) (diff z z')
   assertBool "expected TXT add diff to be non-empty" $
     maybe False (not . isEmpty) (M.lookup (zoneName z) diffs)
   dz <- dependencies z
@@ -43,7 +43,7 @@ immediateTxtDelete = do
       txt = Named ("www" <| org) (RData IN 300 (TXT "hello"))
       z = singleton (Named org (RRSet.singleton (RData IN 300 (SOA org org 1 2 3 4 5))))
       zWithTxt = insert z (fmap RRSet.singleton txt)
-      diffs = M.singleton (zoneName zWithTxt) (diff (compileWildcards zWithTxt) (compileWildcards z))
+      diffs = M.singleton (zoneName zWithTxt) (diff zWithTxt z)
   assertBool "expected TXT delete diff to be non-empty" $
     maybe False (not . isEmpty) (M.lookup (zoneName zWithTxt) diffs)
   dzWithTxt <- dependencies zWithTxt
