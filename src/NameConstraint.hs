@@ -8,6 +8,7 @@ module NameConstraint
   , ConstrainedRRSet
   , toStandardRecord
   , exactly
+  , compileNoContext
   , compileWildcards
   , literalWildcards
   , overlap
@@ -55,6 +56,12 @@ toStandardRecord (Named n d) = Named (toStringName n) d
 exactly :: Name a -> Name (LabelConstraint a)
 exactly (Name ls) = Name (NE.map Exactly ls)
 
+compileNoContext :: Name String -> Name ConstrainedLabel
+compileNoContext (Name (leftMost NE.:| rest)) = Name $ withWC NE.:| map Exactly rest
+  where
+    withWC :: ConstrainedLabel
+    withWC = if leftMost == lwildcard then Wildcard [] else Exactly leftMost
+
 existIn :: T.Node String v -> [String]
 existIn = M.keys . T.children
 
@@ -62,8 +69,9 @@ compileWildcards :: Zone String -> Zone ConstrainedLabel
 compileWildcards (Zone (Name n) r) = Zone (Name (NE.map Exactly n)) (go r)
   where
     mapLabel :: [String] -> String -> ConstrainedLabel
-    mapLabel exist "*" = Wildcard exist
-    mapLabel _ x   = Exactly x
+    mapLabel exist lbl
+      | lbl == lwildcard = Wildcard exist
+      | otherwise = Exactly lbl
 
     go :: T.Node String RRSet.RDataSet -> T.Node ConstrainedLabel RRSet.RDataSet
     go n_@(T.Node _ ch) = n_ { T.children = M.map go $ M.mapKeys (mapLabel (existIn n_)) ch }

@@ -24,7 +24,7 @@ import Resolvable.Dependencies (ResolutionOrder)
 import Data.Maybe (isJust, fromJust)
 import Util.Bool ((==>))
 
-type RRSetID = (Name String, Name String)
+type RRSetID = (Name String, ConstrainedName)
 
 type RecordDependencies = G.Graph RRSetID
 
@@ -36,13 +36,13 @@ fromResolutionOrder =
   . G.filter (isJust . rannotation)
   where
     fromAnnot :: RComp -> RRSetID
-    fromAnnot (RComp ns rrs) = (ns, fmap show (name rrs))
+    fromAnnot (RComp ns rrs) = (ns, name rrs)
 
 canRollout :: RecordDependencies -> Name String -> Name String -> Bool
-canRollout deps ns n = G.leaf deps (ns, n) -- && all matchingWildcardIsLeaf deps
-  -- where
-  --   matchingWildcardIsLeaf :: RRSetID -> Bool
-  --   matchingWildcardIsLeaf node@(ns', n') = (ns == ns' && overlap n n') ==> G.leaf deps node
+canRollout deps ns n = all matchingWildcardIsLeaf deps
+  where
+    matchingWildcardIsLeaf :: RRSetID -> Bool
+    matchingWildcardIsLeaf node@(ns', n') = (ns == ns' && overlap (compileNoContext n) n') ==> G.leaf deps node
 
 type NSDiffs = M.Map (Name String) (ZoneDiff String)
 
@@ -70,7 +70,7 @@ updateDeps :: NSDiffs -> RecordDependencies -> RecordDependencies
 updateDeps diffs = G.filter changed
   where
     changed :: RRSetID -> Bool
-    changed (ns, qn) = maybe False (hasChanges qn) (M.lookup ns diffs)
+    changed (ns, qn) = maybe False (hasChanges $ fmap lshow qn) (M.lookup ns diffs)
 
 type Rollout = [NSDiffs]
 
