@@ -25,13 +25,17 @@ import qualified Control.Monad.Trans.State as St
 import Control.Monad (foldM)
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Maybe (fromMaybe)
 import Data.List (partition)
-import Data.Bifunctor (Bifunctor(first))
 import Data.Tuple (swap)
+import Data.Maybe (fromMaybe, fromJust)
 
--- po maps a key to all nodes that have an edge to the key
+-- edges maps a key to all nodes that have an edge from the key to one of the
+-- values. This datastructure maintains the invariant that all values that occur
+-- in any of edges values also occur as a key in edges.
 newtype Graph a = Graph { edges :: M.Map a (S.Set a) }
+
+instance Foldable Graph where
+  foldr f acc = foldr f acc . M.keys . edges
 
 empty :: Graph a
 empty = Graph M.empty
@@ -39,8 +43,8 @@ empty = Graph M.empty
 null :: Graph a -> Bool
 null = M.null . edges
 
-elems :: Ord a => Graph a -> S.Set a
-elems (Graph m) = foldr S.union (M.keysSet m) (M.elems m)
+elems :: Graph a -> S.Set a
+elems = M.keysSet . edges
 
 toList :: Graph a -> [(a, S.Set a)]
 toList = toAscList
@@ -52,16 +56,16 @@ toAscList :: Graph a -> [(a, S.Set a)]
 toAscList = M.toAscList . edges
 
 fromList :: Ord a => [(a, a)] -> Graph a
-fromList = foldr (uncurry insert . swap . first S.singleton) empty
+fromList = closeLeaves . foldr (\(k, v) -> insertUnsafe k (S.singleton v)) empty
 
-next :: Ord a => Graph a -> a -> S.Set a
-next po a = fromMaybe S.empty $ M.lookup a (edges po)
+next :: Ord a => Graph a -> a -> Maybe (S.Set a)
+next po a = M.lookup a (edges po)
 
 leaves :: Ord a => Graph a -> S.Set a
 leaves = S.fromAscList . Prelude.map fst . Prelude.filter (S.null . snd) . M.toAscList . edges
 
 leaf :: Ord a => Graph a -> a -> Bool
-leaf po = S.null . next po
+leaf po = maybe False S.null . next po
 
 transitiveClosure :: forall a. Ord a => Graph a -> Maybe (Graph a)
 transitiveClosure (Graph d) =
@@ -88,13 +92,20 @@ irreflexive :: Eq a => Graph a -> Graph a
 irreflexive (Graph m) = Graph $ M.mapWithKey (\k -> S.filter (/= k)) m
 
 invert :: Ord a => Graph a -> Graph a
-invert (Graph m) = foldr (uncurry foldF) empty (M.toList m)
+invert = fromList . Prelude.map swap . toFlatList
+
+-- NOTE: Must eventually call closeLeaves to maintain Graph.edges invariant
+insertUnsafe :: Ord a => a -> S.Set a -> Graph a -> Graph a
+insertUnsafe k vs = Graph . M.alter (Just . maybe vs (vs <>)) k . edges
+
+closeLeaves :: Ord a => Graph a -> Graph a
+closeLeaves (Graph m) = Graph $ foldr (flip (foldr (M.alter initEmpty))) m (M.elems m)
   where
-    foldF :: Ord a => a -> S.Set a -> Graph a -> Graph a
-    foldF oldK oldVs d = foldr (`insert` S.singleton oldK) d oldVs
+    initEmpty :: Maybe (S.Set a) -> Maybe (S.Set a)
+    initEmpty = Just . fromMaybe S.empty
 
 insert :: Ord a => a -> S.Set a -> Graph a -> Graph a
-insert k vs (Graph m) = Graph (M.alter (Just . maybe vs (vs <>)) k m)
+insert k vs = closeLeaves . insertUnsafe k vs
 
 remove :: Ord a => a -> Graph a -> Graph a
 remove key (Graph m) = Graph $ M.map (S.delete key) $ M.delete key m
@@ -145,7 +156,7 @@ tarjan po = concat $ St.evalState (mapM go (S.toList $ elems po)) ([], M.empty)
           -- Insert v into state
           St.modify (\(stack, ns) -> (v:stack, M.insert v (M.size ns, M.size ns) ns))
           -- Prepare recursion
-          (unexplored, explored) <- getsNodes (\ns -> S.partition (`M.notMember` ns) (next po v))
+          (unexplored, explored) <- getsNodes (\ns -> S.partition (`M.notMember` ns) (fromJust $ next po v))
           -- Update lowLink for already explored nodes
           St.modify (\(stack, ns) ->
             let update = S.filter (`elem` stack) explored
