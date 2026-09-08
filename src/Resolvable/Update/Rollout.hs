@@ -23,7 +23,7 @@ import qualified Util.Graph as G
 import Resolvable.Dependencies (ResolutionOrder)
 import Data.Maybe (isJust, fromJust)
 
-type RRSetID = (Name String, Name String)
+type RRSetID = (Name String, ConstrainedName)
 
 type RecordDependencies = G.Graph RRSetID
 
@@ -35,14 +35,14 @@ fromResolutionOrder =
   . G.filter (isJust . rannotation)
   where
     fromAnnot :: RComp -> RRSetID
-    fromAnnot (RComp ns rrs) = (ns, fmap show (name rrs))
+    fromAnnot (RComp ns rrs) = (ns, name rrs)
 
-canRollout :: RecordDependencies -> Name String -> Name String -> Bool
+canRollout :: RecordDependencies -> Name String -> ConstrainedName -> Bool
 canRollout deps ns n = G.leaf deps (ns, n)
 
-type NSDiffs = M.Map (Name String) (ZoneDiff String)
+type NSDiffs = M.Map (Name String) (ZoneDiff ConstrainedLabel)
 
-showZoneDiff :: Name String -> ZoneDiff String -> [String]
+showZoneDiff :: Name String -> ZoneDiff ConstrainedLabel -> [String]
 showZoneDiff ns d =
     map indent
   $ ("on server " ++ show ns ++ ":")
@@ -59,8 +59,8 @@ diffServers old new = MM.merge
   (MM.mapMissing (\_ -> fmap deleted))
   (MM.mapMissing (\_ -> fmap added))
   (MM.zipWithMatched (const diff))
-  (M.fromListWith mergeZones $ map (fmap literalWildcards) old)
-  (M.fromListWith mergeZones $ map (fmap literalWildcards) new)
+  (M.fromListWith mergeZones old)
+  (M.fromListWith mergeZones new)
 
 updateDeps :: NSDiffs -> RecordDependencies -> RecordDependencies
 updateDeps diffs = G.filter changed
@@ -93,7 +93,7 @@ rollout' acc (normalize -> diffs) (updateDeps diffs -> old) (updateDeps diffs ->
       let diffs' = M.mapWithKey partitionDiff ds
       in (normalize (M.map fst diffs'), normalize (M.map snd diffs'))
 
-    partitionDiff :: Name String -> ZoneDiff String -> (ZoneDiff String, ZoneDiff String)
+    partitionDiff :: Name String -> ZoneDiff ConstrainedLabel -> (ZoneDiff ConstrainedLabel, ZoneDiff ConstrainedLabel)
     partitionDiff ns = partition (\n _ _ -> canRollout new ns n && canRollout old ns n)
 
 dropEmpty :: NSDiffs -> NSDiffs

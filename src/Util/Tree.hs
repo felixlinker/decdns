@@ -15,14 +15,13 @@ module Util.Tree
   , fmerge
   , merge
   , partition
-  , mapLabels
   , mapNamed
   , traverseNamed
   , allNamed ) where
 
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
-import DNS.Name ( (<|), Name )
+import DNS.Name
 
 import Util.Func
 
@@ -115,9 +114,6 @@ partition p = go []
       let (top, bot) = p path v
           rec = M.mapWithKey (go . (:path)) cs
       in (Node top (M.map fst rec), Node bot (M.map snd rec))
-
-mapLabels :: (Ord a, Ord b) => (a -> b) -> Node a v -> Node b v
-mapLabels f (Node i cs) = Node i $ M.mapKeys f (M.map (mapLabels f) cs)
 
 mapNamed :: (Name a -> u -> v) -> Name a -> Node a u -> Node a v
 mapNamed f owner (Node d cs) = Node (f owner d) (M.mapWithKey (\k -> mapNamed f (k <| owner)) cs)
