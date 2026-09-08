@@ -14,7 +14,6 @@ module DNS.RRSet
   , StdRRSet
   , canonicalRRSet
   , toRecords
-  , rrsetType
   , hasType
   , getType
   , dropType ) where
@@ -87,11 +86,6 @@ singleton rd = RDS $ M.singleton (toType $ rtype rd) (NE.singleton rd)
 
 toRecords :: RRSet a -> NE.NonEmpty (Record a)
 toRecords (Named n sets) = Named n <$> sets
-
--- TODO: Write (quickcheck?) test invariant that RRSets only contain record of
--- the same type
-rrsetType :: RRSet a -> T.Type
-rrsetType = toType . rtype . NE.head . value
 
 hasType :: T.Type -> RTypedSet a -> Bool
 hasType t = M.member t . rds

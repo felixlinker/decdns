@@ -15,7 +15,6 @@ import qualified Data.Map.Merge.Lazy as MM
 
 import DNS.Diff
 import DNS.Name
-import qualified DNS.RecordType as T
 import Resolvable.Prolog.Core ( Rule(rannotation) )
 import Resolvable.Resolvability
 import DNS.ZoneFile
@@ -23,9 +22,8 @@ import NameConstraint
 import qualified Util.Graph as G
 import Resolvable.Dependencies (ResolutionOrder)
 import Data.Maybe (isJust, fromJust)
-import DNS.RRSet (rrsetType)
 
-type RRSetID = (Name String, Name String, T.Type)
+type RRSetID = (Name String, Name String)
 
 type RecordDependencies = G.Graph RRSetID
 
@@ -37,10 +35,10 @@ fromResolutionOrder =
   . G.filter (isJust . rannotation)
   where
     fromAnnot :: RComp -> RRSetID
-    fromAnnot (RComp ns rrs) = (ns, fmap show (name rrs), rrsetType rrs)
+    fromAnnot (RComp ns rrs) = (ns, fmap show (name rrs))
 
-canRollout :: RecordDependencies -> Name String -> Name String -> T.Type -> Bool
-canRollout deps ns n ty = G.leaf deps (ns, n, ty)
+canRollout :: RecordDependencies -> Name String -> Name String -> Bool
+canRollout deps ns n = G.leaf deps (ns, n)
 
 type NSDiffs = M.Map (Name String) (ZoneDiff String)
 
@@ -69,7 +67,7 @@ updateDeps diffs = G.filter changed
   where
     -- TODO: Use type
     changed :: RRSetID -> Bool
-    changed (ns, qn, ty) = maybe False (hasChanges qn ty) (M.lookup ns diffs)
+    changed (ns, qn) = maybe False (hasChanges qn) (M.lookup ns diffs)
 
 type Rollout = [NSDiffs]
 
@@ -96,7 +94,7 @@ rollout' acc (normalize -> diffs) (updateDeps diffs -> old) (updateDeps diffs ->
       in (normalize (M.map fst diffs'), normalize (M.map snd diffs'))
 
     partitionDiff :: Name String -> ZoneDiff String -> (ZoneDiff String, ZoneDiff String)
-    partitionDiff ns = partition (\n ty _ -> canRollout new ns n ty && canRollout old ns n ty)
+    partitionDiff ns = partition (\n _ _ -> canRollout new ns n && canRollout old ns n)
 
 dropEmpty :: NSDiffs -> NSDiffs
 dropEmpty = M.filter (not . isEmpty)
