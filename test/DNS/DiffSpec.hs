@@ -49,7 +49,7 @@ preservesNonRootOrigin = do
       newZ = insert (emptyZone org) (Named n (mkData "192.0.2.2"))
       dz = diff (compileWildcards oldZ) (compileWildcards newZ)
   zoneName dz @?= exactly org
-  hasChanges (exactly n) T.A dz @?= True
+  hasChanges (exactly n) dz @?= True
 
 exactChangeDetection :: Assertion
 exactChangeDetection = do
@@ -57,8 +57,8 @@ exactChangeDetection = do
       oldZ = emptyZone root
       newZ = singleton (Named n (mkData "198.51.100.1"))
   let dz = diff (compileWildcards oldZ) (compileWildcards newZ)
-  hasChanges (exactly n) T.A dz @?= True
-  hasChanges (exactly (mkName ["other", "example", "com", ""])) T.A dz @?= False
+  hasChanges (exactly n) dz @?= True
+  hasChanges (exactly (mkName ["other", "example", "com", ""])) dz @?= False
 
 mkRData :: String -> RData
 mkRData = RData IN 300 . A . read
