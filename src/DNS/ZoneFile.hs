@@ -18,6 +18,7 @@ module DNS.ZoneFile
   , insert
   , fromList
   , get
+  , adjustF
   , set
   , prune
   , allData
@@ -29,6 +30,7 @@ module DNS.ZoneFile
   , allNamed
   , traverseNamed ) where
 
+import Data.Functor.Identity (Identity(runIdentity))
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
 import qualified Control.Monad.Trans.State as St
@@ -125,10 +127,13 @@ get n (Zone org r) = case pathInZone org n of
   Path _ [] p -> T.get p r
   _ -> Nothing
 
+adjustF :: (Label a, Ord a, Applicative f) => ([a] -> T.Node a (t b) -> f (T.Node a (t b))) -> Name a -> AZone a t b -> f (AZone a t b)
+adjustF f nam z@(Zone org r) = case pathInZone org nam of
+  Path _ [] p -> Zone org <$> T.adjustF f p r
+  _ -> pure z
+
 set :: forall a t b. (Label a, Ord a, Monoid (t b)) => Name a -> t b -> AZone a t b -> AZone a t b
-set nam is z@(Zone org r) = case pathInZone org nam of
-  Path _ [] p -> Zone org (T.adjust setF p r)
-  _ -> z
+set nam is = runIdentity . adjustF (\p -> return . setF p) nam
   where
     setF :: [a] -> T.Node a (t b) -> T.Node a (t b)
     setF [] n = n { T.item = is }

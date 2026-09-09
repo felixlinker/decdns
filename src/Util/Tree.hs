@@ -9,6 +9,7 @@ module Util.Tree
   , emptyNode
   , prune
   , get
+  , adjustF
   , adjust
   , insertNode
   , insert
@@ -21,8 +22,10 @@ module Util.Tree
   , traverseNamed
   , allNamed ) where
 
+import Data.Functor.Identity (Identity(runIdentity))
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
+import Data.Maybe (fromJust)
 import DNS.Name ( (<|), Name )
 
 import Util.Func
@@ -85,15 +88,18 @@ get :: Ord k => [k] -> Node k v -> Maybe v
 get [] (Node i _) = Just i
 get (h:t) (Node _ cs) = get t =<< M.lookup h cs
 
-adjust :: forall k v. Ord k => ([k] -> Node k v -> Node k v) -> [k] -> Node k v -> Node k v
-adjust nf = go
+adjustF :: forall f k v. (Functor f, Ord k) => ([k] -> Node k v -> f (Node k v)) -> [k] -> Node k v -> f (Node k v)
+adjustF nf = go
   where
-    go :: [k] -> Node k v -> Node k v
+    go :: [k] -> Node k v -> f (Node k v)
     go [] n = nf [] n
-    go p@(h:t) n@(Node _ cs) =
+    go p@(h:t) n@(Node v cs) =
       if h `M.member` cs
-        then n { children = M.adjust (go t) h cs }
+        then Node v <$> M.alterF (fmap Just . go t . fromJust) h cs
         else nf p n
+
+adjust :: forall k v. Ord k => ([k] -> Node k v -> Node k v) -> [k] -> Node k v -> Node k v
+adjust f p = runIdentity . adjustF (\p' -> return . f p') p
 
 insertNode :: forall k v. (Monoid v, Ord k) => [k] -> Node k v -> Node k v -> Node k v
 insertNode p new = adjust insF p
