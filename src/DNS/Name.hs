@@ -87,7 +87,14 @@ instance Serialize (Name String) where
 data Named a b = Named
   { name :: Name a
   , value :: b }
-  deriving (Eq, Ord)
+  deriving (Eq)
+
+-- NOTE: Manual implementation of Ord so that I can rely on the invairant: if
+-- name a < name b, then a < b. Used in Rollout.hs.
+instance (Ord a, Ord b) => Ord (Named a b) where
+  compare (Named n v) (Named n' v')
+    | n /= n' = compare n n'
+    | otherwise = compare v v'
 
 instance Show a => Show (Named String a) where
   show (Named n d) = show n ++ " " ++ show d

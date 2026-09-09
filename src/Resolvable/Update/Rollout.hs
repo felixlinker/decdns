@@ -70,9 +70,8 @@ diffServers old new = MM.merge
   (M.fromListWith mergeZones $ map (fmap literalWildcards) old)
   (M.fromListWith mergeZones $ map (fmap literalWildcards) new)
 
--- TODO: Could maybe use S.mapMonotonic
 toIDs :: Diffs -> S.Set RRSetID
-toIDs = S.map (fmap name)
+toIDs = S.mapMonotonic (fmap name)
 
 updateDeps :: Diffs -> RecordDependencies -> RecordDependencies
 updateDeps diffs = G.filter (`S.member ` toIDs diffs)
