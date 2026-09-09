@@ -44,6 +44,11 @@ tests =
         "Resolvable.Resolvability authentication"
         [ testCase "signed authenticates the CNAME chain and child zone" $
             authenticatedResolutionTest signedFiles
+        , testCase "signed authenticates a TXT record" $ do
+            results <- resolvableQueries signedTxtFiles
+            assertResolutions signedTxtFiles results
+              [authenticated nsCom RT.TXT com]
+              []
         , testCase "signed-new authenticates answers synthesized from a wildcard" $
             authenticatedWildcardResolutionTest signedNewFiles
         , testCase "signed-nsec3 authenticates the CNAME chain and child zone" $
@@ -115,6 +120,7 @@ exampleFiles =
   , ExampleFile "examples/cname/partially-signed-nsec3-oo/ns.b.com." [bCom]
   , ExampleFile "examples/cname/signed-nsec3/ns.com." [com]
   , ExampleFile "examples/cname/signed-nsec3/ns.b.com." [bCom]
+  , ExampleFile "examples/dnssec/txt/ns.com." [com]
   , ExampleFile "examples/ns/self-deleg/ns.com." [com, subACom]
   , ExampleFile "examples/ns/sub-self-deleg/root.net." [dnsRoot, rootNet]
   , ExampleFile "examples/ns/sub-self-deleg/ns.net." [net]
@@ -247,7 +253,7 @@ exampleConfigs =
 
 baseFiles, newFiles, brokenFiles, partiallySignedFiles, signedFiles, signedNewFiles, signedNonZoneKeyFiles :: [FilePath]
 selfDelegFiles, subSelfDelegFiles, nsLoopFiles, cnameLoopFiles :: [FilePath]
-partiallySignedNsec3Files, partiallySignedNsec3OOFiles, signedNsec3Files :: [FilePath]
+partiallySignedNsec3Files, partiallySignedNsec3OOFiles, signedNsec3Files, signedTxtFiles :: [FilePath]
 baseFiles =
   [ "examples/cname/base/ns.com."
   , "examples/cname/base/ns.b.com." ]
@@ -281,6 +287,8 @@ partiallySignedNsec3OOFiles =
 signedNsec3Files =
   [ "examples/cname/signed-nsec3/ns.com."
   , "examples/cname/signed-nsec3/ns.b.com." ]
+
+signedTxtFiles = ["examples/dnssec/txt/ns.com."]
 
 selfDelegFiles = ["examples/ns/self-deleg/ns.com."]
 
