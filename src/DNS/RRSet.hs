@@ -6,6 +6,8 @@ module DNS.RRSet
   , modify
   , modifyL
   , partition
+  , DNS.RRSet.map
+  , DNS.RRSet.filter
   , RDataSet
   , insert
   , singleton
@@ -67,6 +69,12 @@ modifyL f = RDS . toNE . f . rds
 
 partition :: (T.Type -> NE.NonEmpty a -> Bool) -> RTypedSet a -> (RTypedSet a, RTypedSet a)
 partition p (rds -> d) = bimap RDS RDS (M.partitionWithKey p d)
+
+filter :: (a -> Bool) -> RTypedSet a -> RTypedSet a
+filter p = RDS . M.mapMaybe (NE.nonEmpty . NE.filter p) . rds
+
+map :: (a -> b) -> RTypedSet a -> RTypedSet b
+map f = RDS . M.map (NE.map f) . rds
 
 type RDataSet = RTypedSet RData
 type RRSet a = Named a (NE.NonEmpty RData)

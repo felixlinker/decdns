@@ -9,9 +9,12 @@ module DNS.Diff
   , RDataSetDiff
   , diff
   , setDiff
-  , hasChanges ) where
+  , hasChanges
+  , patch ) where
 
 import qualified Data.Map as M
+import qualified Data.Map.Merge.Lazy as MM
+import Data.Either ( partitionEithers, isRight )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as S
 
@@ -24,6 +27,7 @@ import qualified Util.Tree as T
 import Data.Bifunctor (Bifunctor(bimap))
 import Data.Bifoldable (Bifoldable(bifoldr))
 import Data.Bitraversable (Bitraversable(bitraverse))
+import Util.List (nonEmpty)
 
 -- Left is deleted, Right is added
 newtype Diff a = Diff
@@ -55,6 +59,15 @@ deither l r = either l r . diffEither
 item :: Diff a -> a
 item (Diff (Left a)) = a
 item (Diff (Right a)) = a
+
+isAdded :: Diff a -> Bool
+isAdded = isRight . diffEither
+
+additions :: NE.NonEmpty (Diff a) -> Maybe (NE.NonEmpty a)
+additions = NE.nonEmpty . map item . NE.filter isAdded
+
+partitionDiffs :: NE.NonEmpty (Diff a) -> ([a], [a])
+partitionDiffs = partitionEithers . map diffEither . NE.toList
 
 type ZoneDiff a = AZone a RRSet.RTypedSet (Diff RData)
 type RDataSetDiff = RRSet.RTypedSet (Diff RData)
@@ -92,3 +105,33 @@ hasChanges n (Zone org ns) = case pathInZone org n of
 
     rec :: (Label a, Ord a) => a -> [a] -> T.Node a RDataSetDiff -> Bool
     rec l r (T.Node _ cs) = maybe False (go r) (M.lookup l cs)
+
+patchRData :: NE.NonEmpty (Diff RData) -> NE.NonEmpty RData -> Maybe (NE.NonEmpty RData)
+patchRData diffs d = nonEmpty $ add $ delete (foldr S.insert S.empty d)
+  where
+    dels, adds :: [RData]
+    (dels, adds) = partitionDiffs diffs
+
+    delete :: S.Set RData -> S.Set RData
+    delete s = foldr S.delete s dels
+
+    add :: S.Set RData -> S.Set RData
+    add s = foldr S.insert s adds
+
+patchData :: RDataSetDiff -> RRSet.RDataSet -> RRSet.RDataSet
+patchData (RRSet.RDS diffsM) (RRSet.RDS m) =
+  RRSet.RDS $ MM.merge
+    (MM.mapMaybeMissing (const additions))
+    MM.preserveMissing
+    (MM.zipWithMaybeMatched (\_ diffs -> patchRData diffs))
+    diffsM
+    m
+
+patch :: Named String RDataSetDiff -> Zone String -> Zone String
+patch (Named n d) = adjust aux n
+  where
+    aux :: [String] -> ZNode String -> ZNode String
+    aux [] (T.Node v cs) = T.Node (patchData d v) cs
+    aux (h:t) (T.Node v cs) =
+      let adds = RRSet.map item $ RRSet.filter isAdded d
+      in T.Node v $ if RRSet.null adds then cs else M.insert h (T.leafAt t adds) cs
