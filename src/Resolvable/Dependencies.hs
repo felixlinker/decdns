@@ -179,8 +179,7 @@ solveBody keepGround rs (Rule ann h b) = S.fromList $ map (\(u, b') -> CU.apply 
           nonExDat' <- asNSEC3Data =<< asType (app nonExDat)
           return $ verifyClosestEncloserProof n' exN' exDat' nonExN' nonExDat')
         choices
-      -- This drops unsupported predicates, implicitly assuming that they are true
-      _ -> choices
+      _ -> error "unsupported atom encountered"
       where
         skipUnsolvable :: (CU.ConstrainedUnifier -> Except a Bool) -> (CU.ConstrainedUnifier, [Term]) -> Maybe (CU.ConstrainedUnifier, [Term])
         skipUnsolvable check (u, accB) = either (const $ Just (u, accB ++ [p])) (returnWhen (u, accB)) $ runExcept (check u)
