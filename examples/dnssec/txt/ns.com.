@@ -1,0 +1,53 @@
+; File written on Wed Sep  9 17:10:25 2026
+; dnssec-signzone version 9.20.27
+com.			1200	IN SOA	ns.com. example.com. (
+					0          ; serial
+					0          ; refresh (0 seconds)
+					0          ; retry (0 seconds)
+					0          ; expire (0 seconds)
+					0          ; minimum (0 seconds)
+					)
+			1200	RRSIG	SOA 13 1 1200 (
+					20261009141025 20260909141025 41614 com.
+					VaOfRq0ONwoF1MsZC2cOdb5+YRk+mRomj5Ad
+					Fk/vBEtg7/FngVHhdQKvCAG4QfcFQZqwIHMJ
+					qoR+DRqV3NAkJQ== )
+			1200	NS	ns.com.
+			1200	RRSIG	NS 13 1 1200 (
+					20261009141025 20260909141025 41614 com.
+					LSDUid7t8DEYGnqpgKkVW1l/XTVGVanC5/ZV
+					8l58o3eKhGJ/Hc2OwVO4nkA58f2FnG7q6OAm
+					eZNshmxvHYKwjA== )
+			1200	TXT	"hello"
+			1200	RRSIG	TXT 13 1 1200 (
+					20261009141025 20260909141025 41614 com.
+					E2x97N1UiDqqb779LPYhGsH6Qgn89ldUqqeR
+					qKQgA74fE4H/WPDbBBFLVBjCs9HQe1kbZIkE
+					VslCzFzcvjsbdQ== )
+			0	NSEC	com. NS SOA TXT RRSIG NSEC DNSKEY
+			0	RRSIG	NSEC 13 1 0 (
+					20261009141025 20260909141025 41614 com.
+					j5m8/KUinrk4DSzUhC51cfDo4oXUvpZM26Zq
+					MxylOBBFLc3knaNchq54JnGZ2YuRHZlrci/z
+					j7SdrFM8e3bFnw== )
+			1200	DNSKEY	256 3 13 (
+					cfv6ncp5V9WCnZxFneqBeCCwGV6SOWKC2gv1
+					LOR4Bx+GVub/DTtRwziMxVE2a6KAXXzyI3tq
+					jg03cDpOFZVkLQ==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 41614
+			1200	DNSKEY	257 3 13 (
+					Da76+K3tttBBWB0v9OvYHw/7ijVmdVppHErw
+					dWflMlDHYUTuA701YVvjfLu0iLQnTRHZsrsu
+					SoETOl43q1KE4g==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 62435
+			1200	RRSIG	DNSKEY 13 1 1200 (
+					20261009141025 20260909141025 41614 com.
+					vQsVrN4s7Et81ATbaOSNKIGcIIi6UZIbUrtm
+					U/Js/xwdTRvm1Iu4VtsPWxffJAeWWlnwjotw
+					Nnt00ri6/EFRZA== )
+			1200	RRSIG	DNSKEY 13 1 1200 (
+					20261009141025 20260909141025 62435 com.
+					ZK02sdOwj4vc2r/L5vHmvHUUPgnuL2+rmIjL
+					4JdbQLapDtz0oheHNhH9Wff9p3zIz63/zo0F
+					ig3V+45iu3mHNg== )
+;; Served by ns.com.
