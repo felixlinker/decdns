@@ -59,7 +59,7 @@ zoneWellformed z@(Zone _ r@(Tr.Node rd _)) =
         , expect (noDNSSECKey (dataNoApex z)) "DNSKEY with non-apex owner name" ]
 
 typesAllIn :: RRSet.RTypedSet a -> [T.Type] -> Bool
-typesAllIn rd = RRSet.apply M.null . foldr (RRSet.modify . M.delete) rd
+typesAllIn rd = M.null . RRSet.rds . foldr (RRSet.modify . M.delete) rd
 
 -- See: https://datatracker.ietf.org/doc/html/rfc4034#section-3; third paragraph
 -- This also covers that a CNAME must not be at zone apex (apex will have SOA record).

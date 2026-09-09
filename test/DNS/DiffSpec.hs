@@ -31,7 +31,7 @@ reportsAddsAndDeletes = do
       oldZ = singleton (Named n (mkData "192.0.2.1"))
       newZ = singleton (Named n (mkData "192.0.2.2"))
   let dz = diff oldZ newZ
-  (RRSet.apply (M.lookup T.A) =<< get n dz) @?= Just (NE.fromList [deleted (mkRData "192.0.2.1"), added (mkRData "192.0.2.2")])
+  (M.lookup T.A . RRSet.rds =<< get n dz) @?= Just (NE.fromList [deleted (mkRData "192.0.2.1"), added (mkRData "192.0.2.2")])
 
 unchangedIsEmpty :: Assertion
 unchangedIsEmpty = do

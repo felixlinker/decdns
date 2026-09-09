@@ -3,7 +3,6 @@ module DNS.RRSet
   ( RTypedSet(..)
   , empty
   , DNS.RRSet.null
-  , apply
   , modify
   , modifyL
   , partition
@@ -57,17 +56,14 @@ instance Ord a => Semigroup (RTypedSet a) where
 instance Ord a => Monoid (RTypedSet a) where
   mempty = RDS M.empty
 
-apply :: (M.Map T.Type (NE.NonEmpty a) -> b) -> RTypedSet a -> b
-apply f (RDS m) = f m
-
 modify :: (M.Map T.Type (NE.NonEmpty a) -> M.Map T.Type (NE.NonEmpty b)) -> RTypedSet a -> RTypedSet b
-modify f = RDS . apply f
+modify f = RDS . f . rds
 
 toNE :: M.Map T.Type [a] -> M.Map T.Type (NE.NonEmpty a)
 toNE = runIdentity . M.traverseMaybeWithKey (const $ return . NE.nonEmpty) . M.filter (not . Prelude.null)
 
 modifyL :: (M.Map T.Type (NE.NonEmpty a) -> M.Map T.Type [b]) -> RTypedSet a -> RTypedSet b
-modifyL f rd = RDS $ toNE $ apply f rd
+modifyL f = RDS . toNE . f . rds
 
 partition :: (T.Type -> NE.NonEmpty a -> Bool) -> RTypedSet a -> (RTypedSet a, RTypedSet a)
 partition p (rds -> d) = bimap RDS RDS (M.partitionWithKey p d)

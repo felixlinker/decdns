@@ -152,7 +152,7 @@ allData (Zone orig ns) = go orig ns
       in base : rec
 
 allRRSets :: Zone a -> [RRSet.RRSet a]
-allRRSets = concatMap (\(Named n typed) -> Named n <$> RRSet.apply M.elems typed) . allData
+allRRSets = concatMap (\(Named n typed) -> Named n <$> M.elems (RRSet.rds typed)) . allData
 
 allRecords :: Zone a -> [Record a]
 allRecords = concatMap (NE.toList . RRSet.toRecords) . allRRSets
