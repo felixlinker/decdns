@@ -212,10 +212,9 @@ resolvableStep (map nameTerm -> rootServers) ns zone s@(Named n rs) =
 
 resolvableR :: Fresh (Rule (Maybe RComp))
 resolvableR = do
-  (s, q, n, v, a) <- freshVars5 ("S", "Q", "N", "V", "A")
-  wc1 <- wildcard
-  wc2 <- wildcard
-  return $ Rule Nothing (resolvable s q n v a) [ resolves s q wc1 n wc2 v a ]
+  (s, q, z, n, v, a) <- freshVars6 ("S", "Q", "Z", "N", "V", "A")
+  wc <- wildcard
+  return $ Rule Nothing (resolvable s q n v a) [ resolves s q z n wc v a, z \= glueZone ]
 
 allResolvable :: Rule (Maybe RComp)
 allResolvable =
