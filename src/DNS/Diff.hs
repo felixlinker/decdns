@@ -7,10 +7,12 @@ module DNS.Diff
   , item
   , ZoneDiff
   , diff
+  , setDiff
   , hasChanges ) where
 
 import qualified Data.Map as M
 import qualified Data.List.NonEmpty as NE
+import qualified Data.Set as S
 
 import DNS.Name as N
 import DNS.Record
@@ -74,6 +76,9 @@ diff (fmap deleted -> Zone oldOrg oldRs) (fmap added -> Zone newOrg newRs) =
 
     true :: a -> Bool
     true = const True
+
+setDiff :: Ord a => S.Set a -> S.Set a -> S.Set (Diff a)
+setDiff oldS newS = S.mapMonotonic Diff $ S.disjointUnion (oldS `S.difference` newS) (newS `S.difference` oldS)
 
 hasChanges :: (Label a, Ord a) => Name a -> ZoneDiff a -> Bool
 hasChanges n (Zone org ns) = case pathInZone org n of

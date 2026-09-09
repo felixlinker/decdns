@@ -11,6 +11,8 @@ module DNS.ZoneFile
   , AZone(..)
   , isEmpty
   , zshow
+  , ZNode
+  , ZEdges
   , Zone
   , fromRecordList
   , insert
@@ -61,6 +63,8 @@ instance (Eq a, Label a, Traversable t, Show b) => Show (AZone a t b) where
     where
       printf ls d = return $ maybe "@" (show . Name) (NE.nonEmpty ls) ++ " " ++ show d
 
+type ZEdges a = T.Edges a RRSet.RDataSet
+type ZNode a = T.Node a RRSet.RDataSet
 type Zone a = AZone a RRSet.RTypedSet RData
 
 emptyZone :: Monoid (t b) => Name a -> AZone a t b

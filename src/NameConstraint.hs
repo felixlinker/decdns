@@ -11,13 +11,18 @@ module NameConstraint
   , exactly
   , compileNoContext
   , compileWildcards
+  , recompileWildcards
   , literalWildcards
   , overlap
   , synthesize ) where
 
+import Control.Monad (foldM)
+import qualified Control.Monad.Trans.State as St
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
+import qualified Data.Set as S
 
+import DNS.Diff
 import DNS.ZoneFile
 import DNS.Name
 import DNS.Record
@@ -30,10 +35,8 @@ import Util.List (zipWithStrict)
 data LabelConstraint a = Wildcard [a] | Exactly a
   deriving (Eq, Ord)
 
-instance Label a => Label (LabelConstraint a) where
+instance Label ConstrainedLabel where
   lwildcard = Wildcard [lwildcard]
-  lisWildcard (Wildcard _) = True
-  lisWildcard (Exactly _) = False
   lempty = Exactly lempty
   lshow (Wildcard _) = "*"
   lshow (Exactly l) = lshow l
@@ -59,25 +62,46 @@ toStandardRecord (Named n d) = Named (toStringName n) d
 exactly :: Name a -> Name (LabelConstraint a)
 exactly (Name ls) = Name (NE.map Exactly ls)
 
-compileNoContext :: forall a. Label a => Name a -> Name (LabelConstraint a)
-compileNoContext (Name (leftMost NE.:| rest)) = Name $ withWC NE.:| map Exactly rest
-  where
-    withWC :: LabelConstraint a
-    withWC = if lisWildcard leftMost then lwildcard else Exactly leftMost
+compileNoContext :: Name String -> Name ConstrainedLabel
+compileNoContext (Name (leftMost NE.:| rest)) = Name $ compileLabel [lwildcard] leftMost NE.:| map Exactly rest
 
-existIn :: T.Node String v -> [String]
-existIn = M.keys . T.children
+compileLabel :: [String] -> String -> ConstrainedLabel
+compileLabel exist lbl
+  | isWildcardLabel lbl = Wildcard exist
+  | otherwise = Exactly lbl
+
+existIn :: Label a => T.Node a v -> [String]
+existIn = map lshow . M.keys . T.children
 
 compileWildcards :: Zone String -> Zone ConstrainedLabel
 compileWildcards (Zone (Name n) r) = Zone (Name (NE.map Exactly n)) (go r)
   where
-    mapLabel :: [String] -> String -> ConstrainedLabel
-    mapLabel exist lbl
-      | lbl == lwildcard = Wildcard exist
-      | otherwise = Exactly lbl
+    go :: T.Node String RRSet.RDataSet -> ZNode ConstrainedLabel
+    go n_@(T.Node _ ch) = n_ { T.children = M.map go $ M.mapKeys (compileLabel (existIn n_)) ch }
 
-    go :: T.Node String RRSet.RDataSet -> T.Node ConstrainedLabel RRSet.RDataSet
-    go n_@(T.Node _ ch) = n_ { T.children = M.map go $ M.mapKeys (mapLabel (existIn n_)) ch }
+type WildcardDiffs = S.Set (Diff (Named ConstrainedLabel RRSet.RDataSet))
+type DiffSt = St.State WildcardDiffs
+
+recompileWildcards :: Zone ConstrainedLabel -> (Zone ConstrainedLabel, WildcardDiffs)
+recompileWildcards (Zone zOrg r) = St.runState (Zone zOrg <$> go zOrg (S.fromList $ existIn r) r) S.empty
+  where
+    go :: ConstrainedName -> S.Set String -> ZNode ConstrainedLabel -> DiffSt (ZNode ConstrainedLabel)
+    go n@(Name (h NE.:| lblT)) newExist node@(T.Node d ch) = do
+      case h of
+        Wildcard (S.fromList -> oldExist) ->
+          St.modify (\st -> foldr (S.insert . dataDiff) st (setDiff oldExist newExist))
+        _ -> return ()
+      ch' <- foldM rec M.empty (M.toList ch)
+      return $ node { T.children = ch' }
+      where
+        rec :: ZEdges ConstrainedLabel -> (ConstrainedLabel, ZNode ConstrainedLabel) -> DiffSt (ZEdges ConstrainedLabel)
+        rec acc (oldLbl, c) = do
+          let exist' = existIn node
+          c' <- go (oldLbl <| n) (S.fromList exist') c
+          return $ M.insert (compileLabel exist' (lshow oldLbl)) c' acc
+
+        dataDiff :: Diff String -> Diff (Named ConstrainedLabel RRSet.RDataSet)
+        dataDiff = fmap (\lbl -> Named (Name $ (NE.:| lblT) $ Exactly lbl) d)
 
 literalWildcards :: Zone ConstrainedLabel -> Zone String
 literalWildcards (Zone n r) = Zone (fmap show n) (T.mapLabels show r)

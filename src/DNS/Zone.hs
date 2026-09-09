@@ -16,8 +16,6 @@ import DNS.RRSet
 
 import qualified Util.Tree as Tr
 
-type ZNode a = Tr.Node a RDataSet
-
 insertNonEmpty :: Ord k => k -> [a] -> M.Map k (NE.NonEmpty a) -> M.Map k (NE.NonEmpty a)
 insertNonEmpty k mv = M.alter (const $ NE.nonEmpty mv) k
 

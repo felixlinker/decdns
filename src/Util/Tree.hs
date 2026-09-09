@@ -1,6 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Util.Tree
   ( Node(..)
+  , Edges
   , Util.Tree.null
   , prepend
   , leaf
@@ -26,9 +27,10 @@ import DNS.Name ( (<|), Name )
 
 import Util.Func
 
+type Edges k v = M.Map k (Node k v)
 data Node k v = Node
   { item :: v
-  , children :: M.Map k (Node k v) }
+  , children :: Edges k v }
   deriving Eq
 
 instance (Show k, Show v) => Show (Node k v) where
