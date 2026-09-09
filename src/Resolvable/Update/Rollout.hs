@@ -1,6 +1,9 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TupleSections #-}
 module Resolvable.Update.Rollout
   ( NSDiffs
+  , Diffs
+  , flattenDiffs
   , RecordDependencies
   , fromResolutionOrder
   , diffServers
@@ -8,13 +11,16 @@ module Resolvable.Update.Rollout
   , showRollOut
   , rollout ) where
 
-import Control.Monad (when)
+import Control.Monad (when, foldM)
 import Control.Monad.Trans.Except (Except, throwE)
+import qualified Control.Monad.Trans.State as St
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
+import qualified Data.Set as S
 
 import DNS.Diff
 import DNS.Name
+import qualified DNS.RRSet as RRSet
 import Resolvable.Prolog.Core ( Rule(rannotation) )
 import Resolvable.Resolvability
 import DNS.ZoneFile
@@ -22,8 +28,9 @@ import NameConstraint
 import qualified Util.Graph as G
 import Resolvable.Dependencies (ResolutionOrder)
 import Data.Maybe (isJust, fromJust)
+import Util.Fixpoint
 
-type RRSetID = (Name String, ConstrainedName)
+type RRSetID = (Name String, Name String)
 
 type RecordDependencies = G.Graph RRSetID
 
@@ -35,33 +42,25 @@ fromResolutionOrder =
   . G.filter (isJust . rannotation)
   where
     fromAnnot :: RComp -> RRSetID
-    fromAnnot (RComp ns rrs) = (ns, name rrs)
-
-canRollout :: RecordDependencies -> Name String -> Name String -> Bool
-canRollout deps ns (compileNoContext -> n)
-  | isWildcardName n = foldr matchingWildcardIsLeaf True deps
-  | otherwise = G.leaf deps (ns, n)
-  where
-    -- Lazy in that if any RRSetID matches the name server and name in question,
-    -- we return whether that node is a leaf. Otherwise,
-    matchingWildcardIsLeaf :: RRSetID -> Bool -> Bool
-    matchingWildcardIsLeaf node@(ns', n') acc
-      | ns == ns' && isWildcardName n' && overlap n n' = G.leaf deps node
-      | otherwise = acc
+    fromAnnot (RComp ns rrs) = (ns, lshow <$> name rrs)
 
 type NSDiffs = M.Map (Name String) (ZoneDiff String)
+type Diffs = S.Set (Name String, Named String RDataSetDiff)
 
-showZoneDiff :: Name String -> ZoneDiff String -> [String]
-showZoneDiff ns d =
+flattenDiffs :: NSDiffs -> Diffs
+flattenDiffs = S.fromList . concatMap (\(ns, z) -> map (ns,) $ filter (not . RRSet.null . value) (allData z)) . M.toList
+
+showDiffsAtNS :: Name String -> [Named String RDataSetDiff] -> [String]
+showDiffsAtNS ns ds =
     map indent
   $ ("on server " ++ show ns ++ ":")
-    : map indent (lines (show d))
+    : concatMap (\(Named n d) -> indent (show n) : map (indent . indent . show) (RRSet.flattenData d)) ds
   where
     indent :: String -> String
     indent s = if null s then "" else "  " ++ s
 
-showNSDiffs :: NSDiffs -> [String]
-showNSDiffs = M.foldrWithKey (\ns d -> (showZoneDiff ns d ++)) []
+showDiffs :: Diffs -> [String]
+showDiffs = concatMap (uncurry showDiffsAtNS) . M.toList . foldr (\(ns, d) -> M.alter (Just . maybe [d] (d:)) ns) M.empty
 
 diffServers :: NameServersConfig -> NameServersConfig -> NSDiffs
 diffServers old new = MM.merge
@@ -71,41 +70,40 @@ diffServers old new = MM.merge
   (M.fromListWith mergeZones $ map (fmap literalWildcards) old)
   (M.fromListWith mergeZones $ map (fmap literalWildcards) new)
 
-updateDeps :: NSDiffs -> RecordDependencies -> RecordDependencies
-updateDeps diffs = G.filter changed
-  where
-    changed :: RRSetID -> Bool
-    changed (ns, qn) = maybe False (hasChanges $ fmap lshow qn) (M.lookup ns diffs)
+-- TODO: Could maybe use S.mapMonotonic
+toIDs :: Diffs -> S.Set RRSetID
+toIDs = S.map (fmap name)
 
-type Rollout = [NSDiffs]
+updateDeps :: Diffs -> RecordDependencies -> RecordDependencies
+updateDeps diffs = G.filter (`S.member ` toIDs diffs)
+
+type Rollout = [Diffs]
 
 showRollOut :: Rollout -> [String]
 showRollOut r = do
   (i, diffs) <- zip [(1 :: Int)..] r
-  ("step " ++ show i ++ "; roll out:") : showNSDiffs diffs
+  ("step " ++ show i ++ "; roll out:") : showDiffs diffs
 
 rollout :: NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
-rollout diffs (G.invert -> old) new = do
-  rollout' id diffs old new
+rollout diffs old new = do
+  rollout' id (flattenDiffs diffs) (G.invert old) new
 
-rollout' :: (Rollout -> Rollout) -> NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
-rollout' acc (normalize -> diffs) (updateDeps diffs -> old) (updateDeps diffs -> new)
-  | M.null diffs = return $ acc []
+rollout' :: (Rollout -> Rollout) -> Diffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
+rollout' acc diffs (updateDeps diffs -> old) (updateDeps diffs -> new)
+  | S.null diffs = return $ acc []
   | otherwise = do
-    let (changes, next) = partitionDiffs diffs
-    when (null changes) (throwE $ unlines $ "no changes; rolled out so far:" : showRollOut (acc []) ++ ["remaining changes:"] ++ showNSDiffs next)
+    let (changes, next) = fixpoint rolloutNow (S.empty, diffs)
+    when (null changes) (throwE $ unlines $ "no changes; rolled out so far:" : showRollOut (acc []) ++ ["remaining changes:"] ++ showDiffs next)
     rollout' (acc . (changes :)) next old new
   where
-    partitionDiffs :: NSDiffs -> (NSDiffs, NSDiffs)
-    partitionDiffs ds =
-      let diffs' = M.mapWithKey partitionDiff ds
-      in (normalize (M.map fst diffs'), normalize (M.map snd diffs'))
+    rolloutNow :: (Diffs, Diffs) -> Changed (Diffs, Diffs)
+    rolloutNow (apply, wait) = do
+      let (newApply, wait') = S.partition (canRollout . fmap name) wait
+      apply' <- foldM (flip checkInsert) apply newApply
+      return (apply', wait')
+      where
+        canRollout :: RRSetID -> Bool
+        canRollout (ns, n) = G.leaf old (ns, n) && all (`S.member` toIDs wait) (G.next new (ns, n))
 
-    partitionDiff :: Name String -> ZoneDiff String -> (ZoneDiff String, ZoneDiff String)
-    partitionDiff ns = partition (\n _ _ -> canRollout new ns n && canRollout old ns n)
-
-dropEmpty :: NSDiffs -> NSDiffs
-dropEmpty = M.filter (not . isEmpty)
-
-normalize :: NSDiffs -> NSDiffs
-normalize = dropEmpty . M.map prune
+    checkInsert :: Ord a => a -> S.Set a -> Changed (S.Set a)
+    checkInsert = S.alterF (\found -> St.modify (not found ||) >> return True)

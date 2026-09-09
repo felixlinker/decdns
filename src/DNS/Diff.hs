@@ -6,6 +6,7 @@ module DNS.Diff
   , deither
   , item
   , ZoneDiff
+  , RDataSetDiff
   , diff
   , setDiff
   , hasChanges ) where

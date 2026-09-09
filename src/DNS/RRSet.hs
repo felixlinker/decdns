@@ -10,6 +10,7 @@ module DNS.RRSet
   , RDataSet
   , insert
   , singleton
+  , flattenData
   , RRSet
   , StdRRSet
   , canonicalRRSet
@@ -83,6 +84,9 @@ insert rd = RDS . M.alter (Just . maybe (NE.singleton rd) (rd NE.<|)) (toType $ 
 
 singleton :: RData -> RDataSet
 singleton rd = RDS $ M.singleton (toType $ rtype rd) (NE.singleton rd)
+
+flattenData :: RTypedSet a -> [a]
+flattenData = concatMap NE.toList . M.elems . rds
 
 toRecords :: RRSet a -> NE.NonEmpty (Record a)
 toRecords (Named n sets) = Named n <$> sets

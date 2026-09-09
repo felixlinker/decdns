@@ -13,7 +13,7 @@ import DNS.ZoneFile (Zone, insert, isEmpty, singleton, zoneName)
 import NameConstraint (compileWildcards)
 import Resolvable.Dependencies (resolutionOrder)
 import Resolvable.Resolvability (compileConfig)
-import Resolvable.Update.Rollout (RecordDependencies, fromResolutionOrder, rollout)
+import Resolvable.Update.Rollout
 import Util.Fresh (runFresh)
 
 tests :: TestTree
@@ -35,7 +35,7 @@ immediateTxtAdd = do
     maybe False (not . isEmpty) (M.lookup (zoneName z) diffs)
   dz <- dependencies z
   dz' <- dependencies z'
-  runExcept (rollout diffs dz dz') @?= Right [diffs]
+  runExcept (rollout diffs dz dz') @?= Right [flattenDiffs diffs]
 
 immediateTxtDelete :: Assertion
 immediateTxtDelete = do
@@ -48,7 +48,7 @@ immediateTxtDelete = do
     maybe False (not . isEmpty) (M.lookup (zoneName zWithTxt) diffs)
   dzWithTxt <- dependencies zWithTxt
   dz <- dependencies z
-  runExcept (rollout diffs dzWithTxt dz) @?= Right [diffs]
+  runExcept (rollout diffs dzWithTxt dz) @?= Right [flattenDiffs diffs]
 
 dependencies :: Zone String -> IO RecordDependencies
 dependencies z =
