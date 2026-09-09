@@ -22,6 +22,7 @@ import qualified Util.BoolSpec as BoolSpec
 import qualified Util.GraphSpec as GraphSpec
 import qualified Util.TreeSpec as TreeSpec
 import qualified Util.FreshSpec as FreshSpec
+import qualified Util.FixpointSpec as FixpointSpec
 
 main :: IO ()
 main =
@@ -48,4 +49,5 @@ main =
       , GraphSpec.tests
       , TreeSpec.tests
       , FreshSpec.tests
+      , FixpointSpec.tests
       ]

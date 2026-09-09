@@ -12,6 +12,7 @@ fixpoint addF s = St.evalState (fixpoint' addF s) False
 
 fixpoint' :: (Foldable t, Ord a) => (S.Set a -> t a) -> S.Set a -> Changed (S.Set a)
 fixpoint' addF acc = do
+  St.put False
   acc' <- foldM (flip checkInsert) acc (addF acc)
   changed <- St.get
   if changed
