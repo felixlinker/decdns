@@ -44,12 +44,9 @@ root = Name (NE.singleton lempty)
 
 -- See: https://datatracker.ietf.org/doc/html/rfc4034#section-3.1.3
 labelCount :: (Eq a, Label a) => Name a -> Int
-labelCount (Name ls) = length (NE.filter countLabel ls)
-  where
-    countLabel l
-      | l == lempty = False
-      | l == lwildcard = False
-      | otherwise = True
+labelCount (Name (first NE.:| rest)) =
+  length (filter (/= lempty) rest) +
+    if first == lempty || first == lwildcard then 0 else 1
 
 (<|) :: a -> Name a -> Name a
 (<|) l (Name ls) = Name (l NE.<| ls)
