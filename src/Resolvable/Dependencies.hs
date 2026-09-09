@@ -189,7 +189,7 @@ solveBody keepGround rs (Rule ann h b) = S.fromList $ map (\(u, b') -> CU.apply 
             returnWhen a = ($> a) . guard
 
 solveFixpoint :: forall a t. (Foldable t, Ord a) => Bool -> t (Rule a) -> S.Set (Rule a) -> S.Set (Rule a)
-solveFixpoint keepGround addFrom = fixpoint step
+solveFixpoint keepGround addFrom = fixpointSet step
   where
     step :: S.Set (Rule a) -> [Rule a]
     step acc = concatMap (S.toList . solveBody keepGround acc) addFrom
