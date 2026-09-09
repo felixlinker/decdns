@@ -90,6 +90,7 @@ library
       Util.CondensationGraph
       Util.Debug
       Util.Debug.Stub
+      Util.Fixpoint
       Util.Fresh
       Util.Func
       Util.Graph

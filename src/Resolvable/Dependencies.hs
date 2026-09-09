@@ -32,6 +32,7 @@ import Resolvable.Unification
 import qualified Util.Graph as G
 import qualified Util.CondensationGraph as CG
 import Util.Monad (exceptMaybe)
+import Util.Fixpoint
 
 data DependencyMatch = DependencyMatch
   { dependentRule :: Rule (Maybe RComp)
@@ -187,18 +188,11 @@ solveBody keepGround rs (Rule ann h b) = S.fromList $ map (\(u, b') -> CU.apply 
             returnWhen :: a -> Bool -> Maybe a
             returnWhen a = ($> a) . guard
 
-type Changed = St.State Bool
-
-fixpoint :: (Foldable t, Ord a) => Bool -> t (Rule a) -> S.Set (Rule a) -> S.Set (Rule a)
-fixpoint keepGround addFrom acc =
-  let (rs, changed) = St.runState (foldM (flip aux) acc addFrom) False
-  in  if changed then fixpoint keepGround addFrom rs else rs
+solveFixpoint :: forall a t. (Foldable t, Ord a) => Bool -> t (Rule a) -> S.Set (Rule a) -> S.Set (Rule a)
+solveFixpoint keepGround addFrom = fixpoint step
   where
-    checkInsert :: Ord a => a -> S.Set a -> Changed (S.Set a)
-    checkInsert = S.alterF (\found -> St.modify (not found ||) >> return True)
-
-    aux :: Ord a => Rule a -> S.Set (Rule a) -> Changed (S.Set (Rule a))
-    aux r acc' = foldM (flip checkInsert) acc' (solveBody keepGround acc' r)
+    step :: S.Set (Rule a) -> [Rule a]
+    step acc = concatMap (S.toList . solveBody keepGround acc) addFrom
 
 computeResolvable :: Bool -> S.Set (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp))
 computeResolvable keepGround (S.filter (isResolves . rhead) -> rs) =
@@ -209,5 +203,5 @@ computeResolvable keepGround (S.filter (isResolves . rhead) -> rs) =
       | G.null ord = acc
       | otherwise =
           let leaves = G.leaves ord
-              acc' = foldr (fixpoint keepGround) acc leaves
+              acc' = foldr (solveFixpoint keepGround) acc leaves
           in rec (foldr G.remove ord leaves) acc'
