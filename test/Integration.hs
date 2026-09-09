@@ -51,6 +51,16 @@ tests =
               []
         , testCase "signed-new authenticates answers synthesized from a wildcard" $
             authenticatedWildcardResolutionTest signedNewFiles
+        , testCase "signed wildcard records authenticate synthesized answers" $ do
+            results <- resolvableQueries signedWildcardFiles
+            assertResolutions signedWildcardFiles results
+              [authenticated nsCom RT.A aCom]
+              []
+        , testCase "signed records with asterisk labels in owner names authenticate" $ do
+            results <- resolvableQueries signedWildcardFiles
+            assertResolutions signedWildcardFiles results
+              [authenticated nsCom RT.A xWildcardCom]
+              []
         , testCase "signed-nsec3 authenticates the CNAME chain and child zone" $
             authenticatedResolutionTest signedNsec3Files
         , testCase "partially-signed authenticates unsigned child zone through NSEC" $
@@ -121,6 +131,7 @@ exampleFiles =
   , ExampleFile "examples/cname/signed-nsec3/ns.com." [com]
   , ExampleFile "examples/cname/signed-nsec3/ns.b.com." [bCom]
   , ExampleFile "examples/dnssec/txt/ns.com." [com]
+  , ExampleFile "examples/dnssec/wildcard/ns.com." [com]
   , ExampleFile "examples/ns/self-deleg/ns.com." [com, subACom]
   , ExampleFile "examples/ns/sub-self-deleg/root.net." [dnsRoot, rootNet]
   , ExampleFile "examples/ns/sub-self-deleg/ns.net." [net]
@@ -253,7 +264,7 @@ exampleConfigs =
 
 baseFiles, newFiles, brokenFiles, partiallySignedFiles, signedFiles, signedNewFiles, signedNonZoneKeyFiles :: [FilePath]
 selfDelegFiles, subSelfDelegFiles, nsLoopFiles, cnameLoopFiles :: [FilePath]
-partiallySignedNsec3Files, partiallySignedNsec3OOFiles, signedNsec3Files, signedTxtFiles :: [FilePath]
+partiallySignedNsec3Files, partiallySignedNsec3OOFiles, signedNsec3Files, signedTxtFiles, signedWildcardFiles :: [FilePath]
 baseFiles =
   [ "examples/cname/base/ns.com."
   , "examples/cname/base/ns.b.com." ]
@@ -290,6 +301,8 @@ signedNsec3Files =
 
 signedTxtFiles = ["examples/dnssec/txt/ns.com."]
 
+signedWildcardFiles = ["examples/dnssec/wildcard/ns.com."]
+
 selfDelegFiles = ["examples/ns/self-deleg/ns.com."]
 
 subSelfDelegFiles =
@@ -324,7 +337,7 @@ authenticatedUnsigned :: Name String -> RT.Type -> Name String -> Resolution
 authenticatedUnsigned ns rtype qname =
   Resolution (Query ns rtype qname) top (ad 0)
 
-dnsRoot, com, net, aCom, bCom, subACom :: Name String
+dnsRoot, com, net, aCom, bCom, subACom, xWildcardCom :: Name String
 rootNet, subRootNet, nsCom, nsBCom, nsNet :: Name String
 dnsRoot = root
 com = mkName ["com", ""]
@@ -332,6 +345,7 @@ net = mkName ["net", ""]
 aCom = mkName ["a", "com", ""]
 bCom = mkName ["b", "com", ""]
 subACom = mkName ["sub", "a", "com", ""]
+xWildcardCom = mkName ["x", "*", "com", ""]
 rootNet = mkName ["root", "net", ""]
 subRootNet = mkName ["sub", "root", "net", ""]
 nsCom = mkName ["ns", "com", ""]

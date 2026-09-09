@@ -34,6 +34,7 @@ extra-source-files:
     examples/cname/signed/ns.b.com.
     examples/cname/signed/ns.com.
     examples/dnssec/txt/ns.com.
+    examples/dnssec/wildcard/ns.com.
     examples/ns/cyclic-deleg/ns.net.
     examples/ns/cyclic-deleg/root.com.
     examples/ns/cyclic-deleg/root.net.
