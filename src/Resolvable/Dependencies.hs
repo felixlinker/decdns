@@ -13,7 +13,7 @@ module Resolvable.Dependencies
   , queryFromRule
   , computeResolvable ) where
 
-import Control.Monad (filterM, guard, unless, foldM)
+import Control.Monad (filterM, guard, unless)
 import Control.Monad.Trans.Except (ExceptT, Except, runExcept, throwE)
 import qualified Control.Monad.Trans.State as St
 import Data.Bifunctor (Bifunctor(bimap))
