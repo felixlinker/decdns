@@ -25,10 +25,10 @@ module Util.Tree
 import Data.Functor.Identity (Identity(runIdentity))
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
-import Data.Maybe (fromJust)
 import DNS.Name ( (<|), Name )
 
 import Util.Func
+import Util.Map (alterDefF)
 
 type Edges k v = M.Map k (Node k v)
 data Node k v = Node
@@ -88,14 +88,14 @@ get :: Ord k => [k] -> Node k v -> Maybe v
 get [] (Node i _) = Just i
 get (h:t) (Node _ cs) = get t =<< M.lookup h cs
 
-adjustF :: forall f k v. (Functor f, Ord k) => ([k] -> Node k v -> f (Node k v)) -> [k] -> Node k v -> f (Node k v)
+adjustF :: forall f k v. (Applicative f, Ord k) => ([k] -> Node k v -> f (Node k v)) -> [k] -> Node k v -> f (Node k v)
 adjustF nf = go
   where
     go :: [k] -> Node k v -> f (Node k v)
     go [] n = nf [] n
     go p@(h:t) n@(Node v cs) =
       if h `M.member` cs
-        then Node v <$> M.alterF (fmap Just . go t . fromJust) h cs
+        then Node v <$> alterDefF (go t) h cs
         else nf p n
 
 adjust :: forall k v. Ord k => ([k] -> Node k v -> Node k v) -> [k] -> Node k v -> Node k v

@@ -95,6 +95,7 @@ library
       Util.Func
       Util.Graph
       Util.List
+      Util.Map
       Util.Monad
       Util.Tree
   other-modules:
