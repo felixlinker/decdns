@@ -7,6 +7,7 @@ module Parsing.Config
 
 import qualified Data.List.NonEmpty as NE
 import GHC.Base (failIO, when)
+import System.IO (stderr, hPrint)
 import Text.Parsec (ParseError, SourceName)
 
 import DNS.Name (Name)
@@ -30,7 +31,7 @@ parseZoneFileContents wfc source content = do
     wellformed :: Zone String -> IO (Zone String)
     wellformed zone = do
       let issues = wfc zone
-      mapM_ print issues
+      mapM_ (hPrint stderr) issues
       when (any isFatal issues) (fail "fatal error encountered")
       return zone
 
