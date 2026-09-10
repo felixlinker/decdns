@@ -51,6 +51,14 @@ splitData childZoneName d@(RDS m) =
       childData   = inserts baseChild   [(T.NSEC, nsecChild),   (T.RRSIG, sigsChild)]
   in (RDS parentData, RDS childData)
 
+pickReferrals :: Zone a -> [RRSet a]
+pickReferrals (Zone accn r) =
+  let r' = fmap (modify (M.filterWithKey (\k _ -> k `elem` referralTypes))) r
+  in allRRSets (Zone accn r')
+  where
+    referralTypes :: [T.Type]
+    referralTypes = [T.NS, T.A, T.AAAA]
+
 collectReferrals :: Label a => Zone a -> (Zone a, [RRSet a])
 collectReferrals (Zone zn (Tr.Node apexD apexCS)) =
   first (Zone zn . Tr.Node apexD) $
@@ -60,8 +68,8 @@ collectReferrals (Zone zn (Tr.Node apexD apexCS)) =
     rec accn (Tr.Node d cs)
       | hasType T.NS d = do
         let (parentData, childData) = splitData accn d
-        let glue = allRRSets (Zone accn (Tr.Node childData cs))
-        St.modify (glue ++)
+        let referrals = pickReferrals (Zone accn (Tr.Node childData cs))
+        St.modify (referrals ++)
         return (Tr.Node (dropType T.NS parentData) M.empty)
       | otherwise = do
         cs' <- M.traverseWithKey (\l -> rec (l <| accn)) cs
