@@ -7,6 +7,7 @@ import qualified Resolvable.ConstrainedUnificationSpec as ConstrainedUnification
 import qualified Resolvable.ResolvabilitySpec as ResolvabilitySpec
 import qualified Resolvable.Update.DisunificationSpec as DisunificationSpec
 import qualified Resolvable.Update.RolloutSpec as RolloutSpec
+import qualified NameConstraintSpec
 import qualified DNS.NameSpec as NameSpec
 import qualified DNS.RecordSpec as RecordSpec
 import qualified DNS.SEC.VerificationSpec as VerificationSpec
@@ -34,6 +35,7 @@ main =
       , ResolvabilitySpec.tests
       , DisunificationSpec.tests
       , RolloutSpec.tests
+      , NameConstraintSpec.tests
       , NameSpec.tests
       , RecordSpec.tests
       , VerificationSpec.tests

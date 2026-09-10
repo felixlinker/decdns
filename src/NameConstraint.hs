@@ -8,8 +8,9 @@ module NameConstraint
   , ConstrainedRecord
   , ConstrainedRRSet
   , toStandardRecord
-  , exactly
-  , compileNoContext
+  , compileName
+  , compileLabel
+  , existIn
   , compileWildcards
   , recompileWildcards
   , literalWildcards
@@ -33,10 +34,21 @@ import qualified Util.Tree as T
 import Util.List (zipWithStrict)
 
 data LabelConstraint a = Wildcard [a] | Exactly a
-  deriving (Eq, Ord)
+
+instance Eq a => Eq (LabelConstraint a) where
+  Wildcard _ == Wildcard _ = True
+  Exactly l1 == Exactly l2 = l1 == l2
+  Wildcard _ == Exactly _ = False
+  Exactly _ == Wildcard _ = False
+
+instance Ord a => Ord (LabelConstraint a) where
+  compare (Wildcard _) (Wildcard _) = EQ
+  compare (Wildcard _) (Exactly _) = LT
+  compare (Exactly _) (Wildcard _) = GT
+  compare (Exactly l1) (Exactly l2) = compare l1 l2
 
 instance Label ConstrainedLabel where
-  lwildcard = Wildcard [lwildcard]
+  lwildcard = Wildcard []
   lempty = Exactly lempty
   lshow (Wildcard _) = "*"
   lshow (Exactly l) = lshow l
@@ -59,11 +71,8 @@ type ConstrainedRRSet = RRSet.RRSet ConstrainedLabel
 toStandardRecord :: Label a => Record a -> StandardRecord
 toStandardRecord (Named n d) = Named (toStringName n) d
 
-exactly :: Name a -> Name (LabelConstraint a)
-exactly (Name ls) = Name (NE.map Exactly ls)
-
-compileNoContext :: Name String -> Name ConstrainedLabel
-compileNoContext (Name (leftMost NE.:| rest)) = Name $ compileLabel [lwildcard] leftMost NE.:| map Exactly rest
+compileName :: Name String -> Name ConstrainedLabel
+compileName = fmap (compileLabel [])
 
 compileLabel :: [String] -> String -> ConstrainedLabel
 compileLabel exist lbl

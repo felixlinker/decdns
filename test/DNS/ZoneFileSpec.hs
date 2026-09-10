@@ -12,6 +12,7 @@ module DNS.ZoneFileSpec
   , zoneFromList
   ) where
 
+import qualified Control.Monad.Trans.State as St
 import qualified Data.ByteString as BS
 import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE
@@ -27,6 +28,7 @@ import qualified DNS.RRSet as RRSet
 import qualified DNS.RecordType as RT
 import DNS.SEC.Crypto
 import DNS.ZoneFile
+import NameConstraint (ConstrainedLabel, ConstrainedName, LabelConstraint(..), compileWildcards)
 import Data.Maybe (fromMaybe)
 import DNS.ZoneFile.Printing (printZone)
 import Data.List (sort)
@@ -38,6 +40,7 @@ tests =
     "DNS.ZoneFile"
     [ testCase "getting a non-existent path returns Nothing" getEmptyIsNothing
     , testProperty "getting data set on an empty zone returns that data" propSetGetRoundTrip
+    , testProperty "setting a wildcard path preserves the zone's wildcard constraints" propSetPreservesWildcardConstraints
     , testProperty "pruning setting an empty array results in an empty tree" propPruningSetEmpty
     , testProperty "inserting two records is commutative" propInsertCommutative
     , testCase "merging two zones keeps records from both zones" mergeZonesKeepsBothZones
@@ -64,6 +67,46 @@ propSetGetRoundTrip =
     forAll (genSubDomain org) $ \n ->
       forAll (arbitrary :: Gen [Int]) $ \xs ->
         get n (set n xs (emptyZone org)) === Just xs
+
+type TestPath = NE.NonEmpty [String]
+
+propSetPreservesWildcardConstraints :: Property
+propSetPreservesWildcardConstraints =
+  forAll genWildcardPath $ \path ->
+    allPaths (set path RRSet.empty wildcardZone)
+      === allPaths wildcardZone
+  where
+    genWildcardPath :: Gen ConstrainedName
+    genWildcardPath = do
+      Name ls <- elements [ n | Named n _ <- allData wildcardZone , any N.isWildcardLabel n ]
+      Name <$> traverse varyConstraint ls
+
+    varyConstraint :: ConstrainedLabel -> Gen ConstrainedLabel
+    varyConstraint (Wildcard _) = Wildcard <$> listOf genLabel
+    varyConstraint exact = pure exact
+
+    allPaths :: Zone ConstrainedLabel -> [TestPath]
+    allPaths z = St.execState (traverseNamed (\(Name ls) v -> St.modify (fmap constraint ls:) >> return v) z) []
+
+    constraint :: ConstrainedLabel -> [String]
+    constraint (Wildcard excluded) = excluded
+    constraint (Exactly _) = []
+
+    wildcardZone :: Zone ConstrainedLabel
+    wildcardZone = compileWildcards $ fromList
+      ( recordAt ("*" <| origin)
+      NE.:| [ recordAt ("fixed" <| origin)
+             , recordAt ("leaf" <| ("*" <| origin))
+             , recordAt ("sibling" <| ("*" <| origin))
+             , recordAt ("*" <| ("*" <| origin))
+             ]
+      )
+
+    recordAt :: Name String -> Named String RRSet.RDataSet
+    recordAt n = named n (RData IN 100 (TXT "wildcard"))
+
+    origin :: Name String
+    origin = "example" <| N.root
 
 propPruningSetEmpty :: Property
 propPruningSetEmpty =

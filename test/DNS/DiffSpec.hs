@@ -13,7 +13,7 @@ import DNS.Record
 import qualified DNS.RecordType as T
 import qualified DNS.RRSet as RRSet
 import DNS.ZoneFile (emptyZone, get, insert, isEmpty, zoneName, singleton)
-import NameConstraint (compileWildcards, exactly)
+import NameConstraint (compileWildcards, compileName)
 
 tests :: TestTree
 tests =
@@ -48,8 +48,8 @@ preservesNonRootOrigin = do
       oldZ = insert (emptyZone org) (Named n (mkData "192.0.2.1"))
       newZ = insert (emptyZone org) (Named n (mkData "192.0.2.2"))
       dz = diff (compileWildcards oldZ) (compileWildcards newZ)
-  zoneName dz @?= exactly org
-  hasChanges (exactly n) dz @?= True
+  zoneName dz @?= compileName org
+  hasChanges (compileName n) dz @?= True
 
 exactChangeDetection :: Assertion
 exactChangeDetection = do
@@ -57,8 +57,8 @@ exactChangeDetection = do
       oldZ = emptyZone root
       newZ = singleton (Named n (mkData "198.51.100.1"))
   let dz = diff (compileWildcards oldZ) (compileWildcards newZ)
-  hasChanges (exactly n) dz @?= True
-  hasChanges (exactly (mkName ["other", "example", "com", ""])) dz @?= False
+  hasChanges (compileName n) dz @?= True
+  hasChanges (compileName (mkName ["other", "example", "com", ""])) dz @?= False
 
 mkRData :: String -> RData
 mkRData = RData IN 300 . A . read

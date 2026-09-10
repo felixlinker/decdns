@@ -10,7 +10,7 @@ import DNS.NameSpec (mkName)
 import qualified DNS.RecordType as RT
 import DNS.Wellformedness (zoneWellformed)
 import DNS.ZoneFile (zoneName)
-import NameConstraint (exactly)
+import NameConstraint (compileName)
 import Parsing.Config (parseZoneFileZones, parseZoneFiles)
 import Resolvable.Dependencies (ConstrainedQuery (CQuery), computeResolvable, queryFromRule)
 import Resolvable.Prolog.Core (Term, ad, nameTerm, resolvable, resolves, top, ttypeTerm, wildcard, wildcards3)
@@ -338,7 +338,7 @@ exampleFileTest example =
   testCase (examplePath example) $ do
     config <- parseZoneFileZones zoneWellformed (examplePath example)
     map (zoneName . snd) config
-      @?= map exactly (expectedZones example)
+      @?= map compileName (expectedZones example)
 
 exampleConfigTest :: ExampleConfig -> TestTree
 exampleConfigTest example =
