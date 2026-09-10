@@ -16,9 +16,8 @@ import qualified Crypto.PubKey.ECC.ECDSA as ECDSA
 import Data.Bits (shiftR, shiftL)
 import qualified Data.ByteArray as BA
 import qualified Data.ByteString as BS
-import Data.List (intersperse)
+import Data.List (intersperse, sortOn)
 import qualified Data.List.NonEmpty as NE
-import qualified Data.Set as S
 import Data.Word (Word16, Word32)
 import Control.Monad (guard)
 
@@ -56,10 +55,8 @@ verifySignature (canonicalName -> owner) (map canonicalType -> rrset) (canonical
     mkRecord :: Type -> StandardRecord
     mkRecord = Named originalOwner . RData IN (_originalTTL sig)
 
-    -- Set construction for sorting and deduplication
     serializedRRSet :: [BS.ByteString]
-    serializedRRSet = S.toAscList $ S.fromList
-      $ map (serialize . mkRecord) rrset
+    serializedRRSet = map (serialize . mkRecord) (sortOn serialize rrset)
 
 keyTag :: DNSKEYData -> Word16
 keyTag (serialize -> wireFormat) =
