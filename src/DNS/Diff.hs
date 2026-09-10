@@ -7,11 +7,15 @@ module DNS.Diff
   , item
   , ZoneDiff
   , RDataSetDiff
+  , RRSetDiff
+  , WildcardDiffs
   , diff
   , setDiff
   , hasChanges
   , patch ) where
 
+import Control.Monad (foldM)
+import qualified Control.Monad.Trans.State as St
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
 import Data.Either ( partitionEithers, isRight )
@@ -19,6 +23,7 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as S
 
 import DNS.Name as N
+import NameConstraint
 import DNS.Record
 import qualified DNS.RRSet as RRSet
 import DNS.ZoneFile
@@ -71,6 +76,7 @@ partitionDiffs = partitionEithers . map diffEither . NE.toList
 
 type ZoneDiff a = AZone a RRSet.RTypedSet (Diff RData)
 type RDataSetDiff = RRSet.RTypedSet (Diff RData)
+type RRSetDiff = Named String RDataSetDiff
 
 diff :: (Label a, Ord a) => Zone a -> Zone a -> ZoneDiff a
 diff (fmap deleted -> Zone oldOrg oldRs) (fmap added -> Zone newOrg newRs) =
@@ -127,11 +133,35 @@ patchData (RRSet.RDS diffsM) (RRSet.RDS m) =
     diffsM
     m
 
-patch :: Named String RDataSetDiff -> Zone String -> Zone String
-patch (Named n d) = adjust aux n
+patch :: Foldable t => Zone ConstrainedLabel -> t RRSetDiff -> (Zone ConstrainedLabel, WildcardDiffs)
+patch z = recompileWildcards . foldr (\(Named (compileName -> n) d) -> adjust (aux d) n) z
   where
-    aux :: [String] -> ZNode String -> ZNode String
-    aux [] (T.Node v cs) = T.Node (patchData d v) cs
-    aux (h:t) (T.Node v cs) =
+    aux :: RDataSetDiff -> [ConstrainedLabel] -> ZNode ConstrainedLabel -> ZNode ConstrainedLabel
+    aux d [] (T.Node v cs) = T.Node (patchData d v) cs
+    aux d (h:t) (T.Node v cs) =
       let adds = RRSet.map item $ RRSet.filter isAdded d
       in T.Node v $ if RRSet.null adds then cs else M.insert h (T.leafAt t adds) cs
+
+type WildcardDiffs = S.Set (Diff (Named ConstrainedLabel RRSet.RDataSet))
+type DiffSt = St.State WildcardDiffs
+
+recompileWildcards :: Zone ConstrainedLabel -> (Zone ConstrainedLabel, WildcardDiffs)
+recompileWildcards (Zone zOrg r) = St.runState (Zone zOrg <$> go zOrg (S.fromList $ existIn r) r) S.empty
+  where
+    go :: ConstrainedName -> S.Set String -> ZNode ConstrainedLabel -> DiffSt (ZNode ConstrainedLabel)
+    go n@(Name (h NE.:| lblT)) newExist node@(T.Node d ch) = do
+      case h of
+        Wildcard (S.fromList -> oldExist) ->
+          St.modify (\st -> foldr (S.insert . dataDiff) st (setDiff oldExist newExist))
+        _ -> return ()
+      ch' <- foldM rec M.empty (M.toList ch)
+      return $ node { T.children = ch' }
+      where
+        rec :: ZEdges ConstrainedLabel -> (ConstrainedLabel, ZNode ConstrainedLabel) -> DiffSt (ZEdges ConstrainedLabel)
+        rec acc (oldLbl, c) = do
+          let exist' = existIn node
+          c' <- go (oldLbl <| n) (S.fromList exist') c
+          return $ M.insert (compileLabel exist' (lshow oldLbl)) c' acc
+
+        dataDiff :: Diff String -> Diff (Named ConstrainedLabel RRSet.RDataSet)
+        dataDiff = fmap (\lbl -> Named (Name $ (NE.:| lblT) $ Exactly lbl) d)

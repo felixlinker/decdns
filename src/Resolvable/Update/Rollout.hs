@@ -45,12 +45,12 @@ fromResolutionOrder =
     fromAnnot (RComp ns rrs) = (ns, lshow <$> name rrs)
 
 type NSDiffs = M.Map (Name String) (ZoneDiff String)
-type Diffs = S.Set (Name String, Named String RDataSetDiff)
+type Diffs = S.Set (Name String, RRSetDiff)
 
 flattenDiffs :: NSDiffs -> Diffs
 flattenDiffs = S.fromList . concatMap (\(ns, z) -> map (ns,) $ filter (not . RRSet.null . value) (allData z)) . M.toList
 
-showDiffsAtNS :: Name String -> [Named String RDataSetDiff] -> [String]
+showDiffsAtNS :: Name String -> [RRSetDiff] -> [String]
 showDiffsAtNS ns ds =
     map indent
   $ ("on server " ++ show ns ++ ":")
