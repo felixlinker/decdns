@@ -33,6 +33,7 @@ extra-source-files:
     examples/cname/signed-nsec3/ns.com.
     examples/cname/signed/ns.b.com.
     examples/cname/signed/ns.com.
+    examples/dnssec/ns/example.
     examples/dnssec/txt/ns.com.
     examples/dnssec/wildcard/ns.com.
     examples/ns/cyclic-deleg/ns.net.

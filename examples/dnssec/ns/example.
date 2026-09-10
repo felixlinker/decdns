@@ -1,0 +1,48 @@
+; File written on Thu Sep 10 10:34:22 2026
+; dnssec-signzone version 9.20.27
+example.		500	IN SOA	ns1.outside.edu. root.campus.edu. (
+					3          ; serial
+					604800     ; refresh (1 week)
+					86400      ; retry (1 day)
+					2419200    ; expire (4 weeks)
+					604800     ; minimum (1 week)
+					)
+			500	RRSIG	SOA 13 1 500 (
+					20261010073422 20260910073422 23962 example.
+					ZbwL9DcXsSC7amGM1mipJ1FvjlrDBk91H1rD
+					mTm7UFgFQQnq0ggdX+qAXIIMd9q/+69ycrpk
+					XHhgb5H8PNLouQ== )
+			500	NS	foo.uni.foo.
+			500	NS	email.
+			500	RRSIG	NS 13 1 500 (
+					20261010073422 20260910073422 23962 example.
+					H2Y+s8v53uepYAXmg+QU5PPxWJF5RYompPwi
+					uRgL/BFOscGDX33mMlcq163aUIuYErlNcxHK
+					DNcFEsMou2t1mA== )
+			500	NSEC	example. NS SOA RRSIG NSEC DNSKEY
+			500	RRSIG	NSEC 13 1 500 (
+					20261010073422 20260910073422 23962 example.
+					8Ovu/NDjH73qxeDpEcTyNf3ACoWxT1KsFvE0
+					1zaa6RvELhM6pyxBt9N3mAPZLPy86ojCsmAE
+					38eS9tjfAHbL1w== )
+			500	DNSKEY	256 3 13 (
+					o43L1ig/mc8teoXQl0zZqiqBl/8EI4FFwpxL
+					Fu2wsLSjgULK1qe84uRmhZLHZwcV2K3YQ6h9
+					GuDvq/i7QBrAtw==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 23962
+			500	DNSKEY	257 3 13 (
+					imDa1hARtxJEyzhe/Uw0TI4UXJ9mQttlpa0C
+					G6hkpt6hK/WWKeOI2EsZkvuq2c54H43OdP0j
+					hGY07iVJCgHHwg==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 16129
+			500	RRSIG	DNSKEY 13 1 500 (
+					20261010073422 20260910073422 16129 example.
+					JmOISOxgGklAnDJLoe/okV9CEIA+EU9vL0Q6
+					XJagbkZQLR+NPiCULmF+a31QhRD1TCg2XqhE
+					UYFr+2Ve9Eka4Q== )
+			500	RRSIG	DNSKEY 13 1 500 (
+					20261010073422 20260910073422 23962 example.
+					zdz7FrZRGAiucgXn8h4+tOhzFfw3CkUkO0aY
+					wBeP+IS3YkecSUOvTQ9hPWG/kE1cOV+ct/Cv
+					yp3oPclfZULSAA== )
+;; Served by foo.uni.foo.
