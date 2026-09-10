@@ -1,6 +1,6 @@
 module DNS.Zone
   ( splitZone
-  , collectGlue ) where
+  , collectReferrals ) where
 
 import qualified Control.Monad.Trans.State as St
 import Control.Arrow (first)
@@ -51,8 +51,8 @@ splitData childZoneName d@(RDS m) =
       childData   = inserts baseChild   [(T.NSEC, nsecChild),   (T.RRSIG, sigsChild)]
   in (RDS parentData, RDS childData)
 
-collectGlue :: Label a => Zone a -> (Zone a, [RRSet a])
-collectGlue (Zone zn (Tr.Node apexD apexCS)) =
+collectReferrals :: Label a => Zone a -> (Zone a, [RRSet a])
+collectReferrals (Zone zn (Tr.Node apexD apexCS)) =
   first (Zone zn . Tr.Node apexD) $
     St.runState (M.traverseWithKey (\l -> rec (l <| zn)) apexCS) []
   where
@@ -60,9 +60,9 @@ collectGlue (Zone zn (Tr.Node apexD apexCS)) =
     rec accn (Tr.Node d cs)
       | hasType T.NS d = do
         let (parentData, childData) = splitData accn d
-        let glue = allRRSets (Zone accn (Tr.Node (dropType T.NS childData) cs))
+        let glue = allRRSets (Zone accn (Tr.Node childData cs))
         St.modify (glue ++)
-        return (Tr.Node parentData M.empty)
+        return (Tr.Node (dropType T.NS parentData) M.empty)
       | otherwise = do
         cs' <- M.traverseWithKey (\l -> rec (l <| accn)) cs
         return (Tr.Node d cs')

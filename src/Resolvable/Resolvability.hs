@@ -16,7 +16,7 @@ import Resolvable.Prolog.TermView
 import DNS.Name
 import DNS.Record
 import qualified DNS.RecordType as T
-import DNS.Zone (collectGlue)
+import DNS.Zone (collectReferrals)
 import DNS.ZoneFile
 
 import Util.Fresh (Fresh)
@@ -53,13 +53,16 @@ synthesisCases = [nameWithoutSynthesis', nameWithSynthesis]
     nameWithoutSynthesis' :: ConstrainedName -> Fresh (Term, [Term])
     nameWithoutSynthesis' n = return (nameWithoutSynthesis n, [])
 
-resolvableBase :: [Name String] -> Name String -> Term -> ConstrainedRRSet -> Fresh (S.Set (Rule (Maybe RComp)))
-resolvableBase rootServers ns zone s@(Named n rds@((RData _ _ ty) NE.:| _)) =
+resolvableBase :: [Name String] -> Name String -> ConstrainedName -> Bool -> ConstrainedRRSet -> Fresh (S.Set (Rule (Maybe RComp)))
+resolvableBase rootServers ns zone isReferral s@(Named n rds@((RData _ _ ty) NE.:| _)) =
   foreachM synthesisCases $ \synth ->
   foreachM rootKeyCases   $ \(ver, adb) -> do
     (n', cs) <- synth n
-    return $ S.singleton $ Rule rann (resolves (nameTerm ns) (typeTerm ty) zone n' (rrsetTerm rds) ver adb) cs
+    return $ S.singleton $ Rule rann (resolves (nameTerm ns) (typeTerm ty) zoneTerm n' (rrsetTerm rds) ver adb) cs
     where
+      zoneTerm :: Term
+      zoneTerm = if isReferral then referralZone else nameWithoutSynthesis zone
+
       -- TODO: Refine so that only root keys are trusted
       rootKeyCases :: [(Term, Term)]
       rootKeyCases
@@ -70,8 +73,8 @@ resolvableBase rootServers ns zone s@(Named n rds@((RData _ _ ty) NE.:| _)) =
       rann :: Maybe RComp
       rann = Just (RComp ns s)
 
-resolvableStep :: [Name String] -> Name String -> Term -> ConstrainedRRSet -> Fresh (S.Set (Rule (Maybe RComp)))
-resolvableStep (map nameTerm -> rootServers) ns zone s@(Named n rs) =
+resolvableStep :: [Name String] -> Name String -> ConstrainedName -> ConstrainedRRSet -> Fresh (S.Set (Rule (Maybe RComp)))
+resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s@(Named n rs) =
   foreachM (NE.toList rs) (\r -> foreachM rootServers (`go` rtype r))
   where
     rannot :: Maybe RComp
@@ -94,7 +97,7 @@ resolvableStep (map nameTerm -> rootServers) ns zone s@(Named n rs) =
           else mconcat <$> sequence
             [ foreachM [aType, aaaaType] $ \glueType -> do  -- Unauthenticated
                 (nTail, t, d, dIp) <- freshVars4 ("N", "T", "D", "D_IP")
-                glueZ <- if expectGlue then return glueZone else wildcard
+                glueZ <- if expectGlue then return referralZone else wildcard
                 -- Do not expect wildcard neq constraints on NS records
                 let n' = captureListTail nTail ownerNoSynth
                 return (S.singleton $ Rule rannot (resolves nameServer t zone n' d bot (ad 0))
@@ -214,7 +217,7 @@ resolvableR :: Fresh (Rule (Maybe RComp))
 resolvableR = do
   (s, q, z, n, v, a) <- freshVars6 ("S", "Q", "Z", "N", "V", "A")
   wc <- wildcard
-  return $ Rule Nothing (resolvable s q n v a) [ resolves s q z n wc v a, z \= glueZone ]
+  return $ Rule Nothing (resolvable s q n v a) [ resolves s q z n wc v a, z \= referralZone ]
 
 allResolvable :: Rule (Maybe RComp)
 allResolvable =
@@ -230,18 +233,18 @@ allResolvable =
     bagof :: Term -> Term -> Term -> Term
     bagof x y z = TFunctor "bagof" [ x, y, z ]
 
-compileRRSet :: [Name String] -> Name String -> Term -> ConstrainedRRSet -> Fresh (S.Set (Rule (Maybe RComp)))
-compileRRSet rootServers ns zone rs = (<>) <$> resolvableBase rootServers ns zone rs <*> resolvableStep rootServers ns zone rs
+compileRRSet :: [Name String] -> Name String -> ConstrainedName -> Bool -> ConstrainedRRSet -> Fresh (S.Set (Rule (Maybe RComp)))
+compileRRSet rootServers ns zone isReferral rs = (<>) <$> resolvableBase rootServers ns zone isReferral rs <*> resolvableStep rootServers ns zone rs
 
 fromZone :: [Name String] -> Name String -> Zone ConstrainedLabel -> Fresh (S.Set (Rule (Maybe RComp)))
 fromZone rootServers ns z = do
-    let (z', glue) = collectGlue z
-    authoritative <- mapM (comp (nameWithoutSynthesis $ zoneName z')) (allRRSets z')
-    nonAuthoritative <-  mapM (comp glueZone) glue
+    let (z', referrals) = collectReferrals z
+    authoritative <- mapM (comp False) (allRRSets z')
+    nonAuthoritative <-  mapM (comp True) referrals
     return $ mconcat (authoritative ++ nonAuthoritative)
   where
-    comp :: Term -> ConstrainedRRSet -> Fresh (S.Set (Rule (Maybe RComp)))
-    comp = compileRRSet rootServers ns
+    comp :: Bool -> ConstrainedRRSet -> Fresh (S.Set (Rule (Maybe RComp)))
+    comp = compileRRSet rootServers ns (zoneName z)
 
 type NameServersConfig = [(Name String, Zone ConstrainedLabel)]
 

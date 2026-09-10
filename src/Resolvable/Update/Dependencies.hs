@@ -30,7 +30,7 @@ resolvableQuery (CQuery t neqs) = (`CQuery` neqs) <$> resolvableFromResolves t
 
 resolvableFromResolves :: Term -> Maybe Term
 resolvableFromResolves (toView -> TVResolves r)
-  | resolvesZone r == glueZone = Nothing
+  | resolvesZone r == referralZone = Nothing
   | otherwise = Just $ resolvable
     (resolvesNS r)
     (resolvesQType r)
