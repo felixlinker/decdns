@@ -14,6 +14,7 @@ module Resolvable.Update.Rollout
 import Control.Monad (when, foldM)
 import Control.Monad.Trans.Except (Except, throwE)
 import qualified Control.Monad.Trans.State as St
+import Data.Foldable (Foldable(foldl'))
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
 import qualified Data.Set as S
@@ -29,6 +30,7 @@ import qualified Util.Graph as G
 import Resolvable.Dependencies (ResolutionOrder)
 import Data.Maybe (isJust, fromJust)
 import Util.Fixpoint
+import Util.Map (groupBy, alterDefF)
 
 type RRSetID = (Name String, Name String)
 
@@ -60,7 +62,10 @@ showDiffsAtNS ns ds =
     indent s = if null s then "" else "  " ++ s
 
 showDiffs :: Diffs -> [String]
-showDiffs = concatMap (uncurry showDiffsAtNS) . M.toList . foldr (\(ns, d) -> M.alter (Just . maybe [d] (d:)) ns) M.empty
+showDiffs = concatMap (uncurry showDiffsAtNS) . M.toList . groupDiffs
+
+groupDiffs :: Diffs -> M.Map (Name String) [RRSetDiff]
+groupDiffs = M.map (map snd) . groupBy fst
 
 diffServers :: NameServersConfig -> NameServersConfig -> NSDiffs
 diffServers old new = MM.merge
@@ -83,9 +88,28 @@ showRollOut r = do
   (i, diffs) <- zip [(1 :: Int)..] r
   ("step " ++ show i ++ "; roll out:") : showDiffs diffs
 
-rollout :: NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
-rollout diffs old new = do
-  rollout' id (flattenDiffs diffs) (G.invert old) new
+type NSMap = M.Map (Name String) (Zone ConstrainedLabel)
+
+rollout :: NSMap -> NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
+rollout zones diffs old new = do
+  updateSeq <- rollout' id (flattenDiffs diffs) (G.invert old) new
+  let (_, ($ []) -> synthesized) = foldl' applyStep (zones, id) (map groupDiffs updateSeq)
+  return $ zipWith S.union updateSeq synthesized
+  -- return updateSeq
+  where
+    applyStep :: (NSMap, Rollout -> Rollout) -> M.Map (Name String) [RRSetDiff] -> (NSMap, Rollout -> Rollout)
+    applyStep (config, acc) ds =
+      let (config', synthesized) = St.runState (foldM applyServer config (M.toList ds)) S.empty
+      in  (config', acc . (synthesized:))
+
+    applyServer :: NSMap -> (Name String, [RRSetDiff]) -> St.State Diffs NSMap
+    applyServer config (ns, ds) = alterDefF patchSynthesize ns config
+      where
+        patchSynthesize :: Zone ConstrainedLabel -> St.State Diffs (Zone ConstrainedLabel)
+        patchSynthesize z = do
+          let (z', wcDiffs) = patch z ds
+          St.modify (\st -> foldr (S.insert . (ns,) . fmap (fmap invert)) st wcDiffs)
+          return z'
 
 rollout' :: (Rollout -> Rollout) -> Diffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
 rollout' acc diffs (updateDeps diffs -> old) (updateDeps diffs -> new)

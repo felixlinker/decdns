@@ -35,7 +35,7 @@ immediateTxtAdd = do
     maybe False (not . isEmpty) (M.lookup (zoneName z) diffs)
   dz <- dependencies z
   dz' <- dependencies z'
-  runExcept (rollout diffs dz dz') @?= Right [flattenDiffs diffs]
+  runExcept (rollout (M.singleton (zoneName z) (compileWildcards z)) diffs dz dz') @?= Right [flattenDiffs diffs]
 
 immediateTxtDelete :: Assertion
 immediateTxtDelete = do
@@ -48,7 +48,7 @@ immediateTxtDelete = do
     maybe False (not . isEmpty) (M.lookup (zoneName zWithTxt) diffs)
   dzWithTxt <- dependencies zWithTxt
   dz <- dependencies z
-  runExcept (rollout diffs dzWithTxt dz) @?= Right [flattenDiffs diffs]
+  runExcept (rollout (M.singleton (zoneName zWithTxt) (compileWildcards zWithTxt)) diffs dzWithTxt dz) @?= Right [flattenDiffs diffs]
 
 dependencies :: Zone String -> IO RecordDependencies
 dependencies z =

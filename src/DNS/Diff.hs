@@ -2,6 +2,7 @@
 module DNS.Diff
   ( Diff(..)
   , added
+  , invert
   , deleted
   , deither
   , item
@@ -16,6 +17,7 @@ module DNS.Diff
 
 import Control.Monad (foldM)
 import qualified Control.Monad.Trans.State as St
+import Data.Functor (($>))
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
 import Data.Either ( partitionEithers, isRight )
@@ -57,6 +59,10 @@ deleted = Diff . Left
 
 added :: a  -> Diff a
 added = Diff . Right
+
+invert :: Diff a -> Diff a
+invert (Diff (Left a)) = added a
+invert (Diff (Right a)) = deleted a
 
 deither :: (a -> b) -> (a -> b) -> Diff a -> b
 deither l r = either l r . diffEither
@@ -142,7 +148,7 @@ patch z = recompileWildcards . foldr (\(Named (compileName -> n) d) -> adjust (a
       let adds = RRSet.map item $ RRSet.filter isAdded d
       in T.Node v $ if RRSet.null adds then cs else M.insert h (T.leafAt t adds) cs
 
-type WildcardDiffs = S.Set (Diff (Named ConstrainedLabel RRSet.RDataSet))
+type WildcardDiffs = S.Set RRSetDiff
 type DiffSt = St.State WildcardDiffs
 
 recompileWildcards :: Zone ConstrainedLabel -> (Zone ConstrainedLabel, WildcardDiffs)
@@ -151,7 +157,9 @@ recompileWildcards (Zone zOrg r) = St.runState (Zone zOrg <$> go zOrg (S.fromLis
     go :: ConstrainedName -> S.Set String -> ZNode ConstrainedLabel -> DiffSt (ZNode ConstrainedLabel)
     go n@(Name (h NE.:| lblT)) newExist node@(T.Node d ch) = do
       case h of
-        Wildcard (S.fromList -> oldExist) ->
+        -- oldExist will be null if the wildcard has just been added; in that
+        -- case, there is no diff due to changed in synthesis.
+        Wildcard (S.fromList -> oldExist) | not (S.null oldExist) ->
           St.modify (\st -> foldr (S.insert . dataDiff) st (setDiff oldExist newExist))
         _ -> return ()
       ch' <- foldM rec M.empty (M.toList ch)
@@ -163,5 +171,6 @@ recompileWildcards (Zone zOrg r) = St.runState (Zone zOrg <$> go zOrg (S.fromLis
           c' <- go (oldLbl <| n) (S.fromList exist') c
           return $ M.insert (compileLabel exist' (lshow oldLbl)) c' acc
 
-        dataDiff :: Diff String -> Diff (Named ConstrainedLabel RRSet.RDataSet)
-        dataDiff = fmap (\lbl -> Named (Name $ (NE.:| lblT) $ Exactly lbl) d)
+        dataDiff :: Diff String -> RRSetDiff
+        dataDiff diffLbl =
+          Named (Name (item diffLbl NE.:| map lshow lblT)) (fmap (diffLbl $>) d)
