@@ -13,7 +13,8 @@ module DNS.Diff
   , diff
   , setDiff
   , hasChanges
-  , patch ) where
+  , patch
+  , recompileWildcards ) where
 
 import Control.Monad (foldM)
 import qualified Control.Monad.Trans.State as St
@@ -140,7 +141,7 @@ patchData (RRSet.RDS diffsM) (RRSet.RDS m) =
     m
 
 patch :: Foldable t => Zone ConstrainedLabel -> t RRSetDiff -> (Zone ConstrainedLabel, WildcardDiffs)
-patch z = recompileWildcards . foldr (\(Named (compileName -> n) d) -> adjust (aux d) n) z
+patch z = recompileWildcards . prune . foldr (\(Named (compileName -> n) d) -> adjust (aux d) n) z
   where
     aux :: RDataSetDiff -> [ConstrainedLabel] -> ZNode ConstrainedLabel -> ZNode ConstrainedLabel
     aux d [] (T.Node v cs) = T.Node (patchData d v) cs
