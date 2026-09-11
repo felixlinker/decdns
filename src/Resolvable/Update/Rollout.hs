@@ -31,6 +31,7 @@ import Resolvable.Dependencies (ResolutionOrder)
 import Data.Maybe (isJust, fromJust)
 import Util.Fixpoint
 import Util.Map (groupBy, alterDefF)
+import Data.Bifunctor (Bifunctor(bimap))
 
 type RRSetID = (Name String, Name String)
 
@@ -82,6 +83,7 @@ updateDeps :: Diffs -> RecordDependencies -> RecordDependencies
 updateDeps diffs = G.filter (`S.member ` toIDs diffs)
 
 type Rollout = [Diffs]
+type WildcardGuards = Rollout
 
 showRollOut :: Rollout -> [String]
 showRollOut r = do
@@ -94,22 +96,52 @@ rollout :: NSMap -> NSDiffs -> RecordDependencies -> RecordDependencies -> Excep
 rollout zones diffs old new = do
   updateSeq <- rollout' id (flattenDiffs diffs) (G.invert old) new
   let (_, ($ []) -> synthesized) = foldl' applyStep (zones, id) (map groupDiffs updateSeq)
-  return $ zipWith S.union updateSeq synthesized
+  let resolvabilityGuards = map fst synthesized
+  return $ foldGuards resolvabilityGuards [] $ zipWith S.union updateSeq (map snd synthesized)
   -- return updateSeq
   where
-    applyStep :: (NSMap, Rollout -> Rollout) -> M.Map (Name String) [RRSetDiff] -> (NSMap, Rollout -> Rollout)
+    applyStep :: (NSMap, [(Diffs, Diffs)] -> [(Diffs, Diffs)]) -> M.Map (Name String) [RRSetDiff] -> (NSMap, [(Diffs, Diffs)] -> [(Diffs, Diffs)])
     applyStep (config, acc) ds =
-      let (config', synthesized) = St.runState (foldM applyServer config (M.toList ds)) S.empty
+      let (config', synthesized) = St.runState (foldM applyServer config (M.toList ds)) (S.empty, S.empty)
       in  (config', acc . (synthesized:))
 
-    applyServer :: NSMap -> (Name String, [RRSetDiff]) -> St.State Diffs NSMap
+    -- Apply a diff for a name server. Returns the updated name server map, and
+    -- stores synthesized responses for occluding wildcards and their inverses
+    -- in the state. The left tuple element must be applied before the right
+    -- tuple element.
+    applyServer :: NSMap -> (Name String, [RRSetDiff]) -> St.State (Diffs, Diffs) NSMap
     applyServer config (ns, ds) = alterDefF patchSynthesize ns config
       where
-        patchSynthesize :: Zone ConstrainedLabel -> St.State Diffs (Zone ConstrainedLabel)
+        biInsertDiff :: RRSetDiff -> (Diffs, Diffs) -> (Diffs, Diffs)
+        biInsertDiff wcDiff = bimap (S.insert (ns, fmap invert <$> wcDiff)) (S.insert  (ns, wcDiff))
+
+        patchSynthesize :: Zone ConstrainedLabel -> St.State (Diffs, Diffs) (Zone ConstrainedLabel)
         patchSynthesize z = do
           let (z', wcDiffs) = patch z ds
-          St.modify (\st -> foldr (S.insert . (ns,) . fmap (fmap invert)) st wcDiffs)
+          St.modify (\st -> foldr biInsertDiff st wcDiffs)
           return z'
+
+    -- Below code takes wildcard guards and inserts them into the last step that
+    -- updates the same name.
+    foldGuards :: WildcardGuards -> Rollout -> Rollout -> Rollout
+    foldGuards [] acc [] = acc
+    foldGuards _ _ [] = error "invariant violated: rollout shorter than guards"
+    foldGuards [] _ _ = error "invariant violated: guards shorter than rollout"
+    foldGuards (guards:restGuards) stepsPrefix (step:restSteps) =
+      foldGuards restGuards (insertGuards stepsPrefix ++ [step]) restSteps
+      where
+        insertGuards :: [Diffs] -> [Diffs]
+        insertGuards = fst . foldr insertGuardsStep ([], guards)
+
+    insertGuardsStep :: Diffs -> (Rollout, Diffs) -> (Rollout, Diffs)
+    insertGuardsStep rolloutStep (accR, guards) =
+      let (rolloutStep', guards') = updateRolloutStep rolloutStep guards
+      in  (rolloutStep':accR, guards')
+
+    updateRolloutStep :: Diffs -> Diffs -> (Diffs, Diffs)
+    updateRolloutStep step guards =
+      let (ins, guards') = S.partition (\(fmap name -> g) -> any ((== g) . fmap name) step) guards
+      in  (step <> ins, guards')
 
 rollout' :: (Rollout -> Rollout) -> Diffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
 rollout' acc diffs (updateDeps diffs -> old) (updateDeps diffs -> new)
