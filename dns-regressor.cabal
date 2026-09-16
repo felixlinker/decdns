@@ -41,6 +41,26 @@ extra-source-files:
     examples/ns/self-deleg/ns.com.
     examples/ns/sub-self-deleg/ns.net.
     examples/ns/sub-self-deleg/root.net.
+    examples/rollout/address-to-alias-new/ns.com.
+    examples/rollout/address-to-alias-old/ns.com.
+    examples/rollout/alias/ns.com.
+    examples/rollout/colocated-child/ns.com.
+    examples/rollout/delayed-target-new/ns.com.
+    examples/rollout/delayed-target-old/ns.com.
+    examples/rollout/delegated-address/ns.b.com.
+    examples/rollout/delegated-address/ns.com.
+    examples/rollout/delegated-wildcard/ns.b.com.
+    examples/rollout/delegated-wildcard/ns.com.
+    examples/rollout/direct-address/ns.com.
+    examples/rollout/dname/ns.com.
+    examples/rollout/README.md
+    examples/rollout/wildcard-alias-txt/ns.com.
+    examples/rollout/wildcard-cname-descendant/ns.com.
+    examples/rollout/wildcard-cname/ns.com.
+    examples/rollout/wildcard-explicit/ns.com.
+    examples/rollout/wildcard-nested/ns.com.
+    examples/rollout/wildcard-txt/ns.com.
+    examples/rollout/wildcard/ns.com.
 
 source-repository head
   type: git
@@ -189,7 +209,9 @@ test-suite dns-regressor-test
     , bytestring
     , containers
     , crypton
+    , directory
     , dns-regressor
+    , filepath
     , iproute
     , lens
     , memory

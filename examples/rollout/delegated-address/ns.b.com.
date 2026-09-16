@@ -1,0 +1,7 @@
+$ORIGIN b.com.
+@ 300 IN SOA ns.b.com. hostmaster.com. 1 300 300 300 300
+@ 300 IN NS ns.b.com.
+
+@ 300 IN A 192.0.2.10
+ns 300 IN A 192.0.2.54
+;; Served by ns.b.com.

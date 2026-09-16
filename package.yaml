@@ -18,6 +18,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 extra-source-files:
 - examples/cname/**/*
 - examples/ns/**/*
+- examples/rollout/**/*
 
 dependencies:
 - base >= 4.7 && < 5
@@ -74,3 +75,5 @@ tests:
     - tasty-quickcheck
     - QuickCheck
     - HUnit
+    - directory
+    - filepath
