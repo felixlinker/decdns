@@ -73,7 +73,8 @@ module Resolvable.Prolog.Core
   , keyTag
   , nameWithSynthesis
   , nameWithoutSynthesis
-  , nameTerm ) where
+  , nameTerm
+  , minNameLength ) where
 
 import DNS.Name
 import DNS.Record
@@ -531,3 +532,16 @@ nameTerm (Name (NE.toList -> ls)) = list (reverse $ map TAtom $ filter (not . nu
 
 nameWithoutSynthesis :: ConstrainedName -> Term
 nameWithoutSynthesis = nameTerm . toStringName
+
+minNameLength :: Term -> Int
+minNameLength t =
+  let (els, _) = collectListWithTail t
+  -- (+2) for the length field and the final, empty label. length els accounts
+  -- for . between the labels. As the empty label is ommitted from els, we do
+  -- need to subtract 1.
+  in  2 + length els + sum (map labelLength els)
+  where
+    labelLength :: Term -> Int
+    labelLength (TAtom l) = length l
+    labelLength (TVar _) = 1
+    labelLength _ = 0 -- Technically undefined

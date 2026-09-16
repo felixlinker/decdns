@@ -183,6 +183,7 @@ test-suite dns-regressor-test
       Parsing.NameSpec
       Parsing.ZoneFileSpec
       Resolvable.ConstrainedUnificationSpec
+      Resolvable.Prolog.CoreSpec
       Resolvable.ResolvabilitySpec
       Resolvable.UnificationSpec
       Resolvable.Update.DisunificationSpec

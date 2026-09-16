@@ -3,6 +3,7 @@ module Main (main) where
 import Test.Tasty (defaultMain, testGroup)
 
 import qualified Resolvable.UnificationSpec as UnificationSpec
+import qualified Resolvable.Prolog.CoreSpec as PrologCoreSpec
 import qualified Resolvable.ConstrainedUnificationSpec as ConstrainedUnificationSpec
 import qualified Resolvable.ResolvabilitySpec as ResolvabilitySpec
 import qualified Resolvable.Update.DisunificationSpec as DisunificationSpec
@@ -32,6 +33,7 @@ main = do
     testGroup
       "dns-regressor"
       [ UnificationSpec.tests
+      , PrologCoreSpec.tests
       , ConstrainedUnificationSpec.tests
       , ResolvabilitySpec.tests
       , DisunificationSpec.tests
