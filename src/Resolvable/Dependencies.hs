@@ -111,8 +111,16 @@ matchHead t (Rule _ h b) cu = do
   (b', cu'') <- grabNeqs b cu'
   return (cu'', CU.apply cu'' b')
 
+checkMaxNameLength :: Rule a -> Bool
+checkMaxNameLength (Rule _ (toView -> TVResolves (Resolves { resolvesQName = qn })) _) = minNameLength qn <= 255
+checkMaxNameLength _ = error "unsupported rule head encountered"
+
 solveBody :: Ord a => Bool -> S.Set (Rule a) -> Rule a -> S.Set (Rule a)
-solveBody keepGround rs (Rule ann h b) = S.fromList $ map (\(u, b') -> CU.apply u $ Rule ann h b') $ foldl solvePredicate [(CU.identity, [])] b
+solveBody keepGround rs (Rule ann h b) =
+  S.fromList $
+    filter checkMaxNameLength $
+    map (\(u, b') -> CU.apply u $ Rule ann h b') $
+      foldl solvePredicate [(CU.identity, [])] b
   where
     groundP :: (CU.ConstrainedUnifier, [Term]) -> Bool
     groundP = if keepGround then null . snd else const True
