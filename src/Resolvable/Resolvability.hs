@@ -163,14 +163,16 @@ resolvableStep (map nameTerm -> rootServers) ns zone s@(Named n rs) =
           let rewrite = injectLast l . captureListTail nTail
           -- Do not expect wildcard neq constraints on DNAME records
           return $ Rule rannot (resolves nameServer t zone (rewrite ownerNoSynth) d bot (ad 0))
-            [ resolves rootServer t targetZone (rewrite dname) d bot (ad 0) ]
+            [  t \= dnameType, t \= nsecType, t \= nsec3Type
+              , resolves rootServer t targetZone (rewrite dname) d bot (ad 0) ]
         , do  -- Authenticated
           (l, nTail, t, d, a) <- freshVars5 ("L", "N", "T", "D", "A")
           targetZone <- wildcard
           let rewrite = injectLast l . captureListTail nTail
           -- Do not expect wildcard neq constraints on DNAME records
           return $ Rule rannot (resolves nameServer t zone (rewrite ownerNoSynth) d top a)
-            [ resolves nameServer dnameType zone ownerNoSynth (list [TComplex r]) top (ad 1)
+            [  t \= dnameType, t \= nsecType, t \= nsec3Type
+            , resolves nameServer dnameType zone ownerNoSynth (list [TComplex r]) top (ad 1)
             , resolves rootServer t targetZone (rewrite dname) d top a ] ]
       -- TODO: Check that sigName is the name of the zone containing the record;
       -- does that mean there ex. a corresponding SOA record? Could be, but seems
