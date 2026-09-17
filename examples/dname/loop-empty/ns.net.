@@ -1,0 +1,7 @@
+$ORIGIN com.
+@ 1200 IN SOA ns.com. example.com. 0 0 0 0 0
+@ 1200 IN NS ns.com.
+
+a.a 1200 IN DNAME b.com.
+b 1200 IN DNAME a.com.
+;; Served by ns.net.

@@ -33,6 +33,8 @@ extra-source-files:
     examples/cname/signed-nsec3/ns.com.
     examples/cname/signed/ns.b.com.
     examples/cname/signed/ns.com.
+    examples/dname/loop-empty/ns.net.
+    examples/dname/loop-non-empty/ns.net.
     examples/ns/cyclic-deleg/ns.net.
     examples/ns/cyclic-deleg/root.com.
     examples/ns/cyclic-deleg/root.net.

@@ -17,6 +17,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 extra-source-files:
 - examples/cname/**/*
+- examples/dname/**/*
 - examples/ns/**/*
 - examples/rollout/**/*
 

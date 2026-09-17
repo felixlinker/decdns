@@ -7,13 +7,14 @@ import qualified Data.Set as S
 
 import DNS.Name (Name, root)
 import DNS.NameSpec (mkName)
+import DNS.Record (Type (DNAME, NS, SOA))
 import qualified DNS.RecordType as RT
 import DNS.Wellformedness (zoneWellformed)
 import DNS.ZoneFile (zoneName)
 import NameConstraint (compileName)
 import Parsing.Config (parseZoneFileZones, parseZoneFiles)
 import Resolvable.Dependencies (ConstrainedQuery (CQuery), computeResolvable, queryFromRule)
-import Resolvable.Prolog.Core (Term, ad, nameTerm, resolvable, resolves, top, ttypeTerm, wildcard, wildcards3)
+import Resolvable.Prolog.Core (Term (TComplex), ad, bot, list, nameTerm, resolvable, resolves, top, ttypeTerm, wildcard, wildcards3)
 import Resolvable.Resolvability (NameServersConfig, compileConfig, plResolvable)
 import Resolvable.Update.Dependencies (computeRegressions)
 import qualified Resolvable.ConstrainedUnification as CU
@@ -39,6 +40,17 @@ tests =
               misconfigurationLoopTest cnameLoopFiles
                 [Query nsCom RT.CNAME aCom, Query nsCom RT.CNAME bCom]
                 [Query nsCom RT.A aCom, Query nsCom RT.A bCom]
+          , testCase "handles an empty DNAME loop" $
+              exactResolutionTest dnameLoopEmptyFiles
+                [ resolves (nameTerm nsNet) (ttypeTerm RT.DNAME) (nameTerm com) (nameTerm aaCom)
+                    (list [TComplex (DNAME bCom)]) bot (ad 0)
+                , resolves (nameTerm nsNet) (ttypeTerm RT.DNAME) (nameTerm com) (nameTerm bCom)
+                    (list [TComplex (DNAME aCom)]) bot (ad 0)
+                , resolves (nameTerm nsNet) (ttypeTerm RT.NS) (nameTerm com) (nameTerm com)
+                    (list [TComplex (NS nsCom)]) bot (ad 0)
+                , resolves (nameTerm nsNet) (ttypeTerm RT.SOA) (nameTerm com) (nameTerm com)
+                    (list [TComplex (SOA nsCom exampleCom 0 0 0 0 0)]) bot (ad 0)
+                ]
           ])
     , testGroup
         "Resolvable.Resolvability authentication"
@@ -120,7 +132,9 @@ exampleFiles =
   , ExampleFile "examples/ns/sub-self-deleg/ns.net." [net]
   , ExampleFile "examples/ns/cyclic-deleg/root.net." [dnsRoot]
   , ExampleFile "examples/ns/cyclic-deleg/ns.net." [net]
-  , ExampleFile "examples/ns/cyclic-deleg/root.com." [dnsRoot] ]
+  , ExampleFile "examples/ns/cyclic-deleg/root.com." [dnsRoot]
+  , ExampleFile "examples/dname/loop-empty/ns.net." [com]
+  , ExampleFile "examples/dname/loop-non-empty/ns.net." [com] ]
 
 data ExampleConfig = ExampleConfig
   { configName :: String
@@ -243,10 +257,16 @@ exampleConfigs =
       , Query rootNet RT.SOA rootNet
       , Query rootNet RT.A rootNet
       , Query nsNet RT.A subRootNet ]
-      [Query rootNet RT.TXT subRootNet] ]
+      [Query rootNet RT.TXT subRootNet]
+  , ExampleConfig
+      "dname/loop-non-empty"
+      dnameLoopNonEmptyFiles
+      [Query nsNet RT.TXT aSubSubSubCom]
+      [] ]
 
 baseFiles, newFiles, brokenFiles, partiallySignedFiles, signedFiles, signedNewFiles, signedNonZoneKeyFiles :: [FilePath]
 selfDelegFiles, subSelfDelegFiles, nsLoopFiles, cnameLoopFiles :: [FilePath]
+dnameLoopEmptyFiles, dnameLoopNonEmptyFiles :: [FilePath]
 partiallySignedNsec3Files, partiallySignedNsec3OOFiles, signedNsec3Files :: [FilePath]
 baseFiles =
   [ "examples/cname/base/ns.com."
@@ -294,6 +314,10 @@ nsLoopFiles =
 
 cnameLoopFiles = ["examples/cname/loop/ns.com."]
 
+dnameLoopEmptyFiles = ["examples/dname/loop-empty/ns.net."]
+
+dnameLoopNonEmptyFiles = ["examples/dname/loop-non-empty/ns.net."]
+
 data Query = Query (Name String) RT.Type (Name String)
   deriving Eq
 
@@ -316,14 +340,17 @@ authenticatedUnsigned :: Name String -> RT.Type -> Name String -> Resolution
 authenticatedUnsigned ns rtype qname =
   Resolution (Query ns rtype qname) top (ad 0)
 
-dnsRoot, com, net, aCom, bCom, subACom :: Name String
+dnsRoot, com, net, aCom, bCom, aaCom, subACom, aSubSubSubCom, exampleCom :: Name String
 rootNet, subRootNet, nsCom, nsBCom, nsNet :: Name String
 dnsRoot = root
 com = mkName ["com", ""]
 net = mkName ["net", ""]
 aCom = mkName ["a", "com", ""]
 bCom = mkName ["b", "com", ""]
+aaCom = mkName ["a", "a", "com", ""]
 subACom = mkName ["sub", "a", "com", ""]
+aSubSubSubCom = mkName ["a", "sub", "sub", "sub", "com", ""]
+exampleCom = mkName ["example", "com", ""]
 rootNet = mkName ["root", "net", ""]
 subRootNet = mkName ["sub", "root", "net", ""]
 nsCom = mkName ["ns", "com", ""]
@@ -331,7 +358,7 @@ nsBCom = mkName ["ns", "b", "com", ""]
 nsNet = mkName ["ns", "net", ""]
 
 rootServers :: [Name String]
-rootServers = [nsCom, rootNet]
+rootServers = [nsCom, rootNet, nsNet]
 
 exampleFileTest :: ExampleFile -> TestTree
 exampleFileTest example =
@@ -354,6 +381,14 @@ misconfigurationLoopTest :: [FilePath] -> [Query] -> [Query] -> Assertion
 misconfigurationLoopTest files expected unexpected = do
   results <- resolvableQueries files
   assertQueries files results expected unexpected
+
+exactResolutionTest :: [FilePath] -> [Term] -> Assertion
+exactResolutionTest files expected = do
+  results <- resolvableQueries files
+  forM_ expected $ \resolution ->
+    assertBool
+      (show resolution ++ " was not resolvable for zones:\n" ++ showZoneFiles files)
+      (any (coversTerm resolution) results)
 
 authenticatedResolutionTest :: [FilePath] -> Assertion
 authenticatedResolutionTest files = do
