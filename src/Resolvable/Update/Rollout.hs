@@ -158,7 +158,7 @@ rollout' acc diffs (updateDeps diffs -> old) (updateDeps diffs -> new)
       return (apply', wait')
       where
         canRollout :: RRSetID -> Bool
-        canRollout (ns, n) = G.leaf old (ns, n) && all (`S.member` toIDs wait) (G.next new (ns, n))
+        canRollout (ns, n) = G.leaf old (ns, n) && all (`S.member` toIDs apply) (G.next new (ns, n))
 
     checkInsert :: Ord a => a -> S.Set a -> Changed (S.Set a)
     checkInsert = S.alterF (\found -> St.modify (not found ||) >> return True)
