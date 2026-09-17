@@ -35,6 +35,9 @@ extra-source-files:
     examples/cname/signed/ns.com.
     examples/dname/loop-empty/ns.net.
     examples/dname/loop-non-empty/ns.net.
+    examples/dnssec/ns/example.
+    examples/dnssec/txt/ns.com.
+    examples/dnssec/wildcard/ns.com.
     examples/ns/cyclic-deleg/ns.net.
     examples/ns/cyclic-deleg/root.com.
     examples/ns/cyclic-deleg/root.net.

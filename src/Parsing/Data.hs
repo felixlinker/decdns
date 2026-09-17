@@ -6,7 +6,6 @@ module Parsing.Data
   , parseType
   , parseTypeM ) where
 
-import Data.Char (isPrint)
 import qualified Data.ByteString as BS
 import Data.Functor (($>))
 import Control.Applicative (asum)
@@ -77,7 +76,7 @@ aaaa :: Stream s m Char => TypeParser s m
 aaaa = AAAA <$> ipv6
 
 txt :: Stream s m Char => TypeParser s m
-txt = TXT <$> many1 (satisfy isPrint)
+txt = TXT <$> between (char '"') (char '"') (many (satisfy (/= '"')))
 
 mx :: Stream s m Char => TypeParser s m
 mx = MX <$> int <*> (sep >> absName)

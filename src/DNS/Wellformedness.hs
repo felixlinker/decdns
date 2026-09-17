@@ -1,11 +1,13 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 module DNS.Wellformedness
-  ( responseWellformed
+  ( Issue(..)
+  , isFatal
+  , responseWellformed
   , zoneWellformed ) where
 
-import Control.Applicative (asum)
 import qualified Data.Map as M
+import Data.Maybe (catMaybes)
 import qualified Data.List.NonEmpty as NE
 
 import DNS.Name as N
@@ -18,7 +20,18 @@ import Data.List (uncons)
 import DNS.SEC.Verification (isDNSSECKey)
 import Util.Bool ((==>))
 
-expect :: Bool -> String -> Maybe String
+data Issue a = Warning a | Error a
+  deriving (Eq, Ord)
+
+instance Show a => Show (Issue a) where
+  show (Warning a) = "Warning: " ++ show a
+  show (Error a) = "Error: " ++ show a
+
+isFatal :: Issue a -> Bool
+isFatal (Error _) = True
+isFatal (Warning _) = False
+
+expect :: Bool -> Issue String -> Maybe (Issue String)
 expect p err = if p then Nothing else Just err
 
 dataNoApex :: Zone a -> Tr.Node a (RRSet.RTypedSet RData)
@@ -31,32 +44,30 @@ dataNoApex (Zone _ (Tr.Node _ rcs)) = Tr.Node RRSet.empty rcs
 -- * NSEC3 consistency according to RFC 5155, Sec. 7.2.
 -- * Enfore tautologies on NSEC(3) bitmaps
 -- * There must be the corresponding data for every RRSIG
-wellformed :: Zone String -> Maybe String
-wellformed z@(Zone org r) =
-  asum  [ expect (checkCNAME z) "CNAME record accompanied by records other than NSEC or RRSIG"
-        , expect (not $ any (RRSet.hasType T.SOA) (dataNoApex z)) "zone SOA record below apex"
-        , expect (checkZoneCuts $ dataNoApex z) "illegal record at or below zone cut"
-        , expect (singletonTypes r) "more than one CNAME, DNAME, NSEC or SOA record at owner name"
-        , expect (wildcardRestrictions z) "DNAME, DS or NS wildcard record"
-        , expect (rrsigSignerName org r) "RRSIG has illegal signer name" ]
+wellformed :: Zone String -> [Issue String]
+wellformed z@(Zone org r) = catMaybes
+  [ expect (checkCNAME z) (Error "CNAME record accompanied by records other than NSEC or RRSIG")
+  , expect (not $ any (RRSet.hasType T.SOA) (dataNoApex z)) (Error "zone SOA record below apex")
+  , expect (checkZoneCuts $ dataNoApex z) (Warning "illegal record at or below zone cut")
+  , expect (singletonTypes r) (Error "more than one CNAME, DNAME, NSEC or SOA record at owner name")
+  , expect (wildcardRestrictions z) (Error "DNAME, DS or NS wildcard record")
+  , expect (rrsigSignerName org r) (Error "RRSIG has illegal signer name") ]
 
-responseWellformed :: Zone String -> Maybe String
-responseWellformed z@(Zone _ r) =
-  asum  [ wellformed z
-        , expect (checkDNAME True r) "CNAME next to DNAME or records below DNAME"
-        , expect (rrsigLabelCount True z) "RRSIG has illegal label count" ]
+responseWellformed :: Zone String -> [Issue String]
+responseWellformed z@(Zone _ r) = wellformed z ++ catMaybes
+  [ expect (checkDNAME True r) (Error "CNAME next to DNAME or records below DNAME")
+  , expect (rrsigLabelCount True z) (Error "RRSIG has illegal label count") ]
 
 -- NOTE: I do not enforce that there must not be any DS records at the zone
 -- apex, because I do not distinguish whether the data is at the parent or child
 -- side of the delegation for a name server that also serves the child zone. For
 -- the rule, see: https://datatracker.ietf.org/doc/html/rfc4035#section-2.4
-zoneWellformed :: Zone String -> Maybe String
-zoneWellformed z@(Zone _ r@(Tr.Node rd _)) =
-  asum  [ wellformed z
-        , expect (RRSet.hasType T.SOA rd) "zone misses SOA record"
-        , expect (checkDNAME False r) "CNAME next to DNAME or records below DNAME"
-        , expect (rrsigLabelCount False z) "RRSIG has illegal label count"
-        , expect (noDNSSECKey (dataNoApex z)) "DNSKEY with non-apex owner name" ]
+zoneWellformed :: Zone String -> [Issue String]
+zoneWellformed z@(Zone _ r@(Tr.Node rd _)) = wellformed z ++ catMaybes
+  [ expect (RRSet.hasType T.SOA rd) (Error "zone misses SOA record")
+  , expect (checkDNAME False r) (Error "CNAME next to DNAME or records below DNAME")
+  , expect (rrsigLabelCount False z) (Error "RRSIG has illegal label count")
+  , expect (noDNSSECKey (dataNoApex z)) (Error "DNSKEY with non-apex owner name") ]
 
 typesAllIn :: RRSet.RTypedSet a -> [T.Type] -> Bool
 typesAllIn rd = M.null . RRSet.rds . foldr (RRSet.modify . M.delete) rd

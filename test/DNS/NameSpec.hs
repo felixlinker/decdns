@@ -27,6 +27,12 @@ tests =
     , testGroup
         "unit"
         [ testCase "show root as dot" showRootAsDot
+        , testCase "count labels in a wildcard name" $
+            labelCount (mkName ["*", "example", ""]) @?= 1
+        , testCase "count labels in a non-wildcard name" $
+            labelCount (mkName ["example", ""]) @?= 1
+        , testCase "count an intermediate wildcard label" $
+            labelCount (mkName ["sub", "*", "example", ""]) @?= 3
         , testCase "examples from RFC 4034" canonicalCompareRfc4034Example
         , testCase "more specific name sorts before parent" canonicalCompareSpecificBeforeParent
         , testCase "compares next label when TLD matches" canonicalCompareNextLabel

@@ -5,9 +5,9 @@ module Parsing.Config
   , parseStdin
   ) where
 
-import Control.Monad.Trans.Except (Except, runExcept, throwE)
 import qualified Data.List.NonEmpty as NE
-import GHC.Base (failIO)
+import GHC.Base (failIO, when)
+import System.IO (stderr, hPrint)
 import Text.Parsec (ParseError, SourceName)
 
 import DNS.Name (Name)
@@ -16,34 +16,39 @@ import DNS.Zone (splitZone)
 import NameConstraint (compileWildcards)
 import Parsing (ServedZone, parseZoneFile)
 import Resolvable.Resolvability (NameServersConfig)
+import DNS.Wellformedness (Issue, isFatal)
 
 handleParser :: Either ParseError a -> IO a
 handleParser = either (failIO . show) return
 
-parseZoneFileContents :: (Zone String -> Maybe String) -> SourceName -> String -> IO NameServersConfig
+parseZoneFileContents :: (Zone String -> [Issue String]) -> SourceName -> String -> IO NameServersConfig
 parseZoneFileContents wfc source content = do
-  exceptZones <- map (runExcept . toZones) <$> (handleParser =<< parseZoneFile source content)
-  zones <- concat <$> mapM (either failIO return) exceptZones
+  parsed <- handleParser =<< parseZoneFile source content
+  zones <- concat <$> mapM toZones parsed
+  mapM_ (wellformed . snd) zones
   return $ map (fmap compileWildcards) zones
   where
-    wellformed :: Zone String -> Except String ()
-    wellformed zone = maybe (return ()) throwE (wfc zone)
+    wellformed :: Zone String -> IO (Zone String)
+    wellformed zone = do
+      let issues = wfc zone
+      mapM_ (hPrint stderr) issues
+      when (any isFatal issues) (fail "fatal error encountered")
+      return zone
 
-    toZones :: ServedZone -> Except String [(Name String, Zone String)]
+    toZones :: ServedZone -> IO [(Name String, Zone String)]
     toZones (nameServer, records) = do
-      zones <- maybe (throwE "no records") (return . splitZone . fromRecordList) (NE.nonEmpty records)
-      mapM_ wellformed zones
+      zones <- maybe (fail "no records") (return . splitZone . fromRecordList) (NE.nonEmpty records)
       return $ map (nameServer,) zones
 
-parseStdin :: (Zone String -> Maybe String) -> IO NameServersConfig
+parseStdin :: (Zone String -> [Issue String]) -> IO NameServersConfig
 parseStdin wfc = do
   content <- getContents
   parseZoneFileContents wfc "<stdin>" content
 
-parseZoneFileZones :: (Zone String -> Maybe String) -> FilePath -> IO NameServersConfig
+parseZoneFileZones :: (Zone String -> [Issue String]) -> FilePath -> IO NameServersConfig
 parseZoneFileZones wfc path = do
   content <- readFile path
   parseZoneFileContents wfc path content
 
-parseZoneFiles :: (Zone String -> Maybe String) -> [FilePath] -> IO NameServersConfig
+parseZoneFiles :: (Zone String -> [Issue String]) -> [FilePath] -> IO NameServersConfig
 parseZoneFiles wfc = fmap concat . mapM (parseZoneFileZones wfc)

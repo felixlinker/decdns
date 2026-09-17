@@ -19,7 +19,7 @@ import DNS.Name (Name, Named (..))
 import DNS.Record (StandardRecord)
 import qualified DNS.RecordType as RT
 import qualified DNS.RRSet as RRSet
-import DNS.Wellformedness (zoneWellformed)
+import DNS.Wellformedness (isFatal, zoneWellformed)
 import DNS.Zone (splitZone)
 import DNS.ZoneFile (allData, allRecords, fromRecordList, mergeZones)
 import DNS.ZoneFileSpec (genLabel)
@@ -137,10 +137,15 @@ rolloutInvariant old new = case prepare of
 -- this property tests query continuity, not zone validity or answer equality.
 dependencies :: NameServersConfig -> Either String RecordDependencies
 dependencies cfg = do
-  mapM_ (\(_, z) -> maybe (Right ()) Left (zoneWellformed (literalWildcards z))) cfg
+  mapM_ checkWellformed cfg
   let order = runFresh $ resolutionOrder <$> compileConfig roots cfg
   unless (isJust (G.transitiveClosure order)) (Left "cyclic fixture rule order")
   maybe (Left "cyclic fixture record order") Right (fromResolutionOrder order)
+  where
+    checkWellformed (_, zone) =
+      case filter isFatal (zoneWellformed (literalWildcards zone)) of
+        [] -> Right ()
+        issues -> Left (unlines (map show issues))
 
 -- Project away response data and the answering zone BEFORE intersecting: an
 -- address, alias target, or authoritative zone may legitimately change.

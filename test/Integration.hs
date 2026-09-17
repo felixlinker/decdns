@@ -56,8 +56,29 @@ tests =
         "Resolvable.Resolvability authentication"
         [ testCase "signed authenticates the CNAME chain and child zone" $
             authenticatedResolutionTest signedFiles
+        , testCase "signed authenticates a TXT record" $ do
+            results <- resolvableQueries signedTxtFiles
+            assertResolutions signedTxtFiles results
+              [authenticated nsCom RT.TXT com]
+              []
+        , testCase "signed authenticates an apex NS RRset" $ do
+            results <- resolvableQueries signedNsFiles
+            assertResolutions signedNsFiles results
+              [ authenticated fooUniFoo RT.NS exampleZone
+              , authenticated fooUniFoo RT.NS exampleZone]
+              []
         , testCase "signed-new authenticates answers synthesized from a wildcard" $
             authenticatedWildcardResolutionTest signedNewFiles
+        , testCase "signed wildcard records authenticate synthesized answers" $ do
+            results <- resolvableQueries signedWildcardFiles
+            assertResolutions signedWildcardFiles results
+              [authenticated nsCom RT.A aCom]
+              []
+        , testCase "signed records with asterisk labels in owner names authenticate" $ do
+            results <- resolvableQueries signedWildcardFiles
+            assertResolutions signedWildcardFiles results
+              [authenticated nsCom RT.A xWildcardCom]
+              []
         , testCase "signed-nsec3 authenticates the CNAME chain and child zone" $
             authenticatedResolutionTest signedNsec3Files
         , testCase "partially-signed authenticates unsigned child zone through NSEC" $
@@ -127,6 +148,9 @@ exampleFiles =
   , ExampleFile "examples/cname/partially-signed-nsec3-oo/ns.b.com." [bCom]
   , ExampleFile "examples/cname/signed-nsec3/ns.com." [com]
   , ExampleFile "examples/cname/signed-nsec3/ns.b.com." [bCom]
+  , ExampleFile "examples/dnssec/txt/ns.com." [com]
+  , ExampleFile "examples/dnssec/ns/example." [exampleZone]
+  , ExampleFile "examples/dnssec/wildcard/ns.com." [com]
   , ExampleFile "examples/ns/self-deleg/ns.com." [com, subACom]
   , ExampleFile "examples/ns/sub-self-deleg/root.net." [dnsRoot, rootNet]
   , ExampleFile "examples/ns/sub-self-deleg/ns.net." [net]
@@ -233,6 +257,11 @@ exampleConfigs =
       , Query nsCom RT.NSEC3PARAM com ]
       [Query nsCom RT.TXT aCom]
   , ExampleConfig
+      "dnssec/ns"
+      signedNsFiles
+      [Query fooUniFoo RT.NS exampleZone]
+      []
+  , ExampleConfig
       "ns/self-deleg"
       selfDelegFiles
       [ Query nsCom RT.NS com
@@ -267,7 +296,7 @@ exampleConfigs =
 baseFiles, newFiles, brokenFiles, partiallySignedFiles, signedFiles, signedNewFiles, signedNonZoneKeyFiles :: [FilePath]
 selfDelegFiles, subSelfDelegFiles, nsLoopFiles, cnameLoopFiles :: [FilePath]
 dnameLoopEmptyFiles, dnameLoopNonEmptyFiles :: [FilePath]
-partiallySignedNsec3Files, partiallySignedNsec3OOFiles, signedNsec3Files :: [FilePath]
+partiallySignedNsec3Files, partiallySignedNsec3OOFiles, signedNsec3Files, signedNsFiles, signedTxtFiles, signedWildcardFiles :: [FilePath]
 baseFiles =
   [ "examples/cname/base/ns.com."
   , "examples/cname/base/ns.b.com." ]
@@ -301,6 +330,12 @@ partiallySignedNsec3OOFiles =
 signedNsec3Files =
   [ "examples/cname/signed-nsec3/ns.com."
   , "examples/cname/signed-nsec3/ns.b.com." ]
+
+signedNsFiles = ["examples/dnssec/ns/example."]
+
+signedTxtFiles = ["examples/dnssec/txt/ns.com."]
+
+signedWildcardFiles = ["examples/dnssec/wildcard/ns.com."]
 
 selfDelegFiles = ["examples/ns/self-deleg/ns.com."]
 
@@ -340,25 +375,28 @@ authenticatedUnsigned :: Name String -> RT.Type -> Name String -> Resolution
 authenticatedUnsigned ns rtype qname =
   Resolution (Query ns rtype qname) top (ad 0)
 
-dnsRoot, com, net, aCom, bCom, aaCom, subACom, aSubSubSubCom, exampleCom :: Name String
-rootNet, subRootNet, nsCom, nsBCom, nsNet :: Name String
+dnsRoot, com, net, exampleZone, aCom, bCom, aaCom, subACom, aSubSubSubCom, exampleCom, xWildcardCom :: Name String
+rootNet, subRootNet, nsCom, nsBCom, nsNet, fooUniFoo :: Name String
 dnsRoot = root
 com = mkName ["com", ""]
 net = mkName ["net", ""]
+exampleZone = mkName ["example", ""]
 aCom = mkName ["a", "com", ""]
 bCom = mkName ["b", "com", ""]
 aaCom = mkName ["a", "a", "com", ""]
 subACom = mkName ["sub", "a", "com", ""]
 aSubSubSubCom = mkName ["a", "sub", "sub", "sub", "com", ""]
 exampleCom = mkName ["example", "com", ""]
+xWildcardCom = mkName ["x", "*", "com", ""]
 rootNet = mkName ["root", "net", ""]
 subRootNet = mkName ["sub", "root", "net", ""]
 nsCom = mkName ["ns", "com", ""]
 nsBCom = mkName ["ns", "b", "com", ""]
 nsNet = mkName ["ns", "net", ""]
+fooUniFoo = mkName ["foo", "uni", "foo", ""]
 
 rootServers :: [Name String]
-rootServers = [nsCom, rootNet, nsNet]
+rootServers = [nsCom, rootNet, nsNet, fooUniFoo]
 
 exampleFileTest :: ExampleFile -> TestTree
 exampleFileTest example =

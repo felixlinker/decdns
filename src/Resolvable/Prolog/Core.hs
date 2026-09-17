@@ -62,7 +62,7 @@ module Resolvable.Prolog.Core
   , dataTerm
   , resolves
   , resolvable
-  , glueZone
+  , referralZone
   , top
   , bot
   , ad
@@ -480,8 +480,8 @@ resolves ns qtype zone qname d ver adb = TFunctor resolvesSym [ ns, qtype, zone,
 resolvable :: Term -> Term -> Term -> Term -> Term -> Term
 resolvable ns qtype qname ver auth = TFunctor resolvableSym [ ns, qtype, qname, ver, auth ]
 
-glueZone :: Term
-glueZone = TAtom "glue"
+referralZone :: Term
+referralZone = TAtom "referral"
 
 top :: Term
 top = TFunctor "top" []

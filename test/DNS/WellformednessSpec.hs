@@ -11,8 +11,7 @@ import qualified DNS.RecordType as T
 import DNS.SEC.Crypto (AlgorithmType (RSASHA256))
 import DNS.ZoneFileSpec (named, zoneFromList)
 import DNS.NameSpec (mkName)
-import DNS.Wellformedness (zoneWellformed)
-import Data.Maybe (isJust)
+import DNS.Wellformedness (Issue (Warning), isFatal, zoneWellformed)
 
 tests :: TestTree
 tests =
@@ -21,8 +20,8 @@ tests =
     [ testCase "allows DNSSEC records alongside CNAME" allowsDNSSECAlongsideCNAME
     , testCase "rejects non-DNSSEC records alongside CNAME" rejectsOtherRecordsAlongsideCNAME
     , testCase "allows glue below NS zone cut" allowsGlueBelowNSZoneCut
-    , testCase "rejects CNAME below NS zone cut" rejectsCNAMEBelowNSZoneCut
-    , testCase "rejects records other than delegation data at NS zone cut" rejectsOtherRecordsAtNSZoneCut
+    , testCase "warns about CNAME below NS zone cut" warnsAboutCNAMEBelowNSZoneCut
+    , testCase "warns about records other than delegation data at NS zone cut" warnsAboutOtherRecordsAtNSZoneCut
     , testCase "rejects multiple CNAME records at one owner" rejectsMultipleCNAMEs
     , testCase "rejects multiple DNAME records at one owner" rejectsMultipleDNAMEs
     , testCase "rejects NS records at wildcard leaves" rejectsWildcardNS
@@ -39,7 +38,7 @@ allowsDNSSECAlongsideCNAME = do
     [ soa org
     , named alias (RData IN 300 (CNAME (mkName ["target", "example", "net", ""])))
     , named alias (RData IN 300 (RRSIG (RRSIGData T.CNAME RSASHA256 (labelCount alias) 300 1 0 1 org (BS.pack [1, 2, 3])))) ]
-  zoneWellformed zone @?= Nothing
+  zoneWellformed zone @?= []
   where
     org = mkName ["example", "com", ""]
     alias = "alias" <| org
@@ -50,19 +49,19 @@ allowsGlueBelowNSZoneCut = do
     [ soa org
     , named cut (RData IN 300 (NS glueName))
     , named glueName (RData IN 300 (A $ read "192.0.2.1")) ]
-  zoneWellformed zone @?= Nothing
+  zoneWellformed zone @?= []
   where
     org = mkName ["example", "com", ""]
     cut = "child" <| org
     glueName = "ns" <| cut
 
-rejectsCNAMEBelowNSZoneCut :: Assertion
-rejectsCNAMEBelowNSZoneCut = do
+warnsAboutCNAMEBelowNSZoneCut :: Assertion
+warnsAboutCNAMEBelowNSZoneCut = do
   zone <- zoneFromList
     [ soa org
     , named cut (RData IN 300 (NS ("ns" <| cut)))
     , named alias (RData IN 300 (CNAME (mkName ["target", "example", "net", ""]))) ]
-  isJust (zoneWellformed zone) @?= True
+  zoneWellformed zone @?= [Warning "illegal record at or below zone cut"]
   where
     org = mkName ["example", "com", ""]
     cut = "child" <| org
@@ -74,19 +73,19 @@ rejectsOtherRecordsAlongsideCNAME = do
     [ soa org
     , named alias (RData IN 300 (CNAME target))
     , named alias (RData IN 300 (A $ read "192.0.2.1")) ]
-  isJust (zoneWellformed zone) @?= True
+  any isFatal (zoneWellformed zone) @?= True
   where
     org = mkName ["example", "com", ""]
     alias = "alias" <| org
     target = mkName ["target", "example", "net", ""]
 
-rejectsOtherRecordsAtNSZoneCut :: Assertion
-rejectsOtherRecordsAtNSZoneCut = do
+warnsAboutOtherRecordsAtNSZoneCut :: Assertion
+warnsAboutOtherRecordsAtNSZoneCut = do
   zone <- zoneFromList
     [ soa org
     , named cut (RData IN 300 (NS ("ns" <| cut)))
     , named cut (RData IN 300 (TXT "...")) ]
-  isJust (zoneWellformed zone) @?= True
+  zoneWellformed zone @?= [Warning "illegal record at or below zone cut"]
   where
     org = mkName ["example", "com", ""]
     cut = "child" <| org
@@ -97,7 +96,7 @@ rejectsMultipleCNAMEs = do
     [ soa org
     , named alias (RData IN 300 (CNAME target1))
     , named alias (RData IN 300 (CNAME target2)) ]
-  isJust (zoneWellformed zone) @?= True
+  any isFatal (zoneWellformed zone) @?= True
   where
     org = mkName ["example", "com", ""]
     alias = "alias" <| org
@@ -110,7 +109,7 @@ rejectsMultipleDNAMEs = do
     [ soa org
     , named owner (RData IN 300 (DNAME target1))
     , named owner (RData IN 300 (DNAME target2)) ]
-  isJust (zoneWellformed zone) @?= True
+  any isFatal (zoneWellformed zone) @?= True
   where
     org = mkName ["example", "com", ""]
     owner = "alias" <| org
@@ -120,7 +119,7 @@ rejectsMultipleDNAMEs = do
 rejectsWildcardNS :: Assertion
 rejectsWildcardNS = do
   zone <- zoneFromList [soa org, named wildcard (RData IN 300 (NS ns))]
-  isJust (zoneWellformed zone) @?= True
+  any isFatal (zoneWellformed zone) @?= True
   where
     org = mkName ["example", "com", ""]
     wildcard = "*" <| org
@@ -129,7 +128,7 @@ rejectsWildcardNS = do
 rejectsWildcardDNAME :: Assertion
 rejectsWildcardDNAME = do
   zone <- zoneFromList [soa org, named wildcard (RData IN 300 (DNAME target))]
-  isJust (zoneWellformed zone) @?= True
+  any isFatal (zoneWellformed zone) @?= True
   where
     org = mkName ["example", "com", ""]
     wildcard = "*" <| org
@@ -141,7 +140,7 @@ allowsAncestorSigner = do
     [ soa org
     , named owner (RData IN 300 (A $ read "192.0.2.1"))
     , named owner (rrsig T.A (labelCount owner) org) ]
-  zoneWellformed zone @?= Nothing
+  zoneWellformed zone @?= []
   where
     org = mkName ["example", "com", ""]
     owner = "www" <| org
@@ -152,7 +151,7 @@ rejectsSignerBelowOwner = do
     [ soa org
     , named owner (RData IN 300 (A $ read "192.0.2.1"))
     , named owner (rrsig T.A (labelCount owner) ("signer" <| owner)) ]
-  isJust (zoneWellformed zone) @?= True
+  any isFatal (zoneWellformed zone) @?= True
   where
     org = mkName ["example", "com", ""]
     owner = "www" <| org
@@ -161,8 +160,8 @@ requiresSOASignerAtOwner :: Assertion
 requiresSOASignerAtOwner = do
   valid <- zoneFromList [soa org, named org (rrsig T.SOA orgLs org)]
   invalid <- zoneFromList [soa org, named org (rrsig T.SOA orgLs parent)]
-  zoneWellformed valid @?= Nothing
-  isJust (zoneWellformed invalid) @?= True
+  zoneWellformed valid @?= []
+  any isFatal (zoneWellformed invalid) @?= True
   where
     org = mkName ["example", "com", ""]
     orgLs = labelCount org
@@ -174,8 +173,8 @@ requiresDNSKEYSignerAtOwner = do
     [ soa org, named org (dnskey [ZoneKey]), named org (rrsig T.DNSKEY orgLs org) ]
   invalid <- zoneFromList
     [ soa org, named org (dnskey [ZoneKey]), named org (rrsig T.DNSKEY orgLs owner) ]
-  zoneWellformed valid @?= Nothing
-  isJust (zoneWellformed invalid) @?= True
+  zoneWellformed valid @?= []
+  any isFatal (zoneWellformed invalid) @?= True
   where
     org = mkName ["example", "com", ""]
     orgLs = labelCount org
