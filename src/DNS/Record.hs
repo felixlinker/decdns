@@ -254,7 +254,14 @@ data RData = RData
   { rcat  :: Cat
   , rttl  :: Int
   , rtype :: Type }
-  deriving (Eq, Ord)
+
+-- For equality and ordering, we ignore category  because it is constant, and
+-- TTL because we are not concerned with TTL in this implementation.
+instance Eq RData where
+  (RData _ _ t) == (RData _ _ t') = t == t'
+
+instance Ord RData where
+  compare (RData _ _ t) (RData _ _ t') = compare t t'
 
 type Record a = Named a RData
 type StandardRecord = Record String
