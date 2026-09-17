@@ -147,12 +147,18 @@ rollout' :: (Rollout -> Rollout) -> Diffs -> RecordDependencies -> RecordDepende
 rollout' acc diffs (updateDeps diffs -> old) (updateDeps diffs -> new)
   | S.null diffs = return $ acc []
   | otherwise = do
-    let (changes, next) = rolloutNow diffs
+    let (changes, next) = fixpoint rolloutNow (S.empty, diffs)
     when (null changes) (throwE $ unlines $ "no changes; rolled out so far:" : showRollOut (acc []) ++ ["remaining changes:"] ++ showDiffs next)
     rollout' (acc . (changes :)) next old new
   where
-    rolloutNow :: Diffs -> (Diffs, Diffs)
-    rolloutNow = do S.partition (canRollout . fmap name)
+    rolloutNow :: (Diffs, Diffs) -> Changed (Diffs, Diffs)
+    rolloutNow (apply, wait) = do
+      let (newApply, wait') = S.partition (canRollout . fmap name) wait
+      apply' <- foldM (flip checkInsert) apply newApply
+      return (apply', wait')
       where
         canRollout :: RRSetID -> Bool
-        canRollout (ns, n) = G.leaf old (ns, n) && G.leaf new (ns, n)
+        canRollout (ns, n) = G.leaf old (ns, n) && all (`S.member` toIDs wait) (G.next new (ns, n))
+
+    checkInsert :: Ord a => a -> S.Set a -> Changed (S.Set a)
+    checkInsert = S.alterF (\found -> St.modify (not found ||) >> return True)
