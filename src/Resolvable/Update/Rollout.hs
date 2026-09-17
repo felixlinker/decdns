@@ -93,17 +93,29 @@ showRollOut r = do
 type NSMap = M.Map (Name String) (Zone ConstrainedLabel)
 
 rollout :: NSMap -> NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
-rollout zones diffs old new = do
-  updateSeq <- rollout' id (flattenDiffs diffs) (G.invert old) new
-  let (_, ($ []) -> synthesized) = foldl' applyStep (zones, id) (map groupDiffs updateSeq)
+rollout zones diffs (G.invert -> old) new = do
+  updateSeq <- rollout' id (flattenDiffs diffs) old new
+  let (updateSeq',_ ) = delayDeletions S.empty updateSeq
+  let (_, ($ []) -> synthesized) = foldl' applyStep (zones, id) (map groupDiffs updateSeq')
   let resolvabilityGuards = map fst synthesized
-  return $ foldGuards resolvabilityGuards [] $ zipWith S.union updateSeq (map snd synthesized)
+  return $ foldGuards resolvabilityGuards [] $ zipWith S.union updateSeq' (map snd synthesized)
   -- return updateSeq
   where
     applyStep :: (NSMap, [(Diffs, Diffs)] -> [(Diffs, Diffs)]) -> M.Map (Name String) [RRSetDiff] -> (NSMap, [(Diffs, Diffs)] -> [(Diffs, Diffs)])
     applyStep (config, acc) ds =
       let (config', synthesized) = St.runState (foldM applyServer config (M.toList ds)) (S.empty, S.empty)
       in  (config', acc . (synthesized:))
+
+    delayDeletions :: Diffs -> Rollout -> (Rollout, Diffs)
+    delayDeletions acc [] = ([], acc)
+    delayDeletions acc (s:t) =
+      let (abort, acc')     = S.partition (hasDependencies . fmap name) acc
+          (wcDels, others)  = S.partition (all isDeleted . value . snd) s
+          (r', here)        = delayDeletions (acc' <> wcDels) t
+      in  ((others <> here) : r', abort)
+      where
+        hasDependencies :: RRSetID -> Bool
+        hasDependencies rid = any (\(fmap name -> rid') -> rid `S.member` G.next old rid' || rid `S.member` G.next new rid') s
 
     -- Apply a diff for a name server. Returns the updated name server map, and
     -- stores synthesized responses for occluding wildcards and their inverses

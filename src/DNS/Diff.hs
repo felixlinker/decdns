@@ -6,6 +6,8 @@ module DNS.Diff
   , deleted
   , deither
   , item
+  , isAdded
+  , isDeleted
   , ZoneDiff
   , RDataSetDiff
   , RRSetDiff
@@ -21,7 +23,7 @@ import qualified Control.Monad.Trans.State as St
 import Data.Functor (($>))
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
-import Data.Either ( partitionEithers, isRight )
+import Data.Either ( partitionEithers, isRight, isLeft )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as S
 
@@ -74,6 +76,9 @@ item (Diff (Right a)) = a
 
 isAdded :: Diff a -> Bool
 isAdded = isRight . diffEither
+
+isDeleted :: Diff a -> Bool
+isDeleted = isLeft . diffEither
 
 additions :: NE.NonEmpty (Diff a) -> Maybe (NE.NonEmpty a)
 additions = NE.nonEmpty . map item . NE.filter isAdded
