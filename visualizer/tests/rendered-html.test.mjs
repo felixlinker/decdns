@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { bodyToHeadEdge, layoutGraphLayers, moveRuleSelection, predicateFromOtherRule, ruleEdgePorts, ruleNodeSourceLines, ruleSelectionForSource, sourceHasCycle } from "../app/graph.ts";
+import { bodyToHeadEdge, layoutGraphLayers, moveRuleSelection, predicateFromOtherRule, projectOwnerServerGraph, ruleEdgePorts, ruleNodeSourceLines, ruleSelectionForSource, sourceHasCycle } from "../app/graph.ts";
 import { readVisualizationCatalog, readVisualizationFile } from "../build/visualization-directory.ts";
 
 async function render() {
@@ -40,6 +40,7 @@ test("server-renders the compilation explorer shell", async () => {
   assert.doesNotMatch(html, /Record sets|Compiled rules|Dependency edges|Unifier bindings|Dependency cycles/);
   assert.doesNotMatch(html, /retained by the compiler|Round lower port|matching-head ingress/i);
   assert.match(html, /aria-label="Zoom in"/);
+  assert.match(html, /aria-label="Project graph by owner name and name server"/);
   assert.match(html, /aria-label="Hide RRSets panel"/);
   assert.match(html, /aria-label="Hide inspector panel"/);
   assert.match(html, /Drag canvas to pan.*Scroll to zoom/);
@@ -65,6 +66,39 @@ test("dependency edges use separate ingress and egress ports", () => {
   assert.ok(Math.abs(ports.ingress - 28) < Number.EPSILON * 32);
   assert.ok(Math.abs(ports.egress - 72) < Number.EPSILON * 32);
   assert.ok(ports.ingress < ports.egress);
+});
+
+test("owner and name-server projection merges nodes and their dependencies", () => {
+  const sources = [
+    { id: "a-a", owner: "a.example.", server: "ns1.example." },
+    { id: "a-aaaa", owner: "a.example.", server: "ns1.example." },
+    { id: "a-other-server", owner: "a.example.", server: "ns2.example." },
+    { id: "b-a", owner: "b.example.", server: "ns1.example." },
+  ];
+  const rules = [
+    { id: "rule-1", sourceId: "a-a" },
+    { id: "rule-2", sourceId: "a-aaaa" },
+    { id: "rule-3", sourceId: "a-other-server" },
+    { id: "rule-4", sourceId: "b-a" },
+  ];
+  const matches = [
+    { dependentRuleId: "rule-1", dependencyRuleId: "rule-4", predicate: "first" },
+    { dependentRuleId: "rule-2", dependencyRuleId: "rule-4", predicate: "second" },
+    { dependentRuleId: "rule-3", dependencyRuleId: "rule-1", predicate: "third" },
+  ];
+
+  const projected = projectOwnerServerGraph(sources, rules, matches);
+
+  assert.deepEqual(projected.nodes.map(({ owner, server, ruleIds }) => ({ owner, server, ruleIds })), [
+    { owner: "a.example.", server: "ns1.example.", ruleIds: ["rule-1", "rule-2"] },
+    { owner: "a.example.", server: "ns2.example.", ruleIds: ["rule-3"] },
+    { owner: "b.example.", server: "ns1.example.", ruleIds: ["rule-4"] },
+  ]);
+  assert.equal(projected.edges.length, 2);
+  assert.deepEqual(projected.edges.map((edge) => edge.matches.map((match) => match.predicate)), [
+    ["first", "second"],
+    ["third"],
+  ]);
 });
 
 test("configured directories expose valid visualization exports", async () => {

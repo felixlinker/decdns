@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { bodyToHeadEdge, layoutGraphLayers, moveRuleSelection, predicateFromOtherRule, ruleEdgePorts, ruleNodeSourceLines, ruleSelectionForSource, sourceHasCycle } from "./graph";
+import { bodyToHeadEdge, layoutGraphLayers, moveRuleSelection, predicateFromOtherRule, projectOwnerServerGraph, ruleEdgePorts, ruleNodeSourceLines, ruleSelectionForSource, sourceHasCycle } from "./graph";
 
 type Source = {
   id: string;
@@ -58,6 +58,8 @@ type DirectorySelection = {
 };
 
 type Placement = { id: string; x: number; y: number };
+type GraphNode = { id: string; owner: string | null; server: string | null; ruleIds: string[] };
+type GraphEdge = { matches: Match[]; from: Placement; to: Placement };
 type Viewport = { x: number; y: number; scale: number };
 
 const nodeWidth = 360;
@@ -85,6 +87,7 @@ export default function Home() {
   const [serverFilter, setServerFilter] = useState("all");
   const [showSourcePanel, setShowSourcePanel] = useState(true);
   const [showInspectorPanel, setShowInspectorPanel] = useState(true);
+  const [projectByOwnerServer, setProjectByOwnerServer] = useState(false);
   const [viewport, setViewport] = useState<Viewport>(defaultViewport);
   const [isPanning, setIsPanning] = useState(false);
   const graphSvg = useRef<SVGSVGElement>(null);
@@ -158,10 +161,6 @@ export default function Home() {
   const indexes = useMemo(() => makeIndexes(data), [data]);
   const cycles = useMemo(() => findCycles(data), [data]);
   const cycleNodes = useMemo(() => new Set(cycles.flat()), [cycles]);
-  const cycleMembership = useMemo(
-    () => new Map(cycles.flatMap((component, index) => component.map((ruleId) => [ruleId, index] as const))),
-    [cycles],
-  );
   const selectedSource = selectedSourceId ? indexes.sources.get(selectedSourceId) ?? null : null;
 
   const filteredSources = useMemo(() => {
@@ -174,15 +173,26 @@ export default function Home() {
     });
   }, [data, indexes.rules, search, serverFilter]);
 
-  const graph = useMemo(() => buildGraph(data), [data]);
+  const graph = useMemo(() => buildGraph(data, projectByOwnerServer), [data, projectByOwnerServer]);
+  const graphCycles = useMemo(
+    () => findGraphCycles(graph.nodes.map((node) => node.id), graph.edges.map((edge) => ({ from: edge.from.id, to: edge.to.id }))),
+    [graph],
+  );
+  const graphCycleMembership = useMemo(
+    () => new Map(graphCycles.flatMap((component, index) => component.map((nodeId) => [nodeId, index] as const))),
+    [graphCycles],
+  );
 
   const selectedSourceRuleIds = selectedSource?.ruleIds.filter((id) => indexes.rules.has(id)) ?? [];
   const activeRuleId = selectedSource
     ? selectedSourceRuleIds.includes(selectedRuleId) ? selectedRuleId : selectedSourceRuleIds[0] ?? ""
-    : graph.placements.some((placement) => placement.id === selectedRuleId)
+    : graph.nodes.some((node) => node.ruleIds.includes(selectedRuleId))
       ? selectedRuleId
-      : graph.placements[0]?.id ?? "";
+      : graph.nodes[0]?.ruleIds[0] ?? "";
   const selectedRuleIds = ruleSelectionForSource(selectedSource, activeRuleId);
+  const selectedGraphNodeIds = new Set(graph.nodes
+    .filter((node) => node.ruleIds.some((ruleId) => selectedRuleIds.has(ruleId)))
+    .map((node) => node.id));
   const activeSourceRuleIndex = selectedSourceRuleIds.indexOf(activeRuleId);
   const selectedRule = activeRuleId ? indexes.rules.get(activeRuleId) ?? null : null;
   const selectedRuleSource = selectedRule?.sourceId ? indexes.sources.get(selectedRule.sourceId) ?? null : null;
@@ -377,6 +387,13 @@ export default function Home() {
               >Inspector ☰</button>
             </div>
             <div className="graph-controls" aria-label="Graph zoom controls">
+              <button
+                type="button"
+                className={`text-control projection-control ${projectByOwnerServer ? "active" : ""}`}
+                aria-label={projectByOwnerServer ? "Show full rule graph" : "Project graph by owner name and name server"}
+                aria-pressed={projectByOwnerServer}
+                onClick={() => { setProjectByOwnerServer((projected) => !projected); setViewport(defaultViewport); }}
+              >{projectByOwnerServer ? "Rules" : "Owner + server"}</button>
               <button type="button" onClick={() => zoomFromCenter(1 / 1.22)} aria-label="Zoom out">−</button>
               <span className="zoom-readout" aria-live="polite">{Math.round(viewport.scale * 100)}%</span>
               <button type="button" onClick={() => zoomFromCenter(1.22)} aria-label="Zoom in">+</button>
@@ -411,46 +428,53 @@ export default function Home() {
                   </marker>
                 </defs>
                 <g transform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.scale})`}>
-                  {graph.edges.map(({ match, from, to }, index) => {
-                    const cyclic = cycleMembership.has(match.dependencyRuleId)
-                      && cycleMembership.get(match.dependencyRuleId) === cycleMembership.get(match.dependentRuleId);
-                    const connected = selectedRuleIds.has(match.dependencyRuleId) || selectedRuleIds.has(match.dependentRuleId);
+                  {graph.edges.map(({ matches, from, to }, index) => {
+                    const cyclic = graphCycleMembership.has(from.id)
+                      && graphCycleMembership.get(from.id) === graphCycleMembership.get(to.id);
+                    const connected = selectedGraphNodeIds.has(from.id) || selectedGraphNodeIds.has(to.id);
+                    const firstMatch = matches[0];
                     return (
                       <path
-                        key={`${match.dependencyRuleId}-${match.dependentRuleId}-${index}`}
+                        key={`${from.id}-${to.id}-${index}`}
                         d={edgePath(from, to, index)}
                         className={`graph-edge ${cyclic ? "cyclic" : ""} ${connected ? "connected" : "muted"}`}
                         markerStart={`url(#egress-${cyclic ? "cycle" : "dependency"})`}
                         markerEnd={`url(#arrow-${cyclic ? "cycle" : "dependency"})`}
                       >
-                        <title>{`Body ${match.dependentRuleId} → head ${match.dependencyRuleId}\n${match.predicate}\n${match.unifier}`}</title>
+                        <title>{projectByOwnerServer
+                          ? `${matches.length} rule dependenc${matches.length === 1 ? "y" : "ies"}`
+                          : `Body ${firstMatch.dependentRuleId} → head ${firstMatch.dependencyRuleId}\n${firstMatch.predicate}\n${firstMatch.unifier}`}</title>
                       </path>
                     );
                   })}
                   {graph.placements.map((placement) => {
-                    const rule = indexes.rules.get(placement.id);
+                    const node = graph.nodesById.get(placement.id);
+                    const rule = node ? indexes.rules.get(node.ruleIds[0]) : null;
                     const source = rule?.sourceId ? indexes.sources.get(rule.sourceId) : null;
-                    if (!rule) return null;
-                    const isCycle = cycleNodes.has(rule.id);
+                    if (!rule || !node) return null;
+                    const isCycle = graphCycleMembership.has(node.id);
                     const sourceLines = ruleNodeSourceLines(source);
+                    const selected = selectedGraphNodeIds.has(node.id);
                     return (
                       <g
-                        key={rule.id}
+                        key={node.id}
                         transform={`translate(${placement.x} ${placement.y})`}
-                        className={`rule-node ${selectedRuleIds.has(rule.id) ? "selected" : ""} ${activeRuleId === rule.id ? "active" : ""} ${isCycle ? "in-cycle" : ""}`}
+                        className={`rule-node ${projectByOwnerServer ? "projected-node" : ""} ${selected ? "selected" : ""} ${node.ruleIds.includes(activeRuleId) ? "active" : ""} ${isCycle ? "in-cycle" : ""}`}
                         role="button"
                         tabIndex={0}
-                        aria-label={`Inspect ${rule.id}${source ? ` served by ${source.server}` : ""}`}
-                        onClick={() => selectRule(rule.id)}
-                        onKeyDown={(event: KeyboardEvent<SVGGElement>) => { if (event.key === "Enter" || event.key === " ") selectRule(rule.id); }}
+                        aria-label={projectByOwnerServer && node.owner && node.server
+                          ? `Inspect ${node.owner} served by ${node.server}, ${node.ruleIds.length} rules`
+                          : `Inspect ${rule.id}${source ? ` served by ${source.server}` : ""}`}
+                        onClick={() => selectRule(node.ruleIds[0])}
+                        onKeyDown={(event: KeyboardEvent<SVGGElement>) => { if (event.key === "Enter" || event.key === " ") selectRule(node.ruleIds[0]); }}
                       >
                         <rect width={nodeWidth} height={nodeHeight} rx="10" />
-                        <text x="15" y="25" className="node-id">{rule.id.toUpperCase()}</text>
+                        <text x="15" y="25" className="node-id">{projectByOwnerServer ? "OWNER + NAME SERVER" : rule.id.toUpperCase()}</text>
                         {isCycle && <text x={nodeWidth - 16} y="25" textAnchor="end" className="cycle-label">CYCLE</text>}
-                        <text x="15" y="48" className="node-source">{truncate(sourceLines.record, 47)}</text>
-                        {sourceLines.server && <text x="15" y="64" className="node-server">{truncate(sourceLines.server, 55)}</text>}
-                        <text x="15" y="84" className="node-head">{truncate(rule.head, 54)}</text>
-                        <text x={nodeWidth - 15} y="99" textAnchor="end" className="node-body-count">{rule.body.length} body</text>
+                        <text x="15" y="48" className="node-source">{truncate(projectByOwnerServer ? node.owner ?? "synthetic" : sourceLines.record, 47)}</text>
+                        {(projectByOwnerServer ? node.server : sourceLines.server) && <text x="15" y="64" className="node-server">{truncate(projectByOwnerServer ? `served by ${node.server}` : sourceLines.server, 55)}</text>}
+                        <text x="15" y="84" className="node-head">{truncate(projectByOwnerServer ? `${node.ruleIds.length} compiled rule${node.ruleIds.length === 1 ? "" : "s"}` : rule.head, 54)}</text>
+                        {!projectByOwnerServer && <text x={nodeWidth - 15} y="99" textAnchor="end" className="node-body-count">{rule.body.length} body</text>}
                       </g>
                     );
                   })}
@@ -545,10 +569,20 @@ function makeIndexes(data: Dataset | null) {
   };
 }
 
-function buildGraph(data: Dataset | null) {
-  if (!data) return { placements: [] as Placement[], edges: [] as { match: Match; from: Placement; to: Placement }[], width: 64 * 2 + nodeWidth, height: 300 };
-  const orderedIds = data.rules.map((rule) => rule.id);
-  const layoutEdges = data.matches.map((match) => ({ from: match.dependentRuleId, to: match.dependencyRuleId }));
+function buildGraph(data: Dataset | null, projectByOwnerServer: boolean) {
+  if (!data) return emptyGraph();
+  const projection = projectByOwnerServer
+    ? projectOwnerServerGraph(data.sources, data.rules, data.matches)
+    : {
+        nodes: data.rules.map((rule): GraphNode => ({ id: rule.id, owner: null, server: null, ruleIds: [rule.id] })),
+        edges: data.matches.map((match) => ({
+          from: match.dependentRuleId,
+          to: match.dependencyRuleId,
+          matches: [match],
+        })),
+      };
+  const orderedIds = projection.nodes.map((node) => node.id);
+  const layoutEdges = projection.edges.map(({ from, to }) => ({ from, to }));
   const layered = layoutGraphLayers(
     orderedIds,
     layoutEdges,
@@ -558,15 +592,28 @@ function buildGraph(data: Dataset | null) {
     { id, y, x: 64 + layer * graphColumnSpacing }
   ));
   const byId = new Map(placements.map((placement) => [placement.id, placement]));
-  const edges = data.matches.map((match) => {
-    const endpoints = bodyToHeadEdge(match, byId);
-    return endpoints ? { match, ...endpoints } : null;
-  }).filter((edge): edge is { match: Match; from: Placement; to: Placement } => edge !== null);
+  const edges = projection.edges.map((edge) => {
+    const endpoints = bodyToHeadEdge({ dependentRuleId: edge.from, dependencyRuleId: edge.to }, byId);
+    return endpoints ? { matches: edge.matches, ...endpoints } : null;
+  }).filter((edge): edge is GraphEdge => edge !== null);
   return {
+    nodes: projection.nodes,
+    nodesById: new Map(projection.nodes.map((node) => [node.id, node])),
     placements,
     edges,
     width: 64 * 2 + nodeWidth + Math.max(0, ...layered.map(({ layer }) => layer)) * graphColumnSpacing,
     height: Math.max(300, ...placements.map((placement) => placement.y + nodeHeight + 24)),
+  };
+}
+
+function emptyGraph() {
+  return {
+    nodes: [] as GraphNode[],
+    nodesById: new Map<string, GraphNode>(),
+    placements: [] as Placement[],
+    edges: [] as GraphEdge[],
+    width: 64 * 2 + nodeWidth,
+    height: 300,
   };
 }
 
@@ -591,9 +638,15 @@ function edgePath(from: Placement, to: Placement, index: number) {
 
 function findCycles(data: Dataset | null) {
   if (!data) return [] as string[][];
-  const adjacency = new Map<string, string[]>();
-  data.rules.forEach((rule) => adjacency.set(rule.id, []));
-  data.matches.forEach((match) => adjacency.get(match.dependencyRuleId)?.push(match.dependentRuleId));
+  return findGraphCycles(
+    data.rules.map((rule) => rule.id),
+    data.matches.map((match) => ({ from: match.dependencyRuleId, to: match.dependentRuleId })),
+  );
+}
+
+function findGraphCycles(nodeIds: readonly string[], edges: readonly { from: string; to: string }[]) {
+  const adjacency = new Map(nodeIds.map((id) => [id, [] as string[]]));
+  edges.forEach((edge) => adjacency.get(edge.from)?.push(edge.to));
   let nextIndex = 0;
   const indexes = new Map<string, number>();
   const lows = new Map<string, number>();
@@ -615,7 +668,7 @@ function findCycles(data: Dataset | null) {
       if (component.length > 1 || selfLoop) components.push(component);
     }
   }
-  data.rules.forEach((rule) => { if (!indexes.has(rule.id)) visit(rule.id); });
+  nodeIds.forEach((id) => { if (!indexes.has(id)) visit(id); });
   return components;
 }
 

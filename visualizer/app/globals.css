@@ -93,8 +93,10 @@ button { color: inherit; }
 .graph-controls { position: absolute; top: 12px; right: 12px; z-index: 3; display: flex; align-items: center; gap: 3px; padding: 4px; border: 1px solid #cbd5d0; border-radius: 9px; background: #fbfcfaf2; box-shadow: 0 3px 12px #203d4a17; cursor: default; }
 .graph-controls button { display: grid; min-width: 30px; height: 30px; place-items: center; padding: 0 8px; border: 0; border-radius: 6px; color: #405762; background: transparent; cursor: pointer; font-size: 15px; font-weight: 750; }
 .graph-controls button:hover { color: #4437b6; background: var(--purple-soft); }
+.graph-controls button.active { color: #4437b6; background: #e8e5ff; }
 .graph-controls button:focus-visible { outline: 2px solid var(--purple); outline-offset: 1px; }
 .graph-controls .text-control { min-width: auto; font-size: 10px; }
+.graph-controls .projection-control { padding-inline: 10px; border-right: 1px solid #d8e0dc; border-radius: 6px 0 0 6px; }
 .zoom-readout { min-width: 43px; padding: 0 4px; color: #667780; text-align: center; font: 700 9px var(--mono); }
 .graph-gesture-hint { position: absolute; right: 13px; bottom: 10px; z-index: 2; padding: 5px 8px; border: 1px solid #d2dad6; border-radius: 6px; color: #74847c; background: #fbfcfadd; font-size: 9px; pointer-events: none; }
 .graph-edge { fill: none; stroke: var(--green); stroke-width: 2; opacity: .62; pointer-events: stroke; transition: opacity .12s, stroke-width .12s; }

@@ -8,6 +8,8 @@ Drag the canvas to pan and use the mouse wheel or the toolbar to zoom. **Fit** f
 
 Every rule is shown in graph order. DAG sources appear on the left and leaves on the right; cycles are kept together while the graph around them is layered the same way.
 
+Use **Owner + server** to project the rule graph: every rule whose source has the same owner name and serving name server is merged into one node, and duplicate dependencies between the resulting nodes are combined. Use **Rules** to return to the full compilation graph.
+
 The left pane lists individual RRSets at their serving name servers. Choose an RRSet to highlight every rule compiled from it without changing the graph layout.
 
 ## Run the app

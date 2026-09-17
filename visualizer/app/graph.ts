@@ -6,9 +6,28 @@ type DependencyMatch = {
 type PredicateMatch = DependencyMatch & { predicate: string };
 
 type NamedSource = {
+  id: string;
   owner: string;
   server: string;
   recordType: string;
+};
+
+type ProjectableRule = {
+  id: string;
+  sourceId: string | null;
+};
+
+export type ProjectedOwnerServerNode = {
+  id: string;
+  owner: string | null;
+  server: string | null;
+  ruleIds: string[];
+};
+
+export type ProjectedOwnerServerEdge<T extends DependencyMatch = DependencyMatch> = {
+  from: string;
+  to: string;
+  matches: T[];
 };
 
 export type LayoutEdge = { from: string; to: string };
@@ -58,6 +77,55 @@ export function bodyToHeadEdge<T>(match: DependencyMatch, placements: ReadonlyMa
 
 export function ruleEdgePorts(nodeHeight: number) {
   return { ingress: nodeHeight * 0.28, egress: nodeHeight * 0.72 };
+}
+
+export function projectOwnerServerGraph<T extends DependencyMatch>(
+  sources: readonly Pick<NamedSource, "id" | "owner" | "server">[],
+  rules: readonly ProjectableRule[],
+  matches: readonly T[],
+) {
+  const sourcesById = new Map(sources.map((source) => [source.id, source]));
+  const nodes: ProjectedOwnerServerNode[] = [];
+  const nodesByKey = new Map<string, ProjectedOwnerServerNode>();
+  const nodeIdByRule = new Map<string, string>();
+
+  for (const rule of rules) {
+    const source = rule.sourceId ? sourcesById.get(rule.sourceId) : null;
+    const key = source
+      ? JSON.stringify([source.owner, source.server])
+      : JSON.stringify(["synthetic", rule.id]);
+    let node = nodesByKey.get(key);
+    if (!node) {
+      node = {
+        id: `owner-server-${nodes.length + 1}`,
+        owner: source?.owner ?? null,
+        server: source?.server ?? null,
+        ruleIds: [],
+      };
+      nodesByKey.set(key, node);
+      nodes.push(node);
+    }
+    node.ruleIds.push(rule.id);
+    nodeIdByRule.set(rule.id, node.id);
+  }
+
+  const edges: ProjectedOwnerServerEdge<T>[] = [];
+  const edgesByEndpoints = new Map<string, ProjectedOwnerServerEdge<T>>();
+  for (const match of matches) {
+    const from = nodeIdByRule.get(match.dependentRuleId);
+    const to = nodeIdByRule.get(match.dependencyRuleId);
+    if (!from || !to) continue;
+    const key = JSON.stringify([from, to]);
+    let edge = edgesByEndpoints.get(key);
+    if (!edge) {
+      edge = { from, to, matches: [] };
+      edgesByEndpoints.set(key, edge);
+      edges.push(edge);
+    }
+    edge.matches.push(match);
+  }
+
+  return { nodes, edges };
 }
 
 export function layoutGraphLayers(
