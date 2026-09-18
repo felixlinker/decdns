@@ -98,7 +98,7 @@ rollout :: NSMap -> NSDiffs -> RecordDependencies -> RecordDependencies -> Excep
 rollout zones diffs (G.invert -> old) new = do
   updateSeq <- rollout' id (flattenDiffs diffs) old new
   -- Compute initial sequence of updates
-  let (updateSeq',_ ) = delayDeletions S.empty updateSeq
+  let updateSeq' = filter (not . S.null) $ foldr delayDeletions [] updateSeq
   -- Apply updates to zone and check whether we must account for temporary
   -- changes in wildcard semantics. ($ []) runs the accumulator.
   let (_, ($ []) -> wildcardGuards) = foldl' applyStep (zones, id) (map groupDiffs updateSeq')
@@ -112,16 +112,21 @@ rollout zones diffs (G.invert -> old) new = do
       -- corresponds to the input list's order.
       in  (config', acc . (synthesized:))
 
-    delayDeletions :: Diffs -> Rollout -> (Rollout, Diffs)
-    delayDeletions acc [] = ([], acc)
-    delayDeletions acc (s:t) =
-      let (abort, acc')     = S.partition (hasDependencies . fmap name) acc
-          (wcDels, others)  = S.partition (all isDeleted . value . snd) s
-          (r', here)        = delayDeletions (acc' <> wcDels) t
-      in  ((others <> here) : r', abort)
+    delayDeletions :: Diffs -> Rollout -> Rollout
+    delayDeletions step acc =
+      let (dels, others)  = S.partition (all isDeleted . value . snd) step
+          (acc', here)    = insertDeletions dels acc
+      in  others : here : acc'
+
+    insertDeletions :: Diffs -> Rollout -> (Rollout, Diffs)
+    insertDeletions ins [] = ([ins], S.empty)
+    insertDeletions ins (step:t) =
+      let (cannotIns, ins') = S.partition (hasDependencies . fmap name) ins
+          (t', insHere) = insertDeletions ins' t
+      in  (step <> insHere : t', cannotIns)
       where
         hasDependencies :: RRSetID -> Bool
-        hasDependencies rid = any (\(fmap name -> rid') -> rid `S.member` G.next old rid' || rid `S.member` G.next new rid') s
+        hasDependencies rid = any (\(fmap name -> rid') -> rid `S.member` G.next old rid' || rid `S.member` G.next new rid') step
 
     -- Apply a diff for a name server. Returns the updated name server map, and
     -- stores synthesized responses for occluding wildcards and their inverses
