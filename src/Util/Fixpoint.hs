@@ -1,6 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Util.Fixpoint
   ( Changed
+  , onChange
   , changed
   , unchanged
   , fixpoint
@@ -11,6 +12,11 @@ import qualified Control.Monad.Trans.State as St
 import qualified Data.Set as S
 
 type Changed = St.State Bool
+
+onChange :: (a -> b) -> (a -> b) -> Changed a -> b
+onChange whenChanged whenUnchanged change =
+  let (a, didChange) = St.runState change False
+  in (if didChange then whenChanged else whenUnchanged) a
 
 changed :: a -> Changed a
 changed a = St.put True >> return a

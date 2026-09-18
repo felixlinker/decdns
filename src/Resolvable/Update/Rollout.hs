@@ -31,6 +31,8 @@ import qualified Util.Graph as G
 import Resolvable.Dependencies (ResolutionOrder)
 import Data.Maybe (isJust, fromJust)
 import Util.Map (groupBy, alterDefF)
+import Util.Set (mapMonotonicF)
+import Util.Fixpoint
 
 type RRSetID = (Name String, Name String)
 
@@ -51,6 +53,14 @@ type Diffs = S.Set (Name String, RRSetDiff)
 
 flattenDiffs :: NSDiffs -> Diffs
 flattenDiffs = S.fromList . concatMap (\(ns, z) -> map (ns,) $ filter (not . RRSet.null . value) (allData z)) . M.toList
+
+insertDiff :: (Name String, RRSetDiff) -> Diffs -> Diffs
+insertDiff c@(ns, Named n d) = onChange id (S.insert c) . mapMonotonicF checkInsert
+  where
+    checkInsert :: (Name String, RRSetDiff) -> Changed (Name String, RRSetDiff)
+    checkInsert c'@(ns', Named n' d')
+      | ns == ns' && n == n' = changed (ns', Named n' (d' <> d))
+      | otherwise = unchanged c'
 
 showDiffsAtNS :: Name String -> [RRSetDiff] -> [String]
 showDiffsAtNS ns ds =
@@ -136,7 +146,7 @@ rollout zones diffs (G.invert -> old) new = do
     insertDeletions ins (step:t) =
       let (cannotIns, ins') = S.partition (hasDependencies . fmap name) ins
           (t', insHere) = insertDeletions ins' t
-      in  (step <> insHere : t', cannotIns)
+      in  (foldr insertDiff step insHere : t', cannotIns)
       where
         hasDependencies :: RRSetID -> Bool
         hasDependencies rid = any (\(fmap name -> rid') -> rid `S.member` G.next old rid' || rid `S.member` G.next new rid') step
@@ -151,7 +161,7 @@ rollout zones diffs (G.invert -> old) new = do
         patchSynthesize :: Zone ConstrainedLabel -> St.State Diffs (Zone ConstrainedLabel)
         patchSynthesize z = do
           let (z', wcDiffs) = patch z ds
-          St.modify (\st -> foldr (S.insert . (ns,)) st wcDiffs)
+          St.modify (\st -> foldr (insertDiff . (ns,)) st wcDiffs)
           return z'
 
     insertGuards :: Rollout -> (Diffs, Diffs) -> Rollout
@@ -159,7 +169,7 @@ rollout zones diffs (G.invert -> old) new = do
       -- Insert inverses into the first possible rollout step. This might fail,
       -- in that case, add the inverses right here.
       let (acc', remainingInverses) = foldl' insertGuardsStep ([], invertDiffs guards) acc
-      in  acc' ++ [step <> guards <> remainingInverses]
+      in  acc' ++ [foldr insertDiff step (guards <> remainingInverses)]
 
     insertGuardsStep :: (Rollout, Diffs) -> Diffs -> (Rollout, Diffs)
     insertGuardsStep (accR, guards) rolloutStep =
@@ -169,7 +179,7 @@ rollout zones diffs (G.invert -> old) new = do
     updateRolloutStep :: Diffs -> Diffs -> (Diffs, Diffs)
     updateRolloutStep step guards =
       let (ins, guards') = S.partition (\(fmap name -> g) -> any ((== g) . fmap name) step) guards
-      in  (step <> ins, guards')
+      in  (foldr insertDiff step ins, guards')
 
 rollout' :: (Rollout -> Rollout) -> Diffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
 rollout' acc diffs (updateDeps diffs -> old) (updateDeps diffs -> new)
