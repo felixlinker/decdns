@@ -105,7 +105,7 @@ rollout zones diffs (G.invert -> old) new = do
   return $ foldl' insertGuards [] (zip updateSeq' wildcardGuards)
   where
     -- Applies a rollout step to a config. Also synthesizes wildcard guards and their inv
-    applyStep :: (NSMap, [Diffs] -> [Diffs]) -> M.Map (Name String) [RRSetDiff] -> (NSMap, [Diffs] -> [Diffs])
+    applyStep :: (NSMap, WildcardGuards -> WildcardGuards) -> M.Map (Name String) [RRSetDiff] -> (NSMap, WildcardGuards -> WildcardGuards)
     applyStep (config, acc) step =
       let (config', synthesized) = St.runState (foldM applyServer config (M.toList step)) S.empty
       -- Use (acc . (_:)) accumulator so that the resulting list's order
