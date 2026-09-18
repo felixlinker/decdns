@@ -29,7 +29,6 @@ import NameConstraint
 import qualified Util.Graph as G
 import Resolvable.Dependencies (ResolutionOrder)
 import Data.Maybe (isJust, fromJust)
-import Util.Fixpoint
 import Util.Map (groupBy, alterDefF)
 import Data.Bifunctor (Bifunctor(bimap))
 
@@ -99,7 +98,6 @@ rollout zones diffs (G.invert -> old) new = do
   let (_, ($ []) -> synthesized) = foldl' applyStep (zones, id) (map groupDiffs updateSeq')
   let resolvabilityGuards = map fst synthesized
   return $ foldGuards resolvabilityGuards [] $ zipWith S.union updateSeq' (map snd synthesized)
-  -- return updateSeq
   where
     applyStep :: (NSMap, [(Diffs, Diffs)] -> [(Diffs, Diffs)]) -> M.Map (Name String) [RRSetDiff] -> (NSMap, [(Diffs, Diffs)] -> [(Diffs, Diffs)])
     applyStep (config, acc) ds =

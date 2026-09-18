@@ -66,7 +66,7 @@ type ConstrainedRRSet = RRSet.RRSet ConstrainedLabel
 toStandardRecord :: Label a => Record a -> StandardRecord
 toStandardRecord (Named n d) = Named (toStringName n) d
 
-compileName :: Name String -> Name ConstrainedLabel
+compileName :: Name String -> ConstrainedName
 compileName = fmap (compileLabel [])
 
 compileLabel :: [String] -> String -> ConstrainedLabel
