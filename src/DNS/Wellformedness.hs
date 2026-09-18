@@ -52,7 +52,8 @@ wellformed z@(Zone org r) = catMaybes
   , expect (singletonTypes r) (Error "more than one CNAME, DNAME, NSEC or SOA record at owner name")
   , expect (wildcardRestrictions z) (Error "DNAME, DS or NS wildcard record")
   , expect (rrsigSignerName org r) (Error "RRSIG has illegal signer name")
-  , expect (checkTTL r) (Warning "RRSet containing records with different TTLs") ]
+  , expect (checkTTL r) (Warning "RRSet containing records with different TTLs")
+  , expect (checkTTLRRsig r) (Warning "RRSIG with different TTL than covered RRSet") ]
 
 responseWellformed :: Zone String -> [Issue String]
 responseWellformed z@(Zone _ r) = wellformed z ++ catMaybes
@@ -149,3 +150,14 @@ checkZoneCuts (Tr.Node rs cs)
 -- https://www.rfc-editor.org/info/rfc4034/#section-3
 checkTTL :: Tr.Node String RRSet.RDataSet -> Bool
 checkTTL = all (all (\(r0 NE.:| rt) -> all ((== rttl r0) . rttl) rt) . RRSet.rds . RRSet.dropType T.RRSIG)
+
+checkTTLRRsig :: Tr.Node String RRSet.RDataSet -> Bool
+checkTTLRRsig = all check
+  where
+    check :: RRSet.RDataSet -> Bool
+    check rs = all checkCovered (RRSet.getType T.RRSIG rs)
+      where
+        checkCovered :: RData -> Bool
+        checkCovered (RData _ ttl (RRSIG (RRSIGData { _typeCovered = cov }))) =
+          all ((== ttl) . rttl) (RRSet.getType cov rs)
+        checkCovered _ = True -- technically undefined
