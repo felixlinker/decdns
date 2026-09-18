@@ -51,7 +51,8 @@ wellformed z@(Zone org r) = catMaybes
   , expect (checkZoneCuts $ dataNoApex z) (Warning "illegal record at or below zone cut")
   , expect (singletonTypes r) (Error "more than one CNAME, DNAME, NSEC or SOA record at owner name")
   , expect (wildcardRestrictions z) (Error "DNAME, DS or NS wildcard record")
-  , expect (rrsigSignerName org r) (Error "RRSIG has illegal signer name") ]
+  , expect (rrsigSignerName org r) (Error "RRSIG has illegal signer name")
+  , expect (checkTTL r) (Warning "RRSet containing records with different TTLs") ]
 
 responseWellformed :: Zone String -> [Issue String]
 responseWellformed z@(Zone _ r) = wellformed z ++ catMaybes
@@ -143,3 +144,8 @@ checkZoneCuts (Tr.Node rs cs)
       typesAllIn rs [T.NS, T.DS, T.NSEC, T.RRSIG, T.A, T.AAAA]
         && all (all (`typesAllIn` [T.A, T.AAAA])) cs
   | otherwise = all checkZoneCuts cs
+
+-- https://www.rfc-editor.org/info/rfc2181/#section-5.2
+-- https://www.rfc-editor.org/info/rfc4034/#section-3
+checkTTL :: Tr.Node String RRSet.RDataSet -> Bool
+checkTTL = all (all (\(r0 NE.:| rt) -> all ((== rttl r0) . rttl) rt) . RRSet.rds . RRSet.dropType T.RRSIG)
