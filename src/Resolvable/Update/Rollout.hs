@@ -15,6 +15,7 @@ import Control.Monad (when, foldM)
 import Control.Monad.Trans.Except (Except, throwE)
 import qualified Control.Monad.Trans.State as St
 import Data.Foldable (Foldable(foldl'))
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
 import qualified Data.Set as S
@@ -94,6 +95,17 @@ type NSMap = M.Map (Name String) (Zone ConstrainedLabel)
 invertDiffs :: Diffs -> Diffs
 invertDiffs = S.map $ fmap $ fmap $ fmap invert
 
+removeIdentities :: Diffs -> Diffs
+removeIdentities = S.map (fmap (fmap (RRSet.modify (M.mapMaybe removeIdentities'))))
+  where
+    removeIdentities' :: Eq a => NE.NonEmpty (Diff a) -> Maybe (NE.NonEmpty (Diff a))
+    removeIdentities' = NE.nonEmpty . foldr consInverseNub []
+
+    consInverseNub :: Eq a => Diff a -> [Diff a] -> [Diff a]
+    consInverseNub a acc =
+      let inverse = invert a
+      in if inverse `elem` acc then filter (/= inverse) acc else a:acc
+
 rollout :: NSMap -> NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
 rollout zones diffs (G.invert -> old) new = do
   updateSeq <- rollout' id (flattenDiffs diffs) old new
@@ -102,7 +114,8 @@ rollout zones diffs (G.invert -> old) new = do
   -- Apply updates to zone and check whether we must account for temporary
   -- changes in wildcard semantics. ($ []) runs the accumulator.
   let (_, ($ []) -> wildcardGuards) = foldl' applyStep (zones, id) (map groupDiffs updateSeq')
-  return $ foldl' insertGuards [] (zip updateSeq' wildcardGuards)
+  let updateSeq'' = foldl' insertGuards [] (zip updateSeq' wildcardGuards)
+  return $ map removeIdentities updateSeq''
   where
     -- Applies a rollout step to a config. Also synthesizes wildcard guards and their inv
     applyStep :: (NSMap, WildcardGuards -> WildcardGuards) -> M.Map (Name String) [RRSetDiff] -> (NSMap, WildcardGuards -> WildcardGuards)
