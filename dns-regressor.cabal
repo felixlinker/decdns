@@ -122,6 +122,7 @@ library
       Util.List
       Util.Map
       Util.Monad
+      Util.Set
       Util.Tree
   other-modules:
       Paths_dns_regressor
