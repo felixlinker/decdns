@@ -30,7 +30,6 @@ import qualified Util.Graph as G
 import Resolvable.Dependencies (ResolutionOrder)
 import Data.Maybe (isJust, fromJust)
 import Util.Map (groupBy, alterDefF)
-import Data.Bifunctor (Bifunctor(bimap))
 
 type RRSetID = (Name String, Name String)
 
@@ -91,17 +90,26 @@ showRollOut r = do
 
 type NSMap = M.Map (Name String) (Zone ConstrainedLabel)
 
+-- fmaps correspond to: Tuple then Named then RRSet.RTypedSet
+invertDiffs :: Diffs -> Diffs
+invertDiffs = S.map $ fmap $ fmap $ fmap invert
+
 rollout :: NSMap -> NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
 rollout zones diffs (G.invert -> old) new = do
   updateSeq <- rollout' id (flattenDiffs diffs) old new
+  -- Compute initial sequence of updates
   let (updateSeq',_ ) = delayDeletions S.empty updateSeq
-  let (_, ($ []) -> synthesized) = foldl' applyStep (zones, id) (map groupDiffs updateSeq')
-  let resolvabilityGuards = map fst synthesized
-  return $ foldGuards resolvabilityGuards [] $ zipWith S.union updateSeq' (map snd synthesized)
+  -- Apply updates to zone and check whether we must account for temporary
+  -- changes in wildcard semantics. ($ []) runs the accumulator.
+  let (_, ($ []) -> wildcardGuards) = foldl' applyStep (zones, id) (map groupDiffs updateSeq')
+  return $ foldl' insertGuards [] (zip updateSeq' wildcardGuards)
   where
-    applyStep :: (NSMap, [(Diffs, Diffs)] -> [(Diffs, Diffs)]) -> M.Map (Name String) [RRSetDiff] -> (NSMap, [(Diffs, Diffs)] -> [(Diffs, Diffs)])
-    applyStep (config, acc) ds =
-      let (config', synthesized) = St.runState (foldM applyServer config (M.toList ds)) (S.empty, S.empty)
+    -- Applies a rollout step to a config. Also synthesizes wildcard guards and their inv
+    applyStep :: (NSMap, [Diffs] -> [Diffs]) -> M.Map (Name String) [RRSetDiff] -> (NSMap, [Diffs] -> [Diffs])
+    applyStep (config, acc) step =
+      let (config', synthesized) = St.runState (foldM applyServer config (M.toList step)) S.empty
+      -- Use (acc . (_:)) accumulator so that the resulting list's order
+      -- corresponds to the input list's order.
       in  (config', acc . (synthesized:))
 
     delayDeletions :: Diffs -> Rollout -> (Rollout, Diffs)
@@ -119,34 +127,26 @@ rollout zones diffs (G.invert -> old) new = do
     -- stores synthesized responses for occluding wildcards and their inverses
     -- in the state. The left tuple element must be applied before the right
     -- tuple element.
-    applyServer :: NSMap -> (Name String, [RRSetDiff]) -> St.State (Diffs, Diffs) NSMap
+    applyServer :: NSMap -> (Name String, [RRSetDiff]) -> St.State Diffs NSMap
     applyServer config (ns, ds) = alterDefF patchSynthesize ns config
       where
-        biInsertDiff :: RRSetDiff -> (Diffs, Diffs) -> (Diffs, Diffs)
-        biInsertDiff wcDiff = bimap (S.insert (ns, fmap invert <$> wcDiff)) (S.insert  (ns, wcDiff))
-
-        patchSynthesize :: Zone ConstrainedLabel -> St.State (Diffs, Diffs) (Zone ConstrainedLabel)
+        patchSynthesize :: Zone ConstrainedLabel -> St.State Diffs (Zone ConstrainedLabel)
         patchSynthesize z = do
           let (z', wcDiffs) = patch z ds
-          St.modify (\st -> foldr biInsertDiff st wcDiffs)
+          St.modify (\st -> foldr (S.insert . (ns,)) st wcDiffs)
           return z'
 
-    -- Below code takes wildcard guards and inserts them into the last step that
-    -- updates the same name.
-    foldGuards :: WildcardGuards -> Rollout -> Rollout -> Rollout
-    foldGuards [] acc [] = acc
-    foldGuards _ _ [] = error "invariant violated: rollout shorter than guards"
-    foldGuards [] _ _ = error "invariant violated: guards shorter than rollout"
-    foldGuards (guards:restGuards) stepsPrefix (step:restSteps) =
-      foldGuards restGuards (insertGuards stepsPrefix ++ [step]) restSteps
-      where
-        insertGuards :: [Diffs] -> [Diffs]
-        insertGuards = fst . foldr insertGuardsStep ([], guards)
+    insertGuards :: Rollout -> (Diffs, Diffs) -> Rollout
+    insertGuards acc (step, guards) =
+      -- Insert inverses into the first possible rollout step. This might fail,
+      -- in that case, add the inverses right here.
+      let (acc', remainingInverses) = foldl' insertGuardsStep ([], invertDiffs guards) acc
+      in  acc' ++ [step <> guards <> remainingInverses]
 
-    insertGuardsStep :: Diffs -> (Rollout, Diffs) -> (Rollout, Diffs)
-    insertGuardsStep rolloutStep (accR, guards) =
+    insertGuardsStep :: (Rollout, Diffs) -> Diffs -> (Rollout, Diffs)
+    insertGuardsStep (accR, guards) rolloutStep =
       let (rolloutStep', guards') = updateRolloutStep rolloutStep guards
-      in  (rolloutStep':accR, guards')
+      in  (accR ++ [rolloutStep'], guards')
 
     updateRolloutStep :: Diffs -> Diffs -> (Diffs, Diffs)
     updateRolloutStep step guards =
