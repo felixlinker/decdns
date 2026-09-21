@@ -124,8 +124,13 @@ rollout zones diffs (G.invert -> old) new = do
   -- Apply updates to zone and check whether we must account for temporary
   -- changes in wildcard semantics. ($ []) runs the accumulator.
   let (_, ($ []) -> wildcardGuards) = foldl' applyStep (zones, id) (map groupDiffs updateSeq')
-  let updateSeq'' = foldl' insertGuards [] (zip updateSeq' wildcardGuards)
-  return $ map removeIdentities updateSeq''
+  -- Insert inverse guards at the last change related to the guarded name
+  let updateSeq'' = foldr (insertInverseGuards . invertDiffs) updateSeq' wildcardGuards
+  -- Insert guards at the index where the change in semantics occured; do this
+  -- after previous step so that the place where the name changed remains
+  -- unchanged.
+  let updateSeq''' = zipWith (foldr insertDiff) wildcardGuards updateSeq''
+  return $ map removeIdentities updateSeq'''
   where
     -- Applies a rollout step to a config. Also synthesizes wildcard guards and their inv
     applyStep :: (NSMap, WildcardGuards -> WildcardGuards) -> M.Map (Name String) [RRSetDiff] -> (NSMap, WildcardGuards -> WildcardGuards)
@@ -164,20 +169,18 @@ rollout zones diffs (G.invert -> old) new = do
           St.modify (\st -> foldr (insertDiff . (ns,)) st wcDiffs)
           return z'
 
-    insertGuards :: Rollout -> (Diffs, Diffs) -> Rollout
-    insertGuards acc (step, guards) =
-      -- Insert inverses into the first possible rollout step. This might fail,
-      -- in that case, add the inverses right here.
-      let (acc', remainingInverses) = foldl' insertGuardsStep ([], invertDiffs guards) acc
-      in  acc' ++ [foldr insertDiff step (guards <> remainingInverses)]
-
-    insertGuardsStep :: (Rollout, Diffs) -> Diffs -> (Rollout, Diffs)
-    insertGuardsStep (accR, guards) rolloutStep =
-      let (rolloutStep', guards') = updateRolloutStep rolloutStep guards
-      in  (accR ++ [rolloutStep'], guards')
+    insertInverseGuards :: Diffs -> Rollout -> Rollout
+    insertInverseGuards ds []
+      | S.null ds = []
+      | otherwise = [ds]
+    insertInverseGuards ds [s] = [foldr insertDiff s ds]
+    insertInverseGuards ds (s:t)
+      | S.null ds = s:t
+      | otherwise = let (s', ds') = updateRolloutStep ds s
+                    in  s' : insertInverseGuards ds' t
 
     updateRolloutStep :: Diffs -> Diffs -> (Diffs, Diffs)
-    updateRolloutStep step guards =
+    updateRolloutStep guards step =
       let (ins, guards') = S.partition (\(fmap name -> g) -> any ((== g) . fmap name) step) guards
       in  (foldr insertDiff step ins, guards')
 
