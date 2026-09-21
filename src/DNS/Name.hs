@@ -18,7 +18,8 @@ module DNS.Name
   , intersection
   , canonicalName
   , canonicalCompare
-  , dnameRewrite ) where
+  , dnameRewrite
+  , withoutWildcard ) where
 
 import Data.List (intercalate, isSuffixOf)
 import qualified Data.List.NonEmpty as NE
@@ -151,3 +152,9 @@ dnameRewrite qn@(Name qname) fn@(Name from) (Name to) =
   in if not (isSubDomain qn fn) || prefixLen < 0
     then undefined
     else Name (NE.prependList (NE.take prefixLen qname) to)
+
+withoutWildcard :: Label a => Name a -> Name a
+withoutWildcard n@(Name (h NE.:| t))
+  -- Assume, name is relative to root. Thus, Nothing cannot occur.
+  | isWildcardLabel h = maybe undefined Name (NE.nonEmpty t)
+  | otherwise = n
