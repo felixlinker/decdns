@@ -12,6 +12,7 @@ module DNS.Name
   , (|>)
   , prependLabels
   , toStringName
+  , mapName
   , mapLabels
   , isSubDomain
   , intersection
@@ -105,8 +106,11 @@ instance Serialize a => Serialize (Named String a) where
 toStringName :: Label a => Name a -> Name String
 toStringName (Name ls) = Name $ NE.map lshow ls
 
+mapName :: (Name a -> Name b) -> Named a v -> Named b v
+mapName f (Named n v) = Named (f n) v
+
 mapLabels :: (a1 -> a2) -> Named a1 b -> Named a2 b
-mapLabels f (Named (Name ls) v) = Named (Name (NE.map f ls)) v
+mapLabels f = mapName (fmap f)
 
 isSubDomain :: Eq a => Name a -> Name a -> Bool
 isSubDomain (Name l1) (Name l2) = NE.toList l2 `isSuffixOf` NE.toList l1

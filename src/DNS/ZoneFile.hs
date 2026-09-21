@@ -81,7 +81,7 @@ fromRecordList :: forall a. (Label a, Ord a) => NE.NonEmpty (Record a) -> Zone a
 fromRecordList = fromList . NE.map namedRec
   where
     namedRec :: Record a -> Named a (RRSet.RTypedSet RData)
-    namedRec (Named n d) = Named n (RRSet.singleton d)
+    namedRec = fmap RRSet.singleton
 
 data Path a = Path
   -- New origin of the zone; longest common ancestor between new and old name

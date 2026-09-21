@@ -64,7 +64,7 @@ type ConstrainedRecord = Record ConstrainedLabel
 type ConstrainedRRSet = RRSet.RRSet ConstrainedLabel
 
 toStandardRecord :: Label a => Record a -> StandardRecord
-toStandardRecord (Named n d) = Named (toStringName n) d
+toStandardRecord = mapName toStringName
 
 compileName :: Name String -> ConstrainedName
 compileName = fmap (compileLabel [])
@@ -113,4 +113,4 @@ overlap (Name (h1 NE.:| t1)) (Name (h2 NE.:| t2)) =
   matches h1 h2 && maybe False and (zipWithStrict (==) t1 t2)
 
 synthesize :: Name String -> ConstrainedRecord -> StandardRecord
-synthesize qname (Named cs d) = Named (fromMaybe (toStringName cs) (match qname cs)) d
+synthesize qname = mapName (\cs -> fromMaybe (toStringName cs) (match qname cs))
