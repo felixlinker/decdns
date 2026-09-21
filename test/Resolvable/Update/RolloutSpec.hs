@@ -110,7 +110,7 @@ rolloutInvariant old new = case prepare of
         final = exampleQueries new
         common = S.toList $ S.fromList
           [ q | a <- initial, b <- final, Just q <- [intersectQueries a b] ]
-        states = drop 1 $ scanl applyStep (inventory (exampleConfig old)) steps
+        states = drop 1 $ init $ scanl applyStep (inventory (exampleConfig old)) steps
         intermediate = map (queryPatterns . toConfig) states
     in if null common
        then once $ label "empty endpoint intersection (vacuous invariant)" True
