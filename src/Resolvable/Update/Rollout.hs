@@ -182,7 +182,7 @@ rollout zones diffs (G.invert -> old) new = do
 
     updateRolloutStep :: Diffs -> Diffs -> (Diffs, Diffs)
     updateRolloutStep guards step =
-      let (ins, guards') = S.partition (\(fmap (withoutWildcard . name) -> g) -> any ((== g) . fmap name) step) guards
+      let (ins, guards') = S.partition (\(fmap name -> g) -> any ((== g) . fmap name) step) guards
       in  (foldr insertDiff step ins, guards')
 
 rollout' :: (Rollout -> Rollout) -> Diffs -> RecordDependencies -> RecordDependencies -> Except String Rollout

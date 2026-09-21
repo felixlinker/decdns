@@ -13,20 +13,18 @@ module NameConstraint
   , existIn
   , compileWildcards
   , literalWildcards
-  , overlap
   , synthesize ) where
 
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
+import Control.Monad (guard)
 
 import DNS.ZoneFile
 import DNS.Name
 import DNS.Record
 import qualified DNS.RRSet as RRSet
-import Data.Maybe (fromMaybe)
 
 import qualified Util.Tree as T
-import Util.List (zipWithStrict)
 
 data LabelConstraint a = Wildcard [a] | Exactly a
 
@@ -86,31 +84,13 @@ compileWildcards (Zone (Name n) r) = Zone (Name (NE.map Exactly n)) (go r)
 literalWildcards :: Zone ConstrainedLabel -> Zone String
 literalWildcards (Zone n r) = Zone (fmap show n) (T.mapLabels show r)
 
-match :: Name String -> ConstrainedName -> Maybe (Name String)
-match (Name (NE.reverse -> ls)) (Name (NE.reverse -> cs)) = do
-  matched <- match' ls cs
-  n <- NE.nonEmpty (reverse matched)
-  return $ Name n
+synthesize :: Name String -> ConstrainedName -> Bool
+synthesize (Name (reverse . NE.toList -> ls)) (Name (reverse . NE.toList -> cs)) =
+  match' ls cs
   where
-    match' :: NE.NonEmpty String -> NE.NonEmpty ConstrainedLabel -> Maybe [String]
-    match' (a NE.:| as) ((Exactly c) NE.:| ncs)
-      | a == c = (a:) <$> rec as ncs
-      | otherwise = Nothing
-    match' (a NE.:| as) ((Wildcard c) NE.:| ncs)
-      | (a `notElem` c) && null ncs = Just (a:as)
-      | a == "*" = (a:) <$> rec as ncs
-      | otherwise = Nothing
-
-    rec :: [String] -> [ConstrainedLabel] -> Maybe [String]
-    rec [] [] = Just []
-    rec _ [] = Just []
-    rec [] _ = Nothing
-    rec (a:as) (c:ncs) =
-      match' (a NE.:| as) (c NE.:| ncs)
-
-overlap :: Eq a => Name (LabelConstraint a) -> Name (LabelConstraint a) -> Bool
-overlap (Name (h1 NE.:| t1)) (Name (h2 NE.:| t2)) =
-  matches h1 h2 && maybe False and (zipWithStrict (==) t1 t2)
-
-synthesize :: Name String -> ConstrainedRecord -> StandardRecord
-synthesize qname = mapName (\cs -> fromMaybe (toStringName cs) (match qname cs))
+    match' :: [String] -> [ConstrainedLabel] -> Bool
+    match' [] [] = True
+    match' (a:as) (Exactly c:ncs) = a == c && match' as ncs
+    match' (a:_) [Wildcard c] = a `notElem` c
+    match' ("*":as) (Wildcard _:ncs) = match' as ncs
+    match' _ _ = False
