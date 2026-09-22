@@ -17,7 +17,6 @@ module NameConstraint
 
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
-import Control.Monad (guard)
 
 import DNS.ZoneFile
 import DNS.Name
@@ -45,12 +44,6 @@ instance Label ConstrainedLabel where
   lempty = Exactly lempty
   lshow (Wildcard _) = "*"
   lshow (Exactly l) = lshow l
-
-matches :: Eq a => LabelConstraint a -> LabelConstraint a -> Bool
-matches (Exactly l1) (Exactly l2) = l1 == l2
-matches (Wildcard ls) (Exactly l) = l `notElem` ls
-matches (Exactly l) (Wildcard ls) = l `notElem` ls
-matches (Wildcard _) (Wildcard _) = True
 
 instance Show ConstrainedLabel where
   show (Wildcard _) = "*"
