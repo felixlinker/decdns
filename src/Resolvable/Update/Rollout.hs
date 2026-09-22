@@ -33,6 +33,7 @@ import Data.Maybe (isJust, fromJust)
 import Util.Map (groupBy, alterDefF)
 import Util.Set (mapMonotonicF)
 import Util.Fixpoint
+import DNS.Record (RData)
 
 type RRSetID = (Name String, Name String)
 
@@ -116,6 +117,14 @@ removeIdentities = S.map (fmap (fmap (RRSet.modify (M.mapMaybe removeIdentities'
       let inverse = invert a
       in if inverse `elem` acc then filter (/= inverse) acc else a:acc
 
+invertAndSplit :: WildcardGuards -> (WildcardGuards, WildcardGuards)
+invertAndSplit gs =
+  let inv = map invertDiffs gs
+  in (map (pick isAdded) inv, map (pick isDeleted) inv)
+  where
+    pick :: (Diff RData -> Bool) -> Diffs -> Diffs
+    pick p = S.map (fmap (fmap (RRSet.filter p)))
+
 rollout :: NSMap -> NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
 rollout zones diffs (G.invert -> old) new = do
   updateSeq <- rollout' id (flattenDiffs diffs) old new
@@ -124,13 +133,14 @@ rollout zones diffs (G.invert -> old) new = do
   -- Apply updates to zone and check whether we must account for temporary
   -- changes in wildcard semantics. ($ []) runs the accumulator.
   let (_, ($ []) -> wildcardGuards) = foldl' applyStep (zones, id) (map groupDiffs updateSeq')
-  -- Insert inverse guards at the last change related to the guarded name
-  let updateSeq'' = foldr (insertInverseGuards . invertDiffs) updateSeq' wildcardGuards
+  let (addInvs, delInvs) = invertAndSplit wildcardGuards
+  let updateSeq'' = foldr insertInverse [] (zip updateSeq' delInvs)
+  let updateSeq''' = reverse $ foldr insertInverse [] (zip (reverse updateSeq'') (reverse addInvs))
   -- Insert guards at the index where the change in semantics occured; do this
   -- after previous step so that the place where the name changed remains
   -- unchanged.
-  let updateSeq''' = zipWith (foldr insertDiff) wildcardGuards updateSeq''
-  return $ map removeIdentities updateSeq'''
+  let updateSeq'''' = zipWith (foldr insertDiff) wildcardGuards updateSeq'''
+  return $ map removeIdentities updateSeq''''
   where
     -- Applies a rollout step to a config. Also synthesizes wildcard guards and their inv
     applyStep :: (NSMap, WildcardGuards -> WildcardGuards) -> M.Map (Name String) [RRSetDiff] -> (NSMap, WildcardGuards -> WildcardGuards)
@@ -170,15 +180,13 @@ rollout zones diffs (G.invert -> old) new = do
           St.modify (\st -> foldr (insertDiff . (ns,)) st (wcDiffs <> wcDiffsWithWC))
           return z'
 
-    insertInverseGuards :: Diffs -> Rollout -> Rollout
-    insertInverseGuards ds []
-      | S.null ds = []
-      | otherwise = [ds]
-    insertInverseGuards ds [s] = [foldr insertDiff s ds]
-    insertInverseGuards ds (s:t)
-      | S.null ds = s:t
-      | otherwise = let (s', ds') = updateRolloutStep ds s
-                    in  s' : insertInverseGuards ds' t
+    insertInverse :: (Diffs, Diffs) -> Rollout -> Rollout
+    insertInverse (s, ds) []  = [foldr insertDiff s ds]
+    insertInverse (s, ds) acc@(accS:accT)
+      | S.null ds = s : acc
+      | otherwise =
+          let (s', ds') = updateRolloutStep ds s
+          in  s' : insertInverse (accS, ds') accT
 
     updateRolloutStep :: Diffs -> Diffs -> (Diffs, Diffs)
     updateRolloutStep guards step =
