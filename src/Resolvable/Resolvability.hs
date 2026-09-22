@@ -148,13 +148,13 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s
           (n', cs) <- synth n
           (t, d, targetZone) <- freshVars3 ("T", "D", "Z")
           return $ Rule rannot (resolves nameServer t zone n' d bot (ad 0))
-            (cs ++  [ t \= cnameType, t \= nsecType, t \= nsec3Type, targetZone \= referralZone
+            (cs ++  [ t \= cnameType, t \= nsecType, t \= nsec3Type, t \= rrsigType, targetZone \= referralZone
                           , resolves rootServer t targetZone cname d bot (ad 0) ])
         , do  -- Authenticated
           (n', cs) <- synth n
           (t, d, a, targetZone) <- freshVars4 ("T", "D", "A", "Z")
           return $ Rule rannot (resolves nameServer t zone n' d top a)
-            (cs ++  [ t \= cnameType, t \= nsecType, t \= nsec3Type, targetZone \= referralZone
+            (cs ++  [ t \= cnameType, t \= nsecType, t \= nsec3Type, t \= rrsigType, targetZone \= referralZone
                           , resolves nameServer cnameType zone ownerNoSynth (list [TComplex r]) top (ad 1)
                           , resolves rootServer t targetZone cname d top a ]) ]
       DNAME (nameTerm -> dname) -> S.fromList <$> sequence
@@ -163,14 +163,14 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s
           let rewrite = injectLast l . captureListTail nTail
           -- Do not expect wildcard neq constraints on DNAME records
           return $ Rule rannot (resolves nameServer t zone (rewrite ownerNoSynth) d bot (ad 0))
-            [  t \= dnameType, t \= nsecType, t \= nsec3Type, targetZone \= referralZone
+            [  t \= dnameType, t \= nsecType, t \= nsec3Type, t \= rrsigType, targetZone \= referralZone
               , resolves rootServer t targetZone (rewrite dname) d bot (ad 0) ]
         , do  -- Authenticated
           (l, nTail, t, d, a, targetZone) <- freshVars6 ("L", "N", "T", "D", "A", "Z")
           let rewrite = injectLast l . captureListTail nTail
           -- Do not expect wildcard neq constraints on DNAME records
           return $ Rule rannot (resolves nameServer t zone (rewrite ownerNoSynth) d top a)
-            [  t \= dnameType, t \= nsecType, t \= nsec3Type, targetZone \= referralZone
+            [  t \= dnameType, t \= nsecType, t \= nsec3Type, t \= rrsigType, targetZone \= referralZone
             , resolves nameServer dnameType zone ownerNoSynth (list [TComplex r]) top (ad 1)
             , resolves rootServer t targetZone (rewrite dname) d top a ] ]
       -- TODO: Check that sigName is the name of the zone containing the record;

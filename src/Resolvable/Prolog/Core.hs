@@ -46,6 +46,7 @@ module Resolvable.Prolog.Core
   , nsecType
   , closestEncloser
   , nsec3Type
+  , rrsigType
   , aType
   , aaaaType
   , cnameType
@@ -411,6 +412,9 @@ nsecType = ttypeTerm T.NSEC
 
 nsec3Type :: Term
 nsec3Type = ttypeTerm T.NSEC3
+
+rrsigType :: Term
+rrsigType = ttypeTerm T.RRSIG
 
 aType :: Term
 aType = ttypeTerm T.A
