@@ -74,12 +74,14 @@ exampleDirectories =
   , "examples/rollout/delegated-wildcard"
   , "examples/rollout/direct-address"
   , "examples/rollout/dname"
+  , "examples/rollout/dname-nested"
   , "examples/rollout/wildcard"
   , "examples/rollout/wildcard-alias-txt"
   , "examples/rollout/wildcard-cname"
   , "examples/rollout/wildcard-cname-descendant"
   , "examples/rollout/wildcard-explicit"
   , "examples/rollout/wildcard-nested"
+  , "examples/rollout/wildcard-other-address"
   , "examples/rollout/wildcard-txt"
   ]
 

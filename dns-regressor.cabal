@@ -33,6 +33,7 @@ extra-source-files:
     examples/cname/signed-nsec3/ns.com.
     examples/cname/signed/ns.b.com.
     examples/cname/signed/ns.com.
+    examples/cname/simple/ns.com.
     examples/dname/loop-empty/ns.net.
     examples/dname/loop-non-empty/ns.net.
     examples/dnssec/ns/example.
@@ -57,6 +58,7 @@ extra-source-files:
     examples/rollout/delegated-wildcard/ns.b.com.
     examples/rollout/delegated-wildcard/ns.com.
     examples/rollout/direct-address/ns.com.
+    examples/rollout/dname-nested/ns.com.
     examples/rollout/dname/ns.com.
     examples/rollout/README.md
     examples/rollout/wildcard-alias-txt/ns.com.
@@ -64,6 +66,7 @@ extra-source-files:
     examples/rollout/wildcard-cname/ns.com.
     examples/rollout/wildcard-explicit/ns.com.
     examples/rollout/wildcard-nested/ns.com.
+    examples/rollout/wildcard-other-address/ns.com.
     examples/rollout/wildcard-txt/ns.com.
     examples/rollout/wildcard/ns.com.
 
