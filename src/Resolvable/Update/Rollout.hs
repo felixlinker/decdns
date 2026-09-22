@@ -14,7 +14,6 @@ module Resolvable.Update.Rollout
 import Control.Monad (when, foldM)
 import Control.Monad.Trans.Except (Except, throwE)
 import qualified Control.Monad.Trans.State as St
-import Data.Foldable (Foldable(foldl'))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
@@ -94,7 +93,6 @@ updateDeps :: Diffs -> RecordDependencies -> RecordDependencies
 updateDeps diffs = G.filter (`S.member ` toIDs diffs)
 
 type Rollout = [Diffs]
-type WildcardGuards = Rollout
 
 showRollOut :: Rollout -> [String]
 showRollOut r = do
@@ -118,10 +116,10 @@ removeIdentities = S.map (fmap (fmap (RRSet.modify (M.mapMaybe removeIdentities'
       let inverse = invert a
       in if inverse `elem` acc then filter (/= inverse) acc else a:acc
 
-invertAndSplit :: WildcardGuards -> (WildcardGuards, WildcardGuards)
+invertAndSplit :: Diffs -> (Diffs, Diffs)
 invertAndSplit gs =
-  let inv = map invertDiffs gs
-  in (map (pick isAdded) inv, map (pick isDeleted) inv)
+  let inv = invertDiffs gs
+  in (pick isAdded inv, pick isDeleted inv)
   where
     pick :: (Diff RData -> Bool) -> Diffs -> Diffs
     pick p = S.filter (not . RRSet.null . value . snd) . S.map (fmap (fmap (RRSet.filter p)))
@@ -131,26 +129,9 @@ rollout zones diffs (G.invert -> old) new = do
   updateSeq <- rollout' id (flattenDiffs diffs) old new
   -- Compute initial sequence of updates
   let updateSeq' = filter (not . S.null) $ foldr delayDeletions [] updateSeq
-  -- Apply updates to zone and check whether we must account for temporary
-  -- changes in wildcard semantics. ($ []) runs the accumulator.
-  let (_, ($ []) -> wildcardGuards) = foldl' applyStep (zones, id) (map groupDiffs updateSeq')
-  let (addInvs, delInvs) = invertAndSplit wildcardGuards
-  let updateSeq'' = foldr insertInverse [] (zip updateSeq' delInvs)
-  let updateSeq''' = reverse $ foldr insertInverse [] (zip (reverse updateSeq'') (reverse addInvs))
-  -- Insert guards at the index where the change in semantics occured; do this
-  -- after previous step so that the place where the name changed remains
-  -- unchanged.
-  let updateSeq'''' = zipWith (foldr insertDiff) wildcardGuards updateSeq'''
-  return $ map removeIdentities updateSeq''''
+  let updateSeq'' = wildcardSynthesis zones updateSeq'
+  return $ map removeIdentities updateSeq''
   where
-    -- Applies a rollout step to a config. Also synthesizes wildcard guards and their inv
-    applyStep :: (NSMap, WildcardGuards -> WildcardGuards) -> M.Map (Name String) [RRSetDiff] -> (NSMap, WildcardGuards -> WildcardGuards)
-    applyStep (config, acc) step =
-      let (config', synthesized) = St.runState (foldM applyServer config (M.toList step)) S.empty
-      -- Use (acc . (_:)) accumulator so that the resulting list's order
-      -- corresponds to the input list's order.
-      in  (config', acc . (synthesized:))
-
     delayDeletions :: Diffs -> Rollout -> Rollout
     delayDeletions step acc =
       let (dels, others)  = S.partition (all isDeleted . value . snd) step
@@ -167,27 +148,32 @@ rollout zones diffs (G.invert -> old) new = do
         hasDependencies :: RRSetID -> Bool
         hasDependencies rid = any (\(fmap name -> rid') -> rid `S.member` G.next old rid' || rid `S.member` G.next new rid') step
 
-    -- Apply a diff for a name server. Returns the updated name server map, and
-    -- stores synthesized responses for occluding wildcards and their inverses
-    -- in the state. The left tuple element must be applied before the right
-    -- tuple element.
-    applyServer :: NSMap -> (Name String, [RRSetDiff]) -> St.State Diffs NSMap
-    applyServer config (ns, ds) = alterDefF patchSynthesize ns config
+wildcardSynthesis :: NSMap -> Rollout -> Rollout
+wildcardSynthesis orgZ = aux [] orgZ
+  where
+    aux :: Rollout -> NSMap -> Rollout -> Rollout
+    aux accSeq _    []            = accSeq
+    aux accSeq cfg  (step:steps)  =
+      let (cfg', synthesized) = St.runState (foldM applyStep cfg step) S.empty
+          (addInv, delInv)    = invertAndSplit synthesized
+          (accSeq', rest1)    = foldrWith updateRolloutStep addInv accSeq
+          (steps', rest2)     = foldrWith updateRolloutStep delInv steps
+      in  if    S.null synthesized
+          then  aux (accSeq ++ [step]) cfg' steps
+          else  aux [] orgZ (accSeq' ++ [foldr insertDiff step (synthesized <> rest1 <> rest2)] ++ steps')
+
+    applyStep :: NSMap -> (Name String, RRSetDiff) -> St.State Diffs NSMap
+    applyStep configAcc (ns, ds) = alterDefF patchSynthesize ns configAcc
       where
+        -- TODO: Might require invariant that there is only one RRSetDiff
+        -- per name server. Cleaner would be to refactor Diffs so that it is
+        -- a map.
         patchSynthesize :: Zone ConstrainedLabel -> St.State Diffs (Zone ConstrainedLabel)
         patchSynthesize z = do
-          let (z', wcDiffs) = patch z ds
+          let (z', wcDiffs) = patch z [ds]
           let wcDiffsWithWC = S.mapMonotonic (mapName (lwildcard <|)) wcDiffs
           St.modify (\st -> foldr (insertDiff . (ns,)) st (wcDiffs <> wcDiffsWithWC))
           return z'
-
-    insertInverse :: (Diffs, Diffs) -> Rollout -> Rollout
-    insertInverse (s, ds) []  = [foldr insertDiff s ds]
-    insertInverse (s, ds) acc
-      | S.null ds = s : acc
-      | otherwise =
-        let (acc', ds') = foldrWith updateRolloutStep ds acc
-        in  foldr insertDiff s ds' : acc'
 
     updateRolloutStep :: Diffs -> Diffs -> (Diffs, Diffs)
     updateRolloutStep step guards =
