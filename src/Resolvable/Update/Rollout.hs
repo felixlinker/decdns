@@ -30,6 +30,7 @@ import NameConstraint
 import qualified Util.Graph as G
 import Resolvable.Dependencies (ResolutionOrder)
 import Data.Maybe (isJust, fromJust)
+import Util.List (foldrWith)
 import Util.Map (groupBy, alterDefF)
 import Util.Set (mapMonotonicF)
 import Util.Fixpoint
@@ -182,15 +183,15 @@ rollout zones diffs (G.invert -> old) new = do
 
     insertInverse :: (Diffs, Diffs) -> Rollout -> Rollout
     insertInverse (s, ds) []  = [foldr insertDiff s ds]
-    insertInverse (s, ds) acc@(accS:accT)
+    insertInverse (s, ds) acc
       | S.null ds = s : acc
       | otherwise =
-          let (s', ds') = updateRolloutStep ds s
-          in  s' : insertInverse (accS, ds') accT
+        let (acc', ds') = foldrWith updateRolloutStep ds acc
+        in  foldr insertDiff s ds' : acc'
 
     updateRolloutStep :: Diffs -> Diffs -> (Diffs, Diffs)
-    updateRolloutStep guards step =
-      let (ins, guards') = S.partition (\(fmap name -> g) -> any ((== g) . fmap name) step) guards
+    updateRolloutStep step guards =
+      let (ins, guards') = S.partition (\(ns, name -> n) -> any (\(ns', compileName . name -> n') -> ns == ns' && synthesize n n') step) guards
       in  (foldr insertDiff step ins, guards')
 
 rollout' :: (Rollout -> Rollout) -> Diffs -> RecordDependencies -> RecordDependencies -> Except String Rollout

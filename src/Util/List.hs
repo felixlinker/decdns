@@ -1,7 +1,9 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module Util.List
   ( nonEmpty
   , zipWithStrict
-  , zipStrict ) where
+  , zipStrict
+  , foldrWith ) where
 
 import qualified Data.List.NonEmpty as NE
 
@@ -15,3 +17,11 @@ zipWithStrict _ _ _ = Nothing
 
 zipStrict :: [a] -> [b] -> Maybe [(a, b)]
 zipStrict = zipWithStrict (,)
+
+foldrWith :: forall a b t. Foldable t => (a -> b -> (a, b)) -> b -> t a -> ([a], b)
+foldrWith f acc = foldr aux ([], acc)
+  where
+    aux :: a -> ([a], b) -> ([a], b)
+    aux a (accL, accB) =
+      let (a', accB') = f a accB
+      in (a':accL, accB')
