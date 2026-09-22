@@ -25,6 +25,9 @@ rule or projected dependency orders cause failures rather than silent exclusions
 | `wildcard-explicit`, `wildcard-txt` | Adding explicit owners changes the coverage of an unchanged wildcard. |
 | `wildcard-nested` | Nested wildcard coverage. |
 | `wildcard-cname`, `wildcard-cname-descendant` | Wildcard aliases and changes in name existence. |
+| `nested-alias`, `nested-wildcard-alias`, `dname-chain` | Replacing explicit or wildcard CNAME answers with a DNAME chain deletes the old answers before the chain is ready. |
+| `wildcard-target-alias` | Replacing explicit aliases with a wildcard while changing its target can leave an intermediate answer gap. |
+| `nested-delegation` | Removing a delegation below an explicit ancestor leaves glue blocking the replacement wildcard. |
 | `dname` | Transitions between delegation and subtree redirection. |
 | `colocated-child` | Several zones served by one server; compare with `cname/base`. |
 

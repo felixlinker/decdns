@@ -58,8 +58,13 @@ extra-source-files:
     examples/rollout/delegated-wildcard/ns.b.com.
     examples/rollout/delegated-wildcard/ns.com.
     examples/rollout/direct-address/ns.com.
+    examples/rollout/dname-chain/ns.com.
     examples/rollout/dname-nested/ns.com.
     examples/rollout/dname/ns.com.
+    examples/rollout/nested-alias/ns.com.
+    examples/rollout/nested-delegation/ns.com.
+    examples/rollout/nested-delegation/ns.deep.b.com.
+    examples/rollout/nested-wildcard-alias/ns.com.
     examples/rollout/README.md
     examples/rollout/wildcard-alias-txt/ns.com.
     examples/rollout/wildcard-cname-descendant/ns.com.
@@ -67,6 +72,7 @@ extra-source-files:
     examples/rollout/wildcard-explicit/ns.com.
     examples/rollout/wildcard-nested/ns.com.
     examples/rollout/wildcard-other-address/ns.com.
+    examples/rollout/wildcard-target-alias/ns.com.
     examples/rollout/wildcard-txt/ns.com.
     examples/rollout/wildcard/ns.com.
 
