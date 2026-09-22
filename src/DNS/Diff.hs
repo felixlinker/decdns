@@ -1,6 +1,8 @@
 {-# LANGUAGE ViewPatterns #-}
 module DNS.Diff
-  ( Diff(..)
+  ( Change(..)
+  , summarize
+  , Diff(..)
   , added
   , invert
   , deleted
@@ -38,6 +40,28 @@ import Data.Bifunctor (Bifunctor(bimap))
 import Data.Bifoldable (Bifoldable(bifoldr))
 import Data.Bitraversable (Bitraversable(bitraverse))
 import Util.List (nonEmpty)
+
+data Change = Unmodified | Deleted | Added | Modified
+  deriving (Eq, Ord)
+
+instance Semigroup Change where
+  Unmodified  <> c            = c
+  c           <> Unmodified   = c
+  Modified    <> _            = Modified
+  _           <> Modified     = Modified
+  Deleted     <> Deleted      = Deleted
+  Added       <> Added        = Added
+  Deleted     <> Added        = Modified
+  Added       <> Deleted      = Modified
+
+instance Monoid Change where
+  mempty = Unmodified
+
+fromDiff :: Diff a -> Change
+fromDiff da = if isAdded da then Added else Deleted
+
+summarize :: Foldable t => t (Diff a) -> Change
+summarize = foldr ((<>) . fromDiff) Unmodified
 
 -- Left is deleted, Right is added
 newtype Diff a = Diff

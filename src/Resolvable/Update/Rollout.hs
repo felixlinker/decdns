@@ -203,12 +203,14 @@ rollout' acc diffs (updateDeps diffs -> old) (updateDeps diffs -> new)
   where
     rolloutNow :: (Diffs, Diffs) -> Changed (Diffs, Diffs)
     rolloutNow (apply, wait) = do
-      let (newApply, wait') = S.partition (canRollout . fmap name) wait
+      let (newApply, wait') = S.partition (\(ns, d) -> canRollout (summarize (value d)) (ns, name d)) wait
       apply' <- foldM (flip checkInsert) apply newApply
       return (apply', wait')
       where
-        canRollout :: RRSetID -> Bool
-        canRollout (ns, n) = G.leaf old (ns, n) && all (`S.member` toIDs apply) (G.next new (ns, n))
+        canRollout :: Change -> (Name String, Name String) -> Bool
+        canRollout Unmodified _ = True  -- technically undefined
+        canRollout Deleted n    = G.leaf old n
+        canRollout _ n          = all (`S.member` toIDs apply) (G.next new n)
 
     checkInsert :: Ord a => a -> S.Set a -> Changed (S.Set a)
     checkInsert = S.alterF (\found -> St.modify (not found ||) >> return True)
