@@ -123,7 +123,7 @@ invertAndSplit gs =
   in (map (pick isAdded) inv, map (pick isDeleted) inv)
   where
     pick :: (Diff RData -> Bool) -> Diffs -> Diffs
-    pick p = S.map (fmap (fmap (RRSet.filter p)))
+    pick p = S.filter (not . RRSet.null . value . snd) . S.map (fmap (fmap (RRSet.filter p)))
 
 rollout :: NSMap -> NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
 rollout zones diffs (G.invert -> old) new = do
