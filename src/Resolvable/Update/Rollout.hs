@@ -12,6 +12,7 @@ module Resolvable.Update.Rollout
 import Control.Monad (when, foldM)
 import Control.Monad.Trans.Except (Except, throwE)
 import qualified Control.Monad.Trans.State as St
+import Data.Bifunctor (first)
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
 import qualified Data.Set as S
@@ -26,7 +27,7 @@ import NameConstraint
 import qualified Util.Graph as G
 import Resolvable.Dependencies (ResolutionOrder)
 import Data.Maybe (isJust, fromJust, fromMaybe)
-import Util.Map (alterDefF)
+import Util.Map (alterDefF, groupBy)
 import Util.Fixpoint
 import DNS.Record (RData)
 import Util.Set (checkInsert)
@@ -66,17 +67,17 @@ flattenDiffs = M.fromList . concatMap (uncurry aux) . M.toList
     aux :: Name String -> ZoneDiff String -> [(RRSetID, S.Set (Diff RData))]
     aux ns = filter (not . S.null . snd) . map (\(Named n d) -> ((ns, n), S.fromList (RRSet.flattenData d))) . allData
 
-showDiffsAtNS :: (Name String, Name String) -> [Diff RData] -> [String]
-showDiffsAtNS (ns, n) ds =
+showDiffsAtNS :: Name String -> [(Name String, S.Set (Diff RData))] -> [String]
+showDiffsAtNS ns ds =
     map indent
   $ ("on server " ++ show ns ++ ":")
-    : indent (show n) : map (indent . indent . show) ds
+    : concatMap (\(n, d) -> indent (show n) : map (indent . indent . show) (S.toList d)) ds
   where
     indent :: String -> String
     indent s = if null s then "" else "  " ++ s
 
 showDiffs :: Diffs -> [String]
-showDiffs = concatMap (uncurry showDiffsAtNS) . M.toList . M.map S.toList
+showDiffs = concatMap (uncurry showDiffsAtNS) . M.toList . M.map (map (first snd)) . groupBy (fst . fst) . M.toList
 
 diffServers :: NSMap -> NSMap -> NSDiffs
 diffServers old new = MM.merge
