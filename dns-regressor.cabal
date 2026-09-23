@@ -127,6 +127,7 @@ library
       Util.Fixpoint
       Util.Fresh
       Util.Func
+      Util.Functor
       Util.Graph
       Util.List
       Util.Map
