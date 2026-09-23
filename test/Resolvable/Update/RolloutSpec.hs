@@ -232,11 +232,11 @@ inventory cfg = M.fromListWith S.union
 -- Replay exactly the emitted changes, including filler records. Calling the
 -- synthesizing patcher to create additional changes here would mask rollout bugs.
 applyStep :: Inventory -> Diffs -> Inventory
-applyStep inv step = M.filter (not . S.null) $ foldl' applyOwner inv (S.toList step)
+applyStep inv step = M.filter (not . S.null) $ foldl' applyOwner inv (M.toList step)
   where
-    applyOwner acc (ns, Named owner changes) = M.insert ns
+    applyOwner acc ((ns, owner), changes) = M.insert ns
       (foldl' change (M.findWithDefault S.empty ns acc)
-        [fmap (Named owner) d | d <- RRSet.flattenData changes]) acc
+        [fmap (Named owner) d | d <- S.toList changes]) acc
     change records = deither (`S.delete` records) (`S.insert` records)
 
 toConfig :: Inventory -> NameServersConfig

@@ -67,13 +67,13 @@ recompileDetectsAddedNames :: Assertion
 recompileDetectsAddedNames = do
   let addedName = "added" <| exampleCom
       (_, synthesized) = recompileWildcards $ insert wildcardZone (Named (compileName addedName) (mkData "192.0.2.1"))
-  synthesized @?= S.singleton (Named addedName (fmap added wildcardData))
+  synthesized @?= S.fromList (map (Named addedName . added) (RRSet.flattenData wildcardData))
 
 recompileDetectsRemovedNames :: Assertion
 recompileDetectsRemovedNames = do
   let removedName = "fixed" <| exampleCom
       (_, synthesized) = recompileWildcards $ prune $ set (compileName removedName) RRSet.empty wildcardZone
-  synthesized @?= S.singleton (Named removedName (fmap deleted wildcardData))
+  synthesized @?= S.fromList (map (Named removedName . deleted) (RRSet.flattenData wildcardData))
 
 wildcardZone :: Zone ConstrainedLabel
 wildcardZone = compileWildcards $ fromList
