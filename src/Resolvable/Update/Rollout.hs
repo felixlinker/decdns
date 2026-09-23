@@ -9,7 +9,7 @@ module Resolvable.Update.Rollout
   , showRollOut
   , rollout ) where
 
-import Control.Monad (when, foldM)
+import Control.Monad (when, foldM, guard)
 import Control.Monad.Trans.Except (Except, throwE)
 import qualified Control.Monad.Trans.State as St
 import Data.Bifunctor (first)
@@ -26,7 +26,7 @@ import DNS.ZoneFile
 import NameConstraint
 import qualified Util.Graph as G
 import Resolvable.Dependencies (ResolutionOrder)
-import Data.Maybe (isJust, fromJust, fromMaybe)
+import Data.Maybe (isJust, fromJust, fromMaybe, isNothing)
 import Util.Map (alterDefF, groupBy)
 import Util.Fixpoint
 import DNS.Record (RData)
@@ -136,18 +136,20 @@ wildcardSynthesis :: NSMap -> NSMap -> Diffs -> Rollout -> Rollout
 wildcardSynthesis _ _ _ [] = []
 wildcardSynthesis curZ newZ inverses (step:steps) =
   let (z', chngd) = St.runState (foldM applyStep curZ (M.toList step)) M.empty
+      occluded = occlusionInverses z'
       (reverses, inverses') = occlusionReverses chngd
-  in  foldr insertDiffs step [occlusionInverses, M.map (S.map invert) reverses]
-    : wildcardSynthesis z' newZ (insertDiffs inverses' occlusionInverses) steps
+  in  foldr insertDiffs step [occluded, M.map (S.map invert) reverses]
+    : wildcardSynthesis z' newZ (insertDiffs inverses' occluded) steps
   where
-    occlusionInverses :: Diffs
-    occlusionInverses =
+    occlusionInverses :: NSMap -> Diffs
+    occlusionInverses z' =
       let deletions = M.keys $ M.filter (all isDeleted) step
       in  foldr addOccluded M.empty deletions
       where
         addOccluded :: RRSetID -> Diffs -> Diffs
         addOccluded (ns, n) acc = fromMaybe acc $ do
           synthd <- synthesizeIn n =<< M.lookup ns newZ
+          guard (isNothing $ synthesizeIn n =<< M.lookup ns z')
           return $ foldr (\(added -> d) -> insertDiff (ns, "*" <| n) d . insertDiff (ns, n) d) acc synthd
 
     occlusionReverses :: Diffs -> (Diffs, Diffs)
