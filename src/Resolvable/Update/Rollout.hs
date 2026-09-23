@@ -119,8 +119,9 @@ wildcardSynthesis curZ newZ inverses (step:steps) =
   let (z', chngd) = St.runState (foldM applyStep curZ (M.toList step)) M.empty
       occluded = occlusionInverses z'
       (reverses, inverses') = occlusionReverses chngd
-  in  foldr insertDiffs step [occluded, M.map (S.map invert) reverses]
-    : wildcardSynthesis z' newZ (insertDiffs inverses' occluded) steps
+      step' = foldr insertDiffs step [occluded, M.map (S.map invert) reverses]
+      z'' = St.evalState (foldM applyStep z' (M.toList step')) M.empty
+  in  step' : wildcardSynthesis z'' newZ (insertDiffs inverses' occluded) steps
   where
     occlusionInverses :: NSMap -> Diffs
     occlusionInverses z' =
