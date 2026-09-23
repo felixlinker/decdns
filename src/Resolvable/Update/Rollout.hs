@@ -67,7 +67,7 @@ flattenDiffs :: NSDiffs -> Diffs
 flattenDiffs = M.fromList . concatMap (uncurry aux) . M.toList
   where
     aux :: Name String -> ZoneDiff String -> [(RRSetID, S.Set (Diff RData))]
-    aux ns = map (\(Named n d) -> ((ns, n), S.fromList (RRSet.flattenData d))) . allData
+    aux ns = filter (not . S.null . snd) . map (\(Named n d) -> ((ns, n), S.fromList (RRSet.flattenData d))) . allData
 
 showDiffsAtNS :: (Name String, Name String) -> [Diff RData] -> [String]
 showDiffsAtNS (ns, n) ds =
