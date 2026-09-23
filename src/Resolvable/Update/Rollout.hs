@@ -73,7 +73,7 @@ showDiffsAtNS :: (Name String, Name String) -> [Diff RData] -> [String]
 showDiffsAtNS (ns, n) ds =
     map indent
   $ ("on server " ++ show ns ++ ":")
-    : indent (show n) : map (indent . indent . show . Named n) ds
+    : indent (show n) : map (indent . indent . show) ds
   where
     indent :: String -> String
     indent s = if null s then "" else "  " ++ s
