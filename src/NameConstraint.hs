@@ -26,6 +26,7 @@ import DNS.Record
 import qualified DNS.RRSet as RRSet
 
 import qualified Util.Tree as T
+import Control.Applicative (asum)
 
 data LabelConstraint a = Wildcard [a] | Exactly a
 
@@ -91,7 +92,19 @@ synthesize (Name (reverse . NE.toList -> ls)) (Name (reverse . NE.toList -> cs))
     match' _ _ = False
 
 synthesizeIn :: Name String -> Zone ConstrainedLabel -> Maybe [RData]
-synthesizeIn n z = do
-  Named ownerN d <- getFirst (compileName n) z
-  guard (synthesize n ownerN)
-  return $ RRSet.flattenData d
+synthesizeIn n (Zone org r) = case pathInZone org (compileName n) of
+  Path _ [] p -> walk org p r
+  _ -> Nothing
+  where
+    walk :: Name ConstrainedLabel -> [ConstrainedLabel] -> T.Node ConstrainedLabel (RRSet.RTypedSet RData) -> Maybe [RData]
+    -- Case 1: We found the data, but without synthesis.
+    walk _ [] (T.Node _ _) = Nothing
+    -- Case 2: If there is no child, we may need to perform synthesis.
+    walk acc (h:t) (T.Node _ cs) = asum
+      [ do -- Case 1: We find an exact match
+        c <- M.lookup h cs
+        walk (h <| acc) t c
+      , do -- Case 2: Check whether synthesis is possible
+        T.Node d _ <- M.lookup lwildcard cs
+        guard (synthesize n (Wildcard (map lshow $ M.keys cs) <| acc))
+        return $ RRSet.flattenData d ]

@@ -17,7 +17,6 @@ module DNS.ZoneFile
   , fromRecordList
   , insert
   , fromList
-  , getFirst
   , get
   , adjust
   , set
@@ -40,7 +39,7 @@ import DNS.Record
 import qualified DNS.RecordType as T
 import qualified DNS.RRSet as RRSet
 import qualified Util.Tree as T
-import Data.Bifunctor (Bifunctor(bimap), first)
+import Data.Bifunctor (Bifunctor(bimap))
 import Data.Foldable (Foldable(toList))
 
 data AZone a t b = Zone
@@ -121,11 +120,6 @@ insert (Zone norg zroot) (Named n d) = case pathInZone norg n of
 
 fromList :: (Label a, Ord a, Monoid (t b)) => NE.NonEmpty (Named a (t b)) -> AZone a t b
 fromList (r0 NE.:| rs) = foldr (flip insert) (singleton r0) rs
-
-getFirst :: (Label a, Ord a) => Name a -> AZone a t b -> Maybe (Named a (t b))
-getFirst n (Zone orgN r) = case pathInZone orgN n of
-  Path _ [] p -> Just $ uncurry Named $ first (`prependLabels` orgN) $ T.getFirst p r
-  _ -> Nothing
 
 get :: (Label a, Ord a) => Name a -> AZone a t b -> Maybe (t b)
 get n (Zone org r) = case pathInZone org n of
