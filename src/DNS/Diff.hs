@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
 module DNS.Diff
   ( Change(..)
@@ -24,14 +25,14 @@ import Control.Monad (foldM)
 import qualified Control.Monad.Trans.State as St
 import Data.Functor (($>))
 import qualified Data.Map as M
-import qualified Data.Map.Merge.Lazy as MM
-import Data.Either ( partitionEithers, isRight, isLeft )
+import Data.Either ( isRight, isLeft )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as S
 
 import DNS.Name as N
 import NameConstraint
 import DNS.Record
+import qualified DNS.RecordType as T
 import qualified DNS.RRSet as RRSet
 import DNS.ZoneFile
 
@@ -39,7 +40,6 @@ import qualified Util.Tree as T
 import Data.Bifunctor (Bifunctor(bimap))
 import Data.Bifoldable (Bifoldable(bifoldr))
 import Data.Bitraversable (Bitraversable(bitraverse))
-import Util.List (nonEmpty)
 
 data Change = Unmodified | Deleted | Added | Modified
   deriving (Eq, Ord)
@@ -104,12 +104,6 @@ isAdded = isRight . diffEither
 isDeleted :: Diff a -> Bool
 isDeleted = isLeft . diffEither
 
-additions :: NE.NonEmpty (Diff a) -> Maybe (NE.NonEmpty a)
-additions = NE.nonEmpty . map item . NE.filter isAdded
-
-partitionDiffs :: NE.NonEmpty (Diff a) -> ([a], [a])
-partitionDiffs = partitionEithers . map diffEither . NE.toList
-
 type ZoneDiff a = AZone a RRSet.RTypedSet (Diff RData)
 type RDataSetDiff = RRSet.RTypedSet (Diff RData)
 type RRSetDiff = Named String RDataSetDiff
@@ -148,37 +142,26 @@ hasChanges n (Zone org ns) = case pathInZone org n of
     rec :: (Label a, Ord a) => a -> [a] -> T.Node a RDataSetDiff -> Bool
     rec l r (T.Node _ cs) = maybe False (go r) (M.lookup l cs)
 
-patchRData :: NE.NonEmpty (Diff RData) -> NE.NonEmpty RData -> Maybe (NE.NonEmpty RData)
-patchRData diffs d = nonEmpty $ add $ delete (foldr S.insert S.empty d)
+patchRData :: Diff RData -> [RData] -> Maybe (NE.NonEmpty RData)
+patchRData (Diff (Right d)) = Just . (d NE.:|)
+patchRData (Diff (Left d)) = NE.nonEmpty . filter (/= d)
+
+patchData :: Foldable t => RRSet.RDataSet -> t (Diff RData) -> RRSet.RDataSet
+patchData (RRSet.RDS m) = RRSet.RDS . foldr patchKey m
   where
-    dels, adds :: [RData]
-    (dels, adds) = partitionDiffs diffs
+    patchKey :: Diff RData -> M.Map T.Type (NE.NonEmpty RData) -> M.Map T.Type (NE.NonEmpty RData)
+    patchKey d = M.alter (patchRData d . maybe [] NE.toList) (toType $ rtype $ item d)
 
-    delete :: S.Set RData -> S.Set RData
-    delete s = foldr S.delete s dels
-
-    add :: S.Set RData -> S.Set RData
-    add s = foldr S.insert s adds
-
-patchData :: RDataSetDiff -> RRSet.RDataSet -> RRSet.RDataSet
-patchData (RRSet.RDS diffsM) (RRSet.RDS m) =
-  RRSet.RDS $ MM.merge
-    (MM.mapMaybeMissing (const additions))
-    MM.preserveMissing
-    (MM.zipWithMaybeMatched (\_ diffs -> patchRData diffs))
-    diffsM
-    m
-
-patch :: Foldable t => Zone ConstrainedLabel -> t RRSetDiff -> (Zone ConstrainedLabel, WildcardDiffs)
+patch :: forall t1 t2. (Foldable t1, Foldable t2) => Zone ConstrainedLabel -> t1 (Named String (t2 (Diff RData))) -> (Zone ConstrainedLabel, WildcardDiffs)
 patch z = recompileWildcards . prune . foldr (\(Named (compileName -> n) d) -> adjust (aux d) n) z
   where
-    aux :: RDataSetDiff -> [ConstrainedLabel] -> ZNode ConstrainedLabel -> ZNode ConstrainedLabel
-    aux d [] (T.Node v cs) = T.Node (patchData d v) cs
+    aux :: t2 (Diff RData) -> [ConstrainedLabel] -> ZNode ConstrainedLabel -> ZNode ConstrainedLabel
+    aux d [] (T.Node v cs) = T.Node (patchData v d) cs
     aux d (h:t) (T.Node v cs) =
-      let adds = RRSet.map item $ RRSet.filter isAdded d
-      in T.Node v $ if RRSet.null adds then cs else M.insert h (T.leafAt t adds) cs
+      let rrset = patchData RRSet.empty d
+      in T.Node v (M.insert h (T.leafAt t rrset) cs)
 
-type WildcardDiffs = S.Set RRSetDiff
+type WildcardDiffs = S.Set (Named String (Diff RData))
 type DiffSt = St.State WildcardDiffs
 
 recompileWildcards :: Zone ConstrainedLabel -> (Zone ConstrainedLabel, WildcardDiffs)
@@ -190,7 +173,7 @@ recompileWildcards (Zone zOrg r) = St.runState (Zone zOrg <$> go zOrg (S.fromLis
         -- oldExist will be null if the wildcard has just been added; in that
         -- case, there is no diff due to changed in synthesis.
         Wildcard (S.fromList -> oldExist) | not (S.null oldExist) ->
-          St.modify (\st -> foldr (S.insert . dataDiff) st (setDiff oldExist newExist))
+          St.modify (\st -> foldr ((<>) . dataDiff) st (setDiff oldExist newExist))
         _ -> return ()
       ch' <- foldM rec M.empty (M.toList ch)
       return $ node { T.children = ch' }
@@ -201,6 +184,7 @@ recompileWildcards (Zone zOrg r) = St.runState (Zone zOrg <$> go zOrg (S.fromLis
           c' <- go (oldLbl <| n) (S.fromList exist') c
           return $ M.insert (compileLabel exist' (lshow oldLbl)) c' acc
 
-        dataDiff :: Diff String -> RRSetDiff
+        dataDiff :: Diff String -> S.Set (Named String (Diff RData))
         dataDiff diffLbl =
-          Named (Name (item diffLbl NE.:| map lshow lblT)) (fmap (diffLbl $>) d)
+          let diffN = Name (item diffLbl NE.:| map lshow lblT)
+          in  S.fromList $ map (Named diffN . (diffLbl $>)) $ RRSet.flattenData d

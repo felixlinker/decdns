@@ -3,7 +3,6 @@
 module Resolvable.Update.Rollout
   ( NSDiffs
   , Diffs
-  , flattenDiffs
   , RecordDependencies
   , fromResolutionOrder
   , diffServers
@@ -14,7 +13,6 @@ module Resolvable.Update.Rollout
 import Control.Monad (when, foldM)
 import Control.Monad.Trans.Except (Except, throwE)
 import qualified Control.Monad.Trans.State as St
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
 import qualified Data.Set as S
@@ -28,12 +26,13 @@ import DNS.ZoneFile
 import NameConstraint
 import qualified Util.Graph as G
 import Resolvable.Dependencies (ResolutionOrder)
-import Data.Maybe (isJust, fromJust)
+import Data.Maybe (isJust, fromJust, fromMaybe)
 import Util.List (foldrWith)
-import Util.Map (groupBy, alterDefF)
-import Util.Set (mapMonotonicF)
+import Util.Map (alterDefF)
 import Util.Fixpoint
+import Util.Functor (split)
 import DNS.Record (RData)
+import Util.Set (checkInsert)
 
 type RRSetID = (Name String, Name String)
 
@@ -50,33 +49,37 @@ fromResolutionOrder =
     fromAnnot (RComp ns rrs) = (ns, lshow <$> name rrs)
 
 type NSDiffs = M.Map (Name String) (ZoneDiff String)
-type Diffs = S.Set (Name String, RRSetDiff)
+type Diffs = M.Map RRSetID (S.Set (Diff RData))
+
+insertDiff :: RRSetID -> Diff RData -> Diffs -> Diffs
+insertDiff k v = M.alter (Just . maybe (S.singleton v) (S.insert v)) k
+
+checkInsertDiff :: RRSetID -> Diff RData -> Diffs -> Changed Diffs
+checkInsertDiff k v = M.alterF (fmap Just . checkInsert v . fromMaybe S.empty) k
+
+insertDiffs :: Diffs -> Diffs -> Diffs
+insertDiffs ds = foldr (\(k, vs) acc -> foldr (insertDiff k) acc vs) ds . M.toList
+
+checkInsertDiffs :: Diffs -> Diffs -> Changed Diffs
+checkInsertDiffs ds = foldM (\acc (k, vs) -> foldM (flip $ checkInsertDiff k) acc vs) ds . M.toList
 
 flattenDiffs :: NSDiffs -> Diffs
-flattenDiffs = S.fromList . concatMap (\(ns, z) -> map (ns,) $ filter (not . RRSet.null . value) (allData z)) . M.toList
-
-insertDiff :: (Name String, RRSetDiff) -> Diffs -> Diffs
-insertDiff c@(ns, Named n d) = onChange id (S.insert c) . mapMonotonicF checkInsert
+flattenDiffs = M.fromList . concatMap (uncurry aux) . M.toList
   where
-    checkInsert :: (Name String, RRSetDiff) -> Changed (Name String, RRSetDiff)
-    checkInsert c'@(ns', Named n' d')
-      | ns == ns' && n == n' = changed (ns', Named n' (d' <> d))
-      | otherwise = unchanged c'
+    aux :: Name String -> ZoneDiff String -> [(RRSetID, S.Set (Diff RData))]
+    aux ns = map (\(Named n d) -> ((ns, n), S.fromList (RRSet.flattenData d))) . allData
 
-showDiffsAtNS :: Name String -> [RRSetDiff] -> [String]
-showDiffsAtNS ns ds =
+showDiffsAtNS :: (Name String, Name String) -> [Diff RData] -> [String]
+showDiffsAtNS (ns, n) ds =
     map indent
   $ ("on server " ++ show ns ++ ":")
-    : concatMap (\(Named n d) -> indent (show n) : map (indent . indent . show) (RRSet.flattenData d)) ds
+    : indent (show n) : map (indent . indent . show . Named n) ds
   where
     indent :: String -> String
     indent s = if null s then "" else "  " ++ s
 
 showDiffs :: Diffs -> [String]
-showDiffs = concatMap (uncurry showDiffsAtNS) . M.toList . groupDiffs
-
-groupDiffs :: Diffs -> M.Map (Name String) [RRSetDiff]
-groupDiffs = M.map (map snd) . groupBy fst
+showDiffs = concatMap (uncurry showDiffsAtNS) . M.toList . M.map S.toList
 
 diffServers :: NameServersConfig -> NameServersConfig -> NSDiffs
 diffServers old new = MM.merge
@@ -86,11 +89,8 @@ diffServers old new = MM.merge
   (M.fromListWith mergeZones $ map (fmap literalWildcards) old)
   (M.fromListWith mergeZones $ map (fmap literalWildcards) new)
 
-toIDs :: Diffs -> S.Set RRSetID
-toIDs = S.mapMonotonic (fmap name)
-
 updateDeps :: Diffs -> RecordDependencies -> RecordDependencies
-updateDeps diffs = G.filter (`S.member ` toIDs diffs)
+updateDeps diffs = G.filter (`S.member ` M.keysSet diffs)
 
 type Rollout = [Diffs]
 
@@ -101,52 +101,40 @@ showRollOut r = do
 
 type NSMap = M.Map (Name String) (Zone ConstrainedLabel)
 
--- fmaps correspond to: Tuple then Named then RRSet.RTypedSet
-invertDiffs :: Diffs -> Diffs
-invertDiffs = S.map $ fmap $ fmap $ fmap invert
-
 removeIdentities :: Diffs -> Diffs
-removeIdentities = S.map (fmap (fmap (RRSet.modify (M.mapMaybe removeIdentities'))))
+removeIdentities = M.map (foldr consInverseNub S.empty)
   where
-    removeIdentities' :: Eq a => NE.NonEmpty (Diff a) -> Maybe (NE.NonEmpty (Diff a))
-    removeIdentities' = NE.nonEmpty . foldr consInverseNub []
-
-    consInverseNub :: Eq a => Diff a -> [Diff a] -> [Diff a]
+    consInverseNub :: Ord a => Diff a -> S.Set (Diff a) -> S.Set (Diff a)
     consInverseNub a acc =
-      let inverse = invert a
-      in if inverse `elem` acc then filter (/= inverse) acc else a:acc
+      let withoutInverse = S.alterF (\found -> if found then Just False else Nothing) (invert a) acc
+      in fromMaybe (S.insert a acc) withoutInverse
 
 invertAndSplit :: Diffs -> (Diffs, Diffs)
-invertAndSplit gs =
-  let inv = invertDiffs gs
-  in (pick isAdded inv, pick isDeleted inv)
-  where
-    pick :: (Diff RData -> Bool) -> Diffs -> Diffs
-    pick p = S.filter (not . RRSet.null . value . snd) . S.map (fmap (fmap (RRSet.filter p)))
+invertAndSplit = split (S.partition isAdded . S.map invert)
 
 rollout :: NSMap -> NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
 rollout zones diffs (G.invert -> old) new = do
   updateSeq <- rollout' id (flattenDiffs diffs) old new
   -- Compute initial sequence of updates
-  let updateSeq' = filter (not . S.null) $ foldr delayDeletions [] updateSeq
+  let updateSeq' = filter (not . M.null) $ foldr delayDeletions [] updateSeq
   let updateSeq'' = wildcardSynthesis zones updateSeq'
   return $ map removeIdentities updateSeq''
   where
     delayDeletions :: Diffs -> Rollout -> Rollout
     delayDeletions step acc =
-      let (dels, others)  = S.partition (all isDeleted . value . snd) step
+      let (dels, others)  = M.partition (all isDeleted) step
           (acc', here)    = insertDeletions dels acc
       in  others : here : acc'
 
     insertDeletions :: Diffs -> Rollout -> (Rollout, Diffs)
-    insertDeletions ins [] = ([ins], S.empty)
+    insertDeletions ins [] = ([ins], M.empty)
     insertDeletions ins (step:t) =
-      let (cannotIns, ins') = S.partition (hasDependencies . fmap name) ins
+      let (cannotIns, ins') = M.partitionWithKey (\k _ -> hasDependencies k) ins
           (t', insHere) = insertDeletions ins' t
-      in  (foldr insertDiff step insHere : t', cannotIns)
+      in  (insertDiffs step insHere : t', cannotIns)
       where
         hasDependencies :: RRSetID -> Bool
-        hasDependencies rid = any (\(fmap name -> rid') -> rid `S.member` G.next old rid' || rid `S.member` G.next new rid') step
+        hasDependencies rid = any (\rid' -> rid `S.member` G.next old rid' || rid `S.member` G.next new rid') (M.keys step)
 
 wildcardSynthesis :: NSMap -> Rollout -> Rollout
 wildcardSynthesis orgZ = aux [] orgZ
@@ -154,50 +142,47 @@ wildcardSynthesis orgZ = aux [] orgZ
     aux :: Rollout -> NSMap -> Rollout -> Rollout
     aux accSeq _    []            = accSeq
     aux accSeq cfg  (step:steps)  =
-      let (cfg', synthesized) = St.runState (foldM applyStep cfg step) S.empty
+      let (cfg', synthesized) = St.runState (foldM applyStep cfg (M.toList step)) M.empty
           (addInv, delInv)    = invertAndSplit synthesized
           (accSeq', rest1)    = foldrWith updateRolloutStep addInv accSeq
           (steps', rest2)     = foldrWith updateRolloutStep delInv steps
-      in  if    S.null synthesized
+      in  if    M.null synthesized
           then  aux (accSeq ++ [step]) cfg' steps
-          else  aux [] orgZ (accSeq' ++ [foldr insertDiff step (synthesized <> rest1 <> rest2)] ++ steps')
+          else  aux [] orgZ (accSeq' ++ [insertDiffs step (synthesized <> rest1 <> rest2)] ++ steps')
 
-    applyStep :: NSMap -> (Name String, RRSetDiff) -> St.State Diffs NSMap
-    applyStep configAcc (ns, ds) = alterDefF patchSynthesize ns configAcc
+    applyStep :: NSMap -> ((Name String, Name String), S.Set (Diff RData)) -> St.State Diffs NSMap
+    applyStep configAcc ((ns, n), ds) = alterDefF patchSynthesize ns configAcc
       where
         -- TODO: Might require invariant that there is only one RRSetDiff
         -- per name server. Cleaner would be to refactor Diffs so that it is
         -- a map.
         patchSynthesize :: Zone ConstrainedLabel -> St.State Diffs (Zone ConstrainedLabel)
         patchSynthesize z = do
-          let (z', wcDiffs) = patch z [ds]
+          let (z', wcDiffs) = patch z [Named n ds]
           let wcDiffsWithWC = S.mapMonotonic (mapName (lwildcard <|)) wcDiffs
-          St.modify (\st -> foldr (insertDiff . (ns,)) st (wcDiffs <> wcDiffsWithWC))
+          St.modify (\st -> foldr (\(Named dn d) -> insertDiff (ns, dn) d) st (wcDiffs <> wcDiffsWithWC))
           return z'
 
     updateRolloutStep :: Diffs -> Diffs -> (Diffs, Diffs)
     updateRolloutStep step guards =
-      let (ins, guards') = S.partition (\(ns, name -> n) -> any (\(ns', compileName . name -> n') -> ns == ns' && synthesize n n') step) guards
-      in  (foldr insertDiff step ins, guards')
+      let (ins, guards') = M.partitionWithKey (\(ns, n) _ -> any (\(ns', compileName -> n') -> ns == ns' && synthesize n n') (M.keys step)) guards
+      in  (insertDiffs step ins, guards')
 
 rollout' :: (Rollout -> Rollout) -> Diffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
 rollout' acc diffs (updateDeps diffs -> old) (updateDeps diffs -> new)
-  | S.null diffs = return $ acc []
+  | M.null diffs = return $ acc []
   | otherwise = do
-    let (changes, next) = fixpoint rolloutNow (S.empty, diffs)
+    let (changes, next) = fixpoint rolloutNow (M.empty, diffs)
     when (null changes) (throwE $ unlines $ "no changes; rolled out so far:" : showRollOut (acc []) ++ ["remaining changes:"] ++ showDiffs next)
     rollout' (acc . (changes :)) next old new
   where
     rolloutNow :: (Diffs, Diffs) -> Changed (Diffs, Diffs)
     rolloutNow (apply, wait) = do
-      let (newApply, wait') = S.partition (\(ns, d) -> canRollout (summarize (value d)) (ns, name d)) wait
-      apply' <- foldM (flip checkInsert) apply newApply
+      let (newApply, wait') = M.partitionWithKey (\(ns, n) d -> canRollout (summarize d) (ns, n)) wait
+      apply' <- checkInsertDiffs apply newApply
       return (apply', wait')
       where
         canRollout :: Change -> (Name String, Name String) -> Bool
         canRollout Unmodified _ = True  -- technically undefined
         canRollout Deleted n    = G.leaf old n
-        canRollout _ n          = all (`S.member` toIDs apply) (G.next new n)
-
-    checkInsert :: Ord a => a -> S.Set a -> Changed (S.Set a)
-    checkInsert = S.alterF (\found -> St.modify (not found ||) >> return True)
+        canRollout _ n          = all (`S.member` M.keysSet apply) (G.next new n)
