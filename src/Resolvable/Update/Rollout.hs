@@ -111,26 +111,7 @@ rollout :: NSMap -> NSMap -> RecordDependencies -> RecordDependencies -> Except 
 rollout oldZones newZones (G.invert -> old) new = do
   let diffs = diffServers oldZones newZones
   updateSeq <- rollout' id (flattenDiffs diffs) old new
-  -- Compute initial sequence of updates
-  let updateSeq' = filter (not . M.null) $ foldr delayDeletions [] updateSeq
-  let updateSeq'' = wildcardSynthesis oldZones newZones M.empty updateSeq'
-  return $ map removeIdentities updateSeq''
-  where
-    delayDeletions :: Diffs -> Rollout -> Rollout
-    delayDeletions step acc =
-      let (dels, others)  = M.partition (all isDeleted) step
-          (acc', here)    = insertDeletions dels acc
-      in  others : here : acc'
-
-    insertDeletions :: Diffs -> Rollout -> (Rollout, Diffs)
-    insertDeletions ins [] = ([ins], M.empty)
-    insertDeletions ins (step:t) =
-      let (cannotIns, ins') = M.partitionWithKey (\k _ -> hasDependencies k) ins
-          (t', insHere) = insertDeletions ins' t
-      in  (insertDiffs step insHere : t', cannotIns)
-      where
-        hasDependencies :: RRSetID -> Bool
-        hasDependencies rid = any (\rid' -> rid `S.member` G.next old rid' || rid `S.member` G.next new rid') (M.keys step)
+  return $ wildcardSynthesis oldZones newZones M.empty updateSeq
 
 wildcardSynthesis :: NSMap -> NSMap -> Diffs -> Rollout -> Rollout
 wildcardSynthesis _ _ _ [] = []
