@@ -49,6 +49,8 @@ extra-source-files:
     examples/ns/sub-self-deleg/root.net.
     examples/rollout/address-to-alias-new/ns.com.
     examples/rollout/address-to-alias-old/ns.com.
+    examples/rollout/alias-descendant-chain/ns.com.
+    examples/rollout/alias-descendant-txt/ns.com.
     examples/rollout/alias/ns.com.
     examples/rollout/colocated-child/ns.com.
     examples/rollout/delayed-target-new/ns.com.
@@ -61,14 +63,15 @@ extra-source-files:
     examples/rollout/dname-chain/ns.com.
     examples/rollout/dname-nested/ns.com.
     examples/rollout/dname/ns.com.
+    examples/rollout/nested-alias-target/ns.com.
     examples/rollout/nested-alias/ns.com.
     examples/rollout/nested-delegation/ns.com.
     examples/rollout/nested-delegation/ns.deep.b.com.
     examples/rollout/nested-wildcard-alias/ns.com.
-    examples/rollout/README.md
     examples/rollout/wildcard-alias-txt/ns.com.
     examples/rollout/wildcard-cname-descendant/ns.com.
     examples/rollout/wildcard-cname/ns.com.
+    examples/rollout/wildcard-dname-target/ns.com.
     examples/rollout/wildcard-explicit/ns.com.
     examples/rollout/wildcard-nested/ns.com.
     examples/rollout/wildcard-other-address/ns.com.
