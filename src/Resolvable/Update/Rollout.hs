@@ -10,7 +10,7 @@ module Resolvable.Update.Rollout
   , showRollOut
   , rollout ) where
 
-import Control.Monad (when, foldM)
+import Control.Monad (when, foldM, unless)
 import Control.Monad.Trans.Except (Except, throwE)
 import qualified Control.Monad.Trans.State as St
 import qualified Data.Map as M
@@ -143,13 +143,22 @@ wildcardSynthesis orgZ = aux [] orgZ
     aux accSeq _    []            = accSeq
     aux accSeq cfg  (step:steps)  =
       let (cfg', synthesized) = St.runState (foldM applyStep cfg (M.toList step)) M.empty
-          (step', didChange)  = runChanged $ checkInsertDiffs step synthesized
-          (addInv, delInv)    = invertAndSplit synthesized
+          (step', synthesized')  = checkInsertNew step synthesized
+          (addInv, delInv)    = invertAndSplit synthesized'
           (accSeq', rest1)    = foldrWith updateRolloutStep addInv accSeq
           (steps', rest2)     = foldrWith updateRolloutStep delInv steps
-      in  if    didChange
-          then  aux [] orgZ (accSeq' ++ [insertDiffs (insertDiffs step' rest1) rest2] ++ steps')
-          else  aux (accSeq ++ [step]) cfg' steps
+      in  if    M.null synthesized'
+          then  aux (accSeq ++ [step]) cfg' steps
+          else  aux [] orgZ (accSeq' ++ [insertDiffs (insertDiffs step' rest1) rest2] ++ steps')
+
+    checkInsertNew :: Diffs -> Diffs -> (Diffs, Diffs)
+    checkInsertNew ds = (`St.runState` M.empty) . foldM foldF ds . M.toList
+      where
+        foldF :: Diffs -> (RRSetID, S.Set (Diff RData)) -> St.State Diffs Diffs
+        foldF acc (k, vs) = M.alterF (fmap Just . flip alterF vs . fromMaybe S.empty) k acc
+          where
+            alterF :: S.Set (Diff RData) -> S.Set (Diff RData) -> St.State Diffs (S.Set (Diff RData))
+            alterF = foldM (flip $ \v -> S.alterF (\found -> unless found (St.modify (insertDiff k v)) >> return True) v)
 
     applyStep :: NSMap -> ((Name String, Name String), S.Set (Diff RData)) -> St.State Diffs NSMap
     applyStep configAcc ((ns, n), ds) = alterDefF patchSynthesize ns configAcc
