@@ -8,6 +8,7 @@ module Util.Tree
   , leafAt
   , emptyNode
   , prune
+  , getFirst
   , get
   , adjustF
   , adjust
@@ -22,6 +23,7 @@ module Util.Tree
   , traverseNamed
   , allNamed ) where
 
+import Data.Bifunctor (first)
 import Data.Functor.Identity (Identity(runIdentity))
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
@@ -83,6 +85,10 @@ fmerge f (Node i1 cs1) (Node i2 cs2) =
 
 merge :: (Monoid v, Ord k) => Node k v -> Node k v -> Node k v
 merge = fmerge (<>)
+
+getFirst :: Ord k => [k] -> Node k v -> ([k], v)
+getFirst [] (Node i _) = ([], i)
+getFirst (h:t) (Node i cs) = maybe ([], i) (first (h:) . getFirst t) (M.lookup h cs)
 
 get :: Ord k => [k] -> Node k v -> Maybe v
 get [] (Node i _) = Just i

@@ -13,8 +13,10 @@ module NameConstraint
   , existIn
   , compileWildcards
   , literalWildcards
-  , synthesize ) where
+  , synthesize
+  , synthesizeIn ) where
 
+import Control.Monad (guard)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 
@@ -87,3 +89,9 @@ synthesize (Name (reverse . NE.toList -> ls)) (Name (reverse . NE.toList -> cs))
     match' (a:_) [Wildcard c] = a `notElem` c
     match' ("*":as) (Wildcard _:ncs) = match' as ncs
     match' _ _ = False
+
+synthesizeIn :: Name String -> Zone ConstrainedLabel -> Maybe [RData]
+synthesizeIn n z = do
+  Named ownerN d <- getFirst (compileName n) z
+  guard (synthesize n ownerN)
+  return $ RRSet.flattenData d
