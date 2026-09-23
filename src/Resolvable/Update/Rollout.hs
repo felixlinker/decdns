@@ -143,12 +143,13 @@ wildcardSynthesis orgZ = aux [] orgZ
     aux accSeq _    []            = accSeq
     aux accSeq cfg  (step:steps)  =
       let (cfg', synthesized) = St.runState (foldM applyStep cfg (M.toList step)) M.empty
+          (step', didChange)  = runChanged $ checkInsertDiffs step synthesized
           (addInv, delInv)    = invertAndSplit synthesized
           (accSeq', rest1)    = foldrWith updateRolloutStep addInv accSeq
           (steps', rest2)     = foldrWith updateRolloutStep delInv steps
-      in  if    M.null synthesized
-          then  aux (accSeq ++ [step]) cfg' steps
-          else  aux [] orgZ (accSeq' ++ [insertDiffs step (synthesized <> rest1 <> rest2)] ++ steps')
+      in  if    didChange
+          then  aux [] orgZ (accSeq' ++ [insertDiffs (insertDiffs step' rest1) rest2] ++ steps')
+          else  aux (accSeq ++ [step]) cfg' steps
 
     applyStep :: NSMap -> ((Name String, Name String), S.Set (Diff RData)) -> St.State Diffs NSMap
     applyStep configAcc ((ns, n), ds) = alterDefF patchSynthesize ns configAcc
