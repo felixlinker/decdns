@@ -141,8 +141,10 @@ rolloutInvariant old new = case prepare of
       newDeps <- exampleDependencies new
       let oldConfig = exampleConfig old
           newConfig = exampleConfig new
-      runExcept $ rollout (M.fromListWith mergeZones oldConfig)
-        (diffServers oldConfig newConfig) oldDeps newDeps
+      runExcept $ rollout
+        (M.fromListWith mergeZones oldConfig)
+        (M.fromListWith mergeZones newConfig)
+        oldDeps newDeps
 
 -- Endpoint validation is fixture validation, not an intermediate assertion:
 -- this property tests query continuity, not zone validity or answer equality.
