@@ -42,8 +42,8 @@ main = do
       putStrLn $ showKnowledgeBase $ S.toList res
     "diff" -> do
       (old, new) <- sepBy "--" args
-      oldRecs <- parseZones old
-      newRecs <- parseZones new
+      oldRecs <- M.fromListWith mergeZones <$> parseZones old
+      newRecs <- M.fromListWith mergeZones <$> parseZones new
       let nsDiff = diffServers oldRecs newRecs
       mapM_ (\(ns, d) -> print ns >> print d) (M.toList nsDiff)
     "regressions" -> do
@@ -53,14 +53,14 @@ main = do
       oldRecs <- parseZones old
       newRecs <- parseZones new
       let originalZones = M.fromListWith mergeZones oldRecs
+      let finalZones = M.fromListWith mergeZones newRecs
       let oldRecsC = compileConfig roots oldRecs
       let newRecsC = compileConfig roots newRecs
       regs <- failLeftS $ runFresh $ runExceptT $ computeRegressions (plResolvable =<< oldRecsC) (plResolvable =<< newRecsC)
       mapM_ print regs
-      let nsDiff = diffServers oldRecs newRecs
       oldDeps <- handleMaybe "cyclic old resolution order" $ runFresh $ fromResolutionOrder . resolutionOrder <$> oldRecsC
       newDeps <- handleMaybe "cyclic new resolution order" $ runFresh $ fromResolutionOrder . resolutionOrder <$> newRecsC
-      rolloutSeq <- handleErrorS (rollout originalZones nsDiff oldDeps newDeps)
+      rolloutSeq <- handleErrorS (rollout originalZones finalZones oldDeps newDeps)
       unless (null rolloutSeq) $
         putStrLn $ unlines $ map ("% " ++) $ "You can roll out updates as follow." :  showRollOut rolloutSeq
     "visualize" -> do

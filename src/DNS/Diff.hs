@@ -187,4 +187,5 @@ recompileWildcards (Zone zOrg r) = St.runState (Zone zOrg <$> go zOrg (S.fromLis
         dataDiff :: Diff String -> S.Set (Named String (Diff RData))
         dataDiff diffLbl =
           let diffN = Name (item diffLbl NE.:| map lshow lblT)
-          in  S.fromList $ map (Named diffN . (diffLbl $>)) $ RRSet.flattenData d
+              diffNs = ["*" <| diffN, diffN]
+          in  S.fromList $ concatMap (\el -> map (`Named` (diffLbl $> el)) diffNs) $ RRSet.flattenData d

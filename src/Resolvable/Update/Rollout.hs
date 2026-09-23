@@ -1,5 +1,4 @@
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TupleSections #-}
 module Resolvable.Update.Rollout
   ( NSDiffs
   , Diffs
@@ -10,7 +9,7 @@ module Resolvable.Update.Rollout
   , showRollOut
   , rollout ) where
 
-import Control.Monad (when, foldM, unless)
+import Control.Monad (when, foldM)
 import Control.Monad.Trans.Except (Except, throwE)
 import qualified Control.Monad.Trans.State as St
 import qualified Data.Map as M
@@ -27,10 +26,8 @@ import NameConstraint
 import qualified Util.Graph as G
 import Resolvable.Dependencies (ResolutionOrder)
 import Data.Maybe (isJust, fromJust, fromMaybe)
-import Util.List (foldrWith)
 import Util.Map (alterDefF)
 import Util.Fixpoint
-import Util.Functor (split)
 import DNS.Record (RData)
 import Util.Set (checkInsert)
 
@@ -81,13 +78,13 @@ showDiffsAtNS (ns, n) ds =
 showDiffs :: Diffs -> [String]
 showDiffs = concatMap (uncurry showDiffsAtNS) . M.toList . M.map S.toList
 
-diffServers :: NameServersConfig -> NameServersConfig -> NSDiffs
+diffServers :: NSMap -> NSMap -> NSDiffs
 diffServers old new = MM.merge
   (MM.mapMissing (\_ -> fmap deleted))
   (MM.mapMissing (\_ -> fmap added))
   (MM.zipWithMatched (const diff))
-  (M.fromListWith mergeZones $ map (fmap literalWildcards) old)
-  (M.fromListWith mergeZones $ map (fmap literalWildcards) new)
+  (fmap literalWildcards old)
+  (fmap literalWildcards new)
 
 updateDeps :: Diffs -> RecordDependencies -> RecordDependencies
 updateDeps diffs = G.filter (`S.member ` M.keysSet diffs)
@@ -109,15 +106,13 @@ removeIdentities = M.map (foldr consInverseNub S.empty)
       let withoutInverse = S.alterF (\found -> if found then Just False else Nothing) (invert a) acc
       in fromMaybe (S.insert a acc) withoutInverse
 
-invertAndSplit :: Diffs -> (Diffs, Diffs)
-invertAndSplit = split (S.partition isAdded . S.map invert)
-
-rollout :: NSMap -> NSDiffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
-rollout zones diffs (G.invert -> old) new = do
+rollout :: NSMap -> NSMap -> RecordDependencies -> RecordDependencies -> Except String Rollout
+rollout oldZones newZones (G.invert -> old) new = do
+  let diffs = diffServers oldZones newZones
   updateSeq <- rollout' id (flattenDiffs diffs) old new
   -- Compute initial sequence of updates
   let updateSeq' = filter (not . M.null) $ foldr delayDeletions [] updateSeq
-  let updateSeq'' = wildcardSynthesis zones updateSeq'
+  let updateSeq'' = wildcardSynthesis oldZones newZones M.empty updateSeq'
   return $ map removeIdentities updateSeq''
   where
     delayDeletions :: Diffs -> Rollout -> Rollout
@@ -136,29 +131,30 @@ rollout zones diffs (G.invert -> old) new = do
         hasDependencies :: RRSetID -> Bool
         hasDependencies rid = any (\rid' -> rid `S.member` G.next old rid' || rid `S.member` G.next new rid') (M.keys step)
 
-wildcardSynthesis :: NSMap -> Rollout -> Rollout
-wildcardSynthesis orgZ = aux [] orgZ
+wildcardSynthesis :: NSMap -> NSMap -> Diffs -> Rollout -> Rollout
+wildcardSynthesis _ _ _ [] = []
+wildcardSynthesis curZ newZ inverses (step:steps) =
+  let (z', chngd) = St.runState (foldM applyStep curZ (M.toList step)) M.empty
+      (reverses, inverses') = occlusionReverses chngd
+  in  foldr insertDiffs step [occlusionInverses, M.map (S.map invert) reverses]
+    : wildcardSynthesis z' newZ (insertDiffs inverses' occlusionInverses) steps
   where
-    aux :: Rollout -> NSMap -> Rollout -> Rollout
-    aux accSeq _    []            = accSeq
-    aux accSeq cfg  (step:steps)  =
-      let (cfg', synthesized) = St.runState (foldM applyStep cfg (M.toList step)) M.empty
-          (step', synthesized')  = checkInsertNew step synthesized
-          (addInv, delInv)    = invertAndSplit synthesized'
-          (accSeq', rest1)    = foldrWith updateRolloutStep addInv accSeq
-          (steps', rest2)     = foldrWith updateRolloutStep delInv steps
-      in  if    M.null synthesized'
-          then  aux (accSeq ++ [step]) cfg' steps
-          else  aux [] orgZ (accSeq' ++ [insertDiffs (insertDiffs step' rest1) rest2] ++ steps')
-
-    checkInsertNew :: Diffs -> Diffs -> (Diffs, Diffs)
-    checkInsertNew ds = (`St.runState` M.empty) . foldM foldF ds . M.toList
+    occlusionInverses :: Diffs
+    occlusionInverses =
+      let deletions = M.keys $ M.filter (all isDeleted) step
+      in  foldr addOccluded M.empty deletions
       where
-        foldF :: Diffs -> (RRSetID, S.Set (Diff RData)) -> St.State Diffs Diffs
-        foldF acc (k, vs) = M.alterF (fmap Just . flip alterF vs . fromMaybe S.empty) k acc
-          where
-            alterF :: S.Set (Diff RData) -> S.Set (Diff RData) -> St.State Diffs (S.Set (Diff RData))
-            alterF = foldM (flip $ \v -> S.alterF (\found -> unless found (St.modify (insertDiff k v)) >> return True) v)
+        addOccluded :: RRSetID -> Diffs -> Diffs
+        addOccluded (ns, n) acc = fromMaybe acc $ do
+          synthd <- synthesizeIn n =<< M.lookup ns newZ
+          return $ foldr (\(added -> d) -> insertDiff (ns, "*" <| n) d . insertDiff (ns, n) d) acc synthd
+
+    occlusionReverses :: Diffs -> (Diffs, Diffs)
+    occlusionReverses = M.partitionWithKey p
+      where
+        p :: RRSetID -> S.Set (Diff RData) -> Bool
+        p (ns, compileName -> n) (summarize -> Added) = any (\(ns', n') -> ns == ns' && synthesize n' n) (M.keys inverses)
+        p _ _ = False
 
     applyStep :: NSMap -> ((Name String, Name String), S.Set (Diff RData)) -> St.State Diffs NSMap
     applyStep configAcc ((ns, n), ds) = alterDefF patchSynthesize ns configAcc
@@ -172,11 +168,6 @@ wildcardSynthesis orgZ = aux [] orgZ
           let wcDiffsWithWC = S.mapMonotonic (mapName (lwildcard <|)) wcDiffs
           St.modify (\st -> foldr (\(Named dn d) -> insertDiff (ns, dn) d) st (wcDiffs <> wcDiffsWithWC))
           return z'
-
-    updateRolloutStep :: Diffs -> Diffs -> (Diffs, Diffs)
-    updateRolloutStep step guards =
-      let (ins, guards') = M.partitionWithKey (\(ns, n) _ -> any (\(ns', compileName -> n') -> ns == ns' && synthesize n n') (M.keys step)) guards
-      in  (insertDiffs step ins, guards')
 
 rollout' :: (Rollout -> Rollout) -> Diffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
 rollout' acc diffs (updateDeps diffs -> old) (updateDeps diffs -> new)
