@@ -14,7 +14,7 @@ module NameConstraint
   , compileWildcards
   , literalWildcards
   , synthesize
-  , synthesizeIn ) where
+  , wildcardResponse ) where
 
 import Control.Monad (guard)
 import qualified Data.List.NonEmpty as NE
@@ -91,14 +91,16 @@ synthesize (Name (reverse . NE.toList -> ls)) (Name (reverse . NE.toList -> cs))
     match' ("*":as) (Wildcard _:ncs) = match' as ncs
     match' _ _ = False
 
-synthesizeIn :: Name String -> Zone ConstrainedLabel -> Maybe [RData]
-synthesizeIn n (Zone org r) = case pathInZone org (compileName n) of
+wildcardResponse :: Name String -> Zone ConstrainedLabel -> Maybe [RData]
+wildcardResponse n (Zone org r) = case pathInZone org (compileName n) of
   Path _ [] p -> walk org p r
   _ -> Nothing
   where
     walk :: Name ConstrainedLabel -> [ConstrainedLabel] -> T.Node ConstrainedLabel (RRSet.RTypedSet RData) -> Maybe [RData]
     -- Case 1: We found the data, but without synthesis.
-    walk _ [] (T.Node _ _) = Nothing
+    walk (Name (l NE.:| _)) [] (T.Node d _) = case l of
+      Exactly _   -> Nothing
+      Wildcard _  -> Just $ RRSet.flattenData d
     -- Case 2: If there is no child, we may need to perform synthesis.
     walk acc (h:t) (T.Node _ cs) = asum
       [ do -- Case 1: We find an exact match

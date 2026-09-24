@@ -8,7 +8,7 @@ import DNS.Name (Name (Name), Named (Named))
 import DNS.Record (Cat (IN), RData (RData), Type (A, MX, NS, SOA, TXT))
 import qualified DNS.RRSet as RRSet
 import DNS.ZoneFile (Zone, fromList)
-import NameConstraint (ConstrainedLabel, LabelConstraint (Wildcard), compileWildcards, synthesizeIn)
+import NameConstraint (ConstrainedLabel, LabelConstraint (Wildcard), compileWildcards, wildcardResponse)
 
 tests :: TestTree
 tests =
@@ -19,7 +19,7 @@ tests =
     , testCase "wildcard ordering ignores constraints" $
         compare (Wildcard ["a"]) (Wildcard ["b"]) @?= EQ
     , testGroup
-        "synthesizeIn (RFC 4592 section 2.2.1)"
+        "wildcardResponse (RFC 4592 section 2.2.1)"
         [ testCase "an existing name is not synthesized" $
             wildcardAnswer ["host1", "example", ""] @?= Nothing
         , testCase "host3.example is synthesized from *.example" $
@@ -41,7 +41,7 @@ tests =
 
 -- The complete example zone from RFC 4592 section 2.2.1.  SRV is not a
 -- supported record type, so its two owners are represented as empty nodes;
--- synthesizeIn only needs their existence when finding the closest encloser.
+-- wildcardResponse only needs their existence when finding the closest encloser.
 rfc4592Zone :: Zone ConstrainedLabel
 rfc4592Zone = compileWildcards $ fromList $
   rr ["example", ""] (SOA nsCom hostmaster 1 2 3 4 5)
@@ -69,7 +69,7 @@ wildcardData =
       RRSet.singleton (RData IN 3600 (TXT "this is a wildcard"))
 
 wildcardAnswer :: [String] -> Maybe [RData]
-wildcardAnswer labels = synthesizeIn (name labels) rfc4592Zone
+wildcardAnswer labels = wildcardResponse (name labels) rfc4592Zone
 
 rr :: [String] -> Type -> Named String RRSet.RDataSet
 rr labels ty = Named (name labels) (RRSet.singleton (RData IN 3600 ty))

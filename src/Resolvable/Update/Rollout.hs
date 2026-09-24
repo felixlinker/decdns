@@ -132,7 +132,7 @@ wildcardSynthesis curZ newZ inverses (step:steps) =
       where
         addOccluded :: RRSetID -> Diffs -> Diffs
         addOccluded (ns, n) acc = fromMaybe acc $ do
-          synthd <- synthesizeIn n =<< M.lookup ns newZ
+          synthd <- wildcardResponse n =<< M.lookup ns newZ
           guard (isNothing $ synthesizeIn n =<< M.lookup ns z')
           return $ foldr (\(added -> d) -> insertDiff (ns, "*" <| n) d . insertDiff (ns, n) d) acc synthd
 
