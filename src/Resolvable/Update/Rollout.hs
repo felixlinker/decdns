@@ -99,14 +99,6 @@ showRollOut r = do
 
 type NSMap = M.Map (Name String) (Zone ConstrainedLabel)
 
-removeIdentities :: Diffs -> Diffs
-removeIdentities = M.map (foldr consInverseNub S.empty)
-  where
-    consInverseNub :: Ord a => Diff a -> S.Set (Diff a) -> S.Set (Diff a)
-    consInverseNub a acc =
-      let withoutInverse = S.alterF (\found -> if found then Just False else Nothing) (invert a) acc
-      in fromMaybe (S.insert a acc) withoutInverse
-
 rollout :: NSMap -> NSMap -> RecordDependencies -> RecordDependencies -> Except String Rollout
 rollout oldZones newZones (G.invert -> old) new = do
   let diffs = diffServers oldZones newZones
