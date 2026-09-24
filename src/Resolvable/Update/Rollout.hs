@@ -125,7 +125,7 @@ wildcardSynthesis curZ newZ inverses (step:steps) =
         addOccluded :: RRSetID -> Diffs -> Diffs
         addOccluded (ns, n) acc = fromMaybe acc $ do
           synthd <- wildcardResponse n =<< M.lookup ns newZ
-          guard (isNothing $ synthesizeIn n =<< M.lookup ns z')
+          guard (isNothing $ wildcardResponse n =<< M.lookup ns z')
           return $ foldr (\(added -> d) -> insertDiff (ns, "*" <| n) d . insertDiff (ns, n) d) acc synthd
 
     occlusionReverses :: Diffs -> (Diffs, Diffs)
@@ -165,4 +165,4 @@ rollout' acc diffs (updateDeps diffs -> old) (updateDeps diffs -> new)
         canRollout :: Change -> (Name String, Name String) -> Bool
         canRollout Unmodified _ = True  -- technically undefined
         canRollout Deleted n    = G.leaf old n
-        canRollout _ n          = all (`S.member` M.keysSet apply) (G.next new n)
+        canRollout _ n          = all (`S.member` M.keysSet apply) (G.next old n) && all (`S.member` M.keysSet apply) (G.next new n)
