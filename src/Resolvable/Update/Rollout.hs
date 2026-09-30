@@ -102,8 +102,8 @@ type NSMap = M.Map (Name String) (Zone ConstrainedLabel)
 rollout :: NSMap -> NSMap -> RecordDependencies -> RecordDependencies -> Except String Rollout
 rollout oldZones newZones (G.invert -> old) new = do
   let diffs = diffServers oldZones newZones
-  updateSeq <- rollout' id (flattenDiffs diffs) old new
-  return $ wildcardSynthesis oldZones newZones M.empty updateSeq
+  rollout' id (flattenDiffs diffs) old new
+  -- return $ wildcardSynthesis oldZones newZones M.empty updateSeq
 
 wildcardSynthesis :: NSMap -> NSMap -> Diffs -> Rollout -> Rollout
 wildcardSynthesis _ _ _ [] = []
