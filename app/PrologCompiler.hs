@@ -58,8 +58,8 @@ main = do
       let newRecsC = compileConfig roots newRecs
       regs <- failLeftS $ runFresh $ runExceptT $ computeRegressions (plResolvable =<< oldRecsC) (plResolvable =<< newRecsC)
       mapM_ print regs
-      oldDeps <- handleMaybe "cyclic old resolution order" $ runFresh $ fromResolutionOrder . resolutionOrder <$> oldRecsC
-      newDeps <- handleMaybe "cyclic new resolution order" $ runFresh $ fromResolutionOrder . resolutionOrder <$> newRecsC
+      let oldDeps = runFresh $ fromResolutionOrder . resolutionOrder <$> oldRecsC
+      let newDeps = runFresh $ fromResolutionOrder . resolutionOrder <$> newRecsC
       rolloutSeq <- handleErrorS (rollout originalZones finalZones oldDeps newDeps)
       unless (null rolloutSeq) $
         putStrLn $ unlines $ map ("% " ++) $ "You can roll out updates as follow." :  showRollOut rolloutSeq

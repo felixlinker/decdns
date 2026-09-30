@@ -25,21 +25,22 @@ import Resolvable.Resolvability
 import DNS.ZoneFile
 import NameConstraint
 import qualified Util.Graph as G
+import qualified Util.CondensationGraph as CG
 import Resolvable.Dependencies (ResolutionOrder)
 import Data.Maybe (isJust, fromJust, fromMaybe, isNothing)
 import Util.Map (alterDefF, groupBy)
 import Util.Fixpoint
 import DNS.Record (RData)
 import Util.Set (checkInsert)
+import Util.Bool
 
 type RRSetID = (Name String, Name String)
 
 type RecordDependencies = G.Graph RRSetID
 
-fromResolutionOrder :: ResolutionOrder -> Maybe RecordDependencies
+fromResolutionOrder :: ResolutionOrder -> RecordDependencies
 fromResolutionOrder =
-    G.transitiveClosure
-  . G.irreflexive
+    G.irreflexive
   . G.map (fromAnnot . fromJust . rannotation)
   . G.filter (isJust . rannotation)
   where
@@ -87,8 +88,8 @@ diffServers old new = MM.merge
   (fmap literalWildcards old)
   (fmap literalWildcards new)
 
-updateDeps :: Diffs -> RecordDependencies -> RecordDependencies
-updateDeps diffs = G.filter (`S.member ` M.keysSet diffs)
+updateDeps :: Diffs -> CG.CondensationGraph RRSetID -> CG.CondensationGraph RRSetID
+updateDeps diffs = G.filter (not . S.null) . G.map (S.intersection $ M.keysSet diffs)
 
 type Rollout = [Diffs]
 
@@ -100,7 +101,8 @@ showRollOut r = do
 type NSMap = M.Map (Name String) (Zone ConstrainedLabel)
 
 rollout :: NSMap -> NSMap -> RecordDependencies -> RecordDependencies -> Except String Rollout
-rollout oldZones newZones (G.invert -> old) new = do
+rollout oldZones newZones (CG.fromGraph . G.invert -> old) (CG.fromGraph -> -- . insertNameOrder ->
+  new) = do
   let diffs = diffServers oldZones newZones
   rollout' id (flattenDiffs diffs) old new
   -- return $ wildcardSynthesis oldZones newZones M.empty updateSeq
@@ -148,7 +150,7 @@ wildcardSynthesis curZ newZ inverses (step:steps) =
           St.modify (\st -> foldr (\(Named dn d) -> insertDiff (ns, dn) d) st (wcDiffs <> wcDiffsWithWC))
           return z'
 
-rollout' :: (Rollout -> Rollout) -> Diffs -> RecordDependencies -> RecordDependencies -> Except String Rollout
+rollout' :: (Rollout -> Rollout) -> Diffs -> CG.CondensationGraph RRSetID -> CG.CondensationGraph RRSetID -> Except String Rollout
 rollout' acc diffs (updateDeps diffs -> old) (updateDeps diffs -> new)
   | M.null diffs = return $ acc []
   | otherwise = do
@@ -158,11 +160,12 @@ rollout' acc diffs (updateDeps diffs -> old) (updateDeps diffs -> new)
   where
     rolloutNow :: (Diffs, Diffs) -> Changed (Diffs, Diffs)
     rolloutNow (apply, wait) = do
-      let (newApply, wait') = M.partitionWithKey (\(ns, n) d -> canRollout (summarize d) (ns, n)) wait
+      let summar (ns, n) = M.foldrWithKey (\(ns', n') v c -> c <> (if ns == ns' && synthesize n (compileName n') then summarize v else Unmodified)) Unmodified diffs
+      let (newApply, wait') = M.partitionWithKey (\(ns, n) d -> canRollout (summar (ns, n)) (ns, n)) wait
       apply' <- checkInsertDiffs apply newApply
       return (apply', wait')
       where
-        canRollout :: Change -> (Name String, Name String) -> Bool
+        canRollout :: Change -> RRSetID -> Bool
         canRollout Unmodified _ = True  -- technically undefined
-        canRollout Deleted n    = G.leaf old n
-        canRollout _ n          = all (`S.member` M.keysSet apply) (G.next old n) && all (`S.member` M.keysSet apply) (G.next new n)
+        canRollout Deleted n    = all (\el -> n `S.member` el ==> S.null (G.next old el)) old
+        canRollout _ n          = all (\el -> n `S.member` el ==> all (`S.member` M.keysSet apply) (S.unions (G.next new el))) new

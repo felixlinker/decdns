@@ -153,7 +153,7 @@ dependencies cfg = do
   mapM_ checkWellformed cfg
   let order = runFresh $ resolutionOrder <$> compileConfig roots cfg
   unless (isJust (G.transitiveClosure order)) (Left "cyclic fixture rule order")
-  maybe (Left "cyclic fixture record order") Right (fromResolutionOrder order)
+  Right (fromResolutionOrder order)
   where
     checkWellformed (_, zone) =
       case filter isFatal (zoneWellformed (literalWildcards zone)) of
