@@ -12,11 +12,12 @@ import System.FilePath ((</>))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.QuickCheck
   ( Gen, Property, chooseInt, conjoin, counterexample
-  , elements, forAll, frequency, label, once, suchThat, testProperty, vectorOf )
+  , elements, forAll, forAllShrink, frequency, label, once, shrinkList
+  , sublistOf, suchThat, testProperty, vectorOf )
 
 import DNS.Diff (deither)
 import DNS.Name (Name, Named (..))
-import DNS.Record (StandardRecord)
+import DNS.Record (StandardRecord, rtype, toType)
 import qualified DNS.RecordType as RT
 import qualified DNS.RRSet as RRSet
 import DNS.Wellformedness (isFatal, zoneWellformed)
@@ -42,9 +43,14 @@ tests = do
   configs <- exampleConfigurations
   when (null configs) (fail "no eligible rollout examples found")
   let examples = [Example path cfg (dependencies cfg) (queryPatterns cfg) | (path, cfg) <- configs]
+      pairs = [(old, new, prepareRollout old new) | old <- examples, new <- examples]
+      matrix invariant =
+        [ testProperty (examplePath old ++ " -> " ++ examplePath new) (invariant old new prepared)
+        | (old, new, prepared) <- pairs
+        ]
   pure $ testGroup "Resolvable.Update.Rollout"
-    [ testProperty (examplePath old ++ " -> " ++ examplePath new) (rolloutInvariant old new)
-    | old <- examples, new <- examples
+    [ testGroup "query continuity" (matrix rolloutInvariant)
+    , testGroup "outdated cache" (matrix cacheInvariant)
     ]
 
 -- Share endpoint dependency and resolution computations across the whole matrix.
@@ -113,38 +119,116 @@ dnsName n = fromMaybe (error ("invalid fixture name: " ++ n)) (parseNameM n)
 roots :: [Name String]
 roots = map dnsName ["ns.com.", "root.net."]
 
-rolloutInvariant :: Example -> Example -> Property
-rolloutInvariant old new = case prepare of
+-- Prepare each pair once for both invariants, and share resolution computations
+-- for adjacent states. Include the initial and final states, even for one step.
+type PreparedRollout = Either String (Rollout, [(Inventory, [ConstrainedQuery])])
+
+prepareRollout :: Example -> Example -> PreparedRollout
+prepareRollout old new = do
+  oldDeps <- exampleDependencies old
+  newDeps <- exampleDependencies new
+  steps <- runExcept $ rollout
+    (M.fromListWith mergeZones (exampleConfig old))
+    (M.fromListWith mergeZones (exampleConfig new))
+    oldDeps newDeps
+  let initial = (inventory (exampleConfig old), exampleQueries old)
+      states = drop 1 $ scanl applyStep (fst initial) steps
+  pure (steps, initial : [(inv, queryPatterns (toConfig inv)) | inv <- states])
+
+rolloutInvariant :: Example -> Example -> PreparedRollout -> Property
+rolloutInvariant old new prepared = case prepared of
   Left err -> counterexample err False
-  Right steps ->
+  Right (steps, states) ->
     let initial = exampleQueries old
         final = exampleQueries new
-        common = S.toList $ S.fromList
-          [ q | a <- initial, b <- final, Just q <- [intersectQueries a b] ]
-        states = drop 1 $ init $ scanl applyStep (inventory (exampleConfig old)) steps
-        intermediate = map (queryPatterns . toConfig) states
-    in if null common
-       then once $ label "empty endpoint intersection (vacuous invariant)" True
-       else forAll (elements common >>= sampleQuery) $ \q ->
-         counterexample ("Query: " ++ describeQuery q) $ conjoin $
-           -- Also check the generator's contract; do not hide bad samples with ==>.
-           counterexample "sample is not resolvable at both endpoints"
-             (resolvesQuery initial q && resolvesQuery final q)
-           : [ counterexample
-                 ("Unresolvable after step " ++ show i ++ "\n" ++ unlines (showRollOut steps))
-                 (resolvesQuery answers q)
-             | (i, answers) <- zip [1 :: Int ..] intermediate
-             ]
-  where
-    prepare = do
-      oldDeps <- exampleDependencies old
-      newDeps <- exampleDependencies new
-      let oldConfig = exampleConfig old
-          newConfig = exampleConfig new
-      runExcept $ rollout
-        (M.fromListWith mergeZones oldConfig)
-        (M.fromListWith mergeZones newConfig)
-        oldDeps newDeps
+        intermediate = map snd $ take (length steps - 1) $ drop 1 states
+    in forCommonQueries initial final $ \genQuery -> forAll genQuery $ \q ->
+      counterexample ("Query: " ++ describeQuery q) $ conjoin $
+        sampleResolves initial final q
+        : [ counterexample
+              ("Unresolvable after step " ++ show i ++ "\n" ++ unlines (showRollOut steps))
+              (resolvesQuery answers q)
+          | (i, answers) <- zip [1 :: Int ..] intermediate
+          ]
+
+-- Both endpoints are required: old-only queries may be intentionally removed,
+-- while new-only queries have no pre-update continuity guarantee. This tests
+-- stale positive RRsets, not cached NXDOMAIN/NODATA responses or TTL expiry.
+cacheInvariant :: Example -> Example -> PreparedRollout -> Property
+cacheInvariant old new prepared = case prepared of
+  Left err -> counterexample err False
+  Right (steps, states) ->
+    if null steps
+    then once $ label "no transitions (identical configurations)" $
+      counterexample "empty rollout for distinct configurations"
+        (inventory (exampleConfig old) == inventory (exampleConfig new))
+    else conjoin
+      [ counterexample ("Transition " ++ show i ++ " -> " ++ show (i + 1)
+          ++ "\n" ++ unlines (showRollOut steps)) $
+          forCommonQueries beforeAnswers afterAnswers $ \genQuery ->
+            let beforeRRSets = rrsetInventory before
+                afterRRSets = rrsetInventory after
+                changed = M.keys $ M.differenceWith
+                  (\a b -> if a == b then Nothing else Just a) beforeRRSets afterRRSets
+                gen = (,) <$> genCache changed <*> genQuery
+                -- Shrink the cache without changing the failing query.
+                shrinkCache (cached, q) = [(cached', q) | cached' <- shrinkList (const []) cached]
+            in forAllShrink gen shrinkCache $ \(cached, q) ->
+              let mixed = withOutdatedCache beforeRRSets afterRRSets cached
+                  mixedAnswers = if null cached then afterAnswers else queryPatterns (toConfig mixed)
+              in counterexample ("Query: " ++ describeQuery q
+                  ++ "\nCached RRsets (server, owner, type): " ++ show cached) $
+                conjoin
+                  [ sampleResolves beforeAnswers afterAnswers q
+                  , counterexample "unresolvable with outdated cache"
+                      (resolvesQuery mixedAnswers q)
+                  ]
+      | (i, ((before, beforeAnswers), (after, afterAnswers))) <-
+          zip [0 :: Int ..] (zip states (drop 1 states))
+      ]
+
+forCommonQueries :: [ConstrainedQuery] -> [ConstrainedQuery] -> (Gen Term -> Property) -> Property
+forCommonQueries before after check =
+  let common = S.toList $ S.fromList
+        [ q | a <- before, b <- after, Just q <- [intersectQueries a b] ]
+  in if null common
+     -- Do not use once here: a vacuous transition inside conjoin must not
+     -- reduce the number of samples for other, non-vacuous transitions.
+     then label "empty endpoint intersection (vacuous invariant)" True
+     else check (elements common >>= sampleQuery)
+
+-- Check the generator's contract; do not hide bad samples with ==>.
+sampleResolves :: [ConstrainedQuery] -> [ConstrainedQuery] -> Term -> Property
+sampleResolves before after q = counterexample "sample is not resolvable at both endpoints"
+  (resolvesQuery before q && resolvesQuery after q)
+
+type CacheKey = (Name String, Name String, RT.Type)
+type RRSetInventory = M.Map CacheKey (S.Set StandardRecord)
+
+rrsetInventory :: Inventory -> RRSetInventory
+rrsetInventory inv = M.fromListWith S.union
+  [ ((ns, owner, toType (rtype rd)), S.singleton r)
+  | (ns, records) <- M.toList inv, r@(Named owner rd) <- S.toList records
+  ]
+
+-- Selecting only changed, previously present RRsets is sufficient: unchanged
+-- RRsets have no effect, and absence is not a positive cache entry. Restore
+-- deleted RRsets too. Never mix individual records of a single RRset.
+genCache :: [CacheKey] -> Gen [CacheKey]
+genCache [] = pure []
+genCache keys = frequency
+  [ (1, pure [])
+  , (1, pure keys)
+  , (2, (:[]) <$> elements keys)
+  , (6, sublistOf keys)
+  ]
+
+withOutdatedCache :: RRSetInventory -> RRSetInventory -> [CacheKey] -> Inventory
+withOutdatedCache before after cached = M.fromListWith S.union
+  [ (ns, records)
+  | ((ns, _, _), records) <- M.toList $
+      M.union (M.restrictKeys before (S.fromList cached)) after
+  ]
 
 -- Endpoint validation is fixture validation, not an intermediate assertion:
 -- this property tests query continuity, not zone validity or answer equality.
