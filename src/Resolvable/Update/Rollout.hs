@@ -168,4 +168,4 @@ rollout' acc diffs (updateDeps diffs -> old) (updateDeps diffs -> new)
         canRollout :: Change -> RRSetID -> Bool
         canRollout Unmodified _ = True  -- technically undefined
         canRollout Deleted n    = all (\el -> n `S.member` el ==> S.null (G.next old el)) old
-        canRollout _ n          = all (\el -> n `S.member` el ==> all (`S.member` M.keysSet apply) (S.unions (G.next new el))) new
+        canRollout _ n          = all (\el -> n `S.member` el ==> S.null (S.unions (G.next old el))) old && all (\el -> n `S.member` el ==> all (`S.member` M.keysSet apply) (S.unions (G.next new el))) new
