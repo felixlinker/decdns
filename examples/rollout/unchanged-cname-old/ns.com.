@@ -1,0 +1,11 @@
+;; The unchanged bridge hides the dependency from a to b during rollout.
+$ORIGIN com.
+@ 300 IN SOA ns.com. hostmaster.com. 1 300 300 300 300
+@ 300 IN NS ns.com.
+ns 300 IN A 192.0.2.53
+a 300 IN CNAME bridge.com.
+bridge 300 IN CNAME b.com.
+b 300 IN A 192.0.2.10
+c 300 IN A 192.0.2.10
+target 300 IN CNAME a.com.
+;; Served by ns.com.

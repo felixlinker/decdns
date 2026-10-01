@@ -61,13 +61,12 @@ data Example = Example
   , exampleQueries :: [ConstrainedQuery]
   }
 
--- Keep all rollout inputs here. Signing inputs, DNSSEC configurations, and
--- known cyclic scenarios are deliberately not part of this list.
+-- Keep all rollout inputs here. Wildcard owners, signing inputs, DNSSEC
+-- configurations, and known cyclic scenarios are deliberately excluded.
 exampleDirectories :: [FilePath]
 exampleDirectories =
   [ "examples/cname/base"
   , "examples/cname/broken"
-  , "examples/cname/new"
   , "examples/ns/self-deleg"
   , "examples/ns/sub-self-deleg"
   , "examples/rollout/address-to-alias-new"
@@ -98,6 +97,12 @@ exampleDirectories =
   , "examples/rollout/wildcard-other-address"
   , "examples/rollout/wildcard-target-alias"
   , "examples/rollout/wildcard-txt"
+  , "examples/rollout/unchanged-cname-new"
+  , "examples/rollout/unchanged-cname-old"
+  , "examples/rollout/unchanged-delegation-new"
+  , "examples/rollout/unchanged-delegation-old"
+  , "examples/rollout/unchanged-dname-new"
+  , "examples/rollout/unchanged-dname-old"
   ]
 
 exampleConfigurations :: IO [(FilePath, NameServersConfig)]

@@ -68,6 +68,14 @@ extra-source-files:
     examples/rollout/nested-delegation/ns.com.
     examples/rollout/nested-delegation/ns.deep.b.com.
     examples/rollout/nested-wildcard-alias/ns.com.
+    examples/rollout/unchanged-cname-new/ns.com.
+    examples/rollout/unchanged-cname-old/ns.com.
+    examples/rollout/unchanged-delegation-new/ns.b.com.
+    examples/rollout/unchanged-delegation-new/ns.com.
+    examples/rollout/unchanged-delegation-old/ns.b.com.
+    examples/rollout/unchanged-delegation-old/ns.com.
+    examples/rollout/unchanged-dname-new/ns.com.
+    examples/rollout/unchanged-dname-old/ns.com.
     examples/rollout/wildcard-alias-txt/ns.com.
     examples/rollout/wildcard-cname-descendant/ns.com.
     examples/rollout/wildcard-cname/ns.com.
