@@ -49,6 +49,8 @@ ghc-options:
 
 library:
   source-dirs: src
+  dependencies:
+  - text
 
 executables:
   dns-regressor-prolog:

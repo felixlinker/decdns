@@ -142,6 +142,7 @@ library
     , lens
     , memory
     , parsec
+    , text
     , time
     , transformers
   default-language: Haskell2010
