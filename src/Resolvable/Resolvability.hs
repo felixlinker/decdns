@@ -163,6 +163,8 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s
           let rewrite = injectLast l . captureListTail nTail
           -- Do not expect wildcard neq constraints on DNAME records
           return $ Rule rannot (resolves nameServer t zone (rewrite ownerNoSynth) d bot (ad 0))
+              -- TODO: I believe I can delete the t \= dnameType restriction
+              -- because a query for a DNAME record will never trigger this rule
             [  t \= dnameType, t \= nsecType, t \= nsec3Type, t \= rrsigType, targetZone \= referralZone
               , resolves rootServer t targetZone (rewrite dname) d bot (ad 0) ]
         , do  -- Authenticated
