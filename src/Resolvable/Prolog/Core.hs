@@ -101,7 +101,6 @@ import Data.Maybe (isNothing, fromMaybe)
 infixFunctors :: [String]
 infixFunctors =
   [ caretSym
-  , neqSym
   , leqSym
   , negSym ]
 

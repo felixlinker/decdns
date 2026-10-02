@@ -25,7 +25,7 @@ memberSym :: String
 memberSym = "member"
 
 neqSym :: String
-neqSym = "\\="
+neqSym = "dif"
 
 leqSym :: String
 leqSym = "=<"
