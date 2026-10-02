@@ -6,6 +6,10 @@
    directory_file_path(Directory, 'build/dnssec_native', Library),
    use_foreign_library(Library).
 
+:- table resolves/7.
+all_resolvable(Q, RS, Names) :- bagof(Name, resolvable(RS, Q, Name, _, _), Names).
+resolvable(S, Q, N, V, A) :- resolves(S, Q, Z, N, _, V, A), dif(Z, referral).
+
 :- chr_constraint digestValid/3, rrsigValid/4, nsecUnsigned/2,
                   nsec3Unsigned/3, closestEnclosers/5.
 
