@@ -96,6 +96,7 @@ library
       Parsing.State
       Parsing.Tokens
       Parsing.ZoneFile
+      Prolog.Bridge
       Query
       Resolvable.ConstrainedUnification
       Resolvable.Dependencies

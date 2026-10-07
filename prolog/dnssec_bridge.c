@@ -16,7 +16,7 @@ int dns_term_kind(uintptr_t term) {
     if (PL_is_compound(t)) return 5;
     return -1;
 }
-char *dns_term_text(uintptr_t term) {
+char* dns_term_text(uintptr_t term) {
     char *text = NULL;
     size_t length;
     if (!PL_get_nchars((term_t)term, &length, &text,
@@ -29,7 +29,7 @@ char *dns_term_text(uintptr_t term) {
     return text;
 }
 void dns_text_free(char *text) { PL_free(text); }
-char *dns_term_functor(uintptr_t term, size_t *arity) {
+char* dns_term_functor(uintptr_t term, size_t *arity) {
     atom_t name;
     if (!PL_get_name_arity_sz((term_t)term, &name, arity)) return NULL;
     term_t atom = PL_new_term_ref();
@@ -46,13 +46,11 @@ uintptr_t dns_list_part(uintptr_t term, int tail) {
     return (uintptr_t)(tail ? rest : head);
 }
 
-static foreign_t check(term_t operation, term_t arguments) {
-    int op;
-    if (!PL_get_integer_ex(operation, &op)) return FALSE;
-    if (!PL_is_ground(arguments)) return PL_instantiation_error(arguments);
-    if (!PL_is_acyclic(arguments)) return PL_type_error("acyclic_term", arguments);
+static foreign_t check(term_t predicate) {
+    if (!PL_is_ground(predicate)) return PL_instantiation_error(predicate);
+    if (!PL_is_acyclic(predicate)) return PL_type_error("acyclic_term", predicate);
     char *error = NULL;
-    HsInt32 result = dns_check((HsInt32)op, (HsWord)(uintptr_t)arguments, &error);
+    HsInt32 result = dns_check((HsWord)(uintptr_t)predicate, &error);
     if (result < 0) {
         term_t exception = PL_new_term_ref();
         int built = PL_unify_term(exception,
