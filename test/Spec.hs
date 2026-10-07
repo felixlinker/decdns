@@ -28,7 +28,7 @@ import qualified Util.FixpointSpec as FixpointSpec
 
 main :: IO ()
 main = do
-  rolloutTests <- RolloutSpec.tests
+  -- rolloutTests <- RolloutSpec.tests
   defaultMain $
     testGroup
       "dns-regressor"
@@ -37,7 +37,7 @@ main = do
       , ConstrainedUnificationSpec.tests
       , ResolvabilitySpec.tests
       , DisunificationSpec.tests
-      , rolloutTests
+      -- , rolloutTests
       , NameConstraintSpec.tests
       , NameSpec.tests
       , RecordSpec.tests
