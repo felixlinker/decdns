@@ -1,4 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 module Resolvable.Update.Rollout
   ( NSDiffs
   , Diffs
@@ -161,7 +162,7 @@ rollout' acc diffs (updateDeps diffs -> old) (updateDeps diffs -> new)
     rolloutNow :: (Diffs, Diffs) -> Changed (Diffs, Diffs)
     rolloutNow (apply, wait) = do
       let summar (ns, n) = M.foldrWithKey (\(ns', n') v c -> c <> (if ns == ns' && synthesize n (compileName n') then summarize v else Unmodified)) Unmodified diffs
-      let (newApply, wait') = M.partitionWithKey (\(ns, n) d -> canRollout (summar (ns, n)) (ns, n)) wait
+      let (newApply, wait') = M.partitionWithKey (\(ns, n) _ -> canRollout (summar (ns, n)) (ns, n)) wait
       apply' <- checkInsertDiffs apply newApply
       return (apply', wait')
       where

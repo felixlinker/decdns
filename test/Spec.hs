@@ -7,7 +7,7 @@ import qualified Resolvable.Prolog.CoreSpec as PrologCoreSpec
 import qualified Resolvable.ConstrainedUnificationSpec as ConstrainedUnificationSpec
 import qualified Resolvable.ResolvabilitySpec as ResolvabilitySpec
 import qualified Resolvable.Update.DisunificationSpec as DisunificationSpec
-import qualified Resolvable.Update.RolloutSpec as RolloutSpec
+-- import qualified Resolvable.Update.RolloutSpec as RolloutSpec
 import qualified NameConstraintSpec
 import qualified DNS.NameSpec as NameSpec
 import qualified DNS.RecordSpec as RecordSpec
