@@ -4,14 +4,21 @@ This library runs the existing `DNS.SEC.Verification` Haskell functions from
 CHR constraints. It accepts the names and record terms emitted by
 `dns-regressor-prolog pl-resolvable`.
 
-Build from the repository root with `./prolog/build.sh`; this requires Stack,
+Build from `dns-regressor/` with `make -C prolog`; this requires Make, Stack,
 SWI-Prolog (including its headers and shared library), and a C compiler.
-Stack uses the repository-local `.stack-root`. Build products live in
-`prolog/build/`. The shared object links the Haskell runtime and package
-libraries, so keep the local build dependencies available when loading it.
+Stack uses the repository-local `.stack-root` and builds `Prolog.Bridge` as
+part of the main library. The native adapter is built in `prolog/build/`
+using Stack's generated bridge header. The shared object links the Haskell
+runtime and package libraries, so keep the local build dependencies available when loading it.
 The build is intended for Unix systems with a shared SWI-Prolog installation.
 
-Run the integration tests with `./prolog/test.sh`. Run the Haskell tests with
+Run the integration tests with `make -C prolog test`.
+Remove native build products with `make -C prolog clean`.
+Stack handles Haskell dependency tracking; Make recompiles the C adapter when
+its source or generated header changes and relinks when the Haskell shared
+library changes. An unchanged build only performs Stack and dependency checks.
+
+Run the Haskell tests with
 `stack --stack-root "$PWD/.stack-root" test` from `dns-regressor/`.
 
 ```prolog
@@ -23,8 +30,23 @@ Run the integration tests with `./prolog/test.sh`. Run the Haskell tests with
 digestValid([com, a], dnskey(257, 13, KeyBase64), ds(Tag, 13, 2, DigestHex)).
 ```
 
-Import `dnssec` into the module that loads the generated zone clauses. The
-compiler does not yet insert this import automatically.
+Load the non-module header before the compiler output:
+
+```sh
+swipl prolog/headers.pl output.pl
+```
+
+`headers.pl` imports the DNSSEC constraints, tables `user:resolves/7`, and
+provides `all_resolvable/3` and `resolvable/5` in the same `user` module as the
+generated clauses. For example, with `pl/cname-signed.pl` loaded:
+
+```prolog
+?- all_resolvable(a, [com, ns], Names).
+```
+
+The compiler does not yet insert imports automatically. If you load generated
+clauses into an explicit module instead, that module must also import the
+constraints and define its auxiliary rules and table declaration.
 
 Exported constraints:
 
@@ -53,8 +75,8 @@ constructors, including `dnskey/3`, `rrsig/9`, `nsec/2`, and `nsec3/6`.
 
 `dnssec.pl` defines the CHR rules and loads the shared library.
 `dnssec_bridge.c` registers the private `dnssec:check/2` predicate and exposes a small term
-reading API. `haskell/Bridge.hs` copies ground SWI terms into the existing
-Haskell term representation, reuses the RDATA parser and binary decoders,
+reading API. `../src/Prolog/Bridge.hs` copies ground SWI terms into the
+existing Haskell term representation, reuses the RDATA parser and binary decoders,
 and calls the existing verifier. It never retains SWI term handles across
 calls. Text is copied as UTF-8 and binary data is decoded only in Haskell.
 
