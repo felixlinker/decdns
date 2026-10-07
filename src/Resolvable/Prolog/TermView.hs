@@ -9,6 +9,7 @@ module Resolvable.Prolog.TermView
   , isNeq ) where
 
 import DNS.Record (Type)
+import qualified DNS.RecordType as T
 import Resolvable.Prolog.Symbols
 import Resolvable.Prolog.Core
 import qualified Util.Graph as G
@@ -51,6 +52,20 @@ data TermView = TVList Term Term
               | TVString String
               | TVInt Int
               | TVComplex Type
+              | TVAData Term
+              | TVAAAAData Term
+              | TVCNAMEData Term
+              | TVDNAMEData Term
+              | TVNSData Term
+              | TVTXTData Term
+              | TVMXData Term Term
+              | TVSOAData Term Term Term Term Term Term Term
+              | TVDNSKEYData Term Term Term
+              | TVRRSIGData Term Term Term Term Term Term Term Term Term
+              | TVNSECData Term Term
+              | TVNSEC3Data Term Term Term Term Term Term
+              | TVNSEC3ParamData Term Term Term Term
+              | TVDSData Term Term Term Term
 
 toView :: Term -> TermView
 toView (TFunctor n args)
@@ -94,6 +109,48 @@ toView (TFunctor n args)
     [ TVInt 0 ] -> TVAd False
     [ TVInt 1 ] -> TVAd True
     _ -> undefined
+  | n == ttypeSym T.A = case args of
+     [ip] -> TVAData ip
+     _ -> undefined
+  | n == ttypeSym T.AAAA = case args of
+     [ip] -> TVAAAAData ip
+     _ -> undefined
+  | n == ttypeSym T.CNAME = case args of
+     [alias] -> TVCNAMEData alias
+     _ -> undefined
+  | n == ttypeSym T.DNAME = case args of
+     [alias] -> TVDNAMEData alias
+     _ -> undefined
+  | n == ttypeSym T.NS = case args of
+     [ns] -> TVNSData ns
+     _ -> undefined
+  | n == ttypeSym T.TXT = case args of
+     [txt] -> TVTXTData txt
+     _ -> undefined
+  | n == ttypeSym T.MX = case args of
+     [p, mxn] -> TVMXData p mxn
+     _ -> undefined
+  | n == ttypeSym T.SOA = case args of
+     [mn, rn, s, rf, rt, e, m] -> TVSOAData mn rn s rf rt e m
+     _ -> undefined
+  | n == ttypeSym T.DNSKEY = case args of
+     [fs, alg, k] -> TVDNSKEYData fs alg k
+     _ -> undefined
+  | n == ttypeSym T.RRSIG = case args of
+     [ty, alg, ls, ottl, sigExp, sigInc, tag, sigName, sig] -> TVRRSIGData ty alg ls ottl sigExp sigInc tag sigName sig
+     _ -> undefined
+  | n == ttypeSym T.NSEC = case args of
+     [nextN, covered] -> TVNSECData nextN covered
+     _ -> undefined
+  | n == ttypeSym T.NSEC3 = case args of
+     [alg, flags, iter, salt, nextHashedOwner, types] -> TVNSEC3Data alg flags iter salt nextHashedOwner types
+     _ -> undefined
+  | n == ttypeSym T.NSEC3PARAM = case args of
+     [alg, flags, iter, salt] -> TVNSEC3ParamData alg flags iter salt
+     _ -> undefined
+  | n == ttypeSym T.DS = case args of
+     [tag, alg, digT, dig] -> TVDSData tag alg digT dig
+     _ -> undefined
   | otherwise = TVFunctor n args
 toView TEmptyList = TVEmptyList
 toView (TVar v) = TVVar v
@@ -125,6 +182,20 @@ fromView (TVAtom n) = TAtom n
 fromView (TVString s) = TString s
 fromView (TVInt i) = TInt i
 fromView (TVComplex dat) = TComplex dat
+fromView (TVAData ip) = TFunctor (ttypeSym T.A) [ip]
+fromView (TVAAAAData ip) = TFunctor (ttypeSym T.AAAA) [ip]
+fromView (TVCNAMEData alias) = TFunctor (ttypeSym T.CNAME) [alias]
+fromView (TVDNAMEData alias) = TFunctor (ttypeSym T.DNAME) [alias]
+fromView (TVNSData ns) = TFunctor (ttypeSym T.NS) [ns]
+fromView (TVTXTData txt) = TFunctor (ttypeSym T.TXT) [txt]
+fromView (TVMXData p n) = TFunctor (ttypeSym T.MX) [p, n]
+fromView (TVSOAData mn rn s rf rt e m) = TFunctor (ttypeSym T.SOA) [mn, rn, s, rf, rt, e, m]
+fromView (TVDNSKEYData fs alg k) = TFunctor (ttypeSym T.DNSKEY) [fs, alg, k]
+fromView (TVRRSIGData ty alg ls ottl sigExp sigInc tag sigName sig) = TFunctor (ttypeSym T.RRSIG) [ty, alg, ls, ottl, sigExp, sigInc, tag, sigName, sig]
+fromView (TVNSECData nextN covered) = TFunctor (ttypeSym T.NSEC) [nextN, covered]
+fromView (TVNSEC3Data alg flags iter salt nextHashedOwner types) = TFunctor (ttypeSym T.NSEC3) [alg, flags, iter, salt, nextHashedOwner, types]
+fromView (TVNSEC3ParamData alg flags iter salt) = TFunctor (ttypeSym T.NSEC3PARAM) [alg, flags, iter, salt]
+fromView (TVDSData tag alg digT dig) = TFunctor (ttypeSym T.DS) [tag, alg, digT, dig]
 
 isResolves :: Term -> Bool
 isResolves (toView -> TVResolves {}) = True

@@ -6,3 +6,5 @@ exm/
 pl/
 viz/
 reports/
+.codex/
+.vscode/

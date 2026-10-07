@@ -116,6 +116,7 @@ library
       Parsing.State
       Parsing.Tokens
       Parsing.ZoneFile
+      Prolog.Bridge
       Query
       Resolvable.ConstrainedUnification
       Resolvable.Dependencies
@@ -135,6 +136,7 @@ library
       Util.CondensationGraph
       Util.Debug
       Util.Debug.Stub
+      Util.Except
       Util.Fixpoint
       Util.Fresh
       Util.Func
@@ -143,6 +145,7 @@ library
       Util.List
       Util.Map
       Util.Monad
+      Util.Parsing
       Util.Set
       Util.Tree
   other-modules:
@@ -163,6 +166,7 @@ library
     , lens
     , memory
     , parsec
+    , text
     , time
     , transformers
   default-language: Haskell2010
