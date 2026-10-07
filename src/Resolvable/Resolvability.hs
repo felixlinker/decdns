@@ -73,6 +73,9 @@ resolvableBase rootServers ns zone isReferral s@(Named n rds@((RData _ _ ty) NE.
       rann :: Maybe RComp
       rann = Just (RComp ns s)
 
+dnssecTypeNeqs :: Term -> [Term]
+dnssecTypeNeqs t = map ($ t) [(\= dsType), (\= dnskeyType), (\= rrsigType), (\= nsecType), (\= nsec3Type)]
+
 resolvableStep :: [Name String] -> Name String -> ConstrainedName -> ConstrainedRRSet -> Fresh (S.Set (Rule (Maybe RComp)))
 resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s@(Named n rs) =
   foreachM (NE.toList rs) (\r -> foreachM rootServers (`go` rtype r))
@@ -100,9 +103,9 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s
                 glueZ <- if expectGlue then return referralZone else wildcard
                 -- Do not expect wildcard neq constraints on NS records
                 let n' = captureListTail nTail ownerNoSynth
-                return (S.singleton $ Rule rannot (resolves nameServer t zone n' d bot (ad 0))
+                return $ S.singleton $ Rule rannot (resolves nameServer t zone n' d bot (ad 0))
                   [ resolves delegatedNs t ownerNoSynth n' d bot (ad 0)
-                  , resolves glueS glueType glueZ delegatedNs dIp bot (ad 0) ])
+                  , resolves glueS glueType glueZ delegatedNs dIp bot (ad 0) ]
             , do  -- NSEC for unsigned subzone
                 (nTail, t, d, dNSEC) <- freshVars4 ("N", "T", "D", "D_NSEC")
                 let n' = captureListTail nTail ownerNoSynth
@@ -148,15 +151,17 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s
           (n', cs) <- synth n
           (t, d, targetZone) <- freshVars3 ("T", "D", "Z")
           return $ Rule rannot (resolves nameServer t zone n' d bot (ad 0))
-            (cs ++  [ t \= cnameType, t \= nsecType, t \= nsec3Type, t \= rrsigType, targetZone \= referralZone
-                          , resolves rootServer t targetZone cname d bot (ad 0) ])
+            (cs ++ dnssecTypeNeqs t ++
+              [ t \= cnameType, targetZone \= referralZone
+              , resolves rootServer t targetZone cname d bot (ad 0) ])
         , do  -- Authenticated
           (n', cs) <- synth n
           (t, d, a, targetZone) <- freshVars4 ("T", "D", "A", "Z")
           return $ Rule rannot (resolves nameServer t zone n' d top a)
-            (cs ++  [ t \= cnameType, t \= nsecType, t \= nsec3Type, t \= rrsigType, targetZone \= referralZone
-                          , resolves nameServer cnameType zone ownerNoSynth (list [TComplex r]) top (ad 1)
-                          , resolves rootServer t targetZone cname d top a ]) ]
+            (cs ++ dnssecTypeNeqs t ++
+              [ t \= cnameType, targetZone \= referralZone
+              , resolves nameServer cnameType zone ownerNoSynth (list [TComplex r]) top (ad 1)
+              , resolves rootServer t targetZone cname d top a ]) ]
       DNAME (nameTerm -> dname) -> S.fromList <$> sequence
         [ do  -- Unauthenticated
           (l, nTail, t, d, targetZone) <- freshVars5 ("L", "N", "T", "D", "Z")
@@ -165,16 +170,18 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s
           return $ Rule rannot (resolves nameServer t zone (rewrite ownerNoSynth) d bot (ad 0))
               -- TODO: I believe I can delete the t \= dnameType restriction
               -- because a query for a DNAME record will never trigger this rule
-            [  t \= dnameType, t \= nsecType, t \= nsec3Type, t \= rrsigType, targetZone \= referralZone
-              , resolves rootServer t targetZone (rewrite dname) d bot (ad 0) ]
+            (dnssecTypeNeqs t ++
+              [  t \= dnameType, targetZone \= referralZone
+              , resolves rootServer t targetZone (rewrite dname) d bot (ad 0) ])
         , do  -- Authenticated
           (l, nTail, t, d, a, targetZone) <- freshVars6 ("L", "N", "T", "D", "A", "Z")
           let rewrite = injectLast l . captureListTail nTail
           -- Do not expect wildcard neq constraints on DNAME records
           return $ Rule rannot (resolves nameServer t zone (rewrite ownerNoSynth) d top a)
-            [  t \= dnameType, t \= nsecType, t \= nsec3Type, t \= rrsigType, targetZone \= referralZone
-            , resolves nameServer dnameType zone ownerNoSynth (list [TComplex r]) top (ad 1)
-            , resolves rootServer t targetZone (rewrite dname) d top a ] ]
+            (dnssecTypeNeqs t ++
+              [ t \= dnameType, targetZone \= referralZone
+              , resolves nameServer dnameType zone ownerNoSynth (list [TComplex r]) top (ad 1)
+              , resolves rootServer t targetZone (rewrite dname) d top a ]) ]
       -- TODO: Check that sigName is the name of the zone containing the record;
       -- does that mean there ex. a corresponding SOA record? Could be, but seems
       -- technically wrong as there could be intermediate SOA records. It could be
