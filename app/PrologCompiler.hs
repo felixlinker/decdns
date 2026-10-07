@@ -32,7 +32,7 @@ main = do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
       cfg <- parseZones zones
-      putStr (showKnowledgeBase $ S.toList $ runFresh $ plResolvable =<< compileConfig rootServers cfg)
+      putStr (showKnowledgeBase $ S.toList $ runFresh $ compileConfig rootServers cfg)
     "resolvable" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
