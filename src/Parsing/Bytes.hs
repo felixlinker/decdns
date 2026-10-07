@@ -7,13 +7,12 @@ module Parsing.Bytes
   , hexWithSep) where
 
 import qualified Data.ByteString as BS
-import Data.Char (digitToInt, isHexDigit, toUpper)
-import Data.Word
+import Data.Char (isHexDigit)
 import Text.Parsec
 import Text.Parsec.Char as Char
 
 import Parsing.State
-import Util.Bytes ( fromB64, fromB32 )
+import Util.Bytes ( fromB64, fromB32, fromHex )
 
 base64c :: Stream s m Char => ParsecT s u m Char
 base64c = Char.oneOf $! ['A'..'Z'] ++ ['a'..'z'] ++ ['0'..'9'] ++ ['+', '/', '=']
@@ -35,14 +34,6 @@ b64dec = maybe (fail "could not parse base64") return . fromB64
 b32dec :: String -> ParsecT s u m BS.ByteString
 b32dec = maybe (fail "could not parse b32") return . fromB32
 
-hexdec :: String -> ParsecT s u m BS.ByteString
-hexdec "" = return BS.empty
-hexdec (hi:lo:rest) = BS.cons hexPair <$> hexdec rest
-  where
-    hexPair :: Word8
-    hexPair = fromIntegral (16 * digitToInt (toUpper hi) + digitToInt (toUpper lo))
-hexdec _ = fail "hexdec called with odd-length input"
-
 blobWithSep :: Stream s m Char => Parser s m String -> Parser s m String
 blobWithSep chunk = concat <$> sepEndBy1 chunk (many whiteSpace)
 
@@ -56,7 +47,7 @@ base32Hex :: Stream s m Char => ParsecT s u m BS.ByteString
 base32Hex = b32dec =<< many1 base32HexC
 
 hex :: Stream s m Char => ParsecT s u m BS.ByteString
-hex = hexdec =<< hexs
+hex = fromHex =<< hexs
 
 hexWithSep :: Stream s m Char => Parser s m BS.ByteString
-hexWithSep = hexdec =<< blobWithSep hexs
+hexWithSep = fromHex =<< blobWithSep hexs

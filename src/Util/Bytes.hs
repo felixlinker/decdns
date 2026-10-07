@@ -6,6 +6,7 @@ module Util.Bytes
   , chunk
   , withLength
   , toHex
+  , fromHex
   , fromB64
   , toB64
   , fromB32
@@ -17,7 +18,8 @@ import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Builder as BBS
 import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Char8 as C
-import Data.Char (toUpper)
+import Data.Word (Word8)
+import Data.Char (toUpper, digitToInt)
 import Data.IP (IPv4, IPv6, fromIPv4w, fromIPv6w)
 import Numeric (showHex)
 
@@ -66,14 +68,22 @@ toHex = concatMap (map toUpper . pad . (`showHex` "")) . BS.unpack
     pad [x] = ['0', x]
     pad xs = xs
 
-fromB64 :: String -> Maybe BS.ByteString
-fromB64 = either (const Nothing) Just . B64.decode . C.pack
+fromHex :: MonadFail m => String -> m BS.ByteString
+fromHex "" = return BS.empty
+fromHex (hi:lo:rest) = BS.cons hexPair <$> fromHex rest
+  where
+    hexPair :: Word8
+    hexPair = fromIntegral (16 * digitToInt (toUpper hi) + digitToInt (toUpper lo))
+fromHex _ = fail "fromHex called with odd-length input"
+
+fromB64 :: MonadFail m => String -> m BS.ByteString
+fromB64 = either (const (fail "illegal b64")) return . B64.decode . C.pack
 
 toB64 :: BS.ByteString -> String
 toB64 = C.unpack . B64.encode
 
-fromB32 :: String -> Maybe BS.ByteString
-fromB32 = either (const Nothing) Just . B32Hex.decodeBase32Unpadded . C.pack . map toUpper
+fromB32 :: MonadFail m => String -> m BS.ByteString
+fromB32 = either (const (fail "illegal b32")) return . B32Hex.decodeBase32Unpadded . C.pack . map toUpper
 
 toB32 :: BS.ByteString -> String
 toB32 = C.unpack . B32Hex.encodeBase32Unpadded'
