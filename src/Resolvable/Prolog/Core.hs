@@ -462,12 +462,12 @@ rrsetTerm = list . fmap (TComplex . rtype)
 
 dataTerm :: Type -> Term
 dataTerm t = TFunctor (ttypeSym $ toType t) $ case t of
-  A s -> [TAtomQuoted $ show s]
-  AAAA s -> [TAtomQuoted $ show s]
+  A s -> [TString $ show s]
+  AAAA s -> [TString $ show s]
   CNAME n -> [nameTerm n]
   DNAME n -> [nameTerm n]
   NS n -> [nameTerm n]
-  TXT s -> [TAtomQuoted s]
+  TXT s -> [TString s]
   MX p n -> [TInt p, nameTerm n]
   SOA mn rn s rf rt e m -> [nameTerm mn, nameTerm rn, TInt s, TInt rf, TInt rt, TInt e, TInt m]
   DNSKEY (DNSKEYData fs alg k) -> [TInt (dnsKeyFlagsToInt fs), algTerm alg, b64Term k]
