@@ -41,6 +41,7 @@ module Resolvable.Prolog.Core
   , (\+)
   , showKnowledgeBase
 
+  , ttypeSym
   , dnskeyType
   , dsType
   , nsecType
