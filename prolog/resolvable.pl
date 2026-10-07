@@ -1,6 +1,4 @@
 :- use_module(dnssec).
-
-:- table resolves/7.
 all_resolvable(Queries) :- findall(resolvable(S, Q, N, V, A), resolvable(S, Q, N, V, A), Queries).
 resolvable(S, Q, N, V, A) :-
   dif(Q, ns), dif(Q, cname), dif(Q, dname),
