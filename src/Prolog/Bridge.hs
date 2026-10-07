@@ -7,7 +7,7 @@ import Control.Monad (when, (>=>))
 import qualified Data.ByteString as BS
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as UTF8
-import Data.Int (Int32)
+import Data.Int (Int32, Int64)
 import Data.Word (Word8)
 import Foreign.C.String (CString)
 import Foreign.C.Types (CInt(..), CSize(..))
@@ -15,24 +15,23 @@ import Foreign.Marshal.Alloc (alloca, mallocBytes)
 import Foreign.Marshal.Utils (copyBytes)
 import Foreign.Ptr (Ptr, WordPtr(..), nullPtr)
 import Foreign.Storable (peek, poke, pokeByteOff)
-import Text.Read (readMaybe)
 
 import DNS.SEC.Verification
-import Resolvable.Prolog.Core (Term(..))
+import Resolvable.Prolog.Core
 import Resolvable.Prolog.TermView
 import Resolvable.Prolog.Reverse
 import Util.Except
 
-foreign import ccall unsafe "dns_term_kind" termKind :: WordPtr -> IO CInt
-foreign import ccall unsafe "dns_term_text" termText :: WordPtr -> IO CString
-foreign import ccall unsafe "dns_text_free" freeText :: CString -> IO ()
-foreign import ccall unsafe "dns_term_functor" termFunctor :: WordPtr -> Ptr CSize -> IO CString
-foreign import ccall unsafe "dns_term_arg" termArg :: WordPtr -> CSize -> IO WordPtr
-foreign import ccall unsafe "dns_list_part" listPart :: WordPtr -> CInt -> IO WordPtr
+foreign import ccall unsafe "term_kind" termKind :: WordPtr -> IO CInt
+foreign import ccall unsafe "term_text" termText :: WordPtr -> IO CString
+foreign import ccall unsafe "text_free" freeText :: CString -> IO ()
+foreign import ccall unsafe "term_int" termInt :: WordPtr -> IO Int64
+foreign import ccall unsafe "term_functor" termFunctor :: WordPtr -> Ptr CSize -> IO CString
+foreign import ccall unsafe "term_arg" termArg :: WordPtr -> CSize -> IO WordPtr
+foreign import ccall unsafe "list_head" plhead :: WordPtr -> IO WordPtr
+foreign import ccall unsafe "list_tail" pltail :: WordPtr -> IO WordPtr
 foreign export ccall "dns_check" dnsCheck :: WordPtr -> Ptr CString -> IO Int32
 
--- The C adapter passes native SWI term references, not a textual serialization.
--- Copy the complete ground tree before invoking the pure verifier.
 copyTerm :: Int -> WordPtr -> IO Term
 copyTerm depth term = do
   when (depth > 1024 || term == 0) (fail "term too deep or invalid term reference")
@@ -40,14 +39,12 @@ copyTerm depth term = do
   case kind of
     0 -> pure TEmptyList
     1 -> do
-      h <- listPart term 0 >>= copyTerm (depth + 1)
-      t <- listPart term 1 >>= copyTerm (depth + 1)
-      pure (TFunctor "." [h, t])
+      h <- plhead term >>= copyTerm (depth + 1)
+      t <- pltail term >>= copyTerm (depth + 1)
+      pure (tList h t)
     2 -> TAtom <$> (termText term >>= copyText)
     3 -> TString <$> (termText term >>= copyText)
-    4 -> do
-      text <- termText term >>= copyText
-      maybe (fail "integer outside Haskell Int range") (pure . TInt) (readMaybe text)
+    4 -> TInt . fromIntegral <$> termInt term
     5 -> alloca $ \arityPtr -> do
       name <- termFunctor term arityPtr >>= copyText
       arity <- peek arityPtr

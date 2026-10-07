@@ -4,9 +4,7 @@
 #include <stdlib.h>
 #include "Bridge_stub.h"
 
-/* All term references belong to the current foreign call. Haskell copies
- * text before returning it to SWI and never retains a term reference. */
-int dns_term_kind(uintptr_t term) {
+int term_kind(uintptr_t term) {
     term_t t = (term_t)term;
     if (PL_get_nil(t)) return 0;
     if (PL_is_list(t)) return 1;
@@ -16,11 +14,12 @@ int dns_term_kind(uintptr_t term) {
     if (PL_is_compound(t)) return 5;
     return -1;
 }
-char* dns_term_text(uintptr_t term) {
+
+char *term_text(uintptr_t term) {
     char *text = NULL;
     size_t length;
     if (!PL_get_nchars((term_t)term, &length, &text,
-                      CVT_ATOM | CVT_STRING | CVT_INTEGER | BUF_MALLOC | REP_UTF8))
+                      CVT_ATOM | CVT_STRING | BUF_MALLOC | REP_UTF8))
         return NULL;
     /* Embedded NUL is rejected rather than silently truncating input. */
     for (size_t i = 0; i < length; i++) {
@@ -28,22 +27,41 @@ char* dns_term_text(uintptr_t term) {
     }
     return text;
 }
-void dns_text_free(char *text) { PL_free(text); }
-char* dns_term_functor(uintptr_t term, size_t *arity) {
+
+void text_free(char *text) { PL_free(text); }
+
+int64_t term_int(uintptr_t term) {
+    term_t t = (term_t)term;
+    int64_t i;
+    PL_get_int64_ex(t, &i);
+    return i;
+}
+
+char *term_functor(uintptr_t term, size_t *arity) {
     atom_t name;
     if (!PL_get_name_arity_sz((term_t)term, &name, arity)) return NULL;
     term_t atom = PL_new_term_ref();
     PL_put_atom(atom, name);
-    return dns_term_text(atom);
+    return term_text(atom);
 }
-uintptr_t dns_term_arg(uintptr_t term, size_t index) {
+
+uintptr_t term_arg(uintptr_t term, size_t index) {
     term_t arg = PL_new_term_ref();
     return PL_get_arg_sz(index, (term_t)term, arg) ? (uintptr_t)arg : 0;
 }
-uintptr_t dns_list_part(uintptr_t term, int tail) {
+
+uintptr_t list_part(uintptr_t term, int tail) {
     term_t head = PL_new_term_ref(), rest = PL_new_term_ref();
     if (!PL_get_list((term_t)term, head, rest)) return 0;
     return (uintptr_t)(tail ? rest : head);
+}
+
+uintptr_t list_head(uintptr_t term) {
+    return list_part(term, 0);
+}
+
+uintptr_t list_tail(uintptr_t term) {
+    return list_part(term, 0);
 }
 
 static foreign_t check(term_t predicate) {
