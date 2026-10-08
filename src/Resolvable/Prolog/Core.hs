@@ -4,6 +4,7 @@
 module Resolvable.Prolog.Core
   ( Term(..)
   , freshVar
+  , away
   , wildcard
   , wildcards3
   , wildcards4
@@ -115,8 +116,21 @@ data Term = TFunctor String [Term]
           | TComplex Type
   deriving (Eq, Ord)
 
+mapVarsF :: Applicative f => (String -> f String) -> Term -> f Term
+mapVarsF f (TFunctor n args) = TFunctor n <$> traverse (mapVarsF f) args
+mapVarsF _ TEmptyList = pure TEmptyList
+mapVarsF f (TVar n) = TVar <$> f n
+mapVarsF _ t@(TAtomQuoted _) = pure t
+mapVarsF _ t@(TAtom _) = pure t
+mapVarsF _ t@(TString _) = pure t
+mapVarsF _ t@(TInt _) = pure t
+mapVarsF _ t@(TComplex _) = pure t
+
 freshVar :: String -> Fresh Term
 freshVar = fmap TVar . fresh
+
+away :: Term -> Fresh Term
+away = mapVarsF (const $ fresh "V")
 
 wildcard :: Fresh Term
 wildcard = freshVar wildcardSym

@@ -4,6 +4,7 @@ module Resolvable.Update.Dependencies
 
 import qualified Data.Set as S
 import Control.Monad (foldM)
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except
 
 import Resolvable.Dependencies
@@ -13,16 +14,13 @@ import Util.Fresh
 import Resolvable.Resolvability (RComp)
 import Resolvable.Update.Disunification (withouts)
 
-toExcept :: Monad m => m a -> ExceptT e m a
-toExcept = ExceptT . fmap Right
-
-computeRegressions :: Fresh (S.Set (Rule (Maybe RComp))) -> Fresh (S.Set (Rule (Maybe RComp))) -> ExceptT String Fresh (S.Set ConstrainedQuery)
-computeRegressions (toExcept -> oldf) (toExcept -> newf) = do
-  oldRs <- oldf
-  newRs <- newf
-  resOld <- S.toList <$> foldM toResolvable S.empty (computeResolvable True oldRs)
-  resNew <- S.toList <$> foldM toResolvable S.empty (computeResolvable True newRs)
-  return $ S.fromList $ concatMap (`withouts` resNew) resOld
+computeRegressions :: S.Set (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp)) -> ExceptT String Fresh (S.Set ConstrainedQuery)
+computeRegressions oldRs newRs = do
+  resOld <- lift $ computeResolvable True oldRs
+  resNew <- lift $ computeResolvable True newRs
+  resOldQs <- S.toList <$> foldM toResolvable S.empty resOld
+  resNewQs <- S.toList <$> foldM toResolvable S.empty resNew
+  return $ S.fromList $ concatMap (`withouts` resNewQs) resOldQs
   where
     toResolvable :: Monad m => S.Set ConstrainedQuery -> Rule a -> ExceptT String m (S.Set ConstrainedQuery)
     toResolvable s r = do

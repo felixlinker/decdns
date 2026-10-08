@@ -13,7 +13,7 @@ module Resolvable.Dependencies
   , queryFromRule
   , computeResolvable ) where
 
-import Control.Monad (filterM, guard, unless)
+import Control.Monad (filterM, guard, unless, foldM)
 import Control.Monad.Trans.Except (ExceptT, Except, runExcept, throwE)
 import qualified Control.Monad.Trans.State as St
 import Data.Bifunctor (Bifunctor(bimap))
@@ -33,6 +33,7 @@ import qualified Util.Graph as G
 import qualified Util.CondensationGraph as CG
 import Util.Monad (exceptMaybe)
 import Util.Fixpoint
+import Util.Fresh
 
 data DependencyMatch = DependencyMatch
   { dependentRule :: Rule (Maybe RComp)
@@ -115,12 +116,14 @@ checkMaxNameLength :: Rule a -> Bool
 checkMaxNameLength (Rule _ (toView -> TVResolves (Resolves { resolvesQName = qn })) _) = minNameLength qn <= 255
 checkMaxNameLength _ = error "unsupported rule head encountered"
 
-solveBody :: Ord a => Bool -> S.Set (Rule a) -> Rule a -> S.Set (Rule a)
-solveBody keepGround rs (Rule ann h b) =
-  S.fromList $
+solveBody :: Ord a => Bool -> S.Set (Rule a) -> Rule a -> Fresh (S.Set (Rule a))
+solveBody keepGround rs (Rule ann h b) = do
+  h' <- away h
+  b' <- mapM away b
+  return $ S.fromList $
     filter checkMaxNameLength $
-    map (\(u, b') -> CU.apply u $ Rule ann h b') $
-      foldl solvePredicate [(CU.identity, [])] b
+    map (\(u, b'') -> CU.apply u $ Rule ann h' b'') $
+      foldl solvePredicate [(CU.identity, [])] b'
   where
     groundP :: (CU.ConstrainedUnifier, [Term]) -> Bool
     groundP = if keepGround then null . snd else const True
@@ -195,20 +198,22 @@ solveBody keepGround rs (Rule ann h b) =
             returnWhen :: a -> Bool -> Maybe a
             returnWhen a = ($> a) . guard
 
-solveFixpoint :: forall a t. (Foldable t, Ord a) => Bool -> t (Rule a) -> S.Set (Rule a) -> S.Set (Rule a)
-solveFixpoint keepGround addFrom = fixpointSet step
+solveFixpoint :: forall a t. (Traversable t, Ord a) => Bool -> S.Set (Rule a) -> t (Rule a) -> Fresh (S.Set (Rule a))
+solveFixpoint keepGround prog addFrom = fixpointSetM step prog
   where
-    step :: S.Set (Rule a) -> [Rule a]
-    step acc = concatMap (S.toList . solveBody keepGround acc) addFrom
+    step :: S.Set (Rule a) -> Fresh [Rule a]
+    step acc = do
+      solved <- mapM (solveBody keepGround acc) addFrom
+      return $ concatMap S.toList solved
 
-computeResolvable :: Bool -> S.Set (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp))
-computeResolvable keepGround (S.filter (isResolves . rhead) -> rs) =
+computeResolvable :: Bool -> S.Set (Rule (Maybe RComp)) -> Fresh (S.Set (Rule (Maybe RComp)))
+computeResolvable keepGround (S.filter (isResolves . rhead) -> rs) = do
   rec (CG.fromGraph $ resolutionOrder rs) S.empty
   where
-    rec :: CG.CondensationGraph (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp))
+    rec :: CG.CondensationGraph (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp)) -> Fresh (S.Set (Rule (Maybe RComp)))
     rec ord acc
-      | G.null ord = acc
-      | otherwise =
+      | G.null ord = pure acc
+      | otherwise = do
           let leaves = G.leaves ord
-              acc' = foldr (solveFixpoint keepGround) acc leaves
-          in rec (foldr G.remove ord leaves) acc'
+          acc' <- foldM (solveFixpoint keepGround) acc (map S.toList $ S.toList leaves)
+          rec (foldr G.remove ord leaves) acc'

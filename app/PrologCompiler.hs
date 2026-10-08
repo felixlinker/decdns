@@ -19,6 +19,7 @@ import qualified Data.Set as S
 import Resolvable.Update.Dependencies (computeRegressions)
 import Control.Monad (unless)
 import Control.Monad.Trans.Except (runExceptT)
+import Control.Monad.Trans.Class (lift)
 import Parsing (parseNameM, parseTypeM)
 import Parsing.Config (parseZoneFiles)
 import Query (queryStep)
@@ -37,8 +38,7 @@ main = do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
       cfg <- parseZones zones
-      let compiled = runFresh $ plResolvable =<< compileConfig rootServers cfg
-      let res = computeResolvable True compiled
+      let res = runFresh $ computeResolvable True =<< plResolvable =<< compileConfig rootServers cfg
       putStrLn $ showKnowledgeBase $ S.toList res
     "regressions" -> do
       (sroots, args') <- sepBy "--" args
@@ -46,11 +46,10 @@ main = do
       (old, new) <- sepBy "--" args'
       oldRecs <- parseZones old
       newRecs <- parseZones new
-      let originalZones = M.fromListWith mergeZones oldRecs
-      let finalZones = M.fromListWith mergeZones newRecs
-      let oldRecsC = compileConfig roots oldRecs
-      let newRecsC = compileConfig roots newRecs
-      regs <- failLeftS $ runFresh $ runExceptT $ computeRegressions (plResolvable =<< oldRecsC) (plResolvable =<< newRecsC)
+      regs <- failLeftS $ runFresh $ runExceptT $ do
+        oldRecsC <- lift $ plResolvable =<< compileConfig roots oldRecs
+        newRecsC <- lift $ plResolvable =<< compileConfig roots newRecs
+        computeRegressions oldRecsC newRecsC
       mapM_ print regs
     "visualize" -> do
       (roots, zones) <- sepBy "--" args
@@ -66,8 +65,8 @@ main = do
       rootServers <- parseNames roots
       qname <- parseNameM qnameString
       qtype <- parseTypeM qtypeString
-      compiled <- compileConfig rootServers <$> parseResponse
-      let kb = queryStep qname qtype compiled
+      cfg <- parseResponse
+      let kb = runFresh (queryStep qname qtype =<< compileConfig rootServers cfg)
       let answers = filter isFact $ S.toList kb
       if null answers
         then mapM_ print $ followUpQueries kb

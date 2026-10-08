@@ -1,6 +1,7 @@
 module Integration (tests) where
 
 import Control.Monad (forM_)
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (runExceptT)
 import Data.Maybe (isJust)
 import qualified Data.Set as S
@@ -488,9 +489,10 @@ regressionTest newConfig expected unexpected = do
   regressions <- failLeft $
     runFresh $
       runExceptT $
-        computeRegressions
-          (plResolvable =<< compileConfig rootServers old)
-          (plResolvable =<< compileConfig rootServers new)
+        do
+          oldRules <- lift $ plResolvable =<< compileConfig rootServers old
+          newRules <- lift $ plResolvable =<< compileConfig rootServers new
+          computeRegressions oldRules newRules
   assertResolvableQueries (baseFiles ++ newConfig) regressions expected unexpected
 
 assertQueries :: [FilePath] -> S.Set ConstrainedQuery -> [Query] -> [Query] -> Assertion
@@ -553,8 +555,9 @@ resolutionTerm (Resolution (Query ns rtype qname) verification auth) = runFresh 
 resolvableQueries :: [FilePath] -> IO (S.Set ConstrainedQuery)
 resolvableQueries files = do
   cfg <- loadConfig files
-  let rules = runFresh $ plResolvable =<< compileConfig rootServers cfg
-  let resolvableRules = computeResolvable True rules
+  let resolvableRules = runFresh $ do
+        rules <- plResolvable =<< compileConfig rootServers cfg
+        computeResolvable True rules
   qs <- handleError (traverse queryFromRule $ S.toList resolvableRules)
   return $ S.fromList qs
 

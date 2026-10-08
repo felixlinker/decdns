@@ -18,13 +18,11 @@ queryT (nameTerm -> n) (ttypeTerm -> t) = do
   (ns, zone, d, v, a) <- freshVars5 ("NS", "Z", "D", "V", "A")
   return $ resolves ns t zone n d v a
 
-queryStep :: Name String -> T.Type -> Fresh (S.Set (Rule (Maybe RComp))) -> S.Set (Rule (Maybe RComp))
-queryStep n t rs =
-  let (kb, q) = runFresh $ do
-        kb' <- computeResolvable False <$> rs
-        q' <- queryT n t
-        return (kb', q')
-  in S.fromList . mapMaybe (refine q) $ S.toList kb
+queryStep :: Name String -> T.Type -> S.Set (Rule (Maybe RComp)) -> Fresh (S.Set (Rule (Maybe RComp)))
+queryStep n t rs = do
+  kb <- computeResolvable False rs
+  q <- queryT n t
+  return $ S.fromList . mapMaybe (refine q) $ S.toList kb
   where
     refine :: Term -> Rule a -> Maybe (Rule a)
     refine q r@(Rule _ rh _) = fmap (`U.apply` r) (U.unify q rh)

@@ -257,7 +257,9 @@ queryPatterns cfg = S.toList $ S.fromList $ mapMaybe project
     ty <- [RT.A, RT.AAAA, RT.NS, RT.CNAME, RT.DNAME, RT.TXT, RT.MX, RT.SOA] ]
   where
     answers = either error id $ runExcept $ traverse queryFromRule $ S.toList $
-      computeResolvable True $ runFresh $ plResolvable =<< compileConfig roots cfg
+      runFresh $ do
+        rules <- plResolvable =<< compileConfig roots cfg
+        computeResolvable True rules
     project (answer, ns, ty) = do
       let CQuery h cs = renameQuery "answer_" answer
           q = TVar "query_name"
