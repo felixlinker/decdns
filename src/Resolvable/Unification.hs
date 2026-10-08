@@ -1,6 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Unification
   ( Unifier(..)
+  , Unify(..)
   , Apply(..)
   , identity
   , toList
@@ -10,8 +11,7 @@ module Resolvable.Unification
   , filterRenamings
   , unify
   , unifies
-  , equivModuloRenaming
-  , extendUnifier ) where
+  , equivModuloRenaming ) where
 
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -39,6 +39,9 @@ instance (Apply a, Apply b) => Apply (a, b) where
 
 instance Apply (Rule a) where
   apply u (Rule ann h b) = Rule ann (apply u h) (apply u b)
+
+instance (Apply a, Ord a) => Apply (S.Set a) where
+  apply u = S.map (apply u)
 
 identity :: Unifier
 identity = Unifier M.empty
@@ -91,57 +94,60 @@ instance Apply Term where
   apply _ t@(TInt _) = t
   apply _ t@(TComplex _) = t
 
-unify :: Term -> Term -> Maybe Unifier
+unify :: Unify a => a -> a -> Maybe Unifier
 unify t1 t2 = extendUnifier t1 t2 identity
 
-unifies :: Term -> Term -> Bool
+unifies :: Unify a => a -> a -> Bool
 unifies t1 t2 = isJust (unify t1 t2)
 
-equivModuloRenaming :: Term -> Term -> Bool
+equivModuloRenaming :: Unify a => a -> a -> Bool
 equivModuloRenaming t1 t2 = maybe False isRenaming (unify t1 t2)
 
-extendUnifier :: Term -> Term -> Unifier -> Maybe Unifier
--- Call @apply u@ on @to@ so that the unifier stays normal
-extendUnifier from to u@(Unifier m) = unif (apply u from) (apply u to)
-  where
-    unifList :: [Term] -> [Term] -> Maybe Unifier
-    unifList l1 l2 = foldr (=<<) (Just u) =<< zipWithStrict extendUnifier l1 l2
+class Unify a where
+  extendUnifier :: a -> a -> Unifier -> Maybe Unifier
 
-    unifVar :: Term -> Term -> Maybe Unifier
-    unifVar v@(TVar _) t
-      | t == v = Just u
-      | subterm v t = Nothing
-      | otherwise   =
-        let base = Unifier $ M.insert v t $ M.map (apply (singleton v t)) m
-        in  maybe (Just base) (\t' -> extendUnifier t' t u) (M.lookup v m)
-    unifVar _ _ = undefined
+instance Unify Term where
+  -- Call @apply u@ on @to@ so that the unifier stays normal
+  extendUnifier from to u@(Unifier m) = unif (apply u from) (apply u to)
+    where
+      unifList :: [Term] -> [Term] -> Maybe Unifier
+      unifList l1 l2 = foldr (=<<) (Just u) =<< zipWithStrict extendUnifier l1 l2
 
-    unif :: Term -> Term -> Maybe Unifier
-    unif v@(TVar _) t = unifVar v t
-    unif t v@(TVar _) = unifVar v t
-    unif (TFunctor op1 args1) (TFunctor op2 args2)
-      | op1 == op2 = unifList args1 args2
-      | otherwise  = Nothing
-    unif (TFunctor _ _) _ = Nothing
-    unif TEmptyList TEmptyList = Just u
-    unif TEmptyList _ = Nothing
-    unif (TAtomQuoted a) (TAtomQuoted b)
-      | a == b    = Just u
-      | otherwise = Nothing
-    unif (TAtomQuoted _) _ = Nothing
-    unif (TAtom a) (TAtom b)
-      | a == b    = Just u
-      | otherwise = Nothing
-    unif (TAtom _) _ = Nothing
-    unif (TString a) (TString b)
-      | a == b    = Just u
-      | otherwise = Nothing
-    unif (TString _) _ = Nothing
-    unif (TInt a) (TInt b)
-      | a == b = Just u
-      | otherwise = Nothing
-    unif (TInt _) _ = Nothing
-    unif (TComplex d1) (TComplex d2)
-      | d1 == d2 = Just u
-      | otherwise = Nothing
-    unif (TComplex _) _ = Nothing
+      unifVar :: Term -> Term -> Maybe Unifier
+      unifVar v@(TVar _) t
+        | t == v = Just u
+        | subterm v t = Nothing
+        | otherwise   =
+          let base = Unifier $ M.insert v t $ M.map (apply (singleton v t)) m
+          in  maybe (Just base) (\t' -> extendUnifier t' t u) (M.lookup v m)
+      unifVar _ _ = undefined
+
+      unif :: Term -> Term -> Maybe Unifier
+      unif v@(TVar _) t = unifVar v t
+      unif t v@(TVar _) = unifVar v t
+      unif (TFunctor op1 args1) (TFunctor op2 args2)
+        | op1 == op2 = unifList args1 args2
+        | otherwise  = Nothing
+      unif (TFunctor _ _) _ = Nothing
+      unif TEmptyList TEmptyList = Just u
+      unif TEmptyList _ = Nothing
+      unif (TAtomQuoted a) (TAtomQuoted b)
+        | a == b    = Just u
+        | otherwise = Nothing
+      unif (TAtomQuoted _) _ = Nothing
+      unif (TAtom a) (TAtom b)
+        | a == b    = Just u
+        | otherwise = Nothing
+      unif (TAtom _) _ = Nothing
+      unif (TString a) (TString b)
+        | a == b    = Just u
+        | otherwise = Nothing
+      unif (TString _) _ = Nothing
+      unif (TInt a) (TInt b)
+        | a == b = Just u
+        | otherwise = Nothing
+      unif (TInt _) _ = Nothing
+      unif (TComplex d1) (TComplex d2)
+        | d1 == d2 = Just u
+        | otherwise = Nothing
+      unif (TComplex _) _ = Nothing
