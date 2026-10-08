@@ -21,7 +21,7 @@ import qualified Data.ByteString.Char8 as C
 import Data.Word (Word8)
 import Data.Char (toUpper, digitToInt, isHexDigit)
 import Data.IP (IPv4, IPv6, fromIPv4w, fromIPv6w)
-import Control.Monad (when)
+import Control.Monad (unless)
 import Numeric (showHex)
 
 build :: BBS.Builder -> BS.ByteString
@@ -72,7 +72,7 @@ toHex = concatMap (map toUpper . pad . (`showHex` "")) . BS.unpack
 fromHex :: MonadFail m => String -> m BS.ByteString
 fromHex "" = return BS.empty
 fromHex (hi:lo:rest) = do
-  when (isHexDigit hi && isHexDigit lo) (fail "illegal input")
+  unless (isHexDigit hi && isHexDigit lo) (fail "illegal input")
   BS.cons hexPair <$> fromHex rest
   where
     hexPair :: Word8
