@@ -40,12 +40,6 @@ main = do
       let compiled = runFresh $ plResolvable =<< compileConfig rootServers cfg
       let res = computeResolvable True compiled
       putStrLn $ showKnowledgeBase $ S.toList res
-    "diff" -> do
-      (old, new) <- sepBy "--" args
-      oldRecs <- M.fromListWith mergeZones <$> parseZones old
-      newRecs <- M.fromListWith mergeZones <$> parseZones new
-      let nsDiff = diffServers oldRecs newRecs
-      mapM_ (\(ns, d) -> print ns >> print d) (M.toList nsDiff)
     "regressions" -> do
       (sroots, args') <- sepBy "--" args
       roots <- parseNames sroots
@@ -58,11 +52,6 @@ main = do
       let newRecsC = compileConfig roots newRecs
       regs <- failLeftS $ runFresh $ runExceptT $ computeRegressions (plResolvable =<< oldRecsC) (plResolvable =<< newRecsC)
       mapM_ print regs
-      let oldDeps = runFresh $ fromResolutionOrder . resolutionOrder <$> oldRecsC
-      let newDeps = runFresh $ fromResolutionOrder . resolutionOrder <$> newRecsC
-      rolloutSeq <- handleErrorS (rollout originalZones finalZones oldDeps newDeps)
-      unless (null rolloutSeq) $
-        putStrLn $ unlines $ map ("% " ++) $ "You can roll out updates as follow." :  showRollOut rolloutSeq
     "visualize" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
