@@ -6,7 +6,7 @@ import Test.Tasty.QuickCheck
 import qualified Data.Map.Strict as M
 
 import Resolvable.Prolog.Core
-import Resolvable.Unification (Unifier(..), apply, unify, unifies)
+import Resolvable.Unification (Unifier(..), apply, equivModuloRenaming, unify, unifies)
 import Resolvable.Util (genTerm)
 
 tests :: TestTree
@@ -22,6 +22,26 @@ tests =
         , testCase "propagates substitutions through bindings" propagatesBindings
         , testCase "list tail unifies against longer list" listTailUnifies
         , testCase "fails on different arity" mismatchedArityFails
+        , testCase "equivalence modulo renaming preserves variable sharing" $
+            equivModuloRenaming
+              (TFunctor "f" [TVar "X", TVar "Y"])
+              (TFunctor "f" [TVar "Z", TVar "Z"])
+              @?= False
+        , testCase "equivalence modulo renaming allows different variable names" $
+            equivModuloRenaming
+              (TFunctor "f" [TVar "X", TVar "Y"])
+              (TFunctor "f" [TVar "A", TVar "B"])
+              @?= True
+        , testCase "equivalence modulo renaming preserves repeated variables" $
+            equivModuloRenaming
+              (TFunctor "f" [TVar "X", TVar "X"])
+              (TFunctor "f" [TVar "Y", TVar "Y"])
+              @?= True
+        , testCase "equivalence modulo renaming rejects variables and atoms" $
+            equivModuloRenaming
+              (TFunctor "f" [TVar "X", TVar "X"])
+              (TFunctor "f" [TVar "Y", TAtom "a"])
+              @?= False
         ]
     ]
 

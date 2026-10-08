@@ -84,6 +84,8 @@ import DNS.Record
 import DNS.SEC.Crypto ( algorithmToInt, digestToInt, AlgorithmType, DigestType, nsec3DigestToInt, nsec3FlagsToInt )
 import DNS.SEC.Keys (dnsKeyFlagsToInt)
 import qualified DNS.RecordType as T
+import Control.Monad.Trans.Class (lift)
+import qualified Control.Monad.Trans.State as St
 import NameConstraint
 import Resolvable.Prolog.Symbols
 import Util.Fresh (Fresh, fresh)
@@ -130,7 +132,18 @@ freshVar :: String -> Fresh Term
 freshVar = fmap TVar . fresh
 
 away :: Term -> Fresh Term
-away = mapVarsF (const $ fresh "V")
+away t = St.evalStateT (mapVarsF rename t) M.empty
+  where
+    rename :: String -> St.StateT (M.Map String String) Fresh String
+    rename varName = do
+      mapped <- St.gets (M.lookup varName)
+      maybe freshName return mapped
+      where
+        freshName :: St.StateT (M.Map String String) Fresh String
+        freshName = do
+          n <- lift $ fresh "V"
+          St.modify (M.insert varName n)
+          return n
 
 wildcard :: Fresh Term
 wildcard = freshVar wildcardSym

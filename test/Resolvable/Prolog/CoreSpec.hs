@@ -4,12 +4,17 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
 
 import Resolvable.Prolog.Core
+import Util.Fresh (runFresh)
+import Resolvable.Unification (equivModuloRenaming)
 
 tests :: TestTree
 tests =
   testGroup
     "Resolvable.Prolog.Core"
-    [ testGroup
+    [ testCase "away preserves variable sharing" $
+        let t = TFunctor "pair" [TVar "X", TVar "X", TVar "Y"]
+        in  equivModuloRenaming (runFresh $ away t) t @?= True
+    , testGroup
         "minNameLength"
         [ testCase "variable name" $
             minNameLength (TVar "Name") @?= 2
