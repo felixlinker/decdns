@@ -37,6 +37,7 @@ data TermView = TVList Term Term
               | TVLeq Term Term
               | TVResolves Resolves
               | TVResolvable Term Term Term Term Term
+              | TVIsName Term
               | TVRRSIGValid Term Term Term Term
               | TVDigestValid Term Term Term
               | TVNSECUnsigned Term Term
@@ -87,6 +88,9 @@ toView (TFunctor n args)
   | n == resolvableSym = case args of
     [ ns, qtype, qname, ver, auth ] -> TVResolvable ns qtype qname ver auth
     _ -> undefined
+  | n == isNameSym = case args of
+      [ nam ] -> TVIsName nam
+      _ -> undefined
   | n == rrsigValidSym = case args of
     [ nam, dat, sig, key ] -> TVRRSIGValid nam dat sig key
     _ -> undefined
@@ -167,6 +171,7 @@ fromView (TVNeq a b) = a \= b
 fromView (TVLeq a b) = a =< b
 fromView (TVResolves (Resolves ns qtype zone qname d ver adb)) = resolves ns qtype zone qname d ver adb
 fromView (TVResolvable ns qtype qname ver auth) = resolvable ns qtype qname ver auth
+fromView (TVIsName nam) = isName nam
 fromView (TVRRSIGValid nam dat sig key) = rrsigValid nam dat sig key
 fromView (TVDigestValid nam dsTerm dnskeyTerm) = digestValid nam dsTerm dnskeyTerm
 fromView (TVNSECUnsigned nam nsecDat) = nsecUnsigned nam nsecDat
