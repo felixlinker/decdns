@@ -12,8 +12,8 @@ tests =
   testGroup
     "Resolvable.Prolog.Core"
     [ testCase "away preserves variable sharing" $
-        let t = TFunctor "pair" [TVar "X", TVar "X", TVar "Y"]
-        in  equivModuloRenaming (runFresh $ away t) t @?= True
+        let r = Rule () (TFunctor "pair" [TVar "X", TVar "X", TVar "Y"]) []
+        in  equivModuloRenaming (rhead $ runFresh $ away r) (rhead r) @?= True
     , testGroup
         "minNameLength"
         [ testCase "variable name" $

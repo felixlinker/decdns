@@ -118,7 +118,9 @@ library
       Parsing.ZoneFile
       Prolog.Bridge
       Query
-      Resolvable.ConstrainedUnification
+      Resolvable.Constraint.Neqs
+      Resolvable.Constraint.Solving
+      Resolvable.Constraint.Store
       Resolvable.Dependencies
       Resolvable.Prolog.Core
       Resolvable.Prolog.Reverse
@@ -130,7 +132,6 @@ library
       Resolvable.Update.Disunification
       Resolvable.Update.Resolvability
       Resolvable.Update.Rollout
-      Resolvable.Update.Trivial
       Util.Bool
       Util.Bytes
       Util.CondensationGraph
@@ -213,7 +214,8 @@ test-suite dns-regressor-test
       NameConstraintSpec
       Parsing.NameSpec
       Parsing.ZoneFileSpec
-      Resolvable.ConstrainedUnificationSpec
+      Resolvable.Constraint.NeqsSpec
+      Resolvable.Constraint.StoreSpec
       Resolvable.Prolog.CoreSpec
       Resolvable.ResolvabilitySpec
       Resolvable.UnificationSpec

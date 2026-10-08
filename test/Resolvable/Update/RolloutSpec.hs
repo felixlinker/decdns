@@ -27,8 +27,9 @@ import DNS.ZoneFileSpec (genLabel)
 import NameConstraint (compileWildcards, literalWildcards, toStandardRecord)
 import Parsing (parseNameM)
 import Parsing.Config (parseZoneFiles)
-import qualified Resolvable.ConstrainedUnification as CU
 import Resolvable.Dependencies
+import qualified Resolvable.Constraint.Solving as Solving
+import qualified Resolvable.Constraint.Store as Store
 import Resolvable.Prolog.Core
 import Resolvable.Resolvability (NameServersConfig, compileConfig, plResolvable)
 import Resolvable.Update.Rollout
@@ -58,7 +59,7 @@ data Example = Example
   { examplePath :: FilePath
   , exampleConfig :: NameServersConfig
   , exampleDependencies :: Either String RecordDependencies
-  , exampleQueries :: [ConstrainedQuery]
+  , exampleQueries :: [Fact]
   }
 
 -- Keep all rollout inputs here. Wildcard owners, signing inputs, DNSSEC
@@ -126,7 +127,7 @@ roots = map dnsName ["ns.com.", "root.net."]
 
 -- Prepare each pair once for both invariants, and share resolution computations
 -- for adjacent states. Include the initial and final states, even for one step.
-type PreparedRollout = Either String (Rollout, [(Inventory, [ConstrainedQuery])])
+type PreparedRollout = Either String (Rollout, [(Inventory, [Fact])])
 
 prepareRollout :: Example -> Example -> PreparedRollout
 prepareRollout old new = do
@@ -192,7 +193,7 @@ cacheInvariant old new prepared = case prepared of
           zip [0 :: Int ..] (zip states (drop 1 states))
       ]
 
-forCommonQueries :: [ConstrainedQuery] -> [ConstrainedQuery] -> (Gen Term -> Property) -> Property
+forCommonQueries :: [Fact] -> [Fact] -> (Gen Term -> Property) -> Property
 forCommonQueries before after check =
   let common = S.toList $ S.fromList
         [ q | a <- before, b <- after, Just q <- [intersectQueries a b] ]
@@ -203,7 +204,7 @@ forCommonQueries before after check =
      else check (elements common >>= sampleQuery)
 
 -- Check the generator's contract; do not hide bad samples with ==>.
-sampleResolves :: [ConstrainedQuery] -> [ConstrainedQuery] -> Term -> Property
+sampleResolves :: [Fact] -> [Fact] -> Term -> Property
 sampleResolves before after q = counterexample "sample is not resolvable at both endpoints"
   (resolvesQuery before q && resolvesQuery after q)
 
@@ -251,52 +252,53 @@ dependencies cfg = do
 
 -- Project away response data and the answering zone BEFORE intersecting: an
 -- address, alias target, or authoritative zone may legitimately change.
-queryPatterns :: NameServersConfig -> [ConstrainedQuery]
+queryPatterns :: NameServersConfig -> [Fact]
 queryPatterns cfg = S.toList $ S.fromList $ mapMaybe project
   [ (answer, ns, ty) | answer <- answers, ns <- roots,
     ty <- [RT.A, RT.AAAA, RT.NS, RT.CNAME, RT.DNAME, RT.TXT, RT.MX, RT.SOA] ]
   where
-    answers = either error id $ runExcept $ traverse queryFromRule $ S.toList $
-      runFresh $ do
-        rules <- plResolvable =<< compileConfig roots cfg
-        computeResolvable True rules
+    answers = runFresh $ do
+      rules <- plResolvable =<< compileConfig roots cfg
+      computeResolvable True rules
     project (answer, ns, ty) = do
-      let CQuery h cs = renameQuery "answer_" answer
+      let Fact h cs = renameQuery "answer_" answer
           q = TVar "query_name"
           probe = resolves (nameTerm ns) (ttypeTerm ty) (TVar "query_zone") q
             (TVar "query_data") bot (ad 0)
-      cu <- CU.extendUnifier h probe (CU.CUnifier U.identity cs)
-      pure $ CQuery (TFunctor "query" [nameTerm ns, ttypeTerm ty, CU.apply cu q]) (CU.constraints cu)
+      u <- U.extendUnifier h probe U.identity
+      constraints <- Solving.getSolved $ Store.simplify (U.apply u cs)
+      pure $ Fact (TFunctor "query" [nameTerm ns, ttypeTerm ty, U.apply u q]) constraints
 
-intersectQueries :: ConstrainedQuery -> ConstrainedQuery -> Maybe ConstrainedQuery
+intersectQueries :: Fact -> Fact -> Maybe Fact
 intersectQueries a b = do
-  let CQuery h cs = renameQuery "old_" a
-      CQuery h' cs' = renameQuery "new_" b
-  cu <- CU.extendUnifier h h' (CU.CUnifier U.identity (M.unionWith S.union cs cs'))
-  pure $ CQuery (CU.apply cu h) (CU.constraints cu)
+  let Fact h cs = renameQuery "old_" a
+      Fact h' cs' = renameQuery "new_" b
+  u <- U.extendUnifier h h' U.identity
+  constraints <- Solving.getSolved $ Store.simplify (U.apply u (cs <> cs'))
+  pure $ Fact (U.apply u h) constraints
 
 -- Independently compiled configurations reuse variable names. Renaming both
 -- terms AND constraints apart avoids accidental links between their variables.
-renameQuery :: String -> ConstrainedQuery -> ConstrainedQuery
-renameQuery prefix (CQuery h cs) = CQuery (U.apply u h) renamedConstraints
+renameQuery :: String -> Fact -> Fact
+renameQuery prefix (Fact h cs) = Fact (U.apply u h) (U.apply u cs)
   where
-    terms = h : concatMap (\(a, b) -> [a, b]) (CU.toList cs)
+    terms = h : Store.toBody cs
     variables = S.unions (map vars terms)
     u = U.Unifier $ M.fromList [(v, TVar (prefix ++ n)) | v@(TVar n) <- S.toList variables]
-    renamedConstraints = fromMaybe (error "invalid query constraints") $
-      CU.fromList (U.apply u (CU.toList cs))
 
-resolvesQuery :: [ConstrainedQuery] -> Term -> Bool
+resolvesQuery :: [Fact] -> Term -> Bool
 resolvesQuery answers q = any (covers q) answers
 
-covers :: Term -> ConstrainedQuery -> Bool
-covers q (CQuery h cs) = isJust $ CU.extendUnifier h q (CU.CUnifier U.identity cs)
+covers :: Term -> Fact -> Bool
+covers q (Fact h cs) = isJust $ do
+  u <- U.extendUnifier h q U.identity
+  Solving.getSolved $ Store.simplify (U.apply u cs)
 
 -- Sample a concrete DNS name from a symbolic intersection member, including
 -- wildcard suffixes. Constraint checking rejects excluded names, not properties.
 -- Fresh labels ensure exclusions cannot exhaust the small genLabel alphabet.
-sampleQuery :: ConstrainedQuery -> Gen Term
-sampleQuery patternQuery@(CQuery (TFunctor "query" [ns, ty, n]) _) =
+sampleQuery :: Fact -> Gen Term
+sampleQuery patternQuery@(Fact (TFunctor "query" [ns, ty, n]) _) =
   gen `suchThat` (`covers` patternQuery)
   where
     (labels, rest) = collectListWithTail n

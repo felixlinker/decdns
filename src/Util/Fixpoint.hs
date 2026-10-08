@@ -9,7 +9,8 @@ module Util.Fixpoint
   , fixpointM
   , fixpoint
   , fixpointSetM
-  , fixpointSet ) where
+  , fixpointSet
+  , fixpointP ) where
 
 import Control.Monad (foldM)
 import Control.Monad.Trans.Class (lift)
@@ -57,3 +58,12 @@ fixpointSetM newF = fixpointM (\acc -> foldM (flip checkInsert) acc =<< lift (ne
 
 fixpointSet :: (Foldable t, Ord a) => (S.Set a -> t a) -> S.Set a -> S.Set a
 fixpointSet f = runIdentity . fixpointSetM (return . f)
+
+fixpointP :: forall a m. Monad m => (a -> a -> Bool) -> ([a] -> m [a]) -> [a] -> m [a]
+fixpointP p supplier = fixpointM (\base -> foldM aux base =<< lift (supplier base))
+  where
+    aux :: [a] -> a -> ChangedT m [a]
+    aux base a =
+      if any (p a) base
+        then unchanged base
+        else changed (a:base)

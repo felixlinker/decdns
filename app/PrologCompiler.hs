@@ -7,7 +7,7 @@ import NameConstraint (toStandardRecord)
 import Resolvable.Prolog.Core
 import Resolvable.Resolvability
 import Resolvable.Update.Rollout (diffServers, showRollOut, rollout, fromResolutionOrder)
-import Resolvable.Dependencies (computeResolvable, resolutionOrder)
+import Resolvable.Dependencies (computeResolvable, toRule, resolutionOrder)
 import Util.Fresh (runFresh)
 import Util.Monad (failLeftS, handleErrorS, handleMaybe)
 
@@ -39,7 +39,7 @@ main = do
       rootServers <- parseNames roots
       cfg <- parseZones zones
       let res = runFresh $ computeResolvable True =<< plResolvable =<< compileConfig rootServers cfg
-      putStrLn $ showKnowledgeBase $ S.toList res
+      putStrLn $ showKnowledgeBase $ map toRule res
     "regressions" -> do
       (sroots, args') <- sepBy "--" args
       roots <- parseNames sroots
@@ -50,7 +50,7 @@ main = do
         oldRecsC <- lift $ plResolvable =<< compileConfig roots oldRecs
         newRecsC <- lift $ plResolvable =<< compileConfig roots newRecs
         computeRegressions oldRecsC newRecsC
-      mapM_ print regs
+      mapM_ print $ S.map toRule regs
     "visualize" -> do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots

@@ -22,7 +22,8 @@ queryStep :: Name String -> T.Type -> S.Set (Rule (Maybe RComp)) -> Fresh (S.Set
 queryStep n t rs = do
   kb <- computeResolvable False rs
   q <- queryT n t
-  return $ S.fromList . mapMaybe (refine q) $ S.toList kb
+  undefined
+  -- return $ S.fromList . mapMaybe (refine q) $ S.toList kb
   where
     refine :: Term -> Rule a -> Maybe (Rule a)
     refine q r@(Rule _ rh _) = fmap (`U.apply` r) (U.unify q rh)

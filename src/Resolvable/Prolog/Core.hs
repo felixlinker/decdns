@@ -69,6 +69,7 @@ module Resolvable.Prolog.Core
   , top
   , bot
   , ad
+  , isName
   , rrsigValid
   , digestValid
   , nsecUnsigned
@@ -130,20 +131,6 @@ mapVarsF _ t@(TComplex _) = pure t
 
 freshVar :: String -> Fresh Term
 freshVar = fmap TVar . fresh
-
-away :: Term -> Fresh Term
-away t = St.evalStateT (mapVarsF rename t) M.empty
-  where
-    rename :: String -> St.StateT (M.Map String String) Fresh String
-    rename varName = do
-      mapped <- St.gets (M.lookup varName)
-      maybe freshName return mapped
-      where
-        freshName :: St.StateT (M.Map String String) Fresh String
-        freshName = do
-          n <- lift $ fresh "V"
-          St.modify (M.insert varName n)
-          return n
 
 wildcard :: Fresh Term
 wildcard = freshVar wildcardSym
@@ -389,6 +376,26 @@ instance forall a. Show (Rule a) where
     Rule _ h [] -> show h ++ "."
     Rule _ h b -> show h ++ " :- " ++ intercalate ", " (map show b) ++ "."
 
+away :: Rule a -> Fresh (Rule a)
+away (Rule a h b) = (`St.evalStateT` M.empty) $ do
+  h' <- awayT h
+  b' <- mapM awayT b
+  return $ Rule a h' b'
+  where
+    awayT :: Term -> St.StateT (M.Map String String) Fresh Term
+    awayT = mapVarsF rename
+
+    rename :: String -> St.StateT (M.Map String String) Fresh String
+    rename varName = do
+      mapped <- St.gets (M.lookup varName)
+      maybe freshName return mapped
+      where
+        freshName :: St.StateT (M.Map String String) Fresh String
+        freshName = do
+          n <- lift $ fresh "V"
+          St.modify (M.insert varName n)
+          return n
+
 fact :: a -> Term -> Rule a
 fact ann h = Rule ann h []
 
@@ -522,6 +529,9 @@ bot = TFunctor "bot" []
 
 ad :: Int -> Term
 ad = TFunctor adSym . (:[]) . TInt
+
+isName :: Term -> Term
+isName = TFunctor isNameSym . (:[])
 
 rrsigValid :: Term -> Term -> Term -> Term -> Term
 rrsigValid nam dat sig key  = TFunctor rrsigValidSym [ nam, dat, sig, key ]

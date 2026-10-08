@@ -14,16 +14,16 @@ import DNS.Wellformedness (zoneWellformed)
 import DNS.ZoneFile (zoneName)
 import NameConstraint (compileName)
 import Parsing.Config (parseZoneFileZones, parseZoneFiles)
-import Resolvable.Dependencies (ConstrainedQuery (CQuery), computeResolvable, queryFromRule)
+import Resolvable.Dependencies
+import qualified Resolvable.Constraint.Store as Store
 import Resolvable.Prolog.Core (Term (TComplex), ad, bot, list, nameTerm, resolvable, resolves, top, ttypeTerm, wildcard, wildcards3)
 import Resolvable.Resolvability (NameServersConfig, compileConfig, plResolvable)
 import Resolvable.Update.Dependencies (computeRegressions)
-import qualified Resolvable.ConstrainedUnification as CU
 import qualified Resolvable.Unification as U
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertBool, testCase, (@?=))
 import Util.Fresh (runFresh)
-import Util.Monad (failLeft, handleError)
+import Util.Monad (failLeft)
 
 tests :: TestTree
 tests =
@@ -495,13 +495,13 @@ regressionTest newConfig expected unexpected = do
           computeRegressions oldRules newRules
   assertResolvableQueries (baseFiles ++ newConfig) regressions expected unexpected
 
-assertQueries :: [FilePath] -> S.Set ConstrainedQuery -> [Query] -> [Query] -> Assertion
+assertQueries :: [FilePath] -> S.Set Fact -> [Query] -> [Query] -> Assertion
 assertQueries = assertQueriesWith queryTerm
 
-assertResolvableQueries :: [FilePath] -> S.Set ConstrainedQuery -> [Query] -> [Query] -> Assertion
+assertResolvableQueries :: [FilePath] -> S.Set Fact -> [Query] -> [Query] -> Assertion
 assertResolvableQueries = assertQueriesWith resolvableQueryTerm
 
-assertQueriesWith :: (Query -> Term) -> [FilePath] -> S.Set ConstrainedQuery -> [Query] -> [Query] -> Assertion
+assertQueriesWith :: (Query -> Term) -> [FilePath] -> S.Set Fact -> [Query] -> [Query] -> Assertion
 assertQueriesWith toTerm files results expected unexpected = do
   forM_ expected $ \query ->
     assertBool
@@ -512,7 +512,7 @@ assertQueriesWith toTerm files results expected unexpected = do
       (show query ++ " was wrongly resolvable for zones:\n" ++ showZoneFiles files)
       (not (any (coversTerm (toTerm query)) results))
 
-assertResolutions :: [FilePath] -> S.Set ConstrainedQuery -> [Resolution] -> [Resolution] -> Assertion
+assertResolutions :: [FilePath] -> S.Set Fact -> [Resolution] -> [Resolution] -> Assertion
 assertResolutions files results expected unexpected = do
   forM_ expected $ \resolution ->
     assertBool
@@ -526,16 +526,14 @@ assertResolutions files results expected unexpected = do
 showZoneFiles :: [FilePath] -> String
 showZoneFiles = unlines . map ("  " ++)
 
-coversResolution :: Resolution -> ConstrainedQuery -> Bool
+coversResolution :: Resolution -> Fact -> Bool
 coversResolution = coversTerm . resolutionTerm
 
-coversTerm :: Term -> ConstrainedQuery -> Bool
-coversTerm expected (CQuery actual constraints) =
-  isJust $
-    CU.extendUnifier
-      actual
-      expected
-      (CU.CUnifier U.identity constraints)
+coversTerm :: Term -> Fact -> Bool
+coversTerm expected (Fact actual constraints) =
+  isJust $ do
+    u <- U.unify actual expected
+    Store.solve $ Store.simplify $ U.apply u constraints
 
 queryTerm :: Query -> Term
 queryTerm (Query ns rtype qname) = runFresh $ do
@@ -552,14 +550,12 @@ resolutionTerm (Resolution (Query ns rtype qname) verification auth) = runFresh 
   wc <- wildcard
   return $ resolves (nameTerm ns) (ttypeTerm rtype) zone (nameTerm qname) wc verification auth
 
-resolvableQueries :: [FilePath] -> IO (S.Set ConstrainedQuery)
+resolvableQueries :: [FilePath] -> IO (S.Set Fact)
 resolvableQueries files = do
   cfg <- loadConfig files
-  let resolvableRules = runFresh $ do
+  return $ S.fromList $ runFresh $ do
         rules <- plResolvable =<< compileConfig rootServers cfg
         computeResolvable True rules
-  qs <- handleError (traverse queryFromRule $ S.toList resolvableRules)
-  return $ S.fromList qs
 
 loadConfig :: [FilePath] -> IO NameServersConfig
 loadConfig = parseZoneFiles zoneWellformed

@@ -1,7 +1,6 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Resolvable.Dependencies
   ( ResolutionOrder
@@ -9,23 +8,19 @@ module Resolvable.Dependencies
   , DependencyMatch(..)
   , dependencyMatch
   , dependencyMatches
-  , ConstrainedQuery(..)
-  , queryFromRule
+  , Fact(..)
+  , toRule
   , computeResolvable ) where
 
-import Control.Monad (filterM, guard, unless, foldM)
-import Control.Monad.Trans.Except (ExceptT, Except, runExcept, throwE)
-import qualified Control.Monad.Trans.State as St
-import Data.Bifunctor (Bifunctor(bimap))
+import Control.Monad (foldM, guard)
+import Control.Monad.Trans.Except (runExcept)
 import Data.Either (fromRight)
-import Data.Functor (($>))
 import qualified Data.Set as S
-import Data.Maybe (listToMaybe, mapMaybe, isJust)
+import Data.Maybe (listToMaybe, mapMaybe, isJust, fromMaybe)
 
-import DNS.SEC.Verification (verifySignature, verifyDigest, nsecUnsignedSubzone, nsec3UnsignedSubzone, verifyClosestEncloserProof)
-import qualified Resolvable.ConstrainedUnification as CU
+import qualified Resolvable.Constraint.Store as Store
+import Resolvable.Constraint.Solving (getSolved)
 import Resolvable.Prolog.Core
-import Resolvable.Prolog.Reverse
 import Resolvable.Prolog.TermView
 import Resolvable.Resolvability (RComp)
 import Resolvable.Unification
@@ -45,8 +40,9 @@ data DependencyMatch = DependencyMatch
 
 dependencyMatch :: Rule (Maybe RComp) -> Rule (Maybe RComp) -> Maybe DependencyMatch
 dependencyMatch lrg@(Rule _ (toView -> TVResolves {}) b) sml@(Rule _ h@(toView -> TVResolves {}) _) = do
-  (predicate, u) <- listToMaybe $ mapMaybe unifyBodyPredicate b
-  _ <- CU.applyRule (CU.fromUnifier u) sml
+  let (st, b') = partitionConstraints b
+  (predicate, u) <- listToMaybe $ mapMaybe unifyBodyPredicate b'
+  maybe (return ()) guard $ Store.solve $ Store.simplify $ apply u st
   return $ DependencyMatch lrg sml predicate u
   where
     unifyBodyPredicate :: Term -> Maybe (Term, Unifier)
@@ -72,145 +68,73 @@ resolutionOrder rs = foldr go G.empty rs
     go :: Rule (Maybe RComp) -> ResolutionOrder -> ResolutionOrder
     go r = G.insert r (S.filter (match r) rs)
 
--- TODO: Refactor
-data ConstrainedQuery = CQuery Term CU.Neqs
+partitionConstraints :: [Term] -> (Store.ConstraintStore, [Term])
+partitionConstraints = foldr addConstraint (Store.empty, [])
+  where
+    addConstraint :: Term -> (Store.ConstraintStore, [Term]) -> (Store.ConstraintStore, [Term])
+    addConstraint t (st, b) = maybe (st, t:b) (, b) (Store.add st t)
+
+data Fact = Fact Term Store.ConstraintStore
   deriving (Eq, Ord)
 
-instance Apply (Maybe ConstrainedQuery) where
-  apply :: Unifier -> Maybe ConstrainedQuery -> Maybe ConstrainedQuery
-  apply _ Nothing = Nothing
-  apply u (Just (CQuery t neqs)) = do
-    let app = apply u
-    neqs' <- CU.fromList (map (bimap app app) (CU.toList neqs))
-    return $ CQuery (apply u t) neqs'
+instance Unify Fact where
+  extendUnifier (Fact f _) (Fact f' _) = extendUnifier f f'
 
-toRule :: ConstrainedQuery -> Rule ()
-toRule (CQuery q neqs) = Rule () q (CU.asPredicates neqs)
+instance Apply Fact where
+  apply u (Fact t st) = Fact (apply u t) (apply u st)
 
-queryFromRule :: Monad m => Rule a -> ExceptT String m ConstrainedQuery
-queryFromRule (Rule _ h b) = do
-  (rest, cu) <- exceptMaybe "contradictory body" $ grabNeqs b CU.identity
-  unless (null rest) (throwE "predicate other than inequality in body")
-  return $ CQuery h (CU.constraints cu)
-
-grabNeqs :: [Term] -> CU.ConstrainedUnifier -> Maybe ([Term], CU.ConstrainedUnifier)
-grabNeqs ts = St.runStateT (filterM importNeq ts)
-  where
-    importNeq :: Term -> St.StateT CU.ConstrainedUnifier Maybe Bool
-    importNeq bodyT = case toView bodyT of
-      TVNeq x y -> do
-        St.modifyM (CU.addConstraint x y)
-        return False
-      _ -> return True
-
-instance Show ConstrainedQuery where
+instance Show Fact where
   show = show . toRule
 
-matchHead :: Term -> Rule a -> CU.ConstrainedUnifier -> Maybe (CU.ConstrainedUnifier, [Term])
-matchHead t (Rule _ h b) cu = do
-  cu' <- CU.extendUnifier t h cu
-  (b', cu'') <- grabNeqs b cu'
-  return (cu'', CU.apply cu'' b')
+equivFacts :: Fact -> Fact -> Bool
+equivFacts (Fact f1 c1) (Fact f2 c2) = fromMaybe False $ do
+  u <- unify f1 f2
+  return $ isRenaming u && apply u c1 == apply u c2
 
-checkMaxNameLength :: Rule a -> Bool
-checkMaxNameLength (Rule _ (toView -> TVResolves (Resolves { resolvesQName = qn })) _) = minNameLength qn <= 255
-checkMaxNameLength _ = error "unsupported rule head encountered"
+toRule :: Fact -> Rule ()
+toRule (Fact f cs) = Rule () f (Store.toBody cs)
 
-solveBody :: Ord a => Bool -> S.Set (Rule a) -> Rule a -> Fresh (S.Set (Rule a))
-solveBody keepGround rs (Rule ann h b) = do
-  h' <- away h
-  b' <- mapM away b
-  return $ S.fromList $
-    filter checkMaxNameLength $
-    map (\(u, b'') -> CU.apply u $ Rule ann h' b'') $
-      foldl solvePredicate [(CU.identity, [])] b'
+solveBody :: Bool -> [Fact] -> Rule a -> Fresh [Fact]
+solveBody keepGround fs r = do
+  Rule _ h b <- away r
+  let (st, b') = partitionConstraints b
+  let us = foldl solvePredicate [(identity, st)] b'
+  return $ map (\(u, st') -> Fact (apply u h) (apply u st')) us
   where
-    groundP :: (CU.ConstrainedUnifier, [Term]) -> Bool
-    groundP = if keepGround then null . snd else const True
-
-    solvePredicate :: [(CU.ConstrainedUnifier, [Term])] -> Term -> [(CU.ConstrainedUnifier, [Term])]
-    solvePredicate choices p = filter groundP $ case toView p of
-      TVNeq t1 t2 -> mapMaybe (\(u, accB) -> (,accB) <$> CU.addConstraint t1 t2 u) choices
+    solvePredicate :: [(Unifier, Store.ConstraintStore)] -> Term -> [(Unifier, Store.ConstraintStore)]
+    solvePredicate choices p = case toView p of
       TVResolves {} -> concatMap
-        (\(u, accB) -> foldr
-          (\cq acc -> maybe acc (:acc) $ do
-            (u', b') <- matchHead p cq u
-            return (u', CU.apply u' accB ++ b'))
+        (\(u, accSt) -> foldr
+          (\(Fact h st) acc -> maybe acc (:acc) $ do
+            u' <- extendUnifier p h u
+            accSt' <- getSolved $ Store.simplify $ apply u' accSt <> apply u' st
+            return (u', accSt'))
           []
-          rs)
+          fs)
         choices
       TVMember x l -> concatMap
-        (\(u, accB) -> fromRight [(u, accB ++ [p])] $ runExcept $ do
-          let ul = CU.apply u l
-          l' <- exceptMaybe "member" (collectList ul)
+        (\(u, accSt) -> fromRight [] $ runExcept $ do
+          l' <- exceptMaybe "member" (collectList $ apply u l)
           return $ mapMaybe (\el -> do
-            u' <- CU.extendUnifier x el u
-            return (u', CU.apply u' accB))
+            u' <- extendUnifier x el u
+            return (u', apply u' accSt))
             l')
         choices
-      TVDigestValid n dnskeyT dsT -> mapMaybe
-        (skipUnsolvable $ \u -> do
-          let app = CU.apply u
-          n' <- asName (app n)
-          dsDat <- asDSData =<< asType (app dsT)
-          dnskeyDat <- asDNSKEYData =<< asType (app dnskeyT)
-          return $ verifyDigest n' dsDat dnskeyDat)
-        choices
-      TVRRSIGValid n dat sig k -> mapMaybe
-        (skipUnsolvable $ \u -> do
-          let app = CU.apply u
-          n' <- asName (app n)
-          rrset <- asTypes (app dat)
-          sigDat <- asRRSigData =<< asType (app sig)
-          k' <- asDNSKEYData =<< asType (app k)
-          return (verifySignature n' rrset sigDat k'))
-        choices
-      TVNSECUnsigned n nsecDat -> mapMaybe
-        (skipUnsolvable $ \u -> do
-          let app = CU.apply u
-          n' <- asName (app n)
-          nsecDat' <- asNSECData =<< asType (app nsecDat)
-          return $ nsecUnsignedSubzone n' n' nsecDat')
-        choices
-      TVNSEC3Unsigned n hashedOwner nsec3Dat -> mapMaybe
-        (skipUnsolvable $ \u -> do
-          let app = CU.apply u
-          n' <- asName (app n)
-          hashedOwner' <- asName (app hashedOwner)
-          nsec3Dat' <- asNSEC3Data =<< asType (app nsec3Dat)
-          return $ nsec3UnsignedSubzone n' hashedOwner' nsec3Dat')
-        choices
-      TVClosestEncloser n exN exDat nonExN nonExDat -> mapMaybe
-        (skipUnsolvable $ \u -> do
-          let app = CU.apply u
-          n' <- asName (app n)
-          exN' <- asName (app exN)
-          exDat' <- asNSEC3Data =<< asType (app exDat)
-          nonExN' <- asName (app nonExN)
-          nonExDat' <- asNSEC3Data =<< asType (app nonExDat)
-          return $ verifyClosestEncloserProof n' exN' exDat' nonExN' nonExDat')
-        choices
       _ -> error "unsupported atom encountered"
-      where
-        skipUnsolvable :: (CU.ConstrainedUnifier -> Except a Bool) -> (CU.ConstrainedUnifier, [Term]) -> Maybe (CU.ConstrainedUnifier, [Term])
-        skipUnsolvable check (u, accB) = either (const $ Just (u, accB ++ [p])) (returnWhen (u, accB)) $ runExcept (check u)
-          where
-            returnWhen :: a -> Bool -> Maybe a
-            returnWhen a = ($> a) . guard
 
-solveFixpoint :: forall a t. (Traversable t, Ord a) => Bool -> S.Set (Rule a) -> t (Rule a) -> Fresh (S.Set (Rule a))
-solveFixpoint keepGround prog addFrom = fixpointSetM step prog
+solveFixpoint :: forall a t. (Traversable t, Ord a) => Bool -> [Fact] -> t (Rule a) -> Fresh [Fact]
+solveFixpoint keepGround prog addFrom = fixpointP equivFacts step prog
   where
-    step :: S.Set (Rule a) -> Fresh [Rule a]
+    step :: [Fact] -> Fresh [Fact]
     step acc = do
       solved <- mapM (solveBody keepGround acc) addFrom
-      return $ concatMap S.toList solved
+      return $ concat solved
 
-computeResolvable :: Bool -> S.Set (Rule (Maybe RComp)) -> Fresh (S.Set (Rule (Maybe RComp)))
+computeResolvable :: Bool -> S.Set (Rule (Maybe RComp)) -> Fresh [Fact]
 computeResolvable keepGround (S.filter (isResolves . rhead) -> rs) = do
-  rec (CG.fromGraph $ resolutionOrder rs) S.empty
+  rec (CG.fromGraph $ resolutionOrder rs) []
   where
-    rec :: CG.CondensationGraph (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp)) -> Fresh (S.Set (Rule (Maybe RComp)))
+    rec :: CG.CondensationGraph (Rule (Maybe RComp)) -> [Fact] -> Fresh [Fact]
     rec ord acc
       | G.null ord = pure acc
       | otherwise = do
