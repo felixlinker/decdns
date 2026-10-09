@@ -17,14 +17,16 @@ tests =
     , testGroup
         "minNameLength"
         [ testCase "variable name" $
-            minNameLength (TVar "Name") @?= 2
+            minNameLength (TVar "Name") @?= 1
+        , testCase "root name" $
+            minNameLength (list []) @?= 1
         , testCase "single atom name" $
-            minNameLength (list [TAtom "com"]) @?= 6
+            minNameLength (list [TAtom "com"]) @?= 5
         , testCase "multiple atoms name" $
-            minNameLength (list [TAtom "www", TAtom "example", TAtom "com"]) @?= 18
+            minNameLength (list [TAtom "com", TAtom "example", TAtom "www"]) @?= 17
         , testCase "name containing variable label" $
-            minNameLength (list [TVar "Label", TAtom "com"]) @?= 8
+            minNameLength (list [TAtom "com", TVar "Label"]) @?= 7
         , testCase "name with variable tail" $
-            minNameLength (listWithTail [TAtom "www", TVar "Label"] (TVar "Suffix")) @?= 8
+            minNameLength (listWithTail [TVar "Label", TAtom "www"] (TVar "Suffix")) @?= 7
         ]
     ]
