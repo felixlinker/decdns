@@ -88,7 +88,6 @@ instance Apply Term where
   apply u (TFunctor op (map (apply u) -> args)) = TFunctor op args
   apply _ TEmptyList = TEmptyList
   apply (Unifier m) v@(TVar _) = fromMaybe v (M.lookup v m)
-  apply _ t@(TAtomQuoted _) = t
   apply _ t@(TAtom _) = t
   apply _ t@(TString _) = t
   apply _ t@(TInt _) = t
@@ -131,10 +130,6 @@ instance Unify Term where
       unif (TFunctor _ _) _ = Nothing
       unif TEmptyList TEmptyList = Just u
       unif TEmptyList _ = Nothing
-      unif (TAtomQuoted a) (TAtomQuoted b)
-        | a == b    = Just u
-        | otherwise = Nothing
-      unif (TAtomQuoted _) _ = Nothing
       unif (TAtom a) (TAtom b)
         | a == b    = Just u
         | otherwise = Nothing

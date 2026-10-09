@@ -21,7 +21,6 @@ genTerm = do
     go n
       | n <= 0 = oneof  [ TVar <$> names
                         , TAtom <$> names
-                        , TAtomQuoted <$> names
                         , TString <$> names
                         ]
       | otherwise =

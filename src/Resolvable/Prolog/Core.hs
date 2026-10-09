@@ -112,7 +112,6 @@ infixFunctors =
 data Term = TFunctor String [Term]
           | TEmptyList
           | TVar String
-          | TAtomQuoted String
           | TAtom String
           | TString String
           | TInt Int
@@ -123,7 +122,6 @@ mapVarsF :: Applicative f => (String -> f String) -> Term -> f Term
 mapVarsF f (TFunctor n args) = TFunctor n <$> traverse (mapVarsF f) args
 mapVarsF _ TEmptyList = pure TEmptyList
 mapVarsF f (TVar n) = TVar <$> f n
-mapVarsF _ t@(TAtomQuoted _) = pure t
 mapVarsF _ t@(TAtom _) = pure t
 mapVarsF _ t@(TString _) = pure t
 mapVarsF _ t@(TInt _) = pure t
@@ -273,8 +271,10 @@ instance Show Term where
     | isWildcard v = "_"
     | otherwise = toUpper h : t
   show (TAtom "") = undefined
-  show (TAtom (h:t)) = toLower h : t
-  show (TAtomQuoted a) =  "'" ++ a ++ "'"
+  show (TAtom a) = '\'' : escape a ++ "'"
+    where
+      escape :: String -> String
+      escape = concatMap (\c -> if c == '\'' then "\\'" else return c)
   show (TString s) = show s
   show (TInt i) = show i
   -- "Flatten" data for compilation to Prolog. We only maintain TComplex for
@@ -285,7 +285,6 @@ walk :: Semigroup a => (Term -> a) -> Term -> a
 walk f t@(TFunctor _ args) = sconcat (f t NE.:| map (walk f) args)
 walk f TEmptyList = f TEmptyList
 walk f t@(TVar _) = f t
-walk f t@(TAtomQuoted _) = f t
 walk f t@(TAtom _) = f t
 walk f t@(TString _) = f t
 walk f t@(TInt _) = f t
@@ -321,7 +320,6 @@ replace f t = rec (f t)
     rec (TFunctor op ts) = TFunctor op (map (replace f) ts)
     rec u@TEmptyList = u
     rec u@(TVar _) = u
-    rec u@(TAtomQuoted _) = u
     rec u@(TAtom _) = u
     rec u@(TString _) = u
     rec u@(TInt _) = u
@@ -466,7 +464,7 @@ ds :: Term -> Term -> Term -> Term -> Term
 ds a b c d = TFunctor (ttypeSym T.DS) [a, b, c, d]
 
 dnsWildcard :: Term
-dnsWildcard = TAtom "'*'"
+dnsWildcard = TAtom "*"
 
 ttypeTerm :: T.Type -> Term
 ttypeTerm = TAtom . map toLower . show

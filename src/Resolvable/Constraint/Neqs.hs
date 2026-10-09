@@ -50,7 +50,6 @@ simplifyNeq a b = case a of
   -- We can simplify all below cases to either dropping the inequality, as the
   -- terms are unequal, or deriving a contradiction.
   TEmptyList      -> decideNonVar
-  (TAtomQuoted _) -> decideNonVar
   (TAtom _)       -> decideNonVar
   (TString _)     -> decideNonVar
   (TInt _)        -> decideNonVar

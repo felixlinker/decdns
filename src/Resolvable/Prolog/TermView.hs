@@ -48,7 +48,6 @@ data TermView = TVList Term Term
               | TVFunctor String [ Term ]
               | TVEmptyList
               | TVVar String
-              | TVAtomQuoted String
               | TVAtom String
               | TVString String
               | TVInt Int
@@ -162,7 +161,6 @@ toView (TFunctor n args)
   | otherwise = TVFunctor n args
 toView TEmptyList = TVEmptyList
 toView (TVar v) = TVVar v
-toView (TAtomQuoted n) = TVAtomQuoted n
 toView (TAtom n) = TVAtom n
 toView (TString s) = TVString s
 toView (TInt i) = TVInt i
@@ -186,7 +184,6 @@ fromView (TVAd b) = ad (fromEnum b)
 fromView (TVFunctor n args) = TFunctor n args
 fromView TVEmptyList = TEmptyList
 fromView (TVVar v) = TVar v
-fromView (TVAtomQuoted n) = TAtomQuoted n
 fromView (TVAtom n) = TAtom n
 fromView (TVString s) = TString s
 fromView (TVInt i) = TInt i
