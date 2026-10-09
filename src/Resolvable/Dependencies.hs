@@ -31,14 +31,14 @@ import Util.Fixpoint
 import Util.Fresh
 
 data DependencyMatch = DependencyMatch
-  { dependentRule :: Rule (Maybe RComp)
-  , dependencyRule :: Rule (Maybe RComp)
+  { dependentRule :: Rule RComp
+  , dependencyRule :: Rule RComp
   , dependencyPredicate :: Term
   , dependencyUnifier :: Unifier
   }
   deriving Eq
 
-dependencyMatch :: Rule (Maybe RComp) -> Rule (Maybe RComp) -> Maybe DependencyMatch
+dependencyMatch :: Rule RComp -> Rule RComp -> Maybe DependencyMatch
 dependencyMatch lrg@(Rule _ (toView -> TVResolves {}) b) sml@(Rule _ h@(toView -> TVResolves {}) _) = do
   let (st, b') = partitionConstraints b
   (predicate, u) <- listToMaybe $ mapMaybe unifyBodyPredicate b'
@@ -51,10 +51,10 @@ dependencyMatch lrg@(Rule _ (toView -> TVResolves {}) b) sml@(Rule _ h@(toView -
       return (p, u)
 dependencyMatch _ _ = Nothing
 
-match :: Rule (Maybe RComp) -> Rule (Maybe RComp) -> Bool
+match :: Rule RComp -> Rule RComp -> Bool
 match r = isJust . dependencyMatch r
 
-dependencyMatches :: S.Set (Rule (Maybe RComp)) -> [DependencyMatch]
+dependencyMatches :: S.Set (Rule RComp) -> [DependencyMatch]
 dependencyMatches rs = do
   dependent <- S.toList rs
   dependency <- S.toList rs
@@ -62,10 +62,10 @@ dependencyMatches rs = do
 
 type ResolutionOrder = G.Graph (Rule (Maybe RComp))
 
-resolutionOrder :: S.Set (Rule (Maybe RComp)) -> ResolutionOrder
+resolutionOrder :: S.Set (Rule RComp) -> ResolutionOrder
 resolutionOrder rs = foldr go G.empty rs
   where
-    go :: Rule (Maybe RComp) -> ResolutionOrder -> ResolutionOrder
+    go :: Rule RComp -> ResolutionOrder -> ResolutionOrder
     go r = G.insert r (S.filter (match r) rs)
 
 partitionConstraints :: [Term] -> (Store.ConstraintStore, [Term])
@@ -139,11 +139,11 @@ solveFixpoint keepGround prog addFrom = fixpointSetM step prog
       solved <- mapM (solveBody keepGround acc) addFrom
       return $ S.unions solved
 
-computeResolvable :: Bool -> S.Set (Rule (Maybe RComp)) -> Fresh (S.Set Fact)
+computeResolvable :: Bool -> S.Set (Rule RComp) -> Fresh (S.Set Fact)
 computeResolvable keepGround (S.filter (isResolves . rhead) -> rs) = do
   rec (CG.fromGraph $ resolutionOrder rs) S.empty
   where
-    rec :: CG.CondensationGraph (Rule (Maybe RComp)) -> S.Set Fact -> Fresh (S.Set Fact)
+    rec :: CG.CondensationGraph (Rule RComp) -> S.Set Fact -> Fresh (S.Set Fact)
     rec ord acc
       | G.null ord = pure acc
       | otherwise = do

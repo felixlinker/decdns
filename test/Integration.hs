@@ -490,8 +490,8 @@ regressionTest newConfig expected unexpected = do
     runFresh $
       runExceptT $
         do
-          oldRules <- lift $ plResolvable =<< compileConfig rootServers old
-          newRules <- lift $ plResolvable =<< compileConfig rootServers new
+          oldRules <- lift $ compileConfig rootServers old
+          newRules <- lift $ compileConfig rootServers new
           computeRegressions oldRules newRules
   assertResolvableQueries (baseFiles ++ newConfig) regressions expected unexpected
 
@@ -554,7 +554,7 @@ resolvableQueries :: [FilePath] -> IO (S.Set Fact)
 resolvableQueries files = do
   cfg <- loadConfig files
   return $ runFresh $ do
-        rules <- plResolvable =<< compileConfig rootServers cfg
+        rules <- compileConfig rootServers cfg
         computeResolvable True rules
 
 loadConfig :: [FilePath] -> IO NameServersConfig

@@ -258,7 +258,7 @@ queryPatterns cfg = S.toList $ S.fromList $ mapMaybe project
     ty <- [RT.A, RT.AAAA, RT.NS, RT.CNAME, RT.DNAME, RT.TXT, RT.MX, RT.SOA] ]
   where
     answers = runFresh $ do
-      rules <- plResolvable =<< compileConfig roots cfg
+      rules <- compileConfig roots cfg
       computeResolvable True rules
     project (answer, ns, ty) = do
       let Fact h cs = renameQuery "answer_" answer

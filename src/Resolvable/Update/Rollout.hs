@@ -40,13 +40,13 @@ type RRSetID = (Name String, Name String)
 type RecordDependencies = G.Graph RRSetID
 
 fromResolutionOrder :: ResolutionOrder -> RecordDependencies
-fromResolutionOrder =
-    G.irreflexive
-  . G.map (fromAnnot . fromJust . rannotation)
-  . G.filter (isJust . rannotation)
+fromResolutionOrder = undefined
+  --   G.irreflexive
+  -- . G.map (fromAnnot . fromJust . rannotation)
+  -- . G.filter (isJust . rannotation)
   where
     fromAnnot :: RComp -> RRSetID
-    fromAnnot (RComp ns rrs) = (ns, lshow <$> name rrs)
+    fromAnnot (RComp _ ns rrs) = (ns, lshow <$> name rrs)
 
 type NSDiffs = M.Map (Name String) (ZoneDiff String)
 type Diffs = M.Map RRSetID (S.Set (Diff RData))

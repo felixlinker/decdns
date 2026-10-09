@@ -38,7 +38,7 @@ main = do
       (roots, zones) <- sepBy "--" args
       rootServers <- parseNames roots
       cfg <- parseZones zones
-      let res = runFresh $ computeResolvable True =<< plResolvable =<< compileConfig rootServers cfg
+      let res = runFresh $ computeResolvable True =<< compileConfig rootServers cfg
       putStrLn $ showKnowledgeBase $ map toRule $ S.toList res
     "regressions" -> do
       (sroots, args') <- sepBy "--" args
@@ -47,8 +47,8 @@ main = do
       oldRecs <- parseZones old
       newRecs <- parseZones new
       regs <- failLeftS $ runFresh $ runExceptT $ do
-        oldRecsC <- lift $ plResolvable =<< compileConfig roots oldRecs
-        newRecsC <- lift $ plResolvable =<< compileConfig roots newRecs
+        oldRecsC <- lift $ compileConfig roots oldRecs
+        newRecsC <- lift $ compileConfig roots newRecs
         computeRegressions oldRecsC newRecsC
       mapM_ print $ S.map toRule regs
     "visualize" -> do

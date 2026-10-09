@@ -14,7 +14,7 @@ import Util.Fresh
 import Resolvable.Resolvability (RComp)
 import Resolvable.Update.Disunification (withouts)
 
-computeRegressions :: S.Set (Rule (Maybe RComp)) -> S.Set (Rule (Maybe RComp)) -> ExceptT String Fresh (S.Set Fact)
+computeRegressions :: S.Set (Rule RComp) -> S.Set (Rule RComp) -> ExceptT String Fresh (S.Set Fact)
 computeRegressions oldRs newRs = do
   resOld <- lift $ computeResolvable True oldRs
   resNew <- lift $ computeResolvable True newRs

@@ -18,7 +18,7 @@ queryT (nameTerm -> n) (ttypeTerm -> t) = do
   (ns, zone, d, v, a) <- freshVars5 ("NS", "Z", "D", "V", "A")
   return $ resolves ns t zone n d v a
 
-queryStep :: Name String -> T.Type -> S.Set (Rule (Maybe RComp)) -> Fresh (S.Set (Rule (Maybe RComp)))
+queryStep :: Name String -> T.Type -> S.Set (Rule RComp) -> Fresh (S.Set (Rule RComp))
 queryStep n t rs = do
   kb <- computeResolvable False rs
   q <- queryT n t

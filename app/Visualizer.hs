@@ -11,16 +11,15 @@ import Numeric (showHex)
 
 import DNS.Name (Name, Named(Named))
 import DNS.Record (RData(..), toType)
-import DNS.ZoneFile (allRRSets)
-import NameConstraint (toStandardRecord)
+import NameConstraint (ConstrainedRRSet, toStandardRecord)
 import Resolvable.Dependencies
 import Resolvable.Prolog.Core
 import Resolvable.Prolog.TermView
 import Resolvable.Resolvability (NameServersConfig, RComp(..))
 import Resolvable.Unification (toList)
 
-renderVisualization :: [Name String] -> [FilePath] -> NameServersConfig -> S.Set (Rule (Maybe RComp)) -> String
-renderVisualization roots zonePaths config rules = object
+renderVisualization :: [Name String] -> [FilePath] -> NameServersConfig -> S.Set (Rule RComp) -> String
+renderVisualization roots zonePaths _config rules = object
   [ field "version" "2"
   , field "rootServers" $ array $ map (string . show) roots
   , field "zoneFiles" $ array $ map string zonePaths
@@ -29,27 +28,26 @@ renderVisualization roots zonePaths config rules = object
   , field "matches" $ array $ map renderMatch matchList
   ]
   where
-    sources :: [RComp]
-    sources = S.toList $ S.fromList
-      [ RComp ns rrset
-      | (ns, zone) <- config
-      , rrset <- allRRSets zone
-      ]
+    sources :: [(Name String, ConstrainedRRSet)]
+    sources = S.toList $ S.fromList $ map (sourceOf . rannotation) ruleList
 
-    ruleList :: [Rule (Maybe RComp)]
+    ruleList :: [Rule RComp]
     ruleList = S.toList rules
 
-    sourceIds :: M.Map RComp String
+    sourceIds :: M.Map (Name String, ConstrainedRRSet) String
     sourceIds = M.fromList $ zip sources (map (("source-" ++) . show) [(1 :: Int)..])
 
-    ruleIds :: M.Map (Rule (Maybe RComp)) String
+    ruleIds :: M.Map (Rule RComp) String
     ruleIds = M.fromList $ zip ruleList (map (("rule-" ++) . show) [(1 :: Int)..])
 
     matchList :: [DependencyMatch]
     matchList = dependencyMatches rules
 
-    renderSource :: RComp -> String
-    renderSource source@(RComp ns (Named owner records)) = object
+    sourceOf :: RComp -> (Name String, ConstrainedRRSet)
+    sourceOf source = (fromNS source, fromRecord source)
+
+    renderSource :: (Name String, ConstrainedRRSet) -> String
+    renderSource source@(ns, Named owner records) = object
       [ field "id" $ string $ sourceIds M.! source
       , field "server" $ string $ show ns
       , field "owner" $ string $ show owner
@@ -58,18 +56,18 @@ renderVisualization roots zonePaths config rules = object
       , field "ruleIds" $ array $ map string $ rulesFor source
       ]
 
-    rulesFor :: RComp -> [String]
+    rulesFor :: (Name String, ConstrainedRRSet) -> [String]
     rulesFor source = mapMaybe (ruleFor source) ruleList
 
-    ruleFor :: RComp -> Rule (Maybe RComp) -> Maybe String
+    ruleFor :: (Name String, ConstrainedRRSet) -> Rule RComp -> Maybe String
     ruleFor source rule
-      | rannotation rule == Just source = M.lookup rule ruleIds
+      | sourceOf (rannotation rule) == source = M.lookup rule ruleIds
       | otherwise = Nothing
 
-    renderRule :: Rule (Maybe RComp) -> String
+    renderRule :: Rule RComp -> String
     renderRule rule = object
       [ field "id" $ string $ ruleIds M.! rule
-      , field "sourceId" $ maybe "null" (string . (sourceIds M.!)) $ rannotation rule
+      , field "sourceId" $ string $ sourceIds M.! sourceOf (rannotation rule)
       , field "text" $ string $ show rule
       , field "head" $ string $ show $ rhead rule
       , field "body" $ array $ zipWith renderPredicate [(0 :: Int)..] $ rbody rule

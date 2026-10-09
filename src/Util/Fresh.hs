@@ -5,6 +5,7 @@ module Util.Fresh
   , evalFreshT
   , runFresh
   , evalFresh
+  , freshId
   , fresh
   , avoiding ) where
 
@@ -33,10 +34,15 @@ runFresh m = fst $ runIdentity (runFreshT m 0)
 evalFresh :: Fresh a -> a
 evalFresh m = runIdentity (evalFreshT m 0)
 
-fresh :: Monad m => String -> FreshT m String
-fresh prefix = do
+freshId :: Monad m => FreshT m Int
+freshId = do
   n <- get
   put (n + 1)
+  return n
+
+fresh :: Monad m => String -> FreshT m String
+fresh prefix = do
+  n <- freshId
   return (prefix ++ show n)
 
 avoiding :: (Foldable t, Monad m) => t String -> FreshT m ()

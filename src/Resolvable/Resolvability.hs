@@ -7,6 +7,7 @@ module Resolvable.Resolvability
   , compileConfig
   , plResolvable ) where
 
+import Data.Functor (void)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as S
 
@@ -43,7 +44,8 @@ captureListTail captureWith t = case toView t of
     rec _ = captureWith
 
 data RComp = RComp
-  { fromNS :: Name String
+  { rid :: Int
+  , fromNS :: Name String
   , fromRecord :: ConstrainedRRSet }
   deriving (Eq, Ord)
 
@@ -53,12 +55,13 @@ synthesisCases = [nameWithoutSynthesis', nameWithSynthesis]
     nameWithoutSynthesis' :: ConstrainedName -> Fresh (Term, [Term])
     nameWithoutSynthesis' n = return (nameWithoutSynthesis n, [])
 
-resolvableBase :: [Name String] -> Name String -> ConstrainedName -> Bool -> ConstrainedRRSet -> Fresh (S.Set (Rule (Maybe RComp)))
+resolvableBase :: [Name String] -> Name String -> ConstrainedName -> Bool -> ConstrainedRRSet -> Fresh (S.Set (Rule RComp))
 resolvableBase rootServers ns zone isReferral s@(Named n rds@((RData _ _ ty) NE.:| _)) =
   foreachM synthesisCases $ \synth ->
   foreachM rootKeyCases   $ \(ver, adb) -> do
     (n', cs) <- synth n
-    return $ S.singleton $ Rule rann (resolves (nameTerm ns) (typeTerm ty) zoneTerm n' (rrsetTerm rds) ver adb) cs
+    ra <- rann
+    return $ S.singleton $ Rule ra (resolves (nameTerm ns) (typeTerm ty) zoneTerm n' (rrsetTerm rds) ver adb) cs
     where
       zoneTerm :: Term
       zoneTerm = if isReferral then referralZone else nameWithoutSynthesis zone
@@ -70,18 +73,22 @@ resolvableBase rootServers ns zone isReferral s@(Named n rds@((RData _ _ ty) NE.
         | toType ty == T.DNSKEY && ns `elem` rootServers = [(bot, ad 0), (top, ad 1)]
         | otherwise = [(bot, ad 0)]
 
-      rann :: Maybe RComp
-      rann = Just (RComp ns s)
+      rann :: Fresh RComp
+      rann = do
+        ruleId <- freshId
+        return $ RComp ruleId ns s
 
 dnssecTypeNeqs :: Term -> [Term]
 dnssecTypeNeqs t = map ($ t) [(\= dsType), (\= dnskeyType), (\= rrsigType), (\= nsecType), (\= nsec3Type)]
 
-resolvableStep :: [Name String] -> Name String -> ConstrainedName -> ConstrainedRRSet -> Fresh (S.Set (Rule (Maybe RComp)))
+resolvableStep :: [Name String] -> Name String -> ConstrainedName -> ConstrainedRRSet -> Fresh (S.Set (Rule RComp))
 resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s@(Named n rs) =
   foreachM (NE.toList rs) (\r -> foreachM rootServers (`go` rtype r))
   where
-    rannot :: Maybe RComp
-    rannot = Just $ RComp ns s
+    rannot :: Fresh RComp
+    rannot = do
+      ruleId <- freshId
+      return $ RComp ruleId ns s
 
     nameServer :: Term
     nameServer = nameTerm ns
@@ -89,7 +96,7 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s
     ownerNoSynth :: Term
     ownerNoSynth = nameWithoutSynthesis n
 
-    go :: Term -> Type -> Fresh (S.Set (Rule (Maybe RComp)))
+    go :: Term -> Type -> Fresh (S.Set (Rule RComp))
     go rootServer r = case r of
       NS s' ->
         let delegatedNs = nameTerm s'
@@ -103,14 +110,16 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s
                 glueZ <- if expectGlue then return referralZone else wildcard
                 -- Do not expect wildcard neq constraints on NS records
                 let n' = captureListTail nTail ownerNoSynth
-                return $ S.singleton $ Rule rannot (resolves nameServer t zone n' d bot (ad 0))
+                rann <- rannot
+                return $ S.singleton $ Rule rann (resolves nameServer t zone n' d bot (ad 0))
                   [ isName n'
                   , resolves delegatedNs t ownerNoSynth n' d bot (ad 0)
                   , resolves glueS glueType glueZ delegatedNs dIp bot (ad 0) ]
             , do  -- NSEC for unsigned subzone
                 (nTail, t, d, dNSEC) <- freshVars4 ("N", "T", "D", "D_NSEC")
                 let n' = captureListTail nTail ownerNoSynth
-                return $ S.singleton $ Rule rannot (resolves nameServer t zone n' d top (ad 0))
+                rann <- rannot
+                return $ S.singleton $ Rule rann (resolves nameServer t zone n' d top (ad 0))
                   [ t \= dsType
                   , isName n'
                   , resolves nameServer nsecType zone ownerNoSynth (list [dNSEC]) top (ad 1)
@@ -119,7 +128,8 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s
             , do  -- NSEC3 for owner for unsigned subzone
                 (nTail, t, d, nNSEC, dNSEC) <- freshVars5 ("N", "T", "D", "N_NSEC", "D_NSEC")
                 let n'' = captureListTail nTail ownerNoSynth
-                return $ S.singleton $ Rule rannot (resolves nameServer t zone n'' d top (ad 0))
+                rann <- rannot
+                return $ S.singleton $ Rule rann (resolves nameServer t zone n'' d top (ad 0))
                   [ t \= dsType
                   , isName n''
                   , resolves nameServer nsec3Type zone nNSEC (list [dNSEC]) top (ad 1)
@@ -128,7 +138,8 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s
             , do  -- NSEC3 closest encloser proof for unsigned subzone
               (nTail, t, d, nNSEC, nNSEC', dNSEC, dNSEC') <- freshVars7 ("N", "T", "D", "N_NSEC", "N_NSEC", "D_NSEC", "D_NSEC")
               let n'' = captureListTail nTail ownerNoSynth
-              return $ S.singleton $ Rule rannot (resolves nameServer t zone n'' d top (ad 0))
+              rann <- rannot
+              return $ S.singleton $ Rule rann (resolves nameServer t zone n'' d top (ad 0))
                 [ t \= dsType
                   , isName n''
                 , resolves nameServer nsec3Type zone nNSEC (list [dNSEC]) top (ad 1)
@@ -138,14 +149,16 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s
             , do  -- Authenticated not-DS
                 (nTail, t, d) <- freshVars3 ("N", "T", "D")
                 let n' = captureListTail nTail ownerNoSynth
-                return (S.singleton $ Rule rannot (resolves nameServer t zone n' d top (ad 1))
+                rann <- rannot
+                return (S.singleton $ Rule rann (resolves nameServer t zone n' d top (ad 1))
                   [ t \= dsType
                   , isName n'
                   , resolves delegatedNs t ownerNoSynth n' d top (ad 1) ])
             , do  -- Authenticated DS
                 (l, nTail, d) <- freshVars3 ("L", "N", "D")
                 let n' = injectLast l $ captureListTail nTail ownerNoSynth
-                return (S.singleton $ Rule rannot (resolves nameServer dsType zone n' d top (ad 1))
+                rann <- rannot
+                return (S.singleton $ Rule rann (resolves nameServer dsType zone n' d top (ad 1))
                   [ isName n'
                   , resolves delegatedNs dsType ownerNoSynth n' d top (ad 1) ])
             ]
@@ -156,14 +169,16 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s
         [ do  -- Unauthenticated
           (n', cs) <- synth n
           (t, d, targetZone) <- freshVars3 ("T", "D", "Z")
-          return $ Rule rannot (resolves nameServer t zone n' d bot (ad 0))
+          rann <- rannot
+          return $ Rule rann (resolves nameServer t zone n' d bot (ad 0))
             (cs ++ dnssecTypeNeqs t ++
               [ t \= cnameType, targetZone \= referralZone
               , resolves rootServer t targetZone cname d bot (ad 0) ])
         , do  -- Authenticated
           (n', cs) <- synth n
           (t, d, a, targetZone) <- freshVars4 ("T", "D", "A", "Z")
-          return $ Rule rannot (resolves nameServer t zone n' d top a)
+          rann <- rannot
+          return $ Rule rann (resolves nameServer t zone n' d top a)
             (cs ++ dnssecTypeNeqs t ++
               [ t \= cnameType, targetZone \= referralZone
               , resolves nameServer cnameType zone ownerNoSynth (list [TComplex r]) top (ad 1)
@@ -174,7 +189,8 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s
           let rewrite = injectLast l . captureListTail nTail
           let n' = rewrite ownerNoSynth
           -- Do not expect wildcard neq constraints on DNAME records
-          return $ Rule rannot (resolves nameServer t zone n' d bot (ad 0))
+          rann <- rannot
+          return $ Rule rann (resolves nameServer t zone n' d bot (ad 0))
               -- TODO: I believe I can delete the t \= dnameType restriction
               -- because a query for a DNAME record will never trigger this rule
             (dnssecTypeNeqs t ++
@@ -186,7 +202,8 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s
           let rewrite = injectLast l . captureListTail nTail
           let n' = rewrite ownerNoSynth
           -- Do not expect wildcard neq constraints on DNAME records
-          return $ Rule rannot (resolves nameServer t zone n' d top a)
+          rann <- rannot
+          return $ Rule rann (resolves nameServer t zone n' d top a)
             (dnssecTypeNeqs t ++
               [ t \= dnameType, targetZone \= referralZone
               , isName n'
@@ -202,7 +219,8 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s
           T.DNSKEY -> do
             (d, d_DS, k, kRef) <- freshVars4 ("D", "D_DS", "K", "K_REF")
             parentZone <- wildcard
-            return $ S.singleton $ Rule rannot
+            rann <- rannot
+            return $ S.singleton $ Rule rann
               (resolves nameServer dnskeyType zone ownerNoSynth d top (ad 1))
               [ resolves nameServer dnskeyType zone ownerNoSynth d bot (ad 0)
                     , resolves rootServer dsType parentZone ownerNoSynth d_DS top (ad 1)
@@ -213,7 +231,8 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s
           _ -> foreachM synthesisCases $ \synth -> do
             (n', cs) <- synth n
             (d, d_KEY, k) <- freshVars3 ("D", "D_KEY", "K")
-            return $ S.singleton $ Rule rannot
+            rann <- rannot
+            return $ S.singleton $ Rule rann
               (resolves nameServer (ttypeTerm cov) zone n' d top (ad 1))
               (cs ++  [ isName n'
                             , resolves nameServer (ttypeTerm cov) zone n' d bot (ad 0)
@@ -232,15 +251,15 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s
       DS {} -> return S.empty
       DNSKEY {} -> return S.empty
 
-resolvableR :: Fresh (Rule (Maybe RComp))
+resolvableR :: Fresh (Rule ())
 resolvableR = do
   (s, q, z, n, v, a) <- freshVars6 ("S", "Q", "Z", "N", "V", "A")
   wc <- wildcard
-  return $ Rule Nothing (resolvable s q n v a) [ resolves s q z n wc v a, z \= referralZone ]
+  return $ Rule () (resolvable s q n v a) [ resolves s q z n wc v a, z \= referralZone ]
 
-allResolvable :: Rule (Maybe RComp)
+allResolvable :: Rule ()
 allResolvable =
-  Rule Nothing (TFunctor "all_resolvable" [ q, rns, ns ]) [ bagof n (resolvable rns q n v a) ns ]
+  Rule () (TFunctor "all_resolvable" [ q, rns, ns ]) [ bagof n (resolvable rns q n v a) ns ]
   where
     q = TVar "Q"
     rns = TVar "RS"
@@ -252,25 +271,25 @@ allResolvable =
     bagof :: Term -> Term -> Term -> Term
     bagof x y z = TFunctor "bagof" [ x, y, z ]
 
-compileRRSet :: [Name String] -> Name String -> ConstrainedName -> Bool -> ConstrainedRRSet -> Fresh (S.Set (Rule (Maybe RComp)))
+compileRRSet :: [Name String] -> Name String -> ConstrainedName -> Bool -> ConstrainedRRSet -> Fresh (S.Set (Rule RComp))
 compileRRSet rootServers ns zone isReferral rs = (<>) <$> resolvableBase rootServers ns zone isReferral rs <*> resolvableStep rootServers ns zone rs
 
-fromZone :: [Name String] -> Name String -> Zone ConstrainedLabel -> Fresh (S.Set (Rule (Maybe RComp)))
+fromZone :: [Name String] -> Name String -> Zone ConstrainedLabel -> Fresh (S.Set (Rule RComp))
 fromZone rootServers ns z = do
     let (z', referrals) = collectReferrals z
     authoritative <- mapM (comp False) (allRRSets z')
     nonAuthoritative <-  mapM (comp True) referrals
     return $ mconcat (authoritative ++ nonAuthoritative)
   where
-    comp :: Bool -> ConstrainedRRSet -> Fresh (S.Set (Rule (Maybe RComp)))
+    comp :: Bool -> ConstrainedRRSet -> Fresh (S.Set (Rule RComp))
     comp = compileRRSet rootServers ns (zoneName z)
 
 type NameServersConfig = [(Name String, Zone ConstrainedLabel)]
 
-compileConfig :: [Name String] -> NameServersConfig -> Fresh (S.Set (Rule (Maybe RComp)))
+compileConfig :: [Name String] -> NameServersConfig -> Fresh (S.Set (Rule RComp))
 compileConfig rootServers = (mconcat <$>) . mapM (uncurry (fromZone rootServers))
 
-plResolvable :: S.Set (Rule (Maybe RComp)) -> Fresh (S.Set (Rule (Maybe RComp)))
+plResolvable :: S.Set (Rule a) -> Fresh (S.Set (Rule ()))
 plResolvable compiled = do
   res <- resolvableR
-  return $ foldr S.insert compiled [allResolvable, res]
+  return $ foldr S.insert (S.map void compiled) [allResolvable, res]
