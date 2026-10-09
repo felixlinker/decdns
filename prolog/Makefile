@@ -56,7 +56,8 @@ build/:
 # Run only after building; Prolog must load the newly linked extension.
 test: build
 	$(SWIPL) -q -g run_tests -t halt \
-	  "$(PROLOG_DIR)/test/dnssec_tests.pl" "$(PROLOG_DIR)/test/headers_tests.pl"
+	  "$(PROLOG_DIR)/test/dnssec_tests.pl" "$(PROLOG_DIR)/test/headers_tests.pl" \
+	  "$(PROLOG_DIR)/test/resolvable_tests.pl" "$(PROLOG_DIR)/test/cname_signed_tests.pl"
 
 clean:
 	rm -rf "$(PROLOG_DIR)/build"

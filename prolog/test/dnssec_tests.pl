@@ -62,26 +62,27 @@ test(malformed_record, [throws(error(dnssec_input_error(_),_))]) :-
 test(negative_iterations, [throws(error(dnssec_input_error(_),_))]) :-
     nsec3Unsigned([example], [example,invalid], nsec3(1,0,-1,"","0000000000000000000000000000000000000000",[ns])).
 test(native_requires_ground, [throws(error(instantiation_error,_))]) :-
-    dnssec:check(2, [[com], nsec([com], _)]).
+    dnssec:check(nsecUnsigned([com], nsec([com], _))).
 test(cyclic_input, [throws(error(type_error(acyclic_term,_),_))]) :-
-    X = [com|X], dnssec:check(2, [X, nsec([com],[ns])]).
+    X = [com|X], dnssec:check(nsecUnsigned(X, nsec([com],[ns]))).
 test(repeated_calls) :-
     key(K), ds(D), forall(between(1, 100, _), digestValid([com,a], K, D)).
 
 test(is_name) :- isName([com,example]).
 test(is_name_root) :- isName([]).
-test(is_name_at_limit) :- length(Labels, 125), maplist(=(a), Labels), append(Labels, [aa], Name), isName(Name).
-test(is_name_oversized, [fail]) :- isName(Names), length(Names, 127), maplist(=(a), Names).
+test(is_name_invalid_ground, [fail]) :- isName([42]).
+test(is_name_at_limit) :- length(Name, 127), maplist(=(a), Name), isName(Name).
+test(is_name_oversized, [fail]) :- isName(Names), length(Names, 128), maplist(=(a), Names).
 test(is_name_rejects_non_ground_lower_bound, [fail]) :-
-    length(Names, 127), \+ ground(Names), isName(Names).
-test(is_name_length_requires_ground, [fail]) :- dnssec:dns_name_length([com,_Label], _).
+    length(Names, 128), \+ ground(Names), isName(Names).
+test(is_name_partial_lower_bound) :- dnssec:min_name_length([com,_Label], 7).
 test(is_name_delays_and_wakes) :-
     isName([com,Label]), var(Label),
     once(find_chr_constraint(isName([com,Label]))),
     Label = example,
     \+ find_chr_constraint(isName(_)).
 test(is_name_delayed_oversized, [fail]) :-
-    isName(Names), length(Names, 127), maplist(=(a), Names).
+    isName(Names), length(Names, 128), maplist(=(a), Names).
 
 test(backtracking_rejects_only_invalid_candidate) :-
     key(K), ds(D), findall(Label, (member(Label, [b,a]), digestValid([com,Label], K, D)), [a]).
@@ -101,6 +102,6 @@ test(embedded_nul, [throws(error(dnssec_input_error(_),_))]) :-
 test(wrong_record_type, [throws(error(dnssec_input_error(_),_))]) :-
     key(K), digestValid([com,a], K, a('1.2.3.4')).
 test(wrong_operation, [throws(error(dnssec_input_error(_),_))]) :-
-    dnssec:check(100, []).
+    dnssec:check(unknown_predicate).
 
 :- end_tests(dnssec).

@@ -10,7 +10,10 @@ int term_kind(uintptr_t term) {
     if (PL_is_list(t)) return 1;
     if (PL_is_atom(t)) return 2;
     if (PL_is_string(t)) return 3;
-    if (PL_is_integer(t)) return 4;
+    if (PL_is_integer(t)) {
+        int64_t value;
+        return PL_get_int64(t, &value) ? 4 : -1;
+    }
     if (PL_is_compound(t)) return 5;
     return -1;
 }
@@ -61,7 +64,7 @@ uintptr_t list_head(uintptr_t term) {
 }
 
 uintptr_t list_tail(uintptr_t term) {
-    return list_part(term, 0);
+    return list_part(term, 1);
 }
 
 static foreign_t check(term_t predicate) {
@@ -75,7 +78,7 @@ static foreign_t check(term_t predicate) {
             PL_FUNCTOR_CHARS, "error", 2,
                 PL_FUNCTOR_CHARS, "dnssec_input_error", 1,
                     PL_UTF8_CHARS, error ? error : "Haskell verification failed",
-                PL_CHARS, "dnssec:check/2");
+                PL_CHARS, "dnssec:check/1");
         free(error);
         return built ? PL_raise_exception(exception) : FALSE;
     }
@@ -87,7 +90,7 @@ install_t install(void) {
     char *argv[] = { "dnssec_native", NULL };
     char **args = argv;
     hs_init(&argc, &args);
-    PL_register_foreign_in_module("dnssec", "check", 2, check, 0);
+    PL_register_foreign_in_module("dnssec", "check", 1, check, 0);
 }
 
 install_t uninstall(void) { hs_exit(); }
