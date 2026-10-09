@@ -14,7 +14,6 @@ import Resolvable.Update.Disunification (withouts)
 
 import Control.Monad (foldM)
 import Data.Char (isUpper)
-import Data.Bifunctor (Bifunctor(bimap))
 import Data.List (intercalate)
 import Data.Maybe (fromMaybe)
 
@@ -62,7 +61,7 @@ minusTests =
       , [ qC ["com", "X"] ["X" != "a"] ] )
     , ( qC ["com", "X"] ["X" != "a"]
       , [q ["com", "b"]]
-      , [ qC ["com", "X"] [("X" != "a"), ("X" != "b")] ] )
+      , [ qC ["com", "X"] ["X" != "a", ("X" != "b")] ] )
     , ( qC ["com", "X"] [("X" != "a")]
       , [q ["com", "Y"]]
       , [] )
@@ -102,6 +101,6 @@ a != b = fromString a \= fromString b
 
 fromString :: String -> Term
 fromString "" = undefined
-fromString s@(h:t)
+fromString s@(h:_)
   | isUpper h = TVar s
   | otherwise = TAtom s

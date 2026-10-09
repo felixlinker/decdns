@@ -1,23 +1,20 @@
 module PrologCompiler (main) where
 
-import DNS.ZoneFile (allRecords, mergeZones)
+import DNS.ZoneFile (allRecords)
 import DNS.Dig (followUpQueries)
 import DNS.Wellformedness ( zoneWellformed, responseWellformed )
 import NameConstraint (toStandardRecord)
 import Resolvable.Prolog.Core
 import Resolvable.Resolvability
-import Resolvable.Update.Rollout (diffServers, showRollOut, rollout, fromResolutionOrder)
-import Resolvable.Dependencies (computeResolvable, toRule, resolutionOrder)
+import Resolvable.Dependencies (computeResolvable, toRule)
 import Util.Fresh (runFresh)
-import Util.Monad (failLeftS, handleErrorS, handleMaybe)
+import Util.Monad (failLeftS)
 
 import System.Environment (getArgs)
 import Util
 import Data.List (uncons)
-import qualified Data.Map as M
 import qualified Data.Set as S
 import Resolvable.Update.Dependencies (computeRegressions)
-import Control.Monad (unless)
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
 import Parsing (parseNameM, parseTypeM)
