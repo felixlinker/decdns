@@ -1,6 +1,6 @@
 $ORIGIN com.
-@ 1200 IN SOA ns.com. example.com. 0 0 0 0 0
-@ 1200 IN NS ns.com.
+@ 1200 IN SOA ns.net. example.com. 0 0 0 0 0
+@ 1200 IN NS ns.net.
 
 sub.com. 1200 IN DNAME com.
 a.com. 1200 IN TXT "hello"
