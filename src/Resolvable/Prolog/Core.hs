@@ -233,9 +233,7 @@ emptyList :: Term
 emptyList = TEmptyList
 
 list :: Foldable t =>  t Term -> Term
-list ts
-  | null ts = TEmptyList
-  | otherwise = foldr (\x acc -> TFunctor listSym [ x, acc ]) TEmptyList ts
+list ts = listWithTail ts TEmptyList
 
 collectListWithTail :: Term -> ([Term], Maybe Term)
 collectListWithTail = swap . rec
@@ -252,12 +250,8 @@ collectList t =
   -- Enforce that tail is empty
   in if isNothing mt then Just l else Nothing
 
-listWithTail :: [Term] -> Term -> Term
-listWithTail xs t = go xs
-  where
-    go :: [Term] -> Term
-    go [] = t
-    go (a:as) = TFunctor listSym [ a, go as ]
+listWithTail :: Foldable t => t Term -> Term -> Term
+listWithTail xs t = foldr (\x acc -> TFunctor listSym [ x, acc ]) t xs
 
 member :: Term -> Term -> Term
 member a b = TFunctor memberSym [ a, b ]
