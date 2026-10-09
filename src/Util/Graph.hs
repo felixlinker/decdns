@@ -99,13 +99,16 @@ insertUnsafe :: Ord a => a -> S.Set a -> Graph a -> Graph a
 insertUnsafe k vs = Graph . M.alter (Just . maybe vs (vs <>)) k . edges
 
 closeLeaves :: Ord a => Graph a -> Graph a
-closeLeaves (Graph m) = Graph $ foldr (flip (foldr (M.alter initEmpty))) m (M.elems m)
+closeLeaves g@(Graph m) = initAsLeaves (concatMap S.toList $ M.elems m) g
+
+initAsLeaves :: (Foldable f, Ord a) => f a -> Graph a -> Graph a
+initAsLeaves as (Graph m) = Graph $ foldr (M.alter initEmpty) m as
   where
     initEmpty :: Maybe (S.Set a) -> Maybe (S.Set a)
     initEmpty = Just . fromMaybe S.empty
 
 insert :: Ord a => a -> S.Set a -> Graph a -> Graph a
-insert k vs = closeLeaves . insertUnsafe k vs
+insert k vs = initAsLeaves vs . insertUnsafe k vs
 
 remove :: Ord a => a -> Graph a -> Graph a
 remove key (Graph m) = Graph $ M.map (S.delete key) $ M.delete key m
