@@ -52,6 +52,7 @@ Exported constraints:
 
 | Constraint | Existing implementation |
 | --- | --- |
+| `isName(Name)` | Delayed logic-programming name-length check (maximum 255) |
 | `digestValid(Name, DNSKEY, DS)` | `verifyDigest` |
 | `rrsigValid(Name, RRSet, RRSIG, DNSKEY)` | `verifySignature` |
 | `nsecUnsigned(Name, NSEC)` | `nsecUnsignedSubzone Name Name` |

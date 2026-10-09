@@ -68,6 +68,21 @@ test(cyclic_input, [throws(error(type_error(acyclic_term,_),_))]) :-
 test(repeated_calls) :-
     key(K), ds(D), forall(between(1, 100, _), digestValid([com,a], K, D)).
 
+test(is_name) :- isName([com,example]).
+test(is_name_root) :- isName([]).
+test(is_name_at_limit) :- length(Labels, 125), maplist(=(a), Labels), append(Labels, [aa], Name), isName(Name).
+test(is_name_oversized, [fail]) :- isName(Names), length(Names, 127), maplist(=(a), Names).
+test(is_name_rejects_non_ground_lower_bound, [fail]) :-
+    length(Names, 127), \+ ground(Names), isName(Names).
+test(is_name_length_requires_ground, [fail]) :- dnssec:dns_name_length([com,_Label], _).
+test(is_name_delays_and_wakes) :-
+    isName([com,Label]), var(Label),
+    once(find_chr_constraint(isName([com,Label]))),
+    Label = example,
+    \+ find_chr_constraint(isName(_)).
+test(is_name_delayed_oversized, [fail]) :-
+    isName(Names), length(Names, 127), maplist(=(a), Names).
+
 test(backtracking_rejects_only_invalid_candidate) :-
     key(K), ds(D), findall(Label, (member(Label, [b,a]), digestValid([com,Label], K, D)), [a]).
 test(nsec3_delayed) :-
