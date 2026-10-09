@@ -8,6 +8,7 @@ module Resolvable.Constraint.Neqs
 import Control.Monad (guard)
 import Data.Bifunctor (Bifunctor(bimap))
 import Data.Maybe (maybeToList, catMaybes)
+import Data.List (nub)
 
 import Resolvable.Prolog.Core
 import Resolvable.Constraint.Solving
@@ -24,7 +25,7 @@ addConstraint :: Term -> Term -> Neqs -> Neqs
 addConstraint k v = ((k, v):)
 
 simplify :: Neqs -> Solved Neqs
-simplify = fmap catMaybes . traverse (uncurry simplifyNeq)
+simplify = fmap (nub . catMaybes) . traverse (uncurry simplifyNeq)
 
 simplifyArgs :: [Term] -> [Term] -> Solved [(Term, Term)]
 -- Arguments are equal, i.e., contradictory
