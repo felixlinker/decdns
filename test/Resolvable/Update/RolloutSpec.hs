@@ -241,7 +241,7 @@ withOutdatedCache before after cached = M.fromListWith S.union
 dependencies :: NameServersConfig -> Either String RecordDependencies
 dependencies cfg = do
   mapM_ checkWellformed cfg
-  let order = runFresh $ resolutionOrder <$> compileConfig roots cfg
+  let order = runFresh $ resolutionOrder =<< compileConfig roots cfg
   unless (isJust (G.transitiveClosure order)) (Left "cyclic fixture rule order")
   Right (fromResolutionOrder order)
   where
