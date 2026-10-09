@@ -25,16 +25,16 @@ origin = do
   maybe (fail "no origin") return org
 
 letDigHyp :: Stream s m Char => ParsecT s u m Char
-letDigHyp = letDig <|> Char.char '-'
+letDigHyp = letDigUnderscore <|> Char.char '-'
 
-letDig :: Stream s m Char => ParsecT s u m Char
-letDig = letter <|> digit
+letDigUnderscore :: Stream s m Char => ParsecT s u m Char
+letDigUnderscore = letter <|> digit <|> Char.char '_'
 
 label :: Stream s m Char => ParsecT s u m String
 label = string "*" <|> do
-  p0 <- letDig
+  p0 <- letDigUnderscore
   p1 <- many letDigHyp
-  p2 <- many letDig
+  p2 <- many letDigUnderscore
   return $ map toLower $ p0 : p1 ++ p2
 
 absName :: Stream s m Char => ParsecT s u m (Name String)
