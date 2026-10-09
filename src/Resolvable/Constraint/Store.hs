@@ -31,7 +31,9 @@ simplifyT t =
   where
     simplifyTEx :: Ex.Except String Bool
     simplifyTEx = case toView t of
-      TVIsName n | minNameLength n > 255 -> return False
+      TVIsName n
+        | minNameLength n > 255 -> return False
+        | ground n -> return True
       TVDigestValid n dnskeyT dsT | ground t -> do
           n' <- asName n
           dsDat <- asDSData =<< asType dsT

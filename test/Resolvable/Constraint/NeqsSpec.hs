@@ -1,11 +1,10 @@
 module Resolvable.Constraint.NeqsSpec (tests) where
 
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (Assertion, assertFailure, testCase, (@?=))
+import Test.Tasty.HUnit (Assertion, testCase, (@?=))
 
 import Resolvable.Prolog.Core (Term(..), list, listWithTail)
 import Resolvable.Constraint.Neqs
-import Resolvable.Unification
 import Resolvable.Constraint.Solving
 
 tests :: TestTree
