@@ -6,8 +6,6 @@ The tools purpose and CLI usage is documented in the `README.md`.
 - Re-run tests whenever possible.
 If you implement new features, also implement corresponding test cases.
 You can re-run all tests by executing `stack --stack-root "$PWD/.stack-root" test`.
-- Run all `stack` commands with `--stack-root "$PWD/.stack-root"` and the default restricted/sandboxed permissions so that Stack uses the repository-local cache instead of requesting access to the cache outside the repository (for example, `~/.stack`).
-Only request broader permissions if the command actually fails because it needs a resource such as a missing dependency from the network.
 - If you find that a test case fails, always fix that.
 You may fix a failing test case both by changing the implementation or the test case.
 Always think about which option is the correct one and include your reasoning in your final report.
