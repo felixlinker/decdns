@@ -254,7 +254,7 @@ dependencies cfg = do
 -- address, alias target, or authoritative zone may legitimately change.
 queryPatterns :: NameServersConfig -> [Fact]
 queryPatterns cfg = S.toList $ S.fromList $ mapMaybe project
-  [ (answer, ns, ty) | answer <- answers, ns <- roots,
+  [ (answer, ns, ty) | answer <- S.toList answers, ns <- roots,
     ty <- [RT.A, RT.AAAA, RT.NS, RT.CNAME, RT.DNAME, RT.TXT, RT.MX, RT.SOA] ]
   where
     answers = runFresh $ do

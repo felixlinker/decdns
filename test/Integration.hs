@@ -553,7 +553,7 @@ resolutionTerm (Resolution (Query ns rtype qname) verification auth) = runFresh 
 resolvableQueries :: [FilePath] -> IO (S.Set Fact)
 resolvableQueries files = do
   cfg <- loadConfig files
-  return $ S.fromList $ runFresh $ do
+  return $ runFresh $ do
         rules <- plResolvable =<< compileConfig rootServers cfg
         computeResolvable True rules
 

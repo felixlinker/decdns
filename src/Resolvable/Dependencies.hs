@@ -75,7 +75,21 @@ partitionConstraints = foldr addConstraint (Store.empty, [])
     addConstraint t (st, b) = maybe (st, t:b) (, b) (Store.add st t)
 
 data Fact = Fact Term Store.ConstraintStore
-  deriving (Eq, Ord)
+
+equivFacts :: Fact -> Fact -> Bool
+equivFacts (Fact f1 c1) (Fact f2 c2) = fromMaybe False $ do
+  u <- unify f1 f2
+  return $ isRenaming u && apply u c1 == apply u c2
+
+instance Eq Fact where
+  (==) = equivFacts
+
+instance Ord Fact where
+  compare f1@(Fact t1 c1) f2@(Fact t2 c2)
+    | f1 == f2 = EQ
+    | otherwise = case compare t1 t2 of
+      EQ -> compare c1 c2
+      comp -> comp
 
 instance Unify Fact where
   extendUnifier (Fact f _) (Fact f' _) = extendUnifier f f'
@@ -86,20 +100,15 @@ instance Apply Fact where
 instance Show Fact where
   show = show . toRule
 
-equivFacts :: Fact -> Fact -> Bool
-equivFacts (Fact f1 c1) (Fact f2 c2) = fromMaybe False $ do
-  u <- unify f1 f2
-  return $ isRenaming u && apply u c1 == apply u c2
-
 toRule :: Fact -> Rule ()
 toRule (Fact f cs) = Rule () f (Store.toBody cs)
 
-solveBody :: Bool -> [Fact] -> Rule a -> Fresh [Fact]
+solveBody :: Bool -> S.Set Fact -> Rule a -> Fresh (S.Set Fact)
 solveBody keepGround fs r = do
   Rule _ h b <- away r
   let (st, b') = partitionConstraints b
   let us = foldl solvePredicate [(identity, st)] b'
-  return $ map (\(u, st') -> Fact (apply u h) (apply u st')) us
+  return $ S.fromList $ map (\(u, st') -> Fact (apply u h) (apply u st')) us
   where
     solvePredicate :: [(Unifier, Store.ConstraintStore)] -> Term -> [(Unifier, Store.ConstraintStore)]
     solvePredicate choices p = case toView p of
@@ -122,19 +131,19 @@ solveBody keepGround fs r = do
         choices
       _ -> error "unsupported atom encountered"
 
-solveFixpoint :: forall a t. (Traversable t, Ord a) => Bool -> [Fact] -> t (Rule a) -> Fresh [Fact]
-solveFixpoint keepGround prog addFrom = fixpointP equivFacts step prog
+solveFixpoint :: forall a t. Traversable t => Bool -> S.Set Fact -> t (Rule a) -> Fresh (S.Set Fact)
+solveFixpoint keepGround prog addFrom = fixpointSetM step prog
   where
-    step :: [Fact] -> Fresh [Fact]
+    step :: S.Set Fact -> Fresh (S.Set Fact)
     step acc = do
       solved <- mapM (solveBody keepGround acc) addFrom
-      return $ concat solved
+      return $ S.unions solved
 
-computeResolvable :: Bool -> S.Set (Rule (Maybe RComp)) -> Fresh [Fact]
+computeResolvable :: Bool -> S.Set (Rule (Maybe RComp)) -> Fresh (S.Set Fact)
 computeResolvable keepGround (S.filter (isResolves . rhead) -> rs) = do
-  rec (CG.fromGraph $ resolutionOrder rs) []
+  rec (CG.fromGraph $ resolutionOrder rs) S.empty
   where
-    rec :: CG.CondensationGraph (Rule (Maybe RComp)) -> [Fact] -> Fresh [Fact]
+    rec :: CG.CondensationGraph (Rule (Maybe RComp)) -> S.Set Fact -> Fresh (S.Set Fact)
     rec ord acc
       | G.null ord = pure acc
       | otherwise = do

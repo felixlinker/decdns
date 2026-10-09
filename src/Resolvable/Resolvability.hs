@@ -19,7 +19,7 @@ import qualified DNS.RecordType as T
 import DNS.Zone (collectReferrals)
 import DNS.ZoneFile
 
-import Util.Fresh (Fresh)
+import Util.Fresh (Fresh, freshId)
 import Util.Monad
 
 injectLast :: Term -> Term -> Term

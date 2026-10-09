@@ -39,7 +39,7 @@ main = do
       rootServers <- parseNames roots
       cfg <- parseZones zones
       let res = runFresh $ computeResolvable True =<< plResolvable =<< compileConfig rootServers cfg
-      putStrLn $ showKnowledgeBase $ map toRule res
+      putStrLn $ showKnowledgeBase $ map toRule $ S.toList res
     "regressions" -> do
       (sroots, args') <- sepBy "--" args
       roots <- parseNames sroots
