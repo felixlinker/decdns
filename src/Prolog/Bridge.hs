@@ -70,7 +70,7 @@ verify (toView -> p) = do
       s <- asRRSetData sig >>= toExceptM . asRRSigData
       k <- asRRSetData key >>= toExceptM . asDNSKEYData
       pure (verifySignature n rs s k)
-    TVDigestValid nam dsData key -> do
+    TVDigestValid nam key dsData -> do
       n <- toExceptM (asName nam)
       k <- asRRSetData key >>= toExceptM . asDNSKEYData
       d <- asRRSetData dsData >>= toExceptM . asDSData

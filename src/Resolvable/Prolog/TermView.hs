@@ -95,7 +95,7 @@ toView (TFunctor n args)
     [ nam, dat, sig, key ] -> TVRRSIGValid nam dat sig key
     _ -> undefined
   | n == digestValidSym = case args of
-    [ nam, dsTerm, dnskeyTerm ] -> TVDigestValid nam dsTerm dnskeyTerm
+    [ nam, dnskeyTerm, dsTerm ] -> TVDigestValid nam dnskeyTerm dsTerm
     _ -> undefined
   | n == nsecUnsignedSym = case args of
     [ nam, nsecDat ] -> TVNSECUnsigned nam nsecDat
@@ -175,7 +175,7 @@ fromView (TVResolves (Resolves ns qtype zone qname d ver adb)) = resolves ns qty
 fromView (TVResolvable ns qtype qname ver auth) = resolvable ns qtype qname ver auth
 fromView (TVIsName nam) = isName nam
 fromView (TVRRSIGValid nam dat sig key) = rrsigValid nam dat sig key
-fromView (TVDigestValid nam dsTerm dnskeyTerm) = digestValid nam dsTerm dnskeyTerm
+fromView (TVDigestValid nam dnskeyTerm dsTerm) = digestValid nam dnskeyTerm dsTerm
 fromView (TVNSECUnsigned nam nsecDat) = nsecUnsigned nam nsecDat
 fromView (TVClosestEncloser nam exNam exDat nonExNam nonExDat) = closestEncloser nam exNam exDat nonExNam nonExDat
 fromView (TVNSEC3Unsigned nam hashedNam nsecDat) = nsec3Unsigned nam hashedNam nsecDat

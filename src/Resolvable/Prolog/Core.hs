@@ -530,7 +530,7 @@ rrsigValid :: Term -> Term -> Term -> Term -> Term
 rrsigValid nam dat sig key  = TFunctor rrsigValidSym [ nam, dat, sig, key ]
 
 digestValid :: Term -> Term -> Term -> Term
-digestValid nam dsTerm dnskeyTerm = TFunctor digestValidSym [ nam, dsTerm, dnskeyTerm ]
+digestValid nam dnskeyTerm dsTerm = TFunctor digestValidSym [ nam, dnskeyTerm, dsTerm ]
 
 nsecUnsigned :: Term -> Term -> Term
 nsecUnsigned nam nsecTerm = TFunctor nsecUnsignedSym [ nam, nsecTerm ]
