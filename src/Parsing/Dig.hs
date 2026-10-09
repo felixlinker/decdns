@@ -10,7 +10,7 @@ import DNS.Name ( Name )
 import Parsing.Tokens
 import Parsing.Name
 
-received :: Stream s m Char => ParsecT s u m (Name String)
+received :: Stream s m Char => ParsecT s u m [Name String]
 received = do
   spaces
   _ <- string ";; SERVER: "
@@ -20,10 +20,10 @@ received = do
   _ <- char '('
   n <- absName
   _ <- string ") (UDP)"
-  return n
+  return [n]
 
-served :: Stream s m Char => ParsecT s u m (Name String)
+served :: Stream s m Char => ParsecT s u m [Name String]
 served = do
   spaces
   _ <- string ";; Served by "
-  absName
+  sepBy1 absName (char ',' >> spaces)

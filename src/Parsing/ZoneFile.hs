@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TupleSections #-}
 module Parsing.ZoneFile
   ( ServedZone
   , parseRecords
@@ -105,7 +106,7 @@ line = asum $ map try
   , setTTL $> Nothing
   , Just <$> record ]
 
-nsHintOrLine :: Stream s m Char => Parser s m (Maybe (Either StandardRecord (Name String)))
+nsHintOrLine :: Stream s m Char => Parser s m (Maybe (Either StandardRecord [Name String]))
 nsHintOrLine = choice [right (try received), right (try served), left line]
   where
     left :: Monad m => m (Maybe a) -> m (Maybe (Either a b))
@@ -124,12 +125,12 @@ zoneFile = do
   parsed <- catMaybes <$> many nsHintOrLine
   group [] parsed
   where
-    group :: [ServedZone] -> [Either StandardRecord (Name String)] -> Parser s m [ServedZone]
+    group :: [ServedZone] -> [Either StandardRecord [Name String]] -> Parser s m [ServedZone]
     group acc [] = return acc
     group acc l = do
       let (map (fromLeft undefined) -> recs, other) = span isLeft l
       (Right ns, r) <- maybeFail "missing name server info" $ L.uncons other
-      group ((ns, recs):acc) r
+      group (map (, recs) ns ++ acc) r
 
 parseRecords :: Stream s m Char => SourceName -> s -> m (Either ParseError [StandardRecord])
 parseRecords = runParserT (records <* eof) emptyState
