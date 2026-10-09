@@ -223,6 +223,7 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s
       A {} -> return S.empty
       AAAA {} -> return S.empty
       TXT {} -> return S.empty
+      ZONEMD {} -> return S.empty
       MX {} -> return S.empty
       SOA {} -> return S.empty
       NSEC {} -> return S.empty

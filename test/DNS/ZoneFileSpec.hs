@@ -219,6 +219,7 @@ genRecord org = oneof $ map ($ org)
   , genRRSIGRecord
   , genNSECRecord
   , genDSRecord
+  , genZONEMDRecord
   ]
 
 genSOARecord :: Name String -> Gen StandardRecord
@@ -327,6 +328,16 @@ genDSRecord org = do
   digest <- genBytes 1 64
   return $ Named ownerName (RData IN ttl (DS (DSData keyTag algorithm digestType digest)))
 
+genZONEMDRecord :: Name String -> Gen StandardRecord
+genZONEMDRecord org = do
+  ownerName <- oneof [pure org, genSubDomain org]
+  ttl <- genTTL
+  serial <- chooseInt (0, 2000000000)
+  scheme <- chooseInt (0, 255)
+  hashAlgorithm <- chooseInt (0, 255)
+  digest <- genBytes 1 64
+  return $ Named ownerName (RData IN ttl (ZONEMD serial scheme hashAlgorithm digest))
+
 genIPv4 :: Gen IPv4
 genIPv4 = toIPv4w <$> chooseAny
 
@@ -395,4 +406,5 @@ nsecTypeUniverse =
   , RT.RRSIG
   , RT.NSEC
   , RT.DS
+  , RT.ZONEMD
   ]

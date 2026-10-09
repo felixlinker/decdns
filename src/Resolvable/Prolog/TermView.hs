@@ -67,6 +67,7 @@ data TermView = TVList Term Term
               | TVNSEC3Data Term Term Term Term Term Term
               | TVNSEC3ParamData Term Term Term Term
               | TVDSData Term Term Term Term
+              | TVZONEMDData Term Term Term Term
 
 toView :: Term -> TermView
 toView (TFunctor n args)
@@ -155,6 +156,9 @@ toView (TFunctor n args)
   | n == ttypeSym T.DS = case args of
      [tag, alg, digT, dig] -> TVDSData tag alg digT dig
      _ -> undefined
+  | n == ttypeSym T.ZONEMD = case args of
+     [serial, scheme, hashAlgorithm, digest] -> TVZONEMDData serial scheme hashAlgorithm digest
+     _ -> undefined
   | otherwise = TVFunctor n args
 toView TEmptyList = TVEmptyList
 toView (TVar v) = TVVar v
@@ -201,6 +205,7 @@ fromView (TVNSECData nextN covered) = TFunctor (ttypeSym T.NSEC) [nextN, covered
 fromView (TVNSEC3Data alg flags iter salt nextHashedOwner types) = TFunctor (ttypeSym T.NSEC3) [alg, flags, iter, salt, nextHashedOwner, types]
 fromView (TVNSEC3ParamData alg flags iter salt) = TFunctor (ttypeSym T.NSEC3PARAM) [alg, flags, iter, salt]
 fromView (TVDSData tag alg digT dig) = TFunctor (ttypeSym T.DS) [tag, alg, digT, dig]
+fromView (TVZONEMDData serial scheme hashAlgorithm digest) = TFunctor (ttypeSym T.ZONEMD) [serial, scheme, hashAlgorithm, digest]
 
 isResolves :: Term -> Bool
 isResolves (toView -> TVResolves {}) = True

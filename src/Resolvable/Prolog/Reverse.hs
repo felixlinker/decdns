@@ -164,4 +164,11 @@ asRRSetData t = case toView t of
     TVString digHex <- toViewM dig
     dig' <- fromHex digHex
     return $ DS (DSData tag' alg' digT' dig')
+  TVZONEMDData serial scheme hashAlgorithm digest -> do
+    TVInt serial' <- toViewM serial
+    TVInt scheme' <- toViewM scheme
+    TVInt hashAlgorithm' <- toViewM hashAlgorithm
+    TVString digestHex <- toViewM digest
+    digest' <- fromHex digestHex
+    return $ ZONEMD serial' scheme' hashAlgorithm' digest'
   _ -> throwE "unrecognized term"

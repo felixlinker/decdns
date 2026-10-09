@@ -186,6 +186,7 @@ data Type =
       , _paramSalt :: BS.ByteString
       }
   | DS DSData
+  | ZONEMD Int Int Int BS.ByteString
   deriving (Eq, Ord)
 
 showData :: Type -> String
@@ -208,6 +209,8 @@ showData (NSEC3PARAM hashAlgorithm optOut iterations salt) = unwords
   , if BS.null salt then "-" else toHex salt
   ]
 showData (DS dsData) = show dsData
+showData (ZONEMD serial scheme hashAlgorithm digest) = unwords
+  [ show serial, show scheme, show hashAlgorithm, toHex digest ]
 
 canonicalType :: Type -> Type
 canonicalType (NS n) = NS $ canonicalName n
@@ -224,6 +227,7 @@ canonicalType r@(AAAA _) = r
 canonicalType r@(TXT _) = r
 canonicalType r@(DNSKEY _) = r
 canonicalType r@(DS _) = r
+canonicalType r@(ZONEMD {}) = r
 
 instance Show Type where
   show t = show (toType t) ++ " " ++ showData t
@@ -243,6 +247,7 @@ toType (NSEC {}) = T.NSEC
 toType (NSEC3 {}) = T.NSEC3
 toType (NSEC3PARAM {}) = T.NSEC3PARAM
 toType (DS {}) = T.DS
+toType (ZONEMD {}) = T.ZONEMD
 
 data Cat = IN
   deriving (Eq, Ord, Show)
@@ -339,6 +344,8 @@ instance Serialize Type where
       <> word16 iterations
       <> withLength salt
   serialize (DS dsData) = serialize dsData
+  serialize (ZONEMD serial scheme hashAlgorithm digest) =
+    word32 serial <> word8 scheme <> word8 hashAlgorithm <> digest
 
 canonicalRData :: RData -> RData
 canonicalRData d@(RData _ _ ty) = d { rtype = canonicalType ty }

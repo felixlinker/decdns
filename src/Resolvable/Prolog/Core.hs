@@ -511,6 +511,7 @@ dataTerm t = TFunctor (ttypeSym $ toType t) $ case t of
   NSEC3 (NSEC3Data alg flags iter salt nextHashedOwner types) -> [TInt (nsec3DigestToInt alg), TInt (nsec3FlagsToInt flags), TInt iter, hexTerm salt, hexTerm nextHashedOwner, list (map ttypeTerm types) ]
   NSEC3PARAM alg flags iter salt -> [TInt (nsec3DigestToInt alg), TInt (nsec3FlagsToInt flags), TInt iter, hexTerm salt]
   DS (DSData tag alg digT dig) -> [TInt tag, algTerm alg, digestTerm digT, hexTerm dig]
+  ZONEMD serial scheme hashAlgorithm digest -> [TInt serial, TInt scheme, TInt hashAlgorithm, hexTerm digest]
 
 resolves :: Term -> Term -> Term -> Term -> Term -> Term -> Term -> Term
 resolves ns qtype zone qname d ver adb = TFunctor resolvesSym [ ns, qtype, zone, qname, d, ver, adb ]

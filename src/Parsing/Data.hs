@@ -28,6 +28,7 @@ recordType = asum $ map try
   [ string "CNAME" $> T.CNAME
   , string "DNAME" $> T.DNAME
   , string "NSEC3PARAM" $> T.NSEC3PARAM
+  , string "ZONEMD" $> T.ZONEMD
   , string "NSEC3" $> T.NSEC3
   , string "NSEC" $> T.NSEC
   , string "NS" $> T.NS
@@ -59,6 +60,7 @@ recordTypeData = do
     T.DS -> ds
     T.NSEC3 -> nsec3
     T.NSEC3PARAM -> nsec3param
+    T.ZONEMD -> zonemd
 
 cname :: Stream s m Char => TypeParser s m
 cname = CNAME <$> absName
@@ -167,6 +169,16 @@ ds = do
   digestType <- digestTypeCode
   sep
   DS . DSData tag algorithm digestType <$> hexWithSep
+
+zonemd :: Stream s m Char => TypeParser s m
+zonemd = do
+  serial <- int
+  sep
+  scheme <- int
+  sep
+  hashAlgorithm <- int
+  sep
+  ZONEMD serial scheme hashAlgorithm <$> hexWithSep
 
 algorithmType :: Stream s m Char => Parser s m AlgorithmType
 algorithmType =
