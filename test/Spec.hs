@@ -30,7 +30,6 @@ import qualified Resolvable.ResolutionSpec as ResolutionSpec
 
 main :: IO ()
 main = do
-  -- rolloutTests <- RolloutSpec.tests
   defaultMain $
     testGroup
       "dns-regressor"
@@ -38,7 +37,6 @@ main = do
       , PrologCoreSpec.tests
       , ResolvabilitySpec.tests
       , DisunificationSpec.tests
-      -- , rolloutTests
       , NameConstraintSpec.tests
       , NameSpec.tests
       , NeqsSpec.tests

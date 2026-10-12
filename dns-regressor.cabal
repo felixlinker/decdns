@@ -132,7 +132,6 @@ library
       Resolvable.Update.Dependencies
       Resolvable.Update.Disunification
       Resolvable.Update.Resolvability
-      Resolvable.Update.Rollout
       Util.Bool
       Util.Bytes
       Util.CondensationGraph
@@ -223,7 +222,6 @@ test-suite dns-regressor-test
       Resolvable.ResolvabilitySpec
       Resolvable.UnificationSpec
       Resolvable.Update.DisunificationSpec
-      Resolvable.Update.RolloutSpec
       Resolvable.Util
       Util.BoolSpec
       Util.FixpointSpec
