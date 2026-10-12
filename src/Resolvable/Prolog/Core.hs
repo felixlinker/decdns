@@ -3,9 +3,8 @@
 {-# LANGUAGE InstanceSigs #-}
 module Resolvable.Prolog.Core
   ( Term(..)
+  , mapVarsF
   , freshVar
-  , awayT
-  , awayR
   , wildcard
   , wildcards3
   , wildcards4
@@ -86,8 +85,6 @@ import DNS.Record
 import DNS.SEC.Crypto ( algorithmToInt, digestToInt, AlgorithmType, DigestType, nsec3DigestToInt, nsec3FlagsToInt )
 import DNS.SEC.Keys (dnsKeyFlagsToInt)
 import qualified DNS.RecordType as T
-import Control.Monad.Trans.Class (lift)
-import qualified Control.Monad.Trans.State as St
 import NameConstraint
 import Resolvable.Prolog.Symbols
 import Util.Fresh (Fresh, fresh)
@@ -368,27 +365,6 @@ instance forall a. Show (Rule a) where
   show r = case replaceSingletons r (TVar wildcardSym) of
     Rule _ h [] -> show h ++ "."
     Rule _ h b -> show h ++ " :- " ++ intercalate ", " (map show b) ++ "."
-
-awayT :: Traversable t => t Term -> Fresh (t Term)
-awayT = (`St.evalStateT` M.empty) . traverse (mapVarsF rename)
-  where
-    rename :: String -> St.StateT (M.Map String String) Fresh String
-    rename varName = do
-      mapped <- St.gets (M.lookup varName)
-      maybe freshName return mapped
-      where
-        freshName :: St.StateT (M.Map String String) Fresh String
-        freshName = do
-          n <- lift $ fresh "V"
-          St.modify (M.insert varName n)
-          return n
-
-awayR :: Rule a -> Fresh (Rule a)
-awayR (Rule a h b) = do
-  fr <- awayT (h:b)
-  case fr of
-    (h':b') -> return $ Rule a h' b'
-    _ -> undefined
 
 fact :: a -> Term -> Rule a
 fact ann h = Rule ann h []

@@ -31,6 +31,13 @@ import Util.Fresh
 
 type Solver a = Store.SimplifyCache Fresh a
 
+awayR :: Rule a -> Fresh (Rule a)
+awayR (Rule a h b) = do
+  fr <- fst <$> awayT (h:b)
+  case fr of
+    (h':b') -> return $ Rule a h' b'
+    _ -> undefined
+
 match :: Rule RComp -> Rule RComp -> Bool
 match (Rule _ (toView -> TVResolves {}) b) (Rule _ h@(toView -> TVResolves {}) _) = isJust $ do
   let (st, b') = partitionConstraints b

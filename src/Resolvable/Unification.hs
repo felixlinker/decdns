@@ -11,8 +11,11 @@ module Resolvable.Unification
   , filterRenamings
   , unify
   , unifies
-  , equivModuloRenaming ) where
+  , equivModuloRenaming
+  , awayT ) where
 
+import Control.Monad.Trans.Class (lift)
+import qualified Control.Monad.Trans.State.Strict as St
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Data.List (intercalate)
@@ -20,6 +23,7 @@ import Data.Maybe (fromMaybe, isJust, isNothing)
 
 import Resolvable.Prolog.Core
 import Util.List (zipWithStrict)
+import Util.Fresh
 import Data.Bifunctor (Bifunctor(bimap))
 
 newtype Unifier = Unifier (M.Map Term Term)
@@ -146,3 +150,19 @@ instance Unify Term where
         | d1 == d2 = Just u
         | otherwise = Nothing
       unif (TComplex _) _ = Nothing
+
+awayT :: Traversable t => t Term -> Fresh (t Term, Unifier)
+awayT t = do
+    (t', m) <- St.runStateT (traverse (mapVarsF rename) t) M.empty
+    return (t', Unifier $ M.fromList $ map (bimap TVar TVar) $ M.toList m)
+  where
+    rename :: String -> St.StateT (M.Map String String) Fresh String
+    rename varName = do
+      mapped <- St.gets (M.lookup varName)
+      maybe freshName return mapped
+      where
+        freshName :: St.StateT (M.Map String String) Fresh String
+        freshName = do
+          n <- lift $ fresh "V"
+          St.modify (M.insert varName n)
+          return n
