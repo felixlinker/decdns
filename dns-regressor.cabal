@@ -126,6 +126,7 @@ library
       Resolvable.Prolog.Reverse
       Resolvable.Prolog.Symbols
       Resolvable.Prolog.TermView
+      Resolvable.Resolution
       Resolvable.Resolvability
       Resolvable.Unification
       Resolvable.Update.Dependencies
