@@ -19,6 +19,9 @@ type Solver t m a = t (FreshT m) a
 data Goal a = Goal a Store.ConstraintStore
   deriving (Eq, Ord)
 
+instance Show a => Show (Goal a) where
+  show (Goal a _) = "Goal " ++ show a
+
 instance Functor Goal where
   fmap f (Goal as st) = Goal (f as) st
 
@@ -34,10 +37,9 @@ resolution rs g@(Goal (p:t) st) = case toView p of
     l' <- maybeToList $ collectList l
     u <- mapMaybe (unify x) l'
     return (Goal (apply u t) (apply u st))
-  TVResolves {} -> do
+  _ -> do
     g' <- lift $ awayG g
     foldM (\acc -> fmap (:acc) . resolveRule g') [] rs
-  _ -> error "unsupportd predicate"
   where
     resolveRule :: MonadTrans t => Goal [Term] -> Rule a -> Solver t Maybe (Goal [Term])
     resolveRule g'@(Goal [] _) _ = return g'

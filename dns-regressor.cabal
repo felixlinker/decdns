@@ -217,6 +217,7 @@ test-suite dns-regressor-test
       Resolvable.Constraint.NeqsSpec
       Resolvable.Constraint.StoreSpec
       Resolvable.Prolog.CoreSpec
+      Resolvable.ResolutionSpec
       Resolvable.ResolvabilitySpec
       Resolvable.UnificationSpec
       Resolvable.Update.DisunificationSpec
