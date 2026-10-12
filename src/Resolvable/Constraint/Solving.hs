@@ -5,6 +5,7 @@ module Resolvable.Constraint.Solving
   , solve ) where
 
 import Control.Monad (MonadPlus(..))
+import Data.Foldable (toList)
 
 data Solved a = Unsatisfiable | Satisfiable a
   deriving (Eq, Ord, Show)
@@ -19,12 +20,12 @@ instance Applicative Solved where
   _ <*> Unsatisfiable = Unsatisfiable
   Satisfiable fs <*> Satisfiable as = Satisfiable (fs as)
 
-cup :: Solved [a] -> Solved [a] -> Solved [a]
-cup Unsatisfiable s = s
-cup s Unsatisfiable = s
-cup s@(Satisfiable []) _ = s
-cup _ s@(Satisfiable []) = s
-cup (Satisfiable b1) (Satisfiable b2) = Satisfiable $ b1 ++ b2
+cup :: (Foldable f1, Foldable f2) => Solved (f1 a) -> Solved (f2 a) -> Solved [a]
+cup Unsatisfiable s = toList <$> s
+cup s Unsatisfiable = toList <$> s
+cup (Satisfiable fa) _ | null fa = Satisfiable []
+cup _ (Satisfiable fa) | null fa = Satisfiable []
+cup (Satisfiable b1) (Satisfiable b2) = Satisfiable $ toList b1 ++ toList b2
 
 getSolved :: MonadPlus m => Solved a -> m a
 getSolved Unsatisfiable = mzero

@@ -5,9 +5,15 @@ module Resolvable.Constraint.Store
   , add
   , Resolvable.Constraint.Store.null
   , simplify
+  , SimplifyCache
+  , simplifyCached
+  , evalCached
   , Resolvable.Constraint.Store.solve ) where
 
 import qualified Control.Monad.Trans.Except as Ex
+import qualified Control.Monad.Trans.State.Strict as St
+import qualified Data.Map.Strict as M
+import Data.Functor.Identity (Identity(..))
 import Data.Maybe (catMaybes)
 
 import DNS.SEC.Verification
@@ -23,45 +29,59 @@ data Constraint =
   | Complex Term
   deriving (Eq, Ord)
 
+simplifyTEx :: Term -> Ex.Except String Bool
+simplifyTEx t = case toView t of
+  TVIsName n
+    | minNameLength n > 255 -> return False
+    | ground n -> return True
+  TVDigestValid n dnskeyT dsT | ground t -> do
+      n' <- asName n
+      dsDat <- asDSData =<< asType dsT
+      dnskeyDat <- asDNSKEYData =<< asType dnskeyT
+      return $ verifyDigest n' dsDat dnskeyDat
+  TVRRSIGValid n dat sig k | ground t -> do
+      n' <- asName n
+      rrset <- asTypes dat
+      sigDat <- asRRSigData =<< asType sig
+      k' <- asDNSKEYData =<< asType k
+      return (verifySignature n' rrset sigDat k')
+  TVNSECUnsigned n nsecDat | ground t -> do
+      n' <- asName n
+      nsecDat' <- asNSECData =<< asType nsecDat
+      return $ nsecUnsignedSubzone n' n' nsecDat'
+  TVNSEC3Unsigned n hashedOwner nsec3Dat | ground t -> do
+      n' <- asName n
+      hashedOwner' <- asName hashedOwner
+      nsec3Dat' <- asNSEC3Data =<< asType nsec3Dat
+      return $ nsec3UnsignedSubzone n' hashedOwner' nsec3Dat'
+  TVClosestEncloser n exN exDat nonExN nonExDat | ground t -> do
+      n' <- asName n
+      exN' <- asName exN
+      exDat' <- asNSEC3Data =<< asType exDat
+      nonExN' <- asName nonExN
+      nonExDat' <- asNSEC3Data =<< asType nonExDat
+      return $ verifyClosestEncloserProof n' exN' exDat' nonExN' nonExDat'
+  _ -> Ex.throwE "cannot solve"
+
+resultToSolved :: Bool -> Solved (Maybe Term)
+resultToSolved b = if b then Satisfiable Nothing else Unsatisfiable
+
 simplifyT :: Term -> Solved (Maybe Term)
 simplifyT t =
   either  (const $ Satisfiable $ Just t)
-          (\b -> if b then Satisfiable Nothing else Unsatisfiable)
-          (Ex.runExcept simplifyTEx)
+          resultToSolved
+          (Ex.runExcept $ simplifyTEx t)
+
+simplifyTCached :: Monad m => Term -> SimplifyCache m (Solved (Maybe Term))
+simplifyTCached t = do
+  mB <- St.gets (M.lookup t)
+  maybe setCache (return . resultToSolved) mB
   where
-    simplifyTEx :: Ex.Except String Bool
-    simplifyTEx = case toView t of
-      TVIsName n
-        | minNameLength n > 255 -> return False
-        | ground n -> return True
-      TVDigestValid n dnskeyT dsT | ground t -> do
-          n' <- asName n
-          dsDat <- asDSData =<< asType dsT
-          dnskeyDat <- asDNSKEYData =<< asType dnskeyT
-          return $ verifyDigest n' dsDat dnskeyDat
-      TVRRSIGValid n dat sig k | ground t -> do
-          n' <- asName n
-          rrset <- asTypes dat
-          sigDat <- asRRSigData =<< asType sig
-          k' <- asDNSKEYData =<< asType k
-          return (verifySignature n' rrset sigDat k')
-      TVNSECUnsigned n nsecDat | ground t -> do
-          n' <- asName n
-          nsecDat' <- asNSECData =<< asType nsecDat
-          return $ nsecUnsignedSubzone n' n' nsecDat'
-      TVNSEC3Unsigned n hashedOwner nsec3Dat | ground t -> do
-          n' <- asName n
-          hashedOwner' <- asName hashedOwner
-          nsec3Dat' <- asNSEC3Data =<< asType nsec3Dat
-          return $ nsec3UnsignedSubzone n' hashedOwner' nsec3Dat'
-      TVClosestEncloser n exN exDat nonExN nonExDat | ground t -> do
-          n' <- asName n
-          exN' <- asName exN
-          exDat' <- asNSEC3Data =<< asType exDat
-          nonExN' <- asName nonExN
-          nonExDat' <- asNSEC3Data =<< asType nonExDat
-          return $ verifyClosestEncloserProof n' exN' exDat' nonExN' nonExDat'
-      _ -> Ex.throwE "cannot solve"
+    setCache :: Monad m => SimplifyCache m (Solved (Maybe Term))
+    setCache = do
+      either  (const $ return $ Satisfiable $ Just t)
+              (\b -> St.modify (M.insert t b) >> return (resultToSolved b))
+              (Ex.runExcept $ simplifyTEx t)
 
 instance U.Apply Constraint where
   apply u (Dif a b) = Dif (U.apply u a) (U.apply u b)
@@ -100,7 +120,24 @@ null :: ConstraintStore -> Bool
 null (CStore ns o) = Prelude.null ns && Prelude.null o
 
 simplify :: ConstraintStore -> Solved ConstraintStore
-simplify (CStore ns o) = CStore <$> N.simplify ns <*> (catMaybes <$> traverse simplifyT o)
+simplify = runIdentity . simplifyWithCache (Identity . simplifyT)
+
+simplifyCached :: Monad m => ConstraintStore -> SimplifyCache m (Solved ConstraintStore)
+simplifyCached = simplifyWithCache simplifyTCached
+
+-- The cache belongs to one computation, so independent runs do not retain
+-- each other's zones. Only ground terms are stored: fresh variable names must
+-- neither affect hit rates nor escape into another constraint's result.
+type SimplifyCache m a = St.StateT (M.Map Term Bool) m a
+
+simplifyWithCache :: Monad m => (Term -> m (Solved (Maybe Term))) -> ConstraintStore -> m (Solved ConstraintStore)
+simplifyWithCache cache (CStore ns ts) = do
+  let ns' = N.simplify ns
+  ts' <- fmap catMaybes . sequenceA <$> mapM cache ts
+  return $ CStore <$> ns' <*> ts'
+
+evalCached :: Monad m => SimplifyCache m a -> m a
+evalCached = (`St.evalStateT` M.empty)
 
 solve :: Solved ConstraintStore -> Maybe Bool
 solve = Solving.solve . fmap toBody

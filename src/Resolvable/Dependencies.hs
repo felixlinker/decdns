@@ -13,6 +13,7 @@ module Resolvable.Dependencies
   , computeResolvable ) where
 
 import Control.Monad (foldM, guard)
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (runExcept)
 import Data.Either (fromRight)
 import qualified Data.Map as M
@@ -30,6 +31,8 @@ import qualified Util.CondensationGraph as CG
 import Util.Monad (exceptMaybe)
 import Util.Fixpoint
 import Util.Fresh
+
+type Solver a = Store.SimplifyCache Fresh a
 
 data DependencyMatch = DependencyMatch
   { dependentRule :: Rule RComp
@@ -113,25 +116,28 @@ instance Show Fact where
 toRule :: Fact -> Rule ()
 toRule (Fact f cs) = Rule () f (Store.toBody cs)
 
-solveBody :: Bool -> S.Set Fact -> Rule a -> Fresh (S.Set Fact)
-solveBody keepGround fs r = do
-  Rule _ h b <- away r
+solveBody :: Bool -> S.Set Fact -> Rule a -> Solver (S.Set Fact)
+solveBody _keepGround fs r = do
+  Rule _ h b <- lift $ away r
   let (st, b') = partitionConstraints b
-  let us = foldl solvePredicate [(identity, st)] b'
+  us <- foldM solvePredicate [(identity, st)] b'
   return $ S.fromList $ map (\(u, st') -> Fact (apply u h) (apply u st')) us
   where
-    solvePredicate :: [(Unifier, Store.ConstraintStore)] -> Term -> [(Unifier, Store.ConstraintStore)]
+    solvePredicate :: [(Unifier, Store.ConstraintStore)] -> Term -> Solver [(Unifier, Store.ConstraintStore)]
     solvePredicate choices p = case toView p of
-      TVResolves {} -> concatMap
-        (\(u, accSt) -> foldr
-          (\(Fact h st) acc -> maybe acc (:acc) $ do
-            u' <- extendUnifier p h u
-            accSt' <- getSolved $ Store.simplify $ apply u' accSt <> apply u' st
-            return (u', accSt'))
+      TVResolves {} -> concat <$> mapM
+        (\(u, accSt) -> foldM
+          (\acc (Fact h st) -> do
+            maybe
+              (return acc)
+              (\u' -> do
+                st' <- getSolved <$> Store.simplifyCached (apply u' accSt <> apply u' st)
+                return $ maybe acc ((:acc) . (u',)) st')
+              (extendUnifier p h u))
           []
           fs)
         choices
-      TVMember x l -> concatMap
+      TVMember x l -> pure $ concatMap
         (\(u, accSt) -> fromRight [] $ runExcept $ do
           l' <- exceptMaybe "member" (collectList $ apply u l)
           return $ mapMaybe (\el -> do
@@ -141,22 +147,22 @@ solveBody keepGround fs r = do
         choices
       _ -> error "unsupported atom encountered"
 
-solveFixpoint :: forall a t. Traversable t => Bool -> S.Set Fact -> t (Rule a) -> Fresh (S.Set Fact)
+solveFixpoint :: forall a t. Traversable t => Bool -> S.Set Fact -> t (Rule a) -> Solver (S.Set Fact)
 solveFixpoint keepGround prog addFrom = fixpointSetM step prog
   where
-    step :: S.Set Fact -> Fresh (S.Set Fact)
+    step :: S.Set Fact -> Solver (S.Set Fact)
     step acc = do
       solved <- mapM (solveBody keepGround acc) addFrom
       return $ S.unions solved
 
-solve :: forall a t. Traversable t => Bool -> S.Set Fact -> t (Rule a) -> Fresh (S.Set Fact)
+solve :: forall a t. Traversable t => Bool -> S.Set Fact -> t (Rule a) -> Solver (S.Set Fact)
 solve keepGround kb addFrom = do
   solved <- mapM (solveBody keepGround kb) addFrom
   return $ foldr S.union kb solved
 
 computeResolvable :: Bool -> S.Set (Rule RComp) -> Fresh (S.Set Fact)
-computeResolvable keepGround (S.filter (isResolves . rhead) -> rs) = do
-  ord <- resolutionOrder rs
+computeResolvable keepGround (S.filter (isResolves . rhead) -> rs) = Store.evalCached $ do
+  ord <- lift $ resolutionOrder rs
   let recursive = S.filter (\i -> i `S.member` G.next ord i) (G.elems ord)
   rec recursive (CG.fromGraph ord) S.empty
   where
@@ -166,7 +172,7 @@ computeResolvable keepGround (S.filter (isResolves . rhead) -> rs) = do
     getRules :: S.Set (S.Set Int) -> [Rule RComp]
     getRules = concatMap (mapMaybe (`M.lookup` rules) . S.toList) . S.toList
 
-    rec :: S.Set Int -> CG.CondensationGraph Int -> S.Set Fact -> Fresh (S.Set Fact)
+    rec :: S.Set Int -> CG.CondensationGraph Int -> S.Set Fact -> Solver (S.Set Fact)
     rec recursive ord acc
       | G.null ord = pure acc
       | otherwise = do
