@@ -1,9 +1,11 @@
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Unification
   ( Unifier(..)
+  , (~>)
   , Unify(..)
   , Apply(..)
   , identity
+  , termIdentity
   , toList
   , restrict
   , isRenaming
@@ -30,6 +32,9 @@ import Data.Bifunctor (Bifunctor(bimap))
 newtype Unifier = Unifier (M.Map Term Term)
   deriving Eq
 
+(~>) :: Unifier -> Unifier -> Unifier
+Unifier m1 ~> u = Unifier $ M.map (apply u) m1
+
 instance Show Unifier where
   show (Unifier m) = "{" ++ intercalate ", " (map (\(k, v) -> show k ++ " -> " ++ show v) (M.toList m)) ++ "}"
 
@@ -50,6 +55,11 @@ instance (Apply a, Ord a) => Apply (S.Set a) where
 
 identity :: Unifier
 identity = Unifier M.empty
+
+termIdentity :: Term -> Unifier
+termIdentity t =
+  let vs = S.toList $ vars t
+  in Unifier $ M.fromList $ zip vs vs
 
 singleton :: Term -> Term -> Unifier
 singleton v@(TVar _) t = Unifier (M.singleton v t)

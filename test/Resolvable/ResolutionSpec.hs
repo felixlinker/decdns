@@ -4,25 +4,21 @@ module Resolvable.ResolutionSpec
 
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
-import Control.Monad.Trans.Identity
-import Data.Maybe (fromMaybe)
 
-import qualified Resolvable.Constraint.Store as Store
+import qualified Data.Set as S
+
 import Resolvable.Prolog.Core
-import Resolvable.Resolution
-import Util.Fresh
+import Resolvable.Resolution (runSLD, sld)
+import Resolvable.Unification (Unifier(..), apply)
 
-stubResolution :: [Rule ()] -> Goal [Term] -> [Goal [Term]]
-stubResolution kb = fromMaybe [] . (`evalFreshT` 0) . runIdentityT . resolution kb
-
-goal :: Term -> Goal [Term]
-goal = (`Goal` Store.empty) . (:[])
+stubSLD :: [Rule ()] -> Term -> [Unifier]
+stubSLD kb g = fst $ runSLD $ sld kb g
 
 p :: Term -> Term
 p = TFunctor "p" . (:[])
 
 q :: Term -> Term
-q = TFunctor "a" . (:[])
+q = TFunctor "q" . (:[])
 
 rules :: [Rule ()]
 rules = Rule () (p x) [q x] : map (fact () . q) ints
@@ -36,4 +32,8 @@ tests :: TestTree
 tests =
   testGroup
     "Resolvable.Resolution"
-    [ testCase "can resolve" $ stubResolution rules (goal (p $ TVar "x")) @?= [] ]
+    [ testCase "returns all matching alternatives" $
+        let g = p $ TVar "x"
+            us = stubSLD rules g
+        in  S.fromList (map (`apply` g) us) @?= S.fromList (map (p . TInt) [0..2])
+    ]
