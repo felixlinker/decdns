@@ -57,7 +57,7 @@ resolutionOrder rs =
 
     go :: ResolutionOrder -> Rule RComp -> Fresh ResolutionOrder
     go ord r = do
-      r' <- away r
+      r' <- awayR r
       return $ G.insert (getId r) (S.map getId $ S.filter (match r') rs) ord
 
 partitionConstraints :: [Term] -> (Store.ConstraintStore, [Term])
@@ -97,7 +97,7 @@ toRule (Fact f cs) = Rule () f (Store.toBody cs)
 
 solveBody :: S.Set Fact -> Rule a -> Solver (S.Set Fact)
 solveBody fs r = do
-  Rule _ h b <- lift $ away r
+  Rule _ h b <- lift $ awayR r
   let (st, b') = partitionConstraints b
   us <- foldM solvePredicate [(identity, st)] b'
   return $ S.fromList $ map (\(u, st') -> Fact (apply u h) (apply u st')) us

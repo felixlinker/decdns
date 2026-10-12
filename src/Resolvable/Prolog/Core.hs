@@ -4,7 +4,8 @@
 module Resolvable.Prolog.Core
   ( Term(..)
   , freshVar
-  , away
+  , awayT
+  , awayR
   , wildcard
   , wildcards3
   , wildcards4
@@ -368,15 +369,9 @@ instance forall a. Show (Rule a) where
     Rule _ h [] -> show h ++ "."
     Rule _ h b -> show h ++ " :- " ++ intercalate ", " (map show b) ++ "."
 
-away :: Rule a -> Fresh (Rule a)
-away (Rule a h b) = (`St.evalStateT` M.empty) $ do
-  h' <- awayT h
-  b' <- mapM awayT b
-  return $ Rule a h' b'
+awayT :: Traversable t => t Term -> Fresh (t Term)
+awayT = (`St.evalStateT` M.empty) . traverse (mapVarsF rename)
   where
-    awayT :: Term -> St.StateT (M.Map String String) Fresh Term
-    awayT = mapVarsF rename
-
     rename :: String -> St.StateT (M.Map String String) Fresh String
     rename varName = do
       mapped <- St.gets (M.lookup varName)
@@ -387,6 +382,13 @@ away (Rule a h b) = (`St.evalStateT` M.empty) $ do
           n <- lift $ fresh "V"
           St.modify (M.insert varName n)
           return n
+
+awayR :: Rule a -> Fresh (Rule a)
+awayR (Rule a h b) = do
+  fr <- awayT (h:b)
+  case fr of
+    (h':b') -> return $ Rule a h' b'
+    _ -> undefined
 
 fact :: a -> Term -> Rule a
 fact ann h = Rule ann h []
