@@ -5,9 +5,6 @@
 module Resolvable.Dependencies
   ( ResolutionOrder
   , resolutionOrder
-  , DependencyMatch(..)
-  , dependencyMatch
-  , dependencyMatches
   , Fact(..)
   , toRule
   , computeResolvable ) where
@@ -34,36 +31,18 @@ import Util.Fresh
 
 type Solver a = Store.SimplifyCache Fresh a
 
-data DependencyMatch = DependencyMatch
-  { dependentRule :: Rule RComp
-  , dependencyRule :: Rule RComp
-  , dependencyPredicate :: Term
-  , dependencyUnifier :: Unifier
-  }
-  deriving Eq
-
-dependencyMatch :: Rule RComp -> Rule RComp -> Maybe DependencyMatch
-dependencyMatch lrg@(Rule _ (toView -> TVResolves {}) b) sml@(Rule _ h@(toView -> TVResolves {}) _) = do
+match :: Rule RComp -> Rule RComp -> Bool
+match (Rule _ (toView -> TVResolves {}) b) (Rule _ h@(toView -> TVResolves {}) _) = isJust $ do
   let (st, b') = partitionConstraints b
-  (predicate, u) <- listToMaybe $ mapMaybe unifyBodyPredicate b'
+  (_, u) <- listToMaybe $ mapMaybe unifyBodyPredicate b'
   maybe (return ()) guard $ Store.solve $ Store.simplify $ apply u st
-  return $ DependencyMatch lrg sml predicate u
   where
     unifyBodyPredicate :: Term -> Maybe (Term, Unifier)
     unifyBodyPredicate p = do
       guard (isResolves p)
       u <- unify p h
       return (p, u)
-dependencyMatch _ _ = Nothing
-
-match :: Rule RComp -> Rule RComp -> Bool
-match r = isJust . dependencyMatch r
-
-dependencyMatches :: S.Set (Rule RComp) -> [DependencyMatch]
-dependencyMatches rs = do
-  dependent <- S.toList rs
-  dependency <- S.toList rs
-  maybe [] return $ dependencyMatch dependent dependency
+match _ _ = False
 
 type ResolutionOrder = G.Graph Int
 

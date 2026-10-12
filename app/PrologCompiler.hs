@@ -20,7 +20,6 @@ import Control.Monad.Trans.Class (lift)
 import Parsing (parseNameM, parseTypeM)
 import Parsing.Config (parseZoneFiles)
 import Query (queryStep)
-import Visualizer (renderVisualization)
 
 main :: IO ()
 main = do
@@ -48,12 +47,6 @@ main = do
         newRecsC <- lift $ compileConfig roots newRecs
         computeRegressions oldRecsC newRecsC
       mapM_ print $ S.map toRule regs
-    "visualize" -> do
-      (roots, zones) <- sepBy "--" args
-      rootServers <- parseNames roots
-      cfg <- parseZones zones
-      let compiled = runFresh $ compileConfig rootServers cfg
-      putStrLn $ renderVisualization rootServers zones cfg compiled
     "parse-only" -> do
       parsed <- concatMap (map toStandardRecord . allRecords . snd) <$> parseZones args
       mapM_ print parsed

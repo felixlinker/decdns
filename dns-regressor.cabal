@@ -176,7 +176,6 @@ executable dns-regressor-prolog
   main-is: PrologCompiler.hs
   other-modules:
       Util
-      Visualizer
       Paths_dns_regressor
   autogen-modules:
       Paths_dns_regressor
