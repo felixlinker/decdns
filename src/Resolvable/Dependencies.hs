@@ -40,7 +40,7 @@ awayR (Rule a h b) = do
 
 match :: Rule RComp -> Rule RComp -> Bool
 match (Rule _ (toView -> TVResolves {}) b) (Rule _ h@(toView -> TVResolves {}) _) = isJust $ do
-  let (st, b') = partitionConstraints b
+  let (st, b') = Store.partitionConstraints b
   (_, u) <- listToMaybe $ mapMaybe unifyBodyPredicate b'
   maybe (return ()) guard $ Store.solve $ Store.simplify $ apply u st
   where
@@ -66,12 +66,6 @@ resolutionOrder rs =
     go ord r = do
       r' <- awayR r
       return $ G.insert (getId r) (S.map getId $ S.filter (match r') rs) ord
-
-partitionConstraints :: [Term] -> (Store.ConstraintStore, [Term])
-partitionConstraints = foldr addConstraint (Store.empty, [])
-  where
-    addConstraint :: Term -> (Store.ConstraintStore, [Term]) -> (Store.ConstraintStore, [Term])
-    addConstraint t (st, b) = maybe (st, t:b) (, b) (Store.add st t)
 
 data Fact = Fact Term Store.ConstraintStore
 
@@ -105,7 +99,7 @@ toRule (Fact f cs) = Rule () f (Store.toBody cs)
 solveBody :: S.Set Fact -> Rule a -> Solver (S.Set Fact)
 solveBody fs r = do
   Rule _ h b <- lift $ awayR r
-  let (st, b') = partitionConstraints b
+  let (st, b') = Store.partitionConstraints b
   us <- foldM solvePredicate [(identity, st)] b'
   return $ S.fromList $ map (\(u, st') -> Fact (apply u h) (apply u st')) us
   where

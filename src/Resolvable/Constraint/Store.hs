@@ -1,5 +1,7 @@
+{-# LANGUAGE TupleSections #-}
 module Resolvable.Constraint.Store
   ( ConstraintStore(..)
+  , partitionConstraints
   , empty
   , toBody
   , add
@@ -95,6 +97,14 @@ instance U.Apply ConstraintStore where
 
 instance Semigroup ConstraintStore where
   CStore ns os <> CStore ns' os' = CStore (ns <> ns') (os <> os')
+
+
+partitionConstraints :: [Term] -> (ConstraintStore, [Term])
+partitionConstraints = foldr addConstraint (empty, [])
+  where
+    addConstraint :: Term -> (ConstraintStore, [Term]) -> (ConstraintStore, [Term])
+    addConstraint t (st, b) = maybe (st, t:b) (, b) (add st t)
+
 
 empty :: ConstraintStore
 empty = CStore N.empty []

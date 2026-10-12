@@ -1,6 +1,7 @@
-{-# LANGUAGE TupleSections #-}
 module Resolvable.Resolution
-  ( resolution ) where
+  ( Solver
+  , Goal(..)
+  , resolution ) where
 
 import Control.Monad (foldM)
 import Control.Monad.Trans.Class (lift, MonadTrans)
@@ -26,12 +27,6 @@ awayG (Goal ts st) = do
   (ts', u) <- awayT ts
   return $ Goal ts' (apply u st)
 
-partitionConstraints :: [Term] -> (Store.ConstraintStore, [Term])
-partitionConstraints = foldr addConstraint (Store.empty, [])
-  where
-    addConstraint :: Term -> (Store.ConstraintStore, [Term]) -> (Store.ConstraintStore, [Term])
-    addConstraint t (st, b) = maybe (st, t:b) (, b) (Store.add st t)
-
 resolution :: (Foldable f, MonadTrans t) => f (Rule a) -> Goal [Term] -> Solver t Maybe [Goal [Term]]
 resolution _ g@(Goal [] _) = return [g]
 resolution rs g@(Goal (p:t) st) = case toView p of
@@ -53,6 +48,6 @@ resolution rs g@(Goal (p:t) st) = case toView p of
 
     solveHead :: MonadTrans t => Term -> Rule a -> Solver t Maybe ([Term], Store.ConstraintStore, Unifier)
     solveHead gH (Rule _ h b) = do
-      let (stR, b') = partitionConstraints b
+      let (stR, b') = Store.partitionConstraints b
       u <- lift $ lift $ unify gH h
       return (apply u b', apply u stR, u)
