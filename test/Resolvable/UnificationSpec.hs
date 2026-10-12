@@ -4,16 +4,21 @@ import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertFailure, testCase, (@?=))
 import Test.Tasty.QuickCheck
 import qualified Data.Map.Strict as M
+import Data.Functor.Identity (Identity(..), runIdentity)
 
 import Resolvable.Prolog.Core
-import Resolvable.Unification (Unifier(..), apply, equivModuloRenaming, unify, unifies)
+import Resolvable.Unification
 import Resolvable.Util (genTerm)
+import Util.Fresh (runFresh, Fresh)
 
 tests :: TestTree
 tests =
   testGroup
     "Resolvable.Unification"
-    [ testProperty "apply unifier implies terms become equal" prop_unify_apply_agrees
+    [ testCase "away preserves variable sharing" $
+        let t = TFunctor "pair" [TVar "X", TVar "X", TVar "Y"]
+        in  equivModuloRenaming (runFresh $ awayTerm t) t @?= True
+    , testProperty "apply unifier implies terms become equal" prop_unify_apply_agrees
     , testProperty "unification is symmetric in success" prop_unify_symmetric
     , testProperty "unification yields normal unifiers" prop_unify_normal
     , testGroup
@@ -44,6 +49,9 @@ tests =
               @?= False
         ]
     ]
+
+awayTerm :: Term -> Fresh Term
+awayTerm = fmap (runIdentity . fst) . away . Identity
 
 occursCheckRejectsCycle :: Assertion
 occursCheckRejectsCycle =

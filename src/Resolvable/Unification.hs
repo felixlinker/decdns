@@ -12,7 +12,8 @@ module Resolvable.Unification
   , unify
   , unifies
   , equivModuloRenaming
-  , awayT ) where
+  , awayT
+  , away ) where
 
 import Control.Monad.Trans.Class (lift)
 import qualified Control.Monad.Trans.State.Strict as St
@@ -151,18 +152,21 @@ instance Unify Term where
         | otherwise = Nothing
       unif (TComplex _) _ = Nothing
 
-awayT :: Traversable t => t Term -> Fresh (t Term, Unifier)
+awayT :: (Traversable t, Monad m) => t Term -> FreshT m (t Term, Unifier)
 awayT t = do
     (t', m) <- St.runStateT (traverse (mapVarsF rename) t) M.empty
     return (t', Unifier $ M.fromList $ map (bimap TVar TVar) $ M.toList m)
   where
-    rename :: String -> St.StateT (M.Map String String) Fresh String
+    rename :: Monad m => String -> St.StateT (M.Map String String) (FreshT m) String
     rename varName = do
       mapped <- St.gets (M.lookup varName)
       maybe freshName return mapped
       where
-        freshName :: St.StateT (M.Map String String) Fresh String
+        freshName :: Monad m => St.StateT (M.Map String String) (FreshT m) String
         freshName = do
           n <- lift $ fresh "V"
           St.modify (M.insert varName n)
           return n
+
+away :: (Traversable t) => t Term -> Fresh (t Term, Unifier)
+away = awayT
