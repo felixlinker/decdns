@@ -95,8 +95,8 @@ instance Show Fact where
 toRule :: Fact -> Rule ()
 toRule (Fact f cs) = Rule () f (Store.toBody cs)
 
-solveBody :: Bool -> S.Set Fact -> Rule a -> Solver (S.Set Fact)
-solveBody _keepGround fs r = do
+solveBody :: S.Set Fact -> Rule a -> Solver (S.Set Fact)
+solveBody fs r = do
   Rule _ h b <- lift $ away r
   let (st, b') = partitionConstraints b
   us <- foldM solvePredicate [(identity, st)] b'
@@ -126,21 +126,21 @@ solveBody _keepGround fs r = do
         choices
       _ -> error "unsupported atom encountered"
 
-solveFixpoint :: forall a t. Traversable t => Bool -> S.Set Fact -> t (Rule a) -> Solver (S.Set Fact)
-solveFixpoint keepGround prog addFrom = fixpointSetM step prog
+solveFixpoint :: forall a t. Traversable t => S.Set Fact -> t (Rule a) -> Solver (S.Set Fact)
+solveFixpoint prog addFrom = fixpointSetM step prog
   where
     step :: S.Set Fact -> Solver (S.Set Fact)
     step acc = do
-      solved <- mapM (solveBody keepGround acc) addFrom
+      solved <- mapM (solveBody acc) addFrom
       return $ S.unions solved
 
-solve :: forall a t. Traversable t => Bool -> S.Set Fact -> t (Rule a) -> Solver (S.Set Fact)
-solve keepGround kb addFrom = do
-  solved <- mapM (solveBody keepGround kb) addFrom
+solve :: forall a t. Traversable t => S.Set Fact -> t (Rule a) -> Solver (S.Set Fact)
+solve kb addFrom = do
+  solved <- mapM (solveBody kb) addFrom
   return $ foldr S.union kb solved
 
-computeResolvable :: Bool -> S.Set (Rule RComp) -> Fresh (S.Set Fact)
-computeResolvable keepGround (S.filter (isResolves . rhead) -> rs) = Store.evalCached $ do
+computeResolvable :: S.Set (Rule RComp) -> Fresh (S.Set Fact)
+computeResolvable (S.filter (isResolves . rhead) -> rs) = Store.evalCached $ do
   ord <- lift $ resolutionOrder rs
   let recursive = S.filter (\i -> i `S.member` G.next ord i) (G.elems ord)
   rec recursive (CG.fromGraph ord) S.empty
@@ -158,6 +158,6 @@ computeResolvable keepGround (S.filter (isResolves . rhead) -> rs) = Store.evalC
           let leaves = G.leaves ord
           let leafRules = getRules leaves
           acc' <- if any ((> 1) . S.size) leaves || any (`S.member` recursive) (S.unions leaves)
-            then solveFixpoint keepGround acc leafRules
-            else solve keepGround acc leafRules
+            then solveFixpoint acc leafRules
+            else solve acc leafRules
           rec recursive (foldr G.remove ord leaves) acc'

@@ -259,7 +259,7 @@ queryPatterns cfg = S.toList $ S.fromList $ mapMaybe project
   where
     answers = runFresh $ do
       rules <- compileConfig roots cfg
-      computeResolvable True rules
+      computeResolvable rules
     project (answer, ns, ty) = do
       let Fact h cs = renameQuery "answer_" answer
           q = TVar "query_name"

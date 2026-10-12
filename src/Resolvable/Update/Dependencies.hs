@@ -16,8 +16,8 @@ import Resolvable.Update.Disunification (withouts)
 
 computeRegressions :: S.Set (Rule RComp) -> S.Set (Rule RComp) -> ExceptT String Fresh (S.Set Fact)
 computeRegressions oldRs newRs = do
-  resOld <- lift $ computeResolvable True oldRs
-  resNew <- lift $ computeResolvable True newRs
+  resOld <- lift $ computeResolvable oldRs
+  resNew <- lift $ computeResolvable newRs
   resOldQs <- S.toList <$> foldM toResolvable S.empty resOld
   resNewQs <- S.toList <$> foldM toResolvable S.empty resNew
   return $ S.fromList $ concatMap (`withouts` resNewQs) resOldQs

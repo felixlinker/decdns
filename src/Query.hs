@@ -20,7 +20,7 @@ queryT (nameTerm -> n) (ttypeTerm -> t) = do
 
 queryStep :: Name String -> T.Type -> S.Set (Rule RComp) -> Fresh (S.Set (Rule RComp))
 queryStep n t rs = do
-  kb <- computeResolvable False rs
+  kb <- computeResolvable rs
   q <- queryT n t
   undefined
   -- return $ S.fromList . mapMaybe (refine q) $ S.toList kb

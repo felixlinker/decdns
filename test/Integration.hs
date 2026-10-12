@@ -555,7 +555,7 @@ resolvableQueries files = do
   cfg <- loadConfig files
   return $ runFresh $ do
         rules <- compileConfig rootServers cfg
-        computeResolvable True rules
+        computeResolvable rules
 
 loadConfig :: [FilePath] -> IO NameServersConfig
 loadConfig = parseZoneFiles zoneWellformed
