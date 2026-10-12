@@ -164,6 +164,7 @@ library
     , bytestring
     , containers
     , crypton
+    , dns
     , iproute
     , lens
     , memory
@@ -190,6 +191,7 @@ executable dns-regressor-prolog
     , bytestring
     , containers
     , crypton
+    , dns
     , dns-regressor
     , iproute
     , lens
@@ -245,6 +247,7 @@ test-suite dns-regressor-test
     , containers
     , crypton
     , directory
+    , dns
     , dns-regressor
     , filepath
     , iproute
