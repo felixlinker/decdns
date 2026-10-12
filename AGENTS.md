@@ -4,8 +4,8 @@ The tools purpose and CLI usage is documented in the `README.md`.
 - Always check whether you can reuse existing code before implementing new features.
 - When you find yourself reimplementing functionality or logic that has already been implemented, directly reuse or, when not immediately possible, generalize existing code.
 - Re-run tests whenever possible.
-If you implement new features, also implement corresponding test cases.
-You can re-run all tests by executing `stack --stack-root "$PWD/.stack-root" test`.
+If you implement new features, also implement corresponding test cases whenever this new feature is not already sufficiently covered by old test cases.
+You can re-run all tests by executing `stack test`.
 - If you find that a test case fails, always fix that.
 You may fix a failing test case both by changing the implementation or the test case.
 Always think about which option is the correct one and include your reasoning in your final report.
