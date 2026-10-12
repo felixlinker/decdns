@@ -527,7 +527,8 @@ nameWithSynthesis (Name (l NE.:| ls)) = case l of
   Wildcard cs -> do
     h <- freshVar "H"
     t <- freshVar "T"
-    return (listWithTail (reverse (h : exactlyNatoms ls)) t, neqs h cs)
+    let nameT = listWithTail (reverse (h : exactlyNatoms ls)) t
+    return (nameT, isName nameT : neqs h cs)
   _ -> return (list (reverse (exactlyNatoms (l:ls))), [])
   where
     neqs :: Term -> [String] -> [Term]
