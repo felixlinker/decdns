@@ -19,7 +19,7 @@ import Resolvable.Unification (Unifier, apply)
 stubSLD :: Maybe Int -> [Rule ()] -> Term -> [Unifier]
 stubSLD limits kb g =
   let limitMap = M.fromList $ maybeToList $ ((), ) <$> limits
-  in fst $ runIdentity $ runSLD limitMap $ uncurry (sld kb) (goal g)
+  in fst $ runIdentity $ runSLD $ uncurry (sld kb) (goal limitMap g)
 
 p :: Term -> Term
 p = TFunctor "p" . (:[])
