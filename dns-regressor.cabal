@@ -15,6 +15,20 @@ copyright:      2025 Author name here
 license:        BSD-3-Clause
 build-type:     Simple
 extra-source-files:
+    test/fixtures/querying/child.unsigned
+    test/fixtures/querying/child.zone
+    test/fixtures/querying/external.unsigned
+    test/fixtures/querying/external.zone
+    test/fixtures/querying/generate.sh
+    test/fixtures/querying/README.md
+    test/fixtures/querying/test.unsigned
+    test/fixtures/querying/test.zone
+    test/fixtures/querying/wire-complete.unsigned
+    test/fixtures/querying/wire-complete.zone
+    test/fixtures/querying/wire-nsec3.zone
+    test/fixtures/querying/wire-optout.zone
+    test/fixtures/querying/wire.unsigned
+    test/fixtures/querying/wire.zone
     examples/cname/base/ns.b.com.
     examples/cname/base/ns.com.
     examples/cname/broken/ns.com.
@@ -64,7 +78,6 @@ source-repository head
 library
   exposed-modules:
       DNS.Diff
-      DNS.Dig
       DNS.Name
       DNS.Record
       DNS.RecordType
@@ -88,7 +101,6 @@ library
       Parsing.Tokens
       Parsing.ZoneFile
       Prolog.Bridge
-      Query
       Resolvable.Constraint.Neqs
       Resolvable.Constraint.Solving
       Resolvable.Constraint.Store
@@ -97,6 +109,7 @@ library
       Resolvable.Prolog.Reverse
       Resolvable.Prolog.Symbols
       Resolvable.Prolog.TermView
+      Resolvable.Querying
       Resolvable.Resolution
       Resolvable.Resolvability
       Resolvable.Unification
@@ -189,6 +202,7 @@ test-suite dns-regressor-test
       Resolvable.Constraint.NeqsSpec
       Resolvable.Constraint.StoreSpec
       Resolvable.Prolog.CoreSpec
+      Resolvable.QueryingSpec
       Resolvable.ResolutionSpec
       Resolvable.ResolvabilitySpec
       Resolvable.UnificationSpec
@@ -222,7 +236,9 @@ test-suite dns-regressor-test
     , iproute
     , lens
     , memory
+    , network
     , parsec
+    , process
     , tasty
     , tasty-hunit
     , tasty-quickcheck

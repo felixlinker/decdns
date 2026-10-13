@@ -26,6 +26,7 @@ import qualified Util.GraphSpec as GraphSpec
 import qualified Util.TreeSpec as TreeSpec
 import qualified Util.FreshSpec as FreshSpec
 import qualified Util.FixpointSpec as FixpointSpec
+import qualified Resolvable.QueryingSpec as QueryingSpec
 import qualified Resolvable.ResolutionSpec as ResolutionSpec
 
 main :: IO ()
@@ -33,7 +34,8 @@ main = do
   defaultMain $
     testGroup
       "dns-regressor"
-      [ UnificationSpec.tests
+      [ QueryingSpec.tests
+      , UnificationSpec.tests
       , PrologCoreSpec.tests
       , ResolvabilitySpec.tests
       , DisunificationSpec.tests

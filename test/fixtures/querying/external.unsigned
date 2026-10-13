@@ -1,0 +1,5 @@
+$ORIGIN external.test.
+$TTL 60
+@ IN SOA ns.other.test. hostmaster.external.test. 1 60 60 60 60
+@ IN NS ns.other.test.
+www IN A 192.0.2.40

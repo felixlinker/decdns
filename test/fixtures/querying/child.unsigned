@@ -1,0 +1,6 @@
+$ORIGIN child.test.
+$TTL 60
+@ IN SOA ns.child.test. hostmaster.child.test. 1 60 60 60 60
+@ IN NS ns.child.test.
+ns IN AAAA ::1
+www IN A 192.0.2.30

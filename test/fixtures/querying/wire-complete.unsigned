@@ -1,0 +1,9 @@
+$ORIGIN .
+$TTL 60
+@ IN SOA ns.root. hostmaster.test. 1 60 60 60 60
+@ IN NS ns.root.
+ns.root. IN A 127.0.0.1
+alias.test. IN CNAME target.test.
+target.test. IN A 192.0.2.51
+child.test. IN NS ns.child.test.
+ns.child.test. IN A 127.0.0.1

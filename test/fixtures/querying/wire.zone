@@ -1,0 +1,90 @@
+; File written on Tue Oct 13 13:49:11 2026
+; dnssec-signzone version 9.20.29
+.			60	IN SOA	ns.root. hostmaster.test. (
+					1          ; serial
+					60         ; refresh (1 minute)
+					60         ; retry (1 minute)
+					60         ; expire (1 minute)
+					60         ; minimum (1 minute)
+					)
+			60	RRSIG	SOA 13 0 60 (
+					20350101000000 20200101000000 36043 .
+					z7LNORaYsn5g15BgojFCehd/UdFwiOCxu/Ee
+					PrrFEwL+wnMKdboW6z7xO9V+71ncwA+T08Nx
+					ivAAUQGdnBgAcg== )
+			60	NS	ns.root.
+			60	RRSIG	NS 13 0 60 (
+					20350101000000 20200101000000 36043 .
+					W6/BRLYI0o3IaeQyyT1oCo09ku+nz6itFRI8
+					Ukk3jbDCm7Z8sS5i80Kra6duh1mXUvi1eGaE
+					NiKrltLI4lVc1w== )
+			60	NSEC	ns.root. NS SOA RRSIG NSEC DNSKEY
+			60	RRSIG	NSEC 13 0 60 (
+					20350101000000 20200101000000 36043 .
+					auU2gEizdP6BQY2v3CHuJWbLlRVdZkQNaePN
+					5+G7zKI92GCESDv2kl+jeMa0p1ZVSbrcAB3e
+					4xiPtT3eULmIqQ== )
+			60	DNSKEY	256 3 13 (
+					MPX2h2/3ndcDlHGFfPBl9JgWZjJ0k0LxTFvp
+					pqht8qwdJQjjhbl9XxBlDuV3XwGc0NSru0g0
+					Se8t8EHnT7Lk5A==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 36043
+			60	DNSKEY	257 3 13 (
+					vaIZV/8UWKgEXZhQy8Lw8mTJqgCC8eonRcrS
+					7UbrZFKcjXoZ80z3O1GbiVECwNCcp3kZI4S6
+					LFHiaHwO5XOQIQ==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 49456
+			60	RRSIG	DNSKEY 13 0 60 (
+					20350101000000 20200101000000 36043 .
+					7/tx0Cc/hUxFmx+NAZc+eIYBacRp42oCLU+p
+					yyfwELU3uGQ7axg4IbXC2LC4KdYMbBgv2ARM
+					xVJMmMSDFvlQ2w== )
+			60	RRSIG	DNSKEY 13 0 60 (
+					20350101000000 20200101000000 49456 .
+					R5CIg+p68978a2F+0I6nakfnjki8Iy27hRn7
+					xP7ZocaVI2+u1nmmGGabq1Ms7M1sOnvlk5oE
+					0W/gufs+qxF2zw== )
+ns.root.		60	IN A	127.0.0.1
+			60	RRSIG	A 13 2 60 (
+					20350101000000 20200101000000 36043 .
+					+uW6i9Gwi6I2gg0El+k5EED9PQ2+EdnBUI7Z
+					SKQNcC3dewJBMVPRu3ruRMbjRZe+smhDMfmb
+					RHiROPBJ8Eu4pA== )
+			60	NSEC	alias.test. A RRSIG NSEC
+			60	RRSIG	NSEC 13 2 60 (
+					20350101000000 20200101000000 36043 .
+					qZWrqGgq7oZlHEAasFLXB3V/ZZz6W9pYzgr8
+					Lpyiywau0gaZeKRm5H65evup4sR6Owx9pbNr
+					BQn0LqKMiUKqJg== )
+alias.test.		60	IN CNAME target.test.
+			60	RRSIG	CNAME 13 2 60 (
+					20350101000000 20200101000000 36043 .
+					zq+kp4EWrNzFDjqikKM2/CM51siDCtoA/tSD
+					YGmzu2nZYc8Oir2v6SxjmmQe/ooGnqn9r1Rs
+					pnYlvt3SvQEHKA== )
+			60	NSEC	child.test. CNAME RRSIG NSEC
+			60	RRSIG	NSEC 13 2 60 (
+					20350101000000 20200101000000 36043 .
+					qphRF++z8+a1eL5V9cZ1/3C2B74LALvowkp+
+					nfxYYpzvMfhUjZxj2QT03GageDfmvZiVaWb7
+					4dqoa1mNJuYKKQ== )
+child.test.		60	IN NS	ns.child.test.
+			60	NSEC	target.test. NS RRSIG NSEC
+			60	RRSIG	NSEC 13 2 60 (
+					20350101000000 20200101000000 36043 .
+					i+R78sb8PH1nlfXrdDvppTjQ2l9CBAf9NTVY
+					lKwAT3a6nyk6MhwMW/ECm7gJDmj04tqXFpEA
+					DDEAaeSibVGjLg== )
+ns.child.test.		60	IN A	127.0.0.1
+target.test.		60	IN A	192.0.2.50
+			60	RRSIG	A 13 2 60 (
+					20350101000000 20200101000000 36043 .
+					kYRMI51VBJWfn7pBOMFUmtSLw80lHPumIzpH
+					QRuRCrmqx+dpybcnsMxL3c/r+AypsIYXGCXy
+					+OjTMfXyjzDXxg== )
+			60	NSEC	. A RRSIG NSEC
+			60	RRSIG	NSEC 13 2 60 (
+					20350101000000 20200101000000 36043 .
+					ECJigfCvyXup6+C1d9wNrxP4TI4q16/ZAo7j
+					SLG2QByd2iwiDm05W2843MRjWx4rBeOxesAD
+					2Fp69ABLBdj2BA== )

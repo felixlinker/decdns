@@ -1,8 +1,7 @@
 module PrologCompiler (main) where
 
 import DNS.ZoneFile (allRecords)
-import DNS.Dig (followUpQueries)
-import DNS.Wellformedness ( zoneWellformed, responseWellformed )
+import DNS.Wellformedness ( zoneWellformed )
 import NameConstraint (toStandardRecord)
 import Resolvable.Prolog.Core
 import Resolvable.Resolvability
@@ -15,11 +14,14 @@ import Util
 import Data.List (uncons)
 import qualified Data.Set as S
 import Resolvable.Update.Dependencies (computeRegressions)
+import Control.Monad (when, foldM_)
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
-import Parsing (parseNameM, parseTypeM)
 import Parsing.Config (parseZoneFiles)
-import Query (queryStep)
+import DNS.Name (root, prependLabels)
+import Resolvable.Querying (resolve)
+import Parsing.Name (parseNameM)
+import Parsing (parseTypeM)
 
 main :: IO ()
 main = do
@@ -57,23 +59,20 @@ main = do
       parsed <- concatMap (map toStandardRecord . allRecords . snd) <$> parseZones args
       mapM_ print parsed
     "query" -> do
-      (roots, [qnameString, qtypeString]) <- sepBy "--" args
-      rootServers <- parseNames roots
-      qname <- parseNameM qnameString
-      qtype <- parseTypeM qtypeString
-      cfg <- parseResponse
-      let kb = runFresh (queryStep qname qtype =<< compileConfig rootServers cfg)
-      let answers = filter isFact $ S.toList kb
-      if null answers
-        then mapM_ print $ followUpQueries kb
-        else putStrLn $ showKnowledgeBase answers
+      let rs = [(prependLabels ["a", "root-servers", "net"] root, read "198.41.0.4")]
+      [keysPath, t, qn] <- return args
+      keys <- parseDS keysPath
+      t' <- parseTypeM t
+      qn' <- parseNameM qn
+      (as, qs) <- resolve keys rs t' qn'
+      putStrLn "% Queried:"
+      foldM_ (\_ q -> putStrLn ("% " ++ show q)) () qs
+      when (null as) (putStrLn "no response")
+      mapM_ print as
     _ -> fail "unknown command"
   where
     parseZones :: [FilePath] -> IO NameServersConfig
     parseZones = parseZoneFiles zoneWellformed
-
-    parseResponse :: IO NameServersConfig
-    parseResponse = parseStdin responseWellformed
 
     popArg :: [String] -> IO (String, [String])
     popArg = maybe (fail "too few arguments") return . uncons

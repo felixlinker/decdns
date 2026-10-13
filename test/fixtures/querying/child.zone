@@ -1,0 +1,70 @@
+; File written on Tue Oct 13 13:49:10 2026
+; dnssec-signzone version 9.20.29
+child.test.		60	IN SOA	ns.child.test. hostmaster.child.test. (
+					1          ; serial
+					60         ; refresh (1 minute)
+					60         ; retry (1 minute)
+					60         ; expire (1 minute)
+					60         ; minimum (1 minute)
+					)
+			60	RRSIG	SOA 13 2 60 (
+					20350101000000 20200101000000 62783 child.test.
+					3hm+FE3u4qIl04vzcXnu3W/Dusyzvs56WAXO
+					MBcCZHVwsNE6Gh4nz+yLFmwtsklJGTzRuLTK
+					HdBIgMc3FwkDIw== )
+			60	NS	ns.child.test.
+			60	RRSIG	NS 13 2 60 (
+					20350101000000 20200101000000 62783 child.test.
+					2fxH3DAObjcwNZN3J/e+3g3FQxWY2WvCTiCy
+					kkh00IFNA0QJYG2v6fr5xxw+xvlH1kT9Rt4y
+					KhzEbyaX0qIiHA== )
+			60	NSEC	ns.child.test. NS SOA RRSIG NSEC DNSKEY
+			60	RRSIG	NSEC 13 2 60 (
+					20350101000000 20200101000000 62783 child.test.
+					y3z0Aq6VR4czZYmLB8PCGcFcfcHphoTEh8rL
+					AijYevbB88YoubdwXc7oN9e6JwciFHCapCal
+					pd8Wd3IGM3jf3A== )
+			60	DNSKEY	256 3 13 (
+					nHElKfOHwr+rRYNhAmRzPYn4yOYFdu2B56hs
+					gGjxhlhsi/fLuPMfczB1Brz6J93HZHYTbNAx
+					4qWvOblkWTITUw==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 62783
+			60	DNSKEY	257 3 13 (
+					9WgV38snDX0rcvNuZh9HtJnFarPhbCrbw0C8
+					71Rw2qB4ndYPFIw9X/JojafEzPzYhZ1nIZDA
+					4MCtLp6Bh+Fldg==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 61001
+			60	RRSIG	DNSKEY 13 2 60 (
+					20350101000000 20200101000000 61001 child.test.
+					Wnv6btMVuOEZPF38wFypDveyiDeI9hdo3WsD
+					zd2CavfWieOBeK4guiQhiI3iM1aDW4MYFIgD
+					BYq6QbmOkI7abw== )
+			60	RRSIG	DNSKEY 13 2 60 (
+					20350101000000 20200101000000 62783 child.test.
+					FQds/29gzka/2KId88/9qhJOGIq04jfXACmY
+					mktjcrCMhyrNAEIe4+vmUWPoU4AFXn1yOy/H
+					mWKEZ2j+UDWsuA== )
+ns.child.test.		60	IN AAAA	::1
+			60	RRSIG	AAAA 13 3 60 (
+					20350101000000 20200101000000 62783 child.test.
+					nydZMLFURQ0RcvxKissBJIBbTwLLmou/IxQm
+					6G5y9Pgrt45vCTMJiShiSNk4t0M/41PpFnI1
+					DpulnayRi0py0Q== )
+			60	NSEC	www.child.test. AAAA RRSIG NSEC
+			60	RRSIG	NSEC 13 3 60 (
+					20350101000000 20200101000000 62783 child.test.
+					+ejCypVMw7DxZbU8CaYRddzSgVx/ioyVtATT
+					gtlXdZ3pZX+Z8UEpWjkm94x88IOMX9S3UBYM
+					rcnBdfSLofplgA== )
+www.child.test.		60	IN A	192.0.2.30
+			60	RRSIG	A 13 3 60 (
+					20350101000000 20200101000000 62783 child.test.
+					FG/6rTl4xa24jbm2Pgn9b1AygMZ49eARYEwy
+					pvzhhK9+fAj6SmoM/s9k3ZiY/eDb8+ZHK1nh
+					3teFohxJ4wMGsQ== )
+			60	NSEC	child.test. A RRSIG NSEC
+			60	RRSIG	NSEC 13 3 60 (
+					20350101000000 20200101000000 62783 child.test.
+					EaWXfa8JKd+FFSLT9NBgczXC5sCJHWTpRcTo
+					fdZOPAXLhaE1MLLBYV0p7cZWahBYzM4Wbvub
+					zqtxe4djwjNMwg== )
