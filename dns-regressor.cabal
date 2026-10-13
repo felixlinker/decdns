@@ -68,6 +68,7 @@ library
       DNS.Name
       DNS.Record
       DNS.RecordType
+      DNS.Response
       DNS.RRSet
       DNS.SEC.Crypto
       DNS.SEC.Keys
