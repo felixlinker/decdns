@@ -13,7 +13,7 @@ import Control.Exception (evaluate)
 import System.Timeout (timeout)
 
 import Resolvable.Prolog.Core
-import Resolvable.Resolution (goal, runSLD, sld)
+import Resolvable.Resolution (goal, runSLD, sld, sldFirst)
 import Resolvable.Unification (Unifier, apply)
 
 stubSLD :: Maybe Int -> [Rule ()] -> Term -> [Unifier]
@@ -48,6 +48,13 @@ tests =
         let g = p $ TVar "x"
             us = stubSLD Nothing rules g
         in S.fromList (map (`apply` g) us) @?= S.fromList (map (p . TInt) [0..2])
+    , testCase "first proof skips a later non-terminating alternative" $ do
+        let g = p $ TVar "x"
+            kb = fact () (p (TInt 1)) : loopingRules
+        result <- timeout 100000 $ evaluate $
+          let (us, _) = runIdentity $ runSLD $ uncurry (sldFirst kb) (goal M.empty g)
+          in ((`apply` g) <$> us) == Just (p (TInt 1))
+        result @?= Just True
     , testCase "respects limits" $
         let g = p $ TVar "x"
         in null (stubSLD (Just 3) loopingRules g) @?= True

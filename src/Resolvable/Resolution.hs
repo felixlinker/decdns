@@ -4,12 +4,14 @@ module Resolvable.Resolution
   , Goal(..)
   , goal
   , sld
+  , sldFirst
   , runSLD ) where
 
 import Control.Monad (when, guard)
 import Control.Monad.Trans.Class (lift)
 import qualified Control.Monad.Trans.State as St
 import Data.Maybe (mapMaybe, maybeToList, catMaybes)
+import Data.List (uncons, partition)
 import qualified Data.Map as M
 
 import qualified Resolvable.Constraint.Store as Store
@@ -34,6 +36,9 @@ type Limits k = M.Map k Int
 -- | The remaining rule budgets belong to this search branch.
 data Goal k a = Goal a (Limits k) Store.ConstraintStore
   deriving (Eq, Ord)
+
+finished :: Foldable f => Goal k (f a) -> Bool
+finished (Goal gs _ _) = null gs
 
 checkLimits :: Ord k => k -> Limits k -> Maybe (Limits k)
 checkLimits ann ls = do
@@ -89,7 +94,12 @@ sld _ (Goal [] _ _) u = return [u]
 sld rs g u = do
   (g', u') <- lift $ awayG g
   gs <- resolution rs g' (u ~> u')
-  concat <$> mapM (uncurry (sld rs)) gs
+  let (done, rec) = partition (finished . fst) gs
+  recGs <- concat <$> mapM (uncurry (sld rs)) rec
+  return $ map snd done ++ recGs
+
+sldFirst :: (Monad m, Ord k) => [Rule k] -> Goal k [Term] -> Unifier -> Solver k m (Maybe Unifier)
+sldFirst rs g u = fmap fst . uncons <$> sld rs g u
 
 runSLD :: Monad m => Solver k m a -> m (a, [Goal k [Term]])
 runSLD = (`St.runStateT` []) . (`evalFreshT` 0) . Store.evalCached
