@@ -18,7 +18,6 @@ module DNS.SEC.Crypto
   ) where
 
 import Control.Monad (guard)
-import Crypto.PubKey.ECC.Prim (isPointValid)
 import qualified Crypto.PubKey.RSA.Types as RSA
 import Data.Bits ((.|.))
 import qualified Data.ByteString as BS
@@ -26,6 +25,8 @@ import qualified Crypto.PubKey.ECC.ECDSA as ECDSA
 import qualified Crypto.PubKey.ECC.Types as ECCTypes
 import Data.Bifunctor (Bifunctor(bimap))
 import Crypto.Number.Serialize (os2ip)
+import Data.X509 (SerializedPoint(..))
+import Data.X509.EC (unserializePoint)
 
 data AlgorithmType
   = RSAMD5
@@ -114,7 +115,6 @@ algorithmFromMnemonic "PRIVATEOID" = Just PRIVATEOID
 algorithmFromMnemonic _ = Nothing
 
 -- RFC 6605, Section 4: fixed-width r || s and x || y encodings.
--- Keep the original helpers as P-256 specializations.
 ecdsaSig :: AlgorithmType -> BS.ByteString -> Maybe ECDSA.Signature
 ecdsaSig alg sig = do
   (size, _) <- ecdsaParameters alg
@@ -123,10 +123,9 @@ ecdsaSig alg sig = do
 
 ecdsaPk :: AlgorithmType -> BS.ByteString -> Maybe ECDSA.PublicKey
 ecdsaPk alg key = do
-  (size, curve) <- ecdsaParameters alg
-  guard (BS.length key == 2 * size)
-  let point = uncurry ECCTypes.Point $ bimap os2ip os2ip $ BS.splitAt size key
-  guard (isPointValid curve point)
+  (_, curve) <- ecdsaParameters alg
+  -- DNSKEY omits the SEC1 uncompressed-point tag expected by the decoder.
+  point <- unserializePoint curve (SerializedPoint (BS.cons 4 key))
   return $ ECDSA.PublicKey curve point
 
 ecdsaParameters :: AlgorithmType -> Maybe (Int, ECCTypes.Curve)

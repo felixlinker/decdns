@@ -147,6 +147,7 @@ library
     , bytestring
     , containers
     , crypton
+    , crypton-x509
     , dns
     , iproute
     , lens

@@ -52,6 +52,7 @@ library:
   source-dirs: src
   dependencies:
   - text
+  - crypton-x509
 
 executables:
   dns-regressor-prolog:
