@@ -1,8 +1,10 @@
 module DNS.RecordType
   ( Type(..)
   , allTypes
+  , intToType
   , typeToInt ) where
 
+import Data.List (find)
 import Util.Bytes (Serialize(..), word16)
 
 data Type = CNAME | DNAME | NS | A | AAAA | TXT | MX | SOA | DNSKEY | RRSIG | NSEC | NSEC3 | NSEC3PARAM | DS | ZONEMD
@@ -13,6 +15,9 @@ instance Serialize Type where
 
 allTypes :: [Type]
 allTypes = [ CNAME, DNAME, NS, A, AAAA, TXT, MX, SOA, DNSKEY, RRSIG, NSEC, NSEC3, NSEC3PARAM, DS, ZONEMD ]
+
+intToType :: Int -> Maybe Type
+intToType n = find ((== n) . typeToInt) allTypes
 
 typeToInt :: Type -> Int
 typeToInt A = 1

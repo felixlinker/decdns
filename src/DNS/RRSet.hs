@@ -16,6 +16,7 @@ module DNS.RRSet
   , StdRRSet
   , canonicalRRSet
   , toRecords
+  , rrsetType
   , hasType
   , getType
   , dropType ) where
@@ -94,6 +95,9 @@ flattenData = concatMap NE.toList . M.elems . rds
 
 toRecords :: RRSet a -> NE.NonEmpty (Record a)
 toRecords (Named n sets) = Named n <$> sets
+
+rrsetType :: RRSet a -> T.Type
+rrsetType = toType . rtype . NE.head . value
 
 hasType :: T.Type -> RTypedSet a -> Bool
 hasType t = M.member t . rds

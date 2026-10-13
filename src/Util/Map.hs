@@ -1,6 +1,7 @@
 module Util.Map
   ( groupBy
-  , alterDefF ) where
+  , alterDefF
+  , add ) where
 
 import qualified Data.Map as M
 
@@ -12,3 +13,6 @@ whenDefined f = maybe (pure Nothing) (fmap Just . f)
 
 alterDefF :: (Applicative f, Ord k) => (a -> f a) -> k -> M.Map k a -> f (M.Map k a)
 alterDefF f = M.alterF (whenDefined f)
+
+add :: (Semigroup s, Ord k) => k -> s -> M.Map k s -> M.Map k s
+add = M.insertWith (<>)

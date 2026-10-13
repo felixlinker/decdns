@@ -1,8 +1,12 @@
 module Util.Parsing
-  ( parseS ) where
+  ( handleParser
+  , parseS ) where
 
 import Control.Monad ((<=<))
 import Text.Parsec
 
+handleParser :: MonadFail m => Either ParseError a -> m a
+handleParser = either (fail . show) return
+
 parseS :: MonadFail m => ParsecT String () m a -> String -> m a
-parseS p = either (fail . show) return <=< runParserT p () "string parsing"
+parseS p = handleParser <=< runParserT p () "string parsing"

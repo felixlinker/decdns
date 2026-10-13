@@ -16,7 +16,7 @@ import qualified Crypto.PubKey.ECC.ECDSA as ECDSA
 import Data.Bits (shiftR, shiftL)
 import qualified Data.ByteArray as BA
 import qualified Data.ByteString as BS
-import Data.List (intersperse, sortOn, nub)
+import Data.List (intersperse, sortOn)
 import qualified Data.List.NonEmpty as NE
 import Data.Word (Word16, Word32)
 import Control.Monad (guard)
@@ -28,6 +28,7 @@ import Util.Bytes
 import DNS.SEC.Crypto
 import Data.Maybe (fromMaybe)
 import Data.Functor (void)
+import Util.List (snub)
 
 -- See: https://datatracker.ietf.org/doc/html/rfc4035#section-2.4
 isDNSSECKey :: DNSKEYData -> Bool
@@ -56,7 +57,7 @@ verifySignature (canonicalName -> owner) (map canonicalType -> rrset) (canonical
     mkRecord = Named originalOwner . RData IN (_originalTTL sig)
 
     serializedRRSet :: [BS.ByteString]
-    serializedRRSet = nub $ map (serialize . mkRecord) $ sortOn serialize rrset
+    serializedRRSet = snub $ map (serialize . mkRecord) $ sortOn serialize rrset
 
 keyTag :: DNSKEYData -> Word16
 keyTag (serialize -> wireFormat) =

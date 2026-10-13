@@ -1,15 +1,20 @@
+{-# LANGUAGE TupleSections #-}
 module DNS.Zone
   ( splitZone
+  , splitZoneAt
+  , splitZones
   , collectReferrals ) where
 
 import qualified Control.Monad.Trans.State as St
 import Control.Arrow (first)
 import qualified Data.Map as M
+import qualified Data.Set as S
 import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE
 
 import DNS.Name
 import DNS.ZoneFile
+import qualified DNS.Name as N
 import DNS.Record
 import qualified DNS.RecordType as T
 import DNS.RRSet
@@ -22,22 +27,36 @@ insertNonEmpty k mv = M.alter (const $ NE.nonEmpty mv) k
 inserts :: Ord k => M.Map k (NE.NonEmpty a) -> [(k, [a])] -> M.Map k (NE.NonEmpty a)
 inserts = foldr (uncurry insertNonEmpty)
 
-splitZone :: Label a => Zone a -> [Zone a]
-splitZone (Zone n r) = St.execState (rec n n True r) []
+splitZone :: (Label a, Ord a) => Zone a -> [Zone a]
+splitZone = splitZoneAt S.empty
+
+splitZoneAt :: (Label a, Ord a) => S.Set (Name a) -> Zone a -> [Zone a]
+splitZoneAt apices input =
+  let Zone n r = mergeZones (emptyZone N.root) input
+      (remaining, zones) = St.runState (rec n False r) []
+      partial = prune (Zone n remaining)
+  in if isEmpty partial then zones else partial : zones
   where
-    rec :: Label a => Name a -> Name a -> Bool -> ZNode a -> St.State [Zone a] (ZNode a)
-    rec zn accN retainParent (Tr.Node d cs)
-      | hasType T.SOA d = do
-        let (parentData, childData) = splitData zn d
+    rec accN retainParent (Tr.Node d cs)
+      | hasType T.SOA d || accN `S.member` apices = do
+        let (parentData, childData) = splitData accN d
         let parentNode = Tr.Node (if retainParent then parentData else empty) M.empty
-        childCs <- M.traverseWithKey (\l -> rec accN (l <| accN) True) cs
+        childCs <- M.traverseWithKey (\l -> rec (l <| accN) True) cs
         let childNode = Tr.Node childData childCs
         St.modify (Zone accN childNode:)
         return parentNode
       | otherwise = do
         let retainParent' = retainParent && not (hasType T.NS d)
-        cs' <- M.traverseWithKey (\l -> rec zn (l <| accN) retainParent') cs
+        cs' <- M.traverseWithKey (\l -> rec (l <| accN) retainParent') cs
         return (Tr.Node d cs')
+
+splitZones :: (Name String -> S.Set (Name String)) -> [(Name String, [StandardRecord])] -> [(Name String, Zone String)]
+splitZones apices = concatMap (uncurry aux)
+  where
+    aux :: Name String -> [StandardRecord] -> [(Name String, Zone String)]
+    aux nameServer records =
+      let zones = maybe [] (splitZoneAt (apices nameServer) . fromRecordList) (NE.nonEmpty records)
+      in Prelude.map (nameServer,) zones
 
 splitData :: Label a => Name a -> RDataSet -> (RDataSet, RDataSet)
 splitData childZoneName d@(RDS m) =

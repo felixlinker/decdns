@@ -5,26 +5,23 @@ module Parsing.Config
   , parseStdin
   ) where
 
-import qualified Data.List.NonEmpty as NE
+import qualified Data.Set as S
 import GHC.Base (failIO, when)
 import System.IO (stderr, hPrint)
 import Text.Parsec (ParseError, SourceName)
 
-import DNS.Name (Name)
-import DNS.ZoneFile (Zone, fromRecordList)
-import DNS.Zone (splitZone)
+import DNS.ZoneFile (Zone)
+import DNS.Zone (splitZones)
 import NameConstraint (compileWildcards)
-import Parsing (ServedZone, parseZoneFile)
+import Parsing (parseZoneFile)
 import Resolvable.Resolvability (NameServersConfig)
 import DNS.Wellformedness (Issue, isFatal)
-
-handleParser :: Either ParseError a -> IO a
-handleParser = either (failIO . show) return
+import Util.Parsing
 
 parseZoneFileContents :: (Zone String -> [Issue String]) -> SourceName -> String -> IO NameServersConfig
 parseZoneFileContents wfc source content = do
   parsed <- handleParser =<< parseZoneFile source content
-  zones <- concat <$> mapM toZones parsed
+  let zones = splitZones (const S.empty) parsed
   mapM_ (wellformed . snd) zones
   return $ map (fmap compileWildcards) zones
   where
@@ -34,11 +31,6 @@ parseZoneFileContents wfc source content = do
       mapM_ (hPrint stderr) issues
       when (any isFatal issues) (fail "fatal error encountered")
       return zone
-
-    toZones :: ServedZone -> IO [(Name String, Zone String)]
-    toZones (nameServer, records) = do
-      zones <- maybe (fail "no records") (return . splitZone . fromRecordList) (NE.nonEmpty records)
-      return $ map (nameServer,) zones
 
 parseStdin :: (Zone String -> [Issue String]) -> IO NameServersConfig
 parseStdin wfc = do

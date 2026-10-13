@@ -12,6 +12,7 @@ module NameConstraint
   , compileLabel
   , existIn
   , compileWildcards
+  , compileWildcardsLiteral
   , literalWildcards
   , synthesize
   , wildcardResponse ) where
@@ -71,11 +72,17 @@ compileLabel exist lbl
 existIn :: Label a => T.Node a v -> [String]
 existIn = map lshow . M.keys . T.children
 
-compileWildcards :: Zone String -> Zone ConstrainedLabel
-compileWildcards (Zone (Name n) r) = Zone (Name (NE.map Exactly n)) (go r)
+compileWildcardsWith :: ([String] -> String -> ConstrainedLabel) -> Zone String -> Zone ConstrainedLabel
+compileWildcardsWith f (Zone (Name n) r) = Zone (Name (NE.map Exactly n)) (go r)
   where
     go :: T.Node String RRSet.RDataSet -> ZNode ConstrainedLabel
-    go n_@(T.Node _ ch) = n_ { T.children = M.map go $ M.mapKeys (compileLabel (existIn n_)) ch }
+    go n_@(T.Node _ ch) = n_ { T.children = M.map go $ M.mapKeys (f (existIn n_)) ch }
+
+compileWildcards :: Zone String -> Zone ConstrainedLabel
+compileWildcards = compileWildcardsWith compileLabel
+
+compileWildcardsLiteral :: Zone String -> Zone ConstrainedLabel
+compileWildcardsLiteral = compileWildcardsWith (const Exactly)
 
 literalWildcards :: Zone ConstrainedLabel -> Zone String
 literalWildcards (Zone n r) = Zone (fmap show n) (T.mapLabels show r)
