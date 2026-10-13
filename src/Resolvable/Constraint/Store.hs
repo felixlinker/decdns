@@ -13,7 +13,7 @@ module Resolvable.Constraint.Store
   , Resolvable.Constraint.Store.solve ) where
 
 import qualified Control.Monad.Trans.Except as Ex
-import qualified Control.Monad.Trans.State.Strict as St
+import qualified Control.Monad.Trans.State as St
 import qualified Data.Map.Strict as M
 import Data.Functor.Identity (Identity(..))
 import Data.Maybe (catMaybes)
@@ -104,7 +104,6 @@ partitionConstraints = foldr addConstraint (empty, [])
   where
     addConstraint :: Term -> (ConstraintStore, [Term]) -> (ConstraintStore, [Term])
     addConstraint t (st, b) = maybe (st, t:b) (, b) (add st t)
-
 
 empty :: ConstraintStore
 empty = CStore N.empty []
