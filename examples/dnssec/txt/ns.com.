@@ -1,5 +1,5 @@
-; File written on Wed Sep  9 17:10:25 2026
-; dnssec-signzone version 9.20.27
+; File written on Tue Oct 13 17:38:06 2026
+; dnssec-signzone version 9.20.29
 com.			1200	IN SOA	ns.com. example.com. (
 					0          ; serial
 					0          ; refresh (0 seconds)
@@ -8,46 +8,46 @@ com.			1200	IN SOA	ns.com. example.com. (
 					0          ; minimum (0 seconds)
 					)
 			1200	RRSIG	SOA 13 1 1200 (
-					20261009141025 20260909141025 41614 com.
-					VaOfRq0ONwoF1MsZC2cOdb5+YRk+mRomj5Ad
-					Fk/vBEtg7/FngVHhdQKvCAG4QfcFQZqwIHMJ
-					qoR+DRqV3NAkJQ== )
+					20261112143806 20261013143806 22331 com.
+					D42PJpTDrBzUxQGzyVuEIeMPerYU92Xc8Lx7
+					C0NCObahKOdWFFRGsTGiO7ece8BOWc153zC0
+					UDFiCMisaXI3JQ== )
 			1200	NS	ns.com.
 			1200	RRSIG	NS 13 1 1200 (
-					20261009141025 20260909141025 41614 com.
-					LSDUid7t8DEYGnqpgKkVW1l/XTVGVanC5/ZV
-					8l58o3eKhGJ/Hc2OwVO4nkA58f2FnG7q6OAm
-					eZNshmxvHYKwjA== )
+					20261112143806 20261013143806 22331 com.
+					JrdpcWab+OuCSEZY9Vx4JHLi1Q6z6U1qpQ6/
+					HJV0N8PawRPpitf56ZtWww3CO96YsTiDN+Up
+					J91RwqpjLUfpyg== )
 			1200	TXT	"hello"
 			1200	RRSIG	TXT 13 1 1200 (
-					20261009141025 20260909141025 41614 com.
-					E2x97N1UiDqqb779LPYhGsH6Qgn89ldUqqeR
-					qKQgA74fE4H/WPDbBBFLVBjCs9HQe1kbZIkE
-					VslCzFzcvjsbdQ== )
+					20261112143806 20261013143806 22331 com.
+					O3Gr1Au5F6A+dU0IcPLStBzM+ybNqI6AtxGp
+					zzGk3nkr+O0OEyiKnEgBaVDNd+Avh0XldqtQ
+					uAea76HbHnTIRg== )
 			0	NSEC	com. NS SOA TXT RRSIG NSEC DNSKEY
 			0	RRSIG	NSEC 13 1 0 (
-					20261009141025 20260909141025 41614 com.
-					j5m8/KUinrk4DSzUhC51cfDo4oXUvpZM26Zq
-					MxylOBBFLc3knaNchq54JnGZ2YuRHZlrci/z
-					j7SdrFM8e3bFnw== )
+					20261112143806 20261013143806 22331 com.
+					0kWTtS9/7V2Sr5DOgA5FIVZZnGKkvxDmb6lF
+					oGS7mHcEYYE8XPT3VnrqJU78GYkeOEJt0wKr
+					vLcL3yIIcVHgbA== )
 			1200	DNSKEY	256 3 13 (
-					cfv6ncp5V9WCnZxFneqBeCCwGV6SOWKC2gv1
-					LOR4Bx+GVub/DTtRwziMxVE2a6KAXXzyI3tq
-					jg03cDpOFZVkLQ==
-					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 41614
+					2QhskfrhqUsU+uyMtYXUKqaJ0v3fiZuhHTbs
+					oyyxUB5inF5ZLvwFIWtTlEcyBevmlgBEPOVu
+					pUJ7CjICG6oikw==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 22331
 			1200	DNSKEY	257 3 13 (
-					Da76+K3tttBBWB0v9OvYHw/7ijVmdVppHErw
-					dWflMlDHYUTuA701YVvjfLu0iLQnTRHZsrsu
-					SoETOl43q1KE4g==
-					) ; KSK; alg = ECDSAP256SHA256 ; key id = 62435
+					h+pwp2nNAIlIoWv38t5CZ95TAnuENO5sjxnt
+					p1izDRONz4lRTsmsOEexroK3nlRuyg47uOwf
+					k+KDvsNYnAOvLA==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 45890
 			1200	RRSIG	DNSKEY 13 1 1200 (
-					20261009141025 20260909141025 41614 com.
-					vQsVrN4s7Et81ATbaOSNKIGcIIi6UZIbUrtm
-					U/Js/xwdTRvm1Iu4VtsPWxffJAeWWlnwjotw
-					Nnt00ri6/EFRZA== )
+					20261112143806 20261013143806 22331 com.
+					BJHjxTjSJR2WBliKtqgO0l4F3Ha7D3yLhTiz
+					zNE/FOv/UvLHKjqRbal0VpMQRnd55k4ju6mW
+					fRxDgRuj6Mk1SA== )
 			1200	RRSIG	DNSKEY 13 1 1200 (
-					20261009141025 20260909141025 62435 com.
-					ZK02sdOwj4vc2r/L5vHmvHUUPgnuL2+rmIjL
-					4JdbQLapDtz0oheHNhH9Wff9p3zIz63/zo0F
-					ig3V+45iu3mHNg== )
+					20261112143806 20261013143806 45890 com.
+					5Iq/JMx6pU2JL/pfhmM+qvp30plhB550E8/5
+					mKc3RAforbPgcZ5XEcA+swBftAee6/KpRbpa
+					c/ALG1C8CvvAVg== )
 ;; Served by ns.com.

@@ -1,5 +1,5 @@
-; File written on Wed Sep  9 17:39:58 2026
-; dnssec-signzone version 9.20.27
+; File written on Tue Oct 13 17:36:13 2026
+; dnssec-signzone version 9.20.29
 com.			1200	IN SOA	ns.com. example.com. (
 					0          ; serial
 					0          ; refresh (0 seconds)
@@ -8,64 +8,64 @@ com.			1200	IN SOA	ns.com. example.com. (
 					0          ; minimum (0 seconds)
 					)
 			1200	RRSIG	SOA 13 1 1200 (
-					20261009143958 20260909143958 41614 com.
-					gTgDGCkVJjQzepveHI02Qb1IzkMqbPb9wLrH
-					OA8/teu2jOFk61ZmF7EPw/WDCaXB9IzuWEhx
-					eJ0h7+t/COxilA== )
+					20261112143613 20261013143613 22331 com.
+					x1uC9RB4OtCdScJwzMG/x8E3/HC1L+CEuErY
+					4orWSRPHPDDHeqLrJTuAy6WXB5OGIrd7zPf2
+					2cmRvE/9bWdOGA== )
 			1200	NS	ns.com.
 			1200	RRSIG	NS 13 1 1200 (
-					20261009143958 20260909143958 41614 com.
-					vd2KAFPZiKQFrsA5LcGUSMuBWCdEgZbk+Pre
-					x3qM4LkgjIAKMJ7xW5pZAdQDAFHJXF8cj5i0
-					cEcTKJhEZaSTdg== )
+					20261112143613 20261013143613 22331 com.
+					l+pPmiIz64ib9G5nzy3zvBq12uJcDlCaRIsj
+					TbCAkG/ShzqOasZGsUS0k2j9bKPpZL/glW9d
+					aTEFQsZfoPpfxQ== )
 			0	NSEC	*.com. NS SOA RRSIG NSEC DNSKEY
 			0	RRSIG	NSEC 13 1 0 (
-					20261009143958 20260909143958 41614 com.
-					h828gSbOV3WlAJnHFE8o2MeMC3QVETlVz6ry
-					mrqWTu+h4pZ4qIXpExqIy8hK293SmUKi5MtR
-					xdmSNhmqrMFTEA== )
+					20261112143613 20261013143613 22331 com.
+					dKUHczQdAR28Ry9P4ygIWsva0Engne+7WWNw
+					fAkRFb1ZusKYtPmux12SSgsOt91rPzgppA7S
+					zrq1SYyzKKXkRQ== )
 			1200	DNSKEY	256 3 13 (
-					cfv6ncp5V9WCnZxFneqBeCCwGV6SOWKC2gv1
-					LOR4Bx+GVub/DTtRwziMxVE2a6KAXXzyI3tq
-					jg03cDpOFZVkLQ==
-					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 41614
+					2QhskfrhqUsU+uyMtYXUKqaJ0v3fiZuhHTbs
+					oyyxUB5inF5ZLvwFIWtTlEcyBevmlgBEPOVu
+					pUJ7CjICG6oikw==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 22331
 			1200	DNSKEY	257 3 13 (
-					Da76+K3tttBBWB0v9OvYHw/7ijVmdVppHErw
-					dWflMlDHYUTuA701YVvjfLu0iLQnTRHZsrsu
-					SoETOl43q1KE4g==
-					) ; KSK; alg = ECDSAP256SHA256 ; key id = 62435
+					h+pwp2nNAIlIoWv38t5CZ95TAnuENO5sjxnt
+					p1izDRONz4lRTsmsOEexroK3nlRuyg47uOwf
+					k+KDvsNYnAOvLA==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 45890
 			1200	RRSIG	DNSKEY 13 1 1200 (
-					20261009143958 20260909143958 41614 com.
-					IyVkI8jQyc4JW41PSp0iBLe2FtnYCtnYk+mW
-					9lDPVac1vm/sPjx5n6U3pDNmDjlVGXe4VpF+
-					VLWOiYGgDzsXOg== )
+					20261112143613 20261013143613 22331 com.
+					iQSOeFOB9Ir1144QhAgbpqlw3/Ufk6MjyzjC
+					F6XOyHHGUmuDj1eIU0Nrz4bzXYVYreNdpevf
+					N2l+d9BSckfdFw== )
 			1200	RRSIG	DNSKEY 13 1 1200 (
-					20261009143958 20260909143958 62435 com.
-					SqshcjpN8lgDWNV+QCMg9XqeGRQrJndBXpe7
-					WuZJHbqQqBL1LBY24/Q+KW8M8OPYkMXlNiFm
-					3KvrrJk5toh2nA== )
+					20261112143613 20261013143613 45890 com.
+					ldHFPRzOIPaG4hGcNRjHA3rvHyTbfopFA+lp
+					OELQmhE/EZicwCGv9H37m5TK7TuelFaOKbiM
+					vxmCZXNrPPL8ow== )
 *.com.			1200	IN A	1.2.3.4
 			1200	RRSIG	A 13 1 1200 (
-					20261009143958 20260909143958 41614 com.
-					GfaMZDnWq9TxmsYY+wm0xJM6jekuwlgQhP/y
-					HyDT6aS2fM62RwVMYEf1pC6uVBOlqedbpXl4
-					70K6s5/VjuCHeA== )
+					20261112143613 20261013143613 22331 com.
+					oblzgBMbJLx7XKuxIJ8c4pAlvMW6DeuWikda
+					S1vA+PgqjU3iA9jEiqUI4rcgBSomA5mcdCkv
+					n0Ss92t9e4tUBg== )
 			0	NSEC	x.*.com. A RRSIG NSEC
 			0	RRSIG	NSEC 13 1 0 (
-					20261009143958 20260909143958 41614 com.
-					crMpbc1QR3ScuTTk2qovBx7c3Qys4ssFqXBa
-					9+7yK6dQsRkIZ7dKGNYZ+/XCSbYY4Q49QBvX
-					LRcSXPuQPeQ9fQ== )
+					20261112143613 20261013143613 22331 com.
+					ktUGOCgTModULBnaCL+zCfYWQAEGwL1eGGwP
+					GKhFwQHtE+IcVYVzcBydm74US/gBxM53awo7
+					OD7ekMeRFGX73g== )
 x.*.com.		1200	IN A	5.6.7.8
 			1200	RRSIG	A 13 3 1200 (
-					20261009143958 20260909143958 41614 com.
-					p8x8zddKw3ZoT7ajo0AHAHyWjoXhFi+mZrRN
-					qurV+ekDoTCUObzCtuDzCc4nIgD3b1e+rEzc
-					mDANoTsvJ+ismw== )
+					20261112143613 20261013143613 22331 com.
+					Nk1k38k/ghcM8EHp93oDg8mTz1EEiV6YDMGD
+					kgAgQ2fF/rv3lMGyvcCQhFyC5JGoK0E8vUL2
+					gYeeZaYvmC9JWQ== )
 			0	NSEC	com. A RRSIG NSEC
 			0	RRSIG	NSEC 13 3 0 (
-					20261009143958 20260909143958 41614 com.
-					e8hsRDY1iXr+0EF1g/EmDEz/DDcPIUvtr/mV
-					AtcjKGx8Pd+LkYbhRrsE/PCB5AWFDh0ZavbF
-					N4kIDXoy0qFmFw== )
+					20261112143613 20261013143613 22331 com.
+					MACJXryecdXYljLyJFce1Io6ExC0bviVfVYZ
+					Oy2ffEQry6SUJ7cl1uk/wt5yjnv1sllD2uUy
+					7A4W/tnotZqmmw== )
 ;; Served by ns.com.

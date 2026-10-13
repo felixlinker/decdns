@@ -1,5 +1,5 @@
-; File written on Tue Jul  7 17:34:20 2026
-; dnssec-signzone version 9.20.23
+; File written on Tue Oct 13 17:33:54 2026
+; dnssec-signzone version 9.20.29
 com.			1200	IN SOA	ns.com. example.com. (
 					0          ; serial
 					0          ; refresh (0 seconds)
@@ -8,64 +8,64 @@ com.			1200	IN SOA	ns.com. example.com. (
 					0          ; minimum (0 seconds)
 					)
 			1200	RRSIG	SOA 13 1 1200 (
-					20260806143420 20260707143420 33519 com.
-					LNcNPCY8d7tCVrRe3XBwpsvLitrdBHMO7emr
-					FS+Vj3zyGtOV9EPh3Rv23NWOE1AYuG3oER+p
-					T73c//uYExB0UQ== )
+					20261112143354 20261013143354 22331 com.
+					gjGZZ/Nukfq6rG9W9NQkUnQqYlDBAq0rT+Ns
+					ypw0/2AuJchdHUU7XiaIguoq2Mm4XGFb5T58
+					FUKvPu+ZL4TbyQ== )
 			1200	NS	ns.com.
 			1200	RRSIG	NS 13 1 1200 (
-					20260806143420 20260707143420 33519 com.
-					3DFv0/QAWvpReBveXvI1j2Vq7LJNVVOGkaC2
-					eadjCQGTWuv377qNizk4jYX/W1If7Kg+sduj
-					aL25LpYKviLQGA== )
+					20261112143354 20261013143354 22331 com.
+					Pbd8YDlqHXg7Wj2g34IPIEhaCDw7ktbSRkz5
+					dLka7oh6p/XySbG4Ximt7J5jCqG7S7v0MAsy
+					NNhg6flgFDCa4g== )
 			1200	DNSKEY	256 3 13 (
-					AqsgqbbLG7EsPoDlb++wx0tewfV5lsVkuAz6
-					lkfXI/nKvbO6hRO99wsjhhJ31FxTRcX6p9hE
-					BcfekQuHwE9gsA==
-					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 33519
+					2QhskfrhqUsU+uyMtYXUKqaJ0v3fiZuhHTbs
+					oyyxUB5inF5ZLvwFIWtTlEcyBevmlgBEPOVu
+					pUJ7CjICG6oikw==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 22331
 			1200	DNSKEY	257 3 13 (
-					haRGsujhbZOIQwdAe2FuYSX5243GgvYfI4zk
-					TzbwM59VKGzIqqNvUw9RRAEBcUraIfE/78W4
-					AfiEfxAO7PlodA==
-					) ; KSK; alg = ECDSAP256SHA256 ; key id = 24520
+					h+pwp2nNAIlIoWv38t5CZ95TAnuENO5sjxnt
+					p1izDRONz4lRTsmsOEexroK3nlRuyg47uOwf
+					k+KDvsNYnAOvLA==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 45890
 			1200	RRSIG	DNSKEY 13 1 1200 (
-					20260806143420 20260707143420 24520 com.
-					x2FRmCgAxIi4EAuaVfwmn+09FqQkn7UH+kIy
-					7C6bCvEaaljSMYR72vc7bT3o38ZkKCW2Kf2+
-					7J0fCk8t3/GNUg== )
+					20261112143354 20261013143354 22331 com.
+					knld6cAubhjI8fk3Fyoe1umhgo60vPIGbX38
+					aaoxxJ8j5y9mNI3+0bE9Tp4egCQp3Kdb1nBl
+					h7vAUwCg96/grQ== )
 			1200	RRSIG	DNSKEY 13 1 1200 (
-					20260806143420 20260707143420 33519 com.
-					VW071lN7HVGxd2YeFGTbxqy5WzUSVqCioa91
-					8cq8oXLjA4/OrBq3oYTcKU5Tg+zMA2HyFDCF
-					u/q+sGMtabkWqA== )
+					20261112143354 20261013143354 45890 com.
+					K60dr9fgWVJpj8h7UBHApNcz7tCHPDqF4/Jh
+					B/B3v4/E72dnqpHkXMVQAl6ykvq/v6aMwccd
+					PXFwkVnLXKzz+A== )
 			0	NSEC3PARAM 1 0 1 DEADBEEF
 			0	RRSIG	NSEC3PARAM 13 1 0 (
-					20260806143420 20260707143420 33519 com.
-					w6sGhetXM2kCI9SxBIeMn1i6Eu1DK+ZR72SV
-					P81YHI0ioEf+glZ+XZuXN313Fa83mbvSzLpH
-					MAj9wqNkNeGZsA== )
+					20261112143354 20261013143354 22331 com.
+					8b9ijzXNBgyO66/iH/FQoFSem89NyMBnzNcW
+					ApnnMd7cs+k7x6zYsXoTgthf3hcUS7Hxk2dW
+					j1r1bShJI0aasQ== )
 a.com.			1200	IN CNAME b.com.
 			1200	RRSIG	CNAME 13 2 1200 (
-					20260806143420 20260707143420 33519 com.
-					VLeRyLBadyQuTL5h7ORtH6odNjbU8FLXFjfu
-					FPmByo+j7YJjnZM9uDLg7V5i4O7b23pM8gns
-					zphWwfRk3AAaEA== )
+					20261112143354 20261013143354 22331 com.
+					zbvxCcyxj/q3Yh2mVS0hx3eCivpMoAzNSWqV
+					2jOjCr7uuYdOscD9PsAVuYiPEBSXTPCJ7dUS
+					tk3Ya8VXDhGnDg== )
 b.com.			1200	IN NS	ns.b.com.
 ns.b.com.		1200	IN A	1.2.3.4
 7QIJOET3JMIPERTDJT8D79BQ40S6SKD2.com. 0	IN NSEC3 1 1 1 DEADBEEF (
 					SSA0Q5T55MH7PK0N46S259FR6I3075AE
 					CNAME RRSIG )
 			0	RRSIG	NSEC3 13 2 0 (
-					20260806143420 20260707143420 33519 com.
-					CPLlYCSC1C57wyxsVhyBtN0S/JQicIYsJyOz
-					EiJJg/PHjh2hgQLEyd9Y27JiWCxPSxcfNp1e
-					w87peKO7BIqNcg== )
+					20261112143354 20261013143354 22331 com.
+					3FYkDuNEGIyOsLhw3nOjI9JPZHt3nXFUcciR
+					bYuFTm9lT4tlnuNXZ7fNpKSOWcL2B8ThgzWP
+					8OI9mgDiHoyCUQ== )
 SSA0Q5T55MH7PK0N46S259FR6I3075AE.com. 0	IN NSEC3 1 1 1 DEADBEEF (
 					7QIJOET3JMIPERTDJT8D79BQ40S6SKD2
 					NS SOA RRSIG DNSKEY NSEC3PARAM )
 			0	RRSIG	NSEC3 13 2 0 (
-					20260806143420 20260707143420 33519 com.
-					HGNpIgEz1WCpYMllwIsiUbtvno7ZvAhZovTe
-					6KrMrguhyDjwtIvteXdl1bV2ISaY3/fDNLoD
-					wa2SYTsJNhbGzw== )
+					20261112143354 20261013143354 22331 com.
+					fNmOyWFgOjrUTXkhYsJPIchXkud7FyQyEosF
+					cL1wcr9qde+SxS+pMRPUto543yCPUN2EesdW
+					tZlrdfw0DD5Dpg== )
 ;; Served by ns.com.

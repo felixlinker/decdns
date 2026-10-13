@@ -1,5 +1,5 @@
-; File written on Tue Jul  7 17:34:17 2026
-; dnssec-signzone version 9.20.23
+; File written on Tue Oct 13 17:31:40 2026
+; dnssec-signzone version 9.20.29
 com.			1200	IN SOA	ns.com. example.com. (
 					0          ; serial
 					0          ; refresh (0 seconds)
@@ -8,72 +8,72 @@ com.			1200	IN SOA	ns.com. example.com. (
 					0          ; minimum (0 seconds)
 					)
 			1200	RRSIG	SOA 13 1 1200 (
-					20260806143417 20260707143417 36552 com.
-					IGhHUTfJLwKRsevKkWsxeZtaAgSuXRF2zkN3
-					qAZ+Nb56v8JiM26aQIcuoT9TH8Y4mFR/nbhZ
-					/8R1MOAK4yjyTg== )
+					20261112143140 20261013143140 22331 com.
+					aHncPI5luFz1krROULDPwKiGSTO/okOy7sxc
+					O6u+ZZl/XVOmSzHF+shDA5rXKk1z9zrlf9Jq
+					wg2ThGJkA6M81Q== )
 			1200	NS	ns.com.
 			1200	RRSIG	NS 13 1 1200 (
-					20260806143417 20260707143417 36552 com.
-					jgrrMo0yMBKr1b8VArV21Jv4QBhd5y0ZXYBV
-					GpNuFXRu7nrC2izbR1Y2xFdb29qHHlGp/nQW
-					pNKGACF5yS8Xkg== )
+					20261112143140 20261013143140 22331 com.
+					HHEjT97AyE+HirzIKgwLlYZYBpUrmptPtafa
+					S/2NefjOD4slcIYm80PYcVPwt/lwzKniQbdD
+					rm3px+c06L5jZQ== )
 			1200	DNSKEY	256 3 13 (
-					rc7OFucwm9rzpps6+/t5a5oDdoZONT0ySCbF
-					Uzb5LYCm0s8OKQY+62WbjzRZpI4+dMLfUHJr
-					ijI1veDgPCsbnA==
-					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 36552
+					2QhskfrhqUsU+uyMtYXUKqaJ0v3fiZuhHTbs
+					oyyxUB5inF5ZLvwFIWtTlEcyBevmlgBEPOVu
+					pUJ7CjICG6oikw==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 22331
 			1200	DNSKEY	257 3 13 (
-					UvIquJZJcl6GafC6Jm7vQ1drUfJmQTn4VTcm
-					G1pBKbt/GjQyDqZhnDqSgWpTVwIcDjBSYwma
-					RtmfSusEUXmlsQ==
-					) ; KSK; alg = ECDSAP256SHA256 ; key id = 51101
+					h+pwp2nNAIlIoWv38t5CZ95TAnuENO5sjxnt
+					p1izDRONz4lRTsmsOEexroK3nlRuyg47uOwf
+					k+KDvsNYnAOvLA==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 45890
 			1200	RRSIG	DNSKEY 13 1 1200 (
-					20260806143417 20260707143417 36552 com.
-					IlBs99h0fNQX+C2MrLIng1oFBmOsNYNUs8mL
-					xHDnDPUzELB2lTcpKRKrt8ujAbY3z2UxObVS
-					sbBaRBm4b4/suQ== )
+					20261112143140 20261013143140 22331 com.
+					NNFqw63C7kgbtvPMBdTkm5jJsKAFl9JiuwMv
+					D9lYYVDUCCBZfWnpEr//g0eNcDb56yFP30tT
+					xQ9QPFaZAR8wNQ== )
 			1200	RRSIG	DNSKEY 13 1 1200 (
-					20260806143417 20260707143417 51101 com.
-					Ks1KUNRmxhTdm/wYdfHvXXSD3FDA4Fe9+chE
-					MG7zPCTIvEc/M1fjQVf6hc9lmUDFyepYiWZq
-					C+DjSH0QMafahA== )
+					20261112143140 20261013143140 45890 com.
+					70FrNUuLCNZBUcshFvscbXymrJnc8oP3VFYR
+					oRGwP/zk8Q+jh98HxokvM+Y95LewoYMHS82/
+					MGKqp8IO/+EpMA== )
 			0	NSEC3PARAM 1 0 1 DEADBEEF
 			0	RRSIG	NSEC3PARAM 13 1 0 (
-					20260806143417 20260707143417 36552 com.
-					yUSPPj3QvbsJzZiEHg0Jmzc0X3DhF4YIjhKg
-					cZk0SK6wac0/clV1y/rUICgsj6HBaCl/4F9I
-					P8HRyKNWy2+3Ng== )
+					20261112143140 20261013143140 22331 com.
+					gJciO4ev559+zS/d/7grUqc9XYclrQ+ScMQn
+					jxAS96b6hkQkPXJHeiG8mrnB4v7BYkV3iXwY
+					QPXSJJfQjLjJeA== )
 a.com.			1200	IN CNAME b.com.
 			1200	RRSIG	CNAME 13 2 1200 (
-					20260806143417 20260707143417 36552 com.
-					0DuiBQnBXfXWSnVGFtZNsvWqbj1gFeiOvkbL
-					sF052KbjrPYhQed7UHuhyA/VTrHbNyrsT7tL
-					QUTvPH0zNyIOsA== )
+					20261112143140 20261013143140 22331 com.
+					aQnrc2cL/tI9ursxqUv0vJVsEohLuaSJLOcu
+					6dfQD40iQwkZQ3LkmrDZxUsQyWeZpCF9aVjk
+					K463EMlFjE+Y6A== )
 b.com.			1200	IN NS	ns.b.com.
 ns.b.com.		1200	IN A	1.2.3.4
 5VL5NKIJE031ODJIUE3GRL823D3HRG9Q.com. 0	IN NSEC3 1 0 1 DEADBEEF (
 					7QIJOET3JMIPERTDJT8D79BQ40S6SKD2
 					NS )
 			0	RRSIG	NSEC3 13 2 0 (
-					20260806143417 20260707143417 36552 com.
-					lBsZp4eZEODOVhXxr6oiQhfJg1RWDBwy2V5N
-					+/0hh6C7p79/dJFMQH8frHewC7nZ00h5QcLY
-					dF7Rr7RdsoNsaQ== )
+					20261112143140 20261013143140 22331 com.
+					HBy1k6g+AwAVivw1qUzIOUpkKDGAFtiUqFUJ
+					j8Mr1RivbUp2lkvyMX0kv1XAMrMYIfS5Kb27
+					Mvm0lrKnrTk+ww== )
 7QIJOET3JMIPERTDJT8D79BQ40S6SKD2.com. 0	IN NSEC3 1 0 1 DEADBEEF (
 					SSA0Q5T55MH7PK0N46S259FR6I3075AE
 					CNAME RRSIG )
 			0	RRSIG	NSEC3 13 2 0 (
-					20260806143417 20260707143417 36552 com.
-					BhRRfNMum8Xgh5ylm6KcKmGS9KtMvM6MFMci
-					PcHoSw8tX6LfW/owRbwkvfRsrGv7oh/Lwzti
-					7crkbGHuO18gjQ== )
+					20261112143140 20261013143140 22331 com.
+					KEkg56ywGYLtxHBrozVvMEiDC1XH8LUmHJCu
+					DWapDrFAW3zVgb8ceCTPSr0vKrG8pixFzrJa
+					jDLFCoWRKH1wcA== )
 SSA0Q5T55MH7PK0N46S259FR6I3075AE.com. 0	IN NSEC3 1 0 1 DEADBEEF (
 					5VL5NKIJE031ODJIUE3GRL823D3HRG9Q
 					NS SOA RRSIG DNSKEY NSEC3PARAM )
 			0	RRSIG	NSEC3 13 2 0 (
-					20260806143417 20260707143417 36552 com.
-					+d9awjpKQ4R29O4Nl8jJSvyfEWcRgBu2U/Bo
-					OBfOqbTFGyYV5v2bRVic7R0RYf6OhjGphEGU
-					jI3s0o1RWKqKlA== )
+					20261112143140 20261013143140 22331 com.
+					HU3Ro3AGZXCMI2+2Rh0C1fFaGd+O+nwk/WJl
+					x/tvGueKqJS0SfUan8Gs83KdOfKZ903qIKSt
+					w0ruABOpRQzBiQ== )
 ;; Served by ns.com.

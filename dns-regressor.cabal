@@ -20,23 +20,33 @@ extra-source-files:
     examples/cname/broken/ns.com.
     examples/cname/loop/ns.com.
     examples/cname/new/ns.com.
+    examples/cname/partially-signed-nsec3-oo/dsset-com.
     examples/cname/partially-signed-nsec3-oo/ns.b.com.
     examples/cname/partially-signed-nsec3-oo/ns.com.
+    examples/cname/partially-signed-nsec3/dsset-com.
     examples/cname/partially-signed-nsec3/ns.b.com.
     examples/cname/partially-signed-nsec3/ns.com.
+    examples/cname/partially-signed/dsset-com.
     examples/cname/partially-signed/ns.b.com.
     examples/cname/partially-signed/ns.com.
+    examples/cname/signed-new/dsset-com.
     examples/cname/signed-new/ns.com.
+    examples/cname/signed-non-zone-key/dsset-com.
     examples/cname/signed-non-zone-key/ns.b.com.
     examples/cname/signed-non-zone-key/ns.com.
+    examples/cname/signed-nsec3/dsset-com.
     examples/cname/signed-nsec3/ns.b.com.
     examples/cname/signed-nsec3/ns.com.
+    examples/cname/signed/dsset-com.
     examples/cname/signed/ns.b.com.
     examples/cname/signed/ns.com.
     examples/dname/loop-empty/ns.net.
     examples/dname/loop-non-empty/ns.net.
+    examples/dnssec/ns/dsset-example.
     examples/dnssec/ns/example.
+    examples/dnssec/txt/dsset-com.
     examples/dnssec/txt/ns.com.
+    examples/dnssec/wildcard/dsset-com.
     examples/dnssec/wildcard/ns.com.
     examples/ns/cyclic-deleg/ns.net.
     examples/ns/cyclic-deleg/root.com.
