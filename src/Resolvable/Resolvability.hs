@@ -106,6 +106,25 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) (
                   [ isName n'
                   , resolves glueS glueType glueZ delegatedNs dIp bot (ad 0)
                   , resolves delegatedNs t ownerNoSynth n' d bot (ad 0) ]
+            , foreachM [aType, aaaaType] $ \glueType -> do  -- Validated not-DS
+                (nTail, t, d, dIp, a) <- freshVars5 ("N", "T", "D", "D_IP", "A")
+                glueZ <- if expectGlue then return referralZone else wildcard
+                let n' = captureListTail nTail ownerNoSynth
+                rann <- rannot r
+                return (S.singleton $ Rule rann (resolves nameServer t zone n' d top a)
+                  [ t \= dsType
+                  , isName n'
+                  , resolves glueS glueType glueZ delegatedNs dIp bot (ad 0)
+                  , resolves delegatedNs t ownerNoSynth n' d top a ])
+            , foreachM [aType, aaaaType] $ \glueType -> do  -- Authenticated DS
+                (l, nTail, d, dIp) <- freshVars4 ("L", "N", "D", "D_IP")
+                let n' = injectLast l $ captureListTail nTail ownerNoSynth
+                glueZ <- if expectGlue then return referralZone else wildcard
+                rann <- rannot r
+                return (S.singleton $ Rule rann (resolves nameServer dsType zone n' d top (ad 1))
+                  [ isName n'
+                  , resolves glueS glueType glueZ delegatedNs dIp bot (ad 0)
+                  , resolves delegatedNs dsType ownerNoSynth n' d top (ad 1) ])
             , do  -- NSEC for unsigned subzone
                 (nTail, t, d, dNSEC) <- freshVars4 ("N", "T", "D", "D_NSEC")
                 let n' = captureListTail nTail ownerNoSynth
@@ -137,25 +156,6 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) (
                 , resolves nameServer nsec3Type zone nNSEC' (list [dNSEC']) top (ad 1)
                 , closestEncloser ownerNoSynth nNSEC dNSEC nNSEC' dNSEC'
                 , resolves nameServer t zone n'' d bot (ad 0) ]
-            , foreachM [aType, aaaaType] $ \glueType -> do  -- Validated not-DS
-                (nTail, t, d, dIp, a) <- freshVars5 ("N", "T", "D", "D_IP", "A")
-                glueZ <- if expectGlue then return referralZone else wildcard
-                let n' = captureListTail nTail ownerNoSynth
-                rann <- rannot r
-                return (S.singleton $ Rule rann (resolves nameServer t zone n' d top a)
-                  [ t \= dsType
-                  , isName n'
-                  , resolves glueS glueType glueZ delegatedNs dIp bot (ad 0)
-                  , resolves delegatedNs t ownerNoSynth n' d top a ])
-            , foreachM [aType, aaaaType] $ \glueType -> do  -- Authenticated DS
-                (l, nTail, d, dIp) <- freshVars4 ("L", "N", "D", "D_IP")
-                let n' = injectLast l $ captureListTail nTail ownerNoSynth
-                glueZ <- if expectGlue then return referralZone else wildcard
-                rann <- rannot r
-                return (S.singleton $ Rule rann (resolves nameServer dsType zone n' d top (ad 1))
-                  [ isName n'
-                  , resolves glueS glueType glueZ delegatedNs dIp bot (ad 0)
-                  , resolves delegatedNs dsType ownerNoSynth n' d top (ad 1) ])
             ]
       -- TODO: I forbid recursion on NSEC(3) records here. Implement that more
       -- generally. Why only forbid this for CNAME redirections? Are there other
