@@ -113,8 +113,8 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) s
                 rann <- rannot
                 return $ S.singleton $ Rule rann (resolves nameServer t zone n' d bot (ad 0))
                   [ isName n'
-                  , resolves delegatedNs t ownerNoSynth n' d bot (ad 0)
-                  , resolves glueS glueType glueZ delegatedNs dIp bot (ad 0) ]
+                  , resolves glueS glueType glueZ delegatedNs dIp bot (ad 0)
+                  , resolves delegatedNs t ownerNoSynth n' d bot (ad 0) ]
             , do  -- NSEC for unsigned subzone
                 (nTail, t, d, dNSEC) <- freshVars4 ("N", "T", "D", "D_NSEC")
                 let n' = captureListTail nTail ownerNoSynth
