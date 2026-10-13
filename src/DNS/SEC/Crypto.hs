@@ -5,6 +5,7 @@ module DNS.SEC.Crypto
   , algorithmFromMnemonic
   , ecdsaSig
   , ecdsaPk
+  , rsaPk
   , DigestType(..)
   , digestToInt
   , digestFromInt
@@ -16,6 +17,9 @@ module DNS.SEC.Crypto
   , nsec3FlagsFromInt
   ) where
 
+import Control.Monad (guard)
+import Crypto.PubKey.ECC.Prim (isPointValid)
+import qualified Crypto.PubKey.RSA.Types as RSA
 import Data.Bits ((.|.))
 import qualified Data.ByteString as BS
 import qualified Crypto.PubKey.ECC.ECDSA as ECDSA
@@ -93,25 +97,62 @@ algorithmFromMnemonic "RSAMD5" = Just RSAMD5
 algorithmFromMnemonic "DH" = Just DH
 algorithmFromMnemonic "DSA" = Just DSA
 algorithmFromMnemonic "RSASHA1" = Just RSASHA1
+algorithmFromMnemonic "DSA_NSEC3_SHA1" = Just DSA_NSEC3_SHA1
+algorithmFromMnemonic "RSASHA1_NSEC3_SHA1" = Just RSASHA1_NSEC3_SHA1
+algorithmFromMnemonic "RSASHA256" = Just RSASHA256
+algorithmFromMnemonic "RSASHA512" = Just RSASHA512
+algorithmFromMnemonic "ECC_GOST" = Just ECC_GOST
+algorithmFromMnemonic "ECDSAP256SHA256" = Just ECDSAP256SHA256
+algorithmFromMnemonic "ECDSAP384SHA384" = Just ECDSAP384SHA384
+algorithmFromMnemonic "ED25519" = Just ED25519
+algorithmFromMnemonic "ED448" = Just ED448
+algorithmFromMnemonic "SM2SM3" = Just SM2SM3
+algorithmFromMnemonic "ECC_GOST12" = Just ECC_GOST12
 algorithmFromMnemonic "INDIRECT" = Just INDIRECT
 algorithmFromMnemonic "PRIVATEDNS" = Just PRIVATEDNS
 algorithmFromMnemonic "PRIVATEOID" = Just PRIVATEOID
 algorithmFromMnemonic _ = Nothing
 
--- https://datatracker.ietf.org/doc/html/rfc6605#section-4
-ecdsaSig :: BS.ByteString -> Maybe ECDSA.Signature
-ecdsaSig sig
-  | BS.length sig /= 64 = Nothing
-  | otherwise = Just $ uncurry ECDSA.Signature $ bimap os2ip os2ip $ BS.splitAt 32 sig
+-- RFC 6605, Section 4: fixed-width r || s and x || y encodings.
+-- Keep the original helpers as P-256 specializations.
+ecdsaSig :: AlgorithmType -> BS.ByteString -> Maybe ECDSA.Signature
+ecdsaSig alg sig = do
+  (size, _) <- ecdsaParameters alg
+  guard (BS.length sig == 2 * size)
+  return $ uncurry ECDSA.Signature $ bimap os2ip os2ip $ BS.splitAt size sig
 
-p256 :: ECCTypes.Curve
-p256 = ECCTypes.getCurveByName ECCTypes.SEC_p256r1
+ecdsaPk :: AlgorithmType -> BS.ByteString -> Maybe ECDSA.PublicKey
+ecdsaPk alg key = do
+  (size, curve) <- ecdsaParameters alg
+  guard (BS.length key == 2 * size)
+  let point = uncurry ECCTypes.Point $ bimap os2ip os2ip $ BS.splitAt size key
+  guard (isPointValid curve point)
+  return $ ECDSA.PublicKey curve point
 
--- https://datatracker.ietf.org/doc/html/rfc6605#section-4
-ecdsaPk :: BS.ByteString -> Maybe ECDSA.PublicKey
-ecdsaPk key
-  | BS.length key /= 64 = Nothing
-  | otherwise = Just $ ECDSA.PublicKey p256 $ uncurry ECCTypes.Point $ bimap os2ip os2ip $ BS.splitAt 32 key
+ecdsaParameters :: AlgorithmType -> Maybe (Int, ECCTypes.Curve)
+ecdsaParameters ECDSAP256SHA256 = Just (32, ECCTypes.getCurveByName ECCTypes.SEC_p256r1)
+ecdsaParameters ECDSAP384SHA384 = Just (48, ECCTypes.getCurveByName ECCTypes.SEC_p384r1)
+ecdsaParameters _ = Nothing
+
+-- RFC 3110, Section 2: exponent length (one or three octets), exponent,
+-- and modulus. All RSA DNSSEC algorithms share this encoding.
+rsaPk :: BS.ByteString -> Maybe RSA.PublicKey
+rsaPk key = do
+  (first, rest) <- BS.uncons key
+  (size, body) <- if first == 0
+    then do
+      guard (BS.length rest >= 2)
+      let size = fromIntegral $ os2ip $ BS.take 2 rest
+      guard (size > 255)
+      return (size, BS.drop 2 rest)
+    else return (fromIntegral first, rest)
+  guard (BS.length body > size)
+  let (exponentBytes, modulus) = BS.splitAt size body
+      e = os2ip exponentBytes
+      n = os2ip modulus
+  guard (BS.head exponentBytes /= 0 && BS.head modulus /= 0)
+  guard (e > 1 && odd e && n > e && odd n)
+  return $ RSA.PublicKey (BS.length modulus) n e
 
 data DigestType = NULL | SHA1 | SHA256 | GOST_R_31_11_94 | SHA384
   deriving (Eq, Ord)

@@ -17,14 +17,14 @@ import Test.Tasty.QuickCheck
   , testProperty, chooseAny, suchThat
   )
 import DNS.SEC.Crypto
-  ( AlgorithmType (ECDSAP256SHA256, ECDSAP384SHA384)
+  ( AlgorithmType (..), algorithmFromMnemonic, rsaPk, ecdsaPk, ecdsaSig
   , DigestType (SHA256)
   , NSEC3DigestType (NSEC3_SHA1)
   )
 import Parsing.Bytes (base32Hex, base64, hex)
 import qualified Data.ByteString as BS
 import Text.Parsec (runParser)
-import Util.Bytes (toHex)
+import Util.Bytes (toHex, word16)
 
 import DNS.Record
 import DNS.SEC.Keys
@@ -32,7 +32,7 @@ import DNS.SEC.Verification
 import DNS.Name (Name, Named (Named))
 import DNS.NameSpec (mkName)
 import qualified DNS.RecordType as RT
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust, isNothing)
 
 thd :: (a, b, c) -> c
 thd (_, _, c) = c
@@ -44,6 +44,22 @@ tests =
     [ testGroup "key tag" (zipWith (testKeyTag . show) [0 :: Int, 1..] dnskeyTestCases)
     , testGroup "key digest" (zipWith (testKeyDigest . show) [0 :: Int, 1..] (filter (not . null . thd) dnskeyTestCases))
     , testGroup "NSEC3 hash" (zipWith (testNSEC3Hash . show) [0 :: Int, 1..] nsec3Vectors)
+    , testGroup "supported ciphersuites" (map testAlgorithmVector algorithmVectors)
+    , testCase "decodes both RSA exponent length encodings" $ do
+        let exponentBytes = BS.replicate 257 1
+            modulus = BS.replicate 258 3
+        assertBool "short exponent length" $ isJust $ rsaPk (BS.pack [1, 3, 17])
+        assertBool "extended exponent length" $ isJust $ rsaPk (BS.singleton 0 <> word16 (257 :: Int) <> exponentBytes <> modulus)
+    , testCase "rejects malformed RSA keys" $
+        mapM_ (\bytes -> assertBool (show bytes) (isNothing (rsaPk bytes)))
+          [BS.empty, BS.pack [0], BS.pack [0, 1], BS.pack [0, 0, 1, 3, 17], BS.pack [2, 3], BS.pack [1, 3], BS.pack [1, 0, 17], BS.pack [1, 3, 0], BS.pack [1, 2, 17], BS.pack [1, 3, 3]]
+    , testCase "rejects invalid ECDSA points and lengths" $
+        mapM_ (\(alg, size) -> do
+          assertBool "off-curve point" $ isNothing $ ecdsaPk alg (BS.replicate size 0)
+          assertBool "truncated point" $ isNothing $ ecdsaPk alg (BS.replicate (size - 1) 1)
+          assertBool "truncated signature" $ isNothing $ ecdsaSig alg (BS.replicate (size - 1) 1)
+          assertBool "oversized signature" $ isNothing $ ecdsaSig alg (BS.replicate (size + 1) 1))
+          [(ECDSAP256SHA256, 64), (ECDSAP384SHA384, 96)]
     , testCase "verifies signatures from the static signed zones" testSignedZones
     , testProperty "rejects a modified RRSIG or incomplete RRset" propRejectsMutatedVector
     ]
@@ -118,7 +134,7 @@ mutateRRSIG :: RRSIGData BS.ByteString -> Gen (RRSIGData BS.ByteString)
 mutateRRSIG sig =
   oneof
     [ (\x -> sig { _typeCovered = x }) <$> differentRecordType (_typeCovered sig)
-    , pure sig { _signatureAlgorithm = ECDSAP384SHA384 }
+    , (\x -> sig { _signatureAlgorithm = x }) <$> elements (filter (/= _signatureAlgorithm sig) supportedAlgorithms)
     , pure sig { _labels = _labels sig + 1 }
     , pure sig { _originalTTL = _originalTTL sig + 1 }
     , pure sig { _signatureExpiration = _signatureExpiration sig + 1 }
@@ -153,7 +169,7 @@ byteFlip bytes = do
   return $ prefix <> BS.singleton byte' <> t
 
 signatureVectors :: [SignatureVector]
-signatureVectors =
+signatureVectors = algorithmVectors ++
   [ vector comName [soa ns1Name] RT.SOA 1 1200 23099 comName comZsk
       "Zudwp50+lG2UoUgg+dQwrEdbYBPu/6JvmO9dJE58XE8seqNAQvWl4JL0d7il/YOQsrV4lAyNfHlZvzTZ7rDvZg=="
   , vector comName [NSEC (NSECData aComName [RT.SOA, RT.RRSIG, RT.NSEC, RT.DNSKEY])] RT.NSEC 1 0 23099 comName comZsk
@@ -245,3 +261,69 @@ nsec3Vectors =
   , (mkName ["xx", "example", ""], parseBase32Hex "t644ebqk9bibcna874givr6joj62mlhv")
   , (mkName ["2t7b4g4vsa5smi47k61mv5bv1a22bojr", "example", ""], parseBase32Hex "kohar7mbb8dc2ce8a9qvl8hon4k53uhi")
   ]
+
+-- Static vectors generated with OpenSSL dgst / pkeyutl from a canonical
+-- example.com. A RRset. Verification does not generate or sign test data.
+algorithmVectors :: [SignatureVector]
+algorithmVectors =
+  [ algorithmVector RSASHA1
+    "AwEAAbNLp64gsUKTvGkthWpT37bh1Sre5gz90OLkWbVVzb8vaWhYqpmJMHT4Ra1wEIfrh7u7Akb2/CICHwpMXfH2Yfg35ezugELBLKffn0CnKVLQXHFPyeUqdu7nTERM6YXFbH4BUMlT0MEYBYoc9D0JL4x9nkp/gQw4MF46mKpcSYgp"
+    "XU5GY+4QPTPPZJd+4AYPb2tbAcxg5PrafUy2FTwftj3hgefs5g76zlfgtDrDNhqvdoGjchnlY9uwc9H7SUeDX6jk382cWfwaMTSUJ06QiC1bjO7m160lS1s2Qkqf8mNh+i7LqFVN6018M7DPtGKUkwvKUUtS8+qCiuYsbeb/c40=",
+    algorithmVector RSASHA1_NSEC3_SHA1
+    "AwEAAdokTyw+C3rGdK4trhD3JHgFDtb04M4KyIHTEmGLclyhw3ouJbG39EGOTaas+A8Bt3NkeZlBSu7lQ0pBcKgtlfxPd+xtCOAgVv7uS2VcZW1RQSIGNFbIJfL5AF1RB6nIPBgrL09DEb79ElRWEFLWOR8Ags7389N9X6BYelogu93J"
+    "Y0jmxHxniXroTULW5tWAVwO2yvhEQU/sVYFWlxxb/1Rm9gDcicGY8696CLjpDE3XDEkvNnjf1L/KXgCpQ05ri1T4z507irIPsjgqzCWQk3AaRNprGuY3+HgDNLGrUNeEk0Oewy5k8SIm5jp+zlxTz8KZNw/MuIJv9W40UwsN1R4=",
+    algorithmVector RSASHA256
+    "AwEAAcAL7DSH0kfd6aKEfukzl+T/APmKSP5sueLsFwW5QPwlBbHDjgSeh+EhTrgS8s7w8NNt8v/uHdT/B4m63171rz1L60IAGAXHve3RSpi9wt8jwPa8DwcWd/3vgPgq0doVDb7GZPGXKwkt3mY6eFNV49xikTL/hjeS9QkhayoFJD1x"
+    "NDfeRvTnx3yf5l1/bPQB28o4pk0B2ujQz1HQxG5kVYtJVJptw5r3EljE6AagyRe2xbfyezLBW7DcNhoLlis+NGZ0nvcXyiBjKU3vS3px7tOum3P3d6mISlS97LnBPJtHV64bPyS/YaQx0ey2FnXYgROdpq1TbnwSXlxufPd9W/4=",
+    algorithmVector RSASHA512
+    "AwEAAZ95dF4R5gZ/oh7aEgemeH94yIUKkHfflyzhElJRA5g+2wnzm/OwV4YicdAy3kLFrqwdS5euOJY+Voj4O6dOpC9HHWAd9HzOXVswXDOhhgZ2BQEQAdzIqwLTEMqtJOOn5IVx/dMqgTrCUKoTnv3KqFM4z/zmK7gNTvAhvS/ypM+d"
+    "nNwUOTh0XqhsM7YnwrNNG62dctpD54tv5bPGEUvauSOGm0Zv5qrHKel7pc5Pkc86BjPZC9EiMzO5WSvb0Ll4AB/R0B/kGBeu5VR+WOsDDhKTQv6zjqYAaPEpjS7lRsv0QMIuFY5T6VgwCGtTuyLBNSDcIkoRmFmTsgouZEVjcN0=",
+    algorithmVector ECDSAP256SHA256
+    "s9VqpMFF5lr9Fb2XlViB+6Ut7Lwm99phwPyUHnozh5W1iykY0qhh5Uy/hmNUAYFhC5cZrn0JlR3dliWp/KfgWw=="
+    "E6YAJmk41NfKX+dC3934NV63D3UZ8CreYtsUGNM5mPxeY7cJxzOEwDlwovOxX4NLTlommxYpC2KN+gTDSXZ26Q==",
+    algorithmVector ECDSAP384SHA384
+    "sbP183Xzc8QZPXwB12E7ii3hXu4TrckF3pz5MHv2EBknl04dapd2DMWd55+JBIOeqDYCLqb0nbcS6fUThhB0YJyRwjgBc3RK3H2e7GxBUxB21MmRR5WsNnvT4MDWMESr"
+    "g620TqxiXP+3m+ibAR8/Z9Cz0x6sKjcUavBfnwhybNcsGzbhx+MdPr0A3ngaOoTzFEvvnKuno8ycYGQHBRfOxZZCg7h/65tSYNAGAFLH0tiqRC4CiXhld/mckSSPfKkB",
+    algorithmVector ED25519
+    "BLU6Eb7F3j1QLZiW97fuY1FKndTuRa0DKzXFpvU3/d4="
+    "MCEs0RhDWOcbHRoLSaskOgg3riFKFKadFTnpiNic7YZjqEccCvEF2OC/hDf4iDEwlroussGjPUQKKROmNuQCBw==",
+    algorithmVector ED448
+    "Gpar3ixMgaxl8+5keBvvhtaPOWfdTJp3ChgZmk9aMrXTrDGu9NzCmK1XpkyH7xLmeueX/Ky0gX0A"
+    "w1wAe6eDv+iV07HmnJ9+x+s0A/BzX0yctVzaqJoMBhNxq8tL1kBGeUzn0l+yumbjwef/r99Et9QAn82wDIpihYe+uIMU4PS+PuvqJMh0Dcu+kp9XkdSbM9IrQza0I8GcbkkmPl0OmYUziwAD9EfIkBEA"
+  ]
+
+supportedAlgorithms :: [AlgorithmType]
+supportedAlgorithms = [RSASHA1, RSASHA1_NSEC3_SHA1, RSASHA256, RSASHA512, ECDSAP256SHA256, ECDSAP384SHA384, ED25519, ED448]
+
+algorithmVector :: AlgorithmType -> String -> String -> SignatureVector
+algorithmVector alg key sig =
+  ( exampleName
+  , [A (read "192.0.2.1")]
+  , RRSIGData RT.A alg 2 3600 2000000000 1600000000 12345 exampleName (parseBase64 sig)
+  , DNSKEYData [ZoneKey] alg (parseBase64 key)
+  )
+
+testAlgorithmVector :: SignatureVector -> TestTree
+testAlgorithmVector (owner, rrset, sig, key) = testCase (show (_keyAlgorithm key)) $ do
+  algorithmFromMnemonic (mnemonic (_keyAlgorithm key)) @?= Just (_keyAlgorithm key)
+  assertBool "valid signature" $ verifySignature owner rrset sig key
+  mapM_ (\(label, sig', key') -> assertBool label $ not $ verifySignature owner rrset sig' key')
+    [ ("empty key", sig, key { _publicKey = BS.empty })
+    , ("truncated key", sig, key { _publicKey = BS.init (_publicKey key) })
+    , ("empty signature", sig { _signature = BS.empty }, key)
+    , ("truncated signature", sig { _signature = BS.init (_signature sig) }, key)
+    , ("oversized signature", sig { _signature = _signature sig <> BS.singleton 0 }, key)
+    , ("mismatched key algorithm", sig, key { _keyAlgorithm = DH })
+    , ("missing zone key flag", sig, key { _flags = [] })
+    , ("changed signed data", sig { _originalTTL = 3601 }, key)
+    ]
+  where
+    mnemonic RSASHA1 = "RSASHA1"
+    mnemonic RSASHA1_NSEC3_SHA1 = "RSASHA1_NSEC3_SHA1"
+    mnemonic RSASHA256 = "RSASHA256"
+    mnemonic RSASHA512 = "RSASHA512"
+    mnemonic ECDSAP256SHA256 = "ECDSAP256SHA256"
+    mnemonic ECDSAP384SHA384 = "ECDSAP384SHA384"
+    mnemonic ED25519 = "ED25519"
+    mnemonic ED448 = "ED448"
+    mnemonic _ = "unsupported"

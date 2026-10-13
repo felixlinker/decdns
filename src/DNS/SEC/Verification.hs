@@ -10,9 +10,13 @@ module DNS.SEC.Verification
   , nsec3UnsignedSubzone
   , nsecUnsignedSubzone ) where
 
+import Crypto.Error (maybeCryptoError)
 import Crypto.Hash (Digest, hash)
 import qualified Crypto.Hash.Algorithms as Hash
 import qualified Crypto.PubKey.ECC.ECDSA as ECDSA
+import qualified Crypto.PubKey.RSA.PKCS15 as RSA
+import qualified Crypto.PubKey.Ed25519 as Ed25519
+import qualified Crypto.PubKey.Ed448 as Ed448
 import Data.Bits (shiftR, shiftL)
 import qualified Data.ByteArray as BA
 import qualified Data.ByteString as BS
@@ -35,15 +39,40 @@ isDNSSECKey :: DNSKEYData -> Bool
 isDNSSECKey (DNSKEYData { _flags = fs }) = ZoneKey `elem` fs
 
 verifySignature :: Name String -> [Type] -> RRSIGData BS.ByteString -> DNSKEYData -> Bool
-verifySignature (canonicalName -> owner) (map canonicalType -> rrset) (canonicalRRSIGData -> sig) pk@(DNSKEYData _ _ pkBytes) = fromMaybe False $
+verifySignature (canonicalName -> owner) (map canonicalType -> rrset) (canonicalRRSIGData -> sig) pk@(DNSKEYData _ _ pkBytes) = fromMaybe False $ do
+  guard (isDNSSECKey pk)
+  guard (_signatureAlgorithm sig == _keyAlgorithm pk)
   case _signatureAlgorithm sig of
-    ECDSAP256SHA256 -> do
-      guard (isDNSSECKey pk)
-      cSig <- ecdsaSig (_signature sig)
-      cPk <- ecdsaPk pkBytes
-      return $ ECDSA.verify Hash.SHA256 cPk cSig (BS.concat (serialize (void sig) : serializedRRSet))
+    RSASHA1 -> verifyRSA Hash.SHA1
+    RSASHA1_NSEC3_SHA1 -> verifyRSA Hash.SHA1
+    RSASHA256 -> verifyRSA Hash.SHA256
+    RSASHA512 -> verifyRSA Hash.SHA512
+    ECDSAP256SHA256 -> verifyECDSA Hash.SHA256
+    ECDSAP384SHA384 -> verifyECDSA Hash.SHA384
+    ED25519 -> do
+      cSig <- maybeCryptoError $ Ed25519.signature (_signature sig)
+      cPk <- maybeCryptoError $ Ed25519.publicKey pkBytes
+      return $ Ed25519.verify cPk signedData cSig
+    ED448 -> do
+      cSig <- maybeCryptoError $ Ed448.signature (_signature sig)
+      cPk <- maybeCryptoError $ Ed448.publicKey pkBytes
+      return $ Ed448.verify cPk signedData cSig
     _ -> Nothing
   where
+    signedData :: BS.ByteString
+    signedData = BS.concat (serialize (void sig) : serializedRRSet)
+
+    verifyRSA :: RSA.HashAlgorithmASN1 a => a -> Maybe Bool
+    verifyRSA hashAlg = do
+      cPk <- rsaPk pkBytes
+      return $ RSA.verify (Just hashAlg) cPk signedData (_signature sig)
+
+    verifyECDSA :: Hash.HashAlgorithm a => a -> Maybe Bool
+    verifyECDSA hashAlg = do
+      cSig <- ecdsaSig (_signatureAlgorithm sig) (_signature sig)
+      cPk <- ecdsaPk (_signatureAlgorithm sig) pkBytes
+      return $ ECDSA.verify hashAlg cPk cSig signedData
+
     lc :: Int
     lc = _labels sig
 
