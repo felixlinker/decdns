@@ -1,7 +1,0 @@
-$ORIGIN com.
-@ 300 IN SOA ns.com. hostmaster.com. 1 300 300 300 300
-@ 300 IN NS ns.com.
-ns 300 IN A 192.0.2.53
-deep.b 300 IN CNAME c.com.
-c 300 IN A 192.0.2.11
-;; Served by ns.com.

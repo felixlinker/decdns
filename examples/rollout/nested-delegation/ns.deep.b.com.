@@ -1,6 +1,0 @@
-$ORIGIN deep.b.com.
-@ 300 IN SOA ns.deep.b.com. hostmaster.com. 1 300 300 300 300
-@ 300 IN NS ns.deep.b.com.
-ns 300 IN A 192.0.2.54
-* 300 IN A 192.0.2.10
-;; Served by ns.deep.b.com.

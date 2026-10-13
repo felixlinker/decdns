@@ -20,7 +20,6 @@ extra-source-files:
 - examples/dname/**/*
 - examples/dnssec/**/*
 - examples/ns/**/*
-- examples/rollout/**/*
 
 dependencies:
 - base >= 4.7 && < 5

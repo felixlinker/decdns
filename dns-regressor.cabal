@@ -33,7 +33,6 @@ extra-source-files:
     examples/cname/signed-nsec3/ns.com.
     examples/cname/signed/ns.b.com.
     examples/cname/signed/ns.com.
-    examples/cname/simple/ns.com.
     examples/dname/loop-empty/ns.net.
     examples/dname/loop-non-empty/ns.net.
     examples/dnssec/ns/example.
@@ -47,45 +46,6 @@ extra-source-files:
     examples/ns/self-deleg/ns.com.
     examples/ns/sub-self-deleg/ns.net.
     examples/ns/sub-self-deleg/root.net.
-    examples/rollout/address-to-alias-new/ns.com.
-    examples/rollout/address-to-alias-old/ns.com.
-    examples/rollout/alias-descendant-chain/ns.com.
-    examples/rollout/alias-descendant-txt/ns.com.
-    examples/rollout/alias/ns.com.
-    examples/rollout/colocated-child/ns.com.
-    examples/rollout/delayed-target-new/ns.com.
-    examples/rollout/delayed-target-old/ns.com.
-    examples/rollout/delegated-address/ns.b.com.
-    examples/rollout/delegated-address/ns.com.
-    examples/rollout/delegated-wildcard/ns.b.com.
-    examples/rollout/delegated-wildcard/ns.com.
-    examples/rollout/direct-address/ns.com.
-    examples/rollout/dname-chain/ns.com.
-    examples/rollout/dname-nested/ns.com.
-    examples/rollout/dname/ns.com.
-    examples/rollout/nested-alias-target/ns.com.
-    examples/rollout/nested-alias/ns.com.
-    examples/rollout/nested-delegation/ns.com.
-    examples/rollout/nested-delegation/ns.deep.b.com.
-    examples/rollout/nested-wildcard-alias/ns.com.
-    examples/rollout/unchanged-cname-new/ns.com.
-    examples/rollout/unchanged-cname-old/ns.com.
-    examples/rollout/unchanged-delegation-new/ns.b.com.
-    examples/rollout/unchanged-delegation-new/ns.com.
-    examples/rollout/unchanged-delegation-old/ns.b.com.
-    examples/rollout/unchanged-delegation-old/ns.com.
-    examples/rollout/unchanged-dname-new/ns.com.
-    examples/rollout/unchanged-dname-old/ns.com.
-    examples/rollout/wildcard-alias-txt/ns.com.
-    examples/rollout/wildcard-cname-descendant/ns.com.
-    examples/rollout/wildcard-cname/ns.com.
-    examples/rollout/wildcard-dname-target/ns.com.
-    examples/rollout/wildcard-explicit/ns.com.
-    examples/rollout/wildcard-nested/ns.com.
-    examples/rollout/wildcard-other-address/ns.com.
-    examples/rollout/wildcard-target-alias/ns.com.
-    examples/rollout/wildcard-txt/ns.com.
-    examples/rollout/wildcard/ns.com.
 
 source-repository head
   type: git
