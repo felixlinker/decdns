@@ -26,25 +26,31 @@ main = do
   (cmd, args) <- popArg =<< getArgs
   case cmd of
     "pl-resolvable" -> do
-      (roots, zones) <- sepBy "--" args
+      keysPath:args' <- return args
+      keys <- parseDS keysPath
+      (roots, zones) <- sepBy "--" args'
       rootServers <- parseNames roots
       cfg <- parseZones zones
-      putStr (showKnowledgeBase $ S.toList $ runFresh $ compileConfig rootServers cfg)
+      putStr (showKnowledgeBase $ S.toList $ runFresh $ compileConfig rootServers keys cfg)
     "resolvable" -> do
-      (roots, zones) <- sepBy "--" args
+      keysPath:args' <- return args
+      keys <- parseDS keysPath
+      (roots, zones) <- sepBy "--" args'
       rootServers <- parseNames roots
       cfg <- parseZones zones
-      let res = runFresh $ computeResolvable =<< compileConfig rootServers cfg
+      let res = runFresh $ computeResolvable =<< compileConfig rootServers keys cfg
       putStrLn $ showKnowledgeBase $ map toRule $ S.toList res
     "regressions" -> do
-      (sroots, args') <- sepBy "--" args
+      keysPath:args' <- return args
+      keys <- parseDS keysPath
+      (sroots, args'') <- sepBy "--" args'
       roots <- parseNames sroots
-      (old, new) <- sepBy "--" args'
+      (old, new) <- sepBy "--" args''
       oldRecs <- parseZones old
       newRecs <- parseZones new
       regs <- failLeftS $ runFresh $ runExceptT $ do
-        oldRecsC <- lift $ compileConfig roots oldRecs
-        newRecsC <- lift $ compileConfig roots newRecs
+        oldRecsC <- lift $ compileConfig roots keys oldRecs
+        newRecsC <- lift $ compileConfig roots keys newRecs
         computeRegressions oldRecsC newRecsC
       mapM_ print $ S.map toRule regs
     "parse-only" -> do

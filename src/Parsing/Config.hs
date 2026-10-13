@@ -3,17 +3,22 @@ module Parsing.Config
   ( parseZoneFileZones
   , parseZoneFiles
   , parseStdin
+  , parseDS
   ) where
 
 import qualified Data.Set as S
-import GHC.Base (failIO, when)
+import qualified Data.List.NonEmpty as NE
+import GHC.Base (when)
 import System.IO (stderr, hPrint)
-import Text.Parsec (ParseError, SourceName)
+import Text.Parsec (SourceName)
 
-import DNS.ZoneFile (Zone)
+import DNS.ZoneFile (Zone, allRRSets, fromRecordList)
+import DNS.RRSet (RRSet, rrsetType)
+import qualified DNS.RecordType as T
 import DNS.Zone (splitZones)
 import NameConstraint (compileWildcards)
 import Parsing (parseZoneFile)
+import Parsing.ZoneFile (parseRecords)
 import Resolvable.Resolvability (NameServersConfig)
 import DNS.Wellformedness (Issue, isFatal)
 import Util.Parsing
@@ -44,3 +49,8 @@ parseZoneFileZones wfc path = do
 
 parseZoneFiles :: (Zone String -> [Issue String]) -> [FilePath] -> IO NameServersConfig
 parseZoneFiles wfc = fmap concat . mapM (parseZoneFileZones wfc)
+
+parseDS :: FilePath -> IO [RRSet String]
+parseDS path = do
+  records <- handleParser =<< parseRecords path =<< readFile path
+  return $ maybe [] (filter ((== T.DS) . rrsetType) . allRRSets . fromRecordList) (NE.nonEmpty records)

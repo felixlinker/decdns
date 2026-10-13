@@ -4,20 +4,24 @@ import Control.Monad (forM_)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (runExceptT)
 import Data.Maybe (isJust)
+import Data.List (isPrefixOf, nub, sort)
 import qualified Data.Set as S
+import System.Directory (listDirectory)
+import System.FilePath (takeDirectory, (</>))
 
 import DNS.Name (Name, root)
 import DNS.NameSpec (mkName)
 import DNS.Record (Type (DNAME, NS, SOA))
+import DNS.RRSet (RRSet)
 import qualified DNS.RecordType as RT
 import DNS.Wellformedness (zoneWellformed)
 import DNS.ZoneFile (zoneName)
 import NameConstraint (compileName)
-import Parsing.Config (parseZoneFileZones, parseZoneFiles)
+import Parsing.Config (parseZoneFileZones, parseZoneFiles, parseDS)
 import Resolvable.Dependencies
 import qualified Resolvable.Constraint.Store as Store
 import Resolvable.Prolog.Core (Term (TComplex), ad, bot, list, nameTerm, resolvable, resolves, top, ttypeTerm, wildcard, wildcards3)
-import Resolvable.Resolvability (NameServersConfig, compileConfig, plResolvable)
+import Resolvable.Resolvability (NameServersConfig, compileConfig)
 import Resolvable.Update.Dependencies (computeRegressions)
 import qualified Resolvable.Unification as U
 import Test.Tasty (TestTree, testGroup)
@@ -490,8 +494,8 @@ regressionTest newConfig expected unexpected = do
     runFresh $
       runExceptT $
         do
-          oldRules <- lift $ compileConfig rootServers old
-          newRules <- lift $ compileConfig rootServers new
+          oldRules <- lift $ uncurry (compileConfig rootServers) old
+          newRules <- lift $ uncurry (compileConfig rootServers) new
           computeRegressions oldRules newRules
   assertResolvableQueries (baseFiles ++ newConfig) regressions expected unexpected
 
@@ -554,8 +558,15 @@ resolvableQueries :: [FilePath] -> IO (S.Set Fact)
 resolvableQueries files = do
   cfg <- loadConfig files
   return $ runFresh $ do
-        rules <- compileConfig rootServers cfg
+        rules <- uncurry (compileConfig rootServers) cfg
         computeResolvable rules
 
-loadConfig :: [FilePath] -> IO NameServersConfig
-loadConfig = parseZoneFiles zoneWellformed
+loadConfig :: [FilePath] -> IO ([RRSet String], NameServersConfig)
+loadConfig files = do
+  cfg <- parseZoneFiles zoneWellformed files
+  keys <- concat <$> mapM loadKeys (nub $ map takeDirectory files)
+  return (keys, cfg)
+  where
+    loadKeys directory = do
+      paths <- filter ("dsset-" `isPrefixOf`) . sort <$> listDirectory directory
+      concat <$> mapM (parseDS . (directory </>)) paths
