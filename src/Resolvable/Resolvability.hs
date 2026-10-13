@@ -90,13 +90,12 @@ resolvableStep (map nameTerm -> rootServers) ns (nameWithoutSynthesis -> zone) (
 
     go :: Term -> Type -> Fresh (S.Set (Rule RComp))
     go rootServer r = case r of
+      NS _ | ownerNoSynth == zone -> return S.empty
       NS s' ->
         let delegatedNs = nameTerm s'
             expectGlue = isSubDomain s' (toStringName n)
             glueS = if expectGlue then nameServer else rootServer
-        in if nameServer == delegatedNs
-          then return S.empty
-          else mconcat <$> sequence
+        in mconcat <$> sequence
             [ foreachM [aType, aaaaType] $ \glueType -> do  -- Unauthenticated
                 (nTail, t, d, dIp) <- freshVars4 ("N", "T", "D", "D_IP")
                 glueZ <- if expectGlue then return referralZone else wildcard
