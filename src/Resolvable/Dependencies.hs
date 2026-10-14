@@ -140,6 +140,7 @@ solve kb addFrom = do
   solved <- mapM (solveBody kb) addFrom
   return $ foldr S.union kb solved
 
+-- TODO: Rename to immediate consequences
 computeResolvable :: S.Set (Rule RComp) -> Fresh (S.Set Fact)
 computeResolvable (S.filter (isResolves . rhead) -> rs) = Store.evalCached $ do
   ord <- lift $ resolutionOrder rs
