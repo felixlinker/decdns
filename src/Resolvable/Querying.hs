@@ -16,6 +16,7 @@ import qualified Data.ByteString.Char8 as BS
 import Data.Bifunctor (Bifunctor(bimap))
 import Data.IP (IP(..))
 import Data.Maybe (mapMaybe, isJust)
+import Data.List (sortOn)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Network.DNS as W
@@ -60,6 +61,9 @@ newtype Query = Query (Name String, T.Type, Name String)
 
 instance Show Query where
   show (Query (ns, t, n)) = unwords ['@' : show ns, show t, show n]
+
+equivQuery :: Query -> Query -> Bool
+equivQuery (Query (_, qt1, qn1)) (Query (_, qt2, qn2)) = qt1 == qt2 && qn1 == qn2
 
 data QueryState = QueryState
   { dnsData :: M.Map (Name String) (S.Set StandardRecord)
@@ -202,6 +206,30 @@ rootSRule ns =
   in Rule Nothing (queryT q n d v a)
        [resolves (nameTerm ns) q z n d v a, z \= referralZone]
 
+sortFailures :: [Query] -> T.Type -> Name String -> [Goal (Maybe T.Type) [Term]]
+             -> [Goal (Maybe T.Type) [Term]]
+sortFailures qs qt qn = sortOn priority
+  where
+    priority failed = case goalToQuery failed of
+      Nothing -> (3, True, 0, 0)
+      Just q@(Query (_, t, n)) -> (group t, not (any (equivQuery q) qs), qnameDistance n, typePriority t)
+
+    group :: T.Type -> Int
+    group T.DNSKEY = 0
+    group t | t `elem` [T.NSEC, T.NSEC3, T.NSEC3PARAM] = 2
+    group _ = 1
+
+    qnameDistance :: Name String -> Int
+    qnameDistance n =
+      let common = maybe 0 length (intersection qn n)
+      in length qn + length n - 2 * common
+
+    typePriority :: T.Type -> Int
+    typePriority t | t == qt = 0
+    typePriority T.A = 1
+    typePriority T.AAAA = 1
+    typePriority _ = 2
+
 runOnline :: T.Type -> Name String -> Goal (Maybe T.Type) [Term] -> Unifier
           -> OnlineSolver (Maybe Unifier)
 runOnline qt qn g u = do
@@ -209,10 +237,10 @@ runOnline qt qn g u = do
   us <- sldSome (S.toList rs) g u
   failures <- clearFailures
   if null us then do
-    join <$> firstP isJust (S.toList failures)
+    qs <- liftRuleBase $ getsState queried
+    join <$> firstP isJust (sortFailures qs qt qn (S.toList failures))
       (dnsLookup >=> (\new -> if new then runOnline qt qn g u else return Nothing))
   else return us
-  where
 
 resolve :: [RRSet String] -> [(Name String, IP)] -> T.Type -> Name String -> IO (Maybe Term, [Query])
 resolve = resolveWith defaultQueryConfig
