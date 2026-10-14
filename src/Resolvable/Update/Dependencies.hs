@@ -1,12 +1,14 @@
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Update.Dependencies
-  ( computeRegressions ) where
+  ( computeRegressions
+  , resolvableQuery ) where
 
 import qualified Data.Set as S
 import Control.Monad (foldM)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except
 
+import qualified DNS.RecordType as T
 import Resolvable.Dependencies
 import Resolvable.Prolog.Core
 import Resolvable.Prolog.TermView
@@ -30,8 +32,11 @@ resolvableQuery :: Fact -> Maybe Fact
 resolvableQuery (Fact t neqs) = (`Fact` neqs) <$> resolvableFromResolves t
 
 resolvableFromResolves :: Term -> Maybe Term
-resolvableFromResolves (toView -> TVResolves r)
-  | resolvesZone r == referralZone = Nothing
+resolvableFromResolves (toView -> TVResolves r@(Resolves { resolvesZone = z, resolvesQType = qt }))
+  -- Do not report referral data as resolvable
+  | z == referralZone = Nothing
+  -- Do not report structural records as resolvable
+  | qt `elem` map ttypeTerm [T.CNAME, T.DNAME, T.SOA, T.DS, T.DNSKEY, T.NSEC, T.NSEC3, T.RRSIG] = Nothing
   | otherwise = Just $ resolvable
     (resolvesZone r)
     (resolvesQType r)

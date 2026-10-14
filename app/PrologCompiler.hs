@@ -13,13 +13,14 @@ import System.Environment (getArgs)
 import Util
 import Data.List (uncons)
 import qualified Data.Set as S
-import Resolvable.Update.Dependencies (computeRegressions)
+import Resolvable.Update.Dependencies (computeRegressions, resolvableQuery)
 import Control.Monad (when)
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
 import Parsing
-import DNS.Name (Name, root, prependLabels)
+import DNS.Name (root, prependLabels)
 import Resolvable.Querying (resolve)
+import Data.Maybe (mapMaybe)
 
 main :: IO ()
 main = do
@@ -32,7 +33,7 @@ main = do
       rootServers <- parseNames roots
       cfg <- parseZones zones
       putStr (showKnowledgeBase $ S.toList $ runFresh $ compileConfig rootServers keys cfg)
-    "resolvable" -> do
+    "resolves" -> do
       keysPath:args' <- return args
       keys <- parseDS keysPath
       (roots, zones) <- sepBy "--" args'
@@ -40,6 +41,14 @@ main = do
       cfg <- parseZones zones
       let res = runFresh $ computeResolvable =<< compileConfig rootServers keys cfg
       putStrLn $ showKnowledgeBase $ map toRule $ S.toList res
+    "resolvable" -> do
+      keysPath:args' <- return args
+      keys <- parseDS keysPath
+      (roots, zones) <- sepBy "--" args'
+      rootServers <- parseNames roots
+      cfg <- parseZones zones
+      let res = runFresh $ computeResolvable =<< compileConfig rootServers keys cfg
+      putStrLn $ showKnowledgeBase $ mapMaybe (fmap toRule . resolvableQuery) $ S.toList res
     "regressions" -> do
       keysPath:args' <- return args
       keys <- parseDS keysPath

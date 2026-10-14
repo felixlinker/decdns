@@ -3,10 +3,8 @@ module Resolvable.Resolvability
   ( RComp(..)
   , fromZone
   , compileRRSet
-  , compileConfig
-  , plResolvable ) where
+  , compileConfig ) where
 
-import Data.Functor (void)
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as S
@@ -260,26 +258,6 @@ resolvableStep roots nses (nameWithoutSynthesis -> zone) rrset@(Named n rs) = go
       T.DS -> return S.empty
       T.DNSKEY -> return S.empty
 
-resolvableR :: Fresh (Rule ())
-resolvableR = do
-  (s, q, z, n, v, a) <- freshVars6 ("S", "Q", "Z", "N", "V", "A")
-  wc <- wildcard
-  return $ Rule () (resolvable z q n v a) [ resolves s q z n wc v a, z \= referralZone ]
-
-allResolvable :: Rule ()
-allResolvable =
-  Rule () (TFunctor "all_resolvable" [ q, z, ns ]) [ bagof n (resolvable z q n v a) ns ]
-  where
-    q = TVar "Q"
-    z = TVar "Zone"
-    ns = TVar "Names"
-    n = TVar "Name"
-    v = TVar "Ver"
-    a = TVar "Auth"
-
-    bagof :: Term -> Term -> Term -> Term
-    bagof x y result = TFunctor "bagof" [ x, y, result ]
-
 compileRRSet :: ZoneNSesT -> ZoneNSesT -> ConstrainedName -> Bool -> ConstrainedRRSet -> Fresh (S.Set (Rule RComp))
 compileRRSet roots nses zone isReferral rs =
   (<>) <$> resolvableBase nses zone isReferral rs <*> resolvableStep roots nses zone rs
@@ -310,8 +288,3 @@ compileConfig roots dsData zones = do
   return $ foldr S.insert rs trustedKeys
   where
     rootsTs = maybe (error "invariant error") nsesTerm $ NE.nonEmpty roots
-
-plResolvable :: S.Set (Rule a) -> Fresh (S.Set (Rule ()))
-plResolvable compiled = do
-  res <- resolvableR
-  return $ foldr S.insert (S.map void compiled) [allResolvable, res]
