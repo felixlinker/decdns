@@ -1,6 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Resolvable.Dependencies
   ( ResolutionOrder
@@ -13,9 +12,10 @@ import Control.Monad (foldM, guard)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (runExcept)
 import Data.Either (fromRight)
+import Data.Foldable (Foldable(foldl'))
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Maybe (listToMaybe, mapMaybe, isJust, fromMaybe)
+import Data.Maybe (listToMaybe, mapMaybe, catMaybes, isJust, fromMaybe)
 
 import qualified Resolvable.Constraint.Store as Store
 import Resolvable.Constraint.Solving (getSolved)
@@ -100,24 +100,25 @@ solveBody :: S.Set Fact -> Rule a -> Solver (S.Set Fact)
 solveBody fs r = do
   Rule _ h b <- lift $ awayR r
   let (st, b') = Store.partitionConstraints b
-  us <- foldM solvePredicate [(identity, st)] b'
-  return $ S.fromList $ map (\(u, st') -> Fact (apply u h) (apply u st')) us
+  let us = foldl' solvePredicate [(identity, st)] b'
+  facts <- catMaybes <$> mapM (uncurry $ toFact h) us
+  return $ S.fromList facts
   where
-    solvePredicate :: [(Unifier, Store.ConstraintStore)] -> Term -> Solver [(Unifier, Store.ConstraintStore)]
+    toFact :: Term -> Unifier -> Store.ConstraintStore -> Solver (Maybe Fact)
+    toFact h u st = do
+      reduced <- getSolved <$> Store.simplifyCached (apply u st)
+      return $ Fact (apply u h) <$> reduced
+
+    solvePredicate :: [(Unifier, Store.ConstraintStore)] -> Term -> [(Unifier, Store.ConstraintStore)]
     solvePredicate choices p = case toView p of
-      TVResolves {} -> concat <$> mapM
-        (\(u, accSt) -> foldM
-          (\acc (Fact h st) -> do
-            maybe
-              (return acc)
-              (\u' -> do
-                st' <- getSolved <$> Store.simplifyCached (apply u' accSt <> apply u' st)
-                return $ maybe acc ((:acc) . (u',)) st')
-              (extendUnifier p h u))
+      TVResolves {} -> concatMap
+        (\(u, accSt) -> foldr
+          (\(Fact h st) acc ->
+            maybe acc (\u' -> (u', apply u' (accSt <> st)) : acc) (extendUnifier p h u))
           []
           fs)
         choices
-      TVMember x l -> pure $ concatMap
+      TVMember x l -> concatMap
         (\(u, accSt) -> fromRight [] $ runExcept $ do
           l' <- exceptMaybe "member" (collectList $ apply u l)
           return $ mapMaybe (\el -> do
