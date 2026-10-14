@@ -36,7 +36,7 @@ resolvableFromResolves (toView -> TVResolves r@(Resolves { resolvesZone = z, res
   -- Do not report referral data as resolvable
   | z == referralZone = Nothing
   -- Do not report structural records as resolvable
-  | qt `elem` map ttypeTerm [T.CNAME, T.DNAME, T.SOA, T.DS, T.DNSKEY, T.NSEC, T.NSEC3, T.RRSIG] = Nothing
+  | qt `elem` map ttypeTerm [T.CNAME, T.DNAME, T.SOA, T.NS, T.DS, T.DNSKEY, T.NSEC, T.NSEC3, T.RRSIG] = Nothing
   | otherwise = Just $ resolvable
     (resolvesZone r)
     (resolvesQType r)

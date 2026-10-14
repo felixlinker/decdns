@@ -14,7 +14,9 @@ import Resolvable.Prolog.TermView
 
 toNeq :: Term -> Maybe (Term, Term)
 toNeq (toView -> TVNeq a b) = Just (a, b)
-toNeq _ = Nothing  -- TODO: This case may silently drop non-neq constraints; address that
+-- Dropping isName constraints is permitted
+toNeq (toView -> TVIsName {}) = Nothing
+toNeq _ = error "residual, unsolved constraints"
 
 negateFact :: Fact -> Maybe [Term]
 negateFact (Fact t (mapMaybe toNeq . Store.toBody -> neqs))
