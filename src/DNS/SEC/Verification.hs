@@ -86,7 +86,7 @@ verifySignature (canonicalName -> owner) (map canonicalType -> rrset) (canonical
     mkRecord = Named originalOwner . RData IN (_originalTTL sig)
 
     serializedRRSet :: [BS.ByteString]
-    serializedRRSet = snub $ map (serialize . mkRecord) $ sortOn serialize rrset
+    serializedRRSet = map (serialize . mkRecord) $ sortOn serialize $ snub rrset
 
 keyTag :: DNSKEYData -> Word16
 keyTag (serialize -> wireFormat) =
