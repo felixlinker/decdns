@@ -5,7 +5,7 @@ import Control.Monad (forever, void)
 import Data.IORef
 import Data.List (sort)
 import qualified Data.List.NonEmpty as NE
-import Control.Exception (bracket, onException)
+import Control.Exception (bracket, onException, try)
 import qualified Data.ByteString.Char8 as BS
 import Data.IP (IP(..))
 import Data.Maybe (fromJust, isJust, isNothing, maybeToList)
@@ -24,14 +24,13 @@ import Test.Tasty.HUnit
 import DNS.Name
 import DNS.Record
 import qualified DNS.RecordType as T
-import DNS.SEC.Crypto (DigestType(SHA256))
+import DNS.SEC.Crypto (DigestType(SHA256), AlgorithmType(ECDSAP256SHA256))
 import DNS.SEC.Verification (keyTag, keyDigest)
 import DNS.Response
-import DNS.Zone (splitZone, splitZoneAt)
 import qualified DNS.ZoneFile as Z
 import qualified DNS.RRSet as RRSet
 import Parsing.Name (parseNameM)
-import Parsing.ZoneFile (parseRecords)
+import Parsing.ZoneFile (parseRecords, parseAddrs)
 import Resolvable.Prolog.Core hiding (ds, keyTag)
 import Resolvable.Querying
 import Util.Bytes (serialize)
@@ -63,7 +62,17 @@ mismatchAnchor = fmap (fmap mismatch)
 resolveFixture :: QueryConfig -> [(Name String, IP)] -> T.Type -> Name String -> IO (Maybe Term, [Query])
 resolveFixture cfg hints qt qn = do
   anchors <- fixtureAnchors
-  resolveWith cfg anchors hints qt qn
+  resolveWith cfg anchors (rootAddresses hints) qt qn
+
+rootAddresses :: [(Name String, IP)] -> [RRSet.RRSet String]
+rootAddresses hints =
+  [Named root (NE.fromList [RData IN 60 (NS ns) | ns <- S.toList (S.fromList (map fst hints))])] ++
+  map (\(owner, ip) -> Named owner (NE.singleton (RData IN 60 (case ip of
+    IPv4 addr -> A addr
+    IPv6 addr -> AAAA addr)))) hints
+
+rootCache :: ZoneCache
+rootCache = cacheRecords (S.singleton server) [Named root (RData IN 60 (NS server))] emptyZoneCache
 
 -- CoreDNS is bound only to loopback, on an ephemeral unprivileged port.
 startServer :: IO (QueryConfig, FilePath, ProcessHandle)
@@ -302,7 +311,7 @@ tests = testGroup "Resolvable.Querying"
       [ testCase "anchors compile to an authentic root DS RRSet without lookups" $ do
           anchors <- fixtureAnchors
           (answers, queries) <- resolveWith (defaultQueryConfig { queryLimit = 0 })
-            anchors [(server, IPv4 (read "127.0.0.1"))] T.DS root
+            anchors (rootAddresses [(server, IPv4 (read "127.0.0.1"))]) T.DS root
           answers @?= Just (TFunctor "query" [dsType, nameTerm root,
             rrsetTerm (concatMap (NE.toList . value) anchors), top, ad 1])
           queries @?= []
@@ -311,14 +320,14 @@ tests = testGroup "Resolvable.Querying"
             anchors <- fixtureAnchors
             let wrong = map mismatchAnchor anchors
             (answers, _) <- resolveWith cfg (wrong ++ anchors)
-              [(server, IPv4 (read "127.0.0.1"))] T.A (name' "alias.test.")
+              (rootAddresses [(server, IPv4 (read "127.0.0.1"))]) T.A (name' "alias.test.")
             assertBool "expected a validated answer" (isJust answers)
       , testCase "missing or mismatching anchors cannot validate root DNSKEYs" $
           withWireServer (aliasResponse True) $ \cfg _ -> do
             anchors <- fixtureAnchors
             mapM_ (\keys -> do
               (answers, _) <- resolveWith (cfg { queryLimit = 100 }) keys
-                [(server, IPv4 (read "127.0.0.1"))] T.A (name' "alias.test.")
+                (rootAddresses [(server, IPv4 (read "127.0.0.1"))]) T.A (name' "alias.test.")
               answers @?= Nothing) [[], map mismatchAnchor anchors]
       , testCase "root DNSKEYs require a valid self-signature" $
           withWireFixtureModified "wire"
@@ -328,6 +337,56 @@ tests = testGroup "Resolvable.Querying"
             (return . aliasResponse True) $ \cfg _ ->
               results (cfg { queryLimit = 100 }) T.A "alias.test." >>= (@?= S.empty)
       ]
+  , testCase "parent keys are fetched before retrying child keys at another server" $ do
+      parent <- loadWireFixture "test"
+      child <- loadWireFixture "child"
+      firstAnswer <- newIORef True
+      let rootKeys r = W.rrtype r == W.DNSKEY || case W.rdata r of
+            W.RD_RRSIG sig -> W.rrsigType sig == W.DNSKEY
+            _ -> False
+          ns owner target = W.ResourceRecord (BS.pack owner) W.NS 1 60 (W.RD_NS (BS.pack target))
+          address target = W.ResourceRecord (BS.pack target) W.A 1 60 (W.RD_A (read "127.0.0.1"))
+          -- Both child servers answer with the same keys. Their validation
+          -- still needs the root DNSKEY RRSet, which is deliberately withheld.
+          parentData = filter (not . rootKeys) parent ++
+            [ns "child.test." "other.child.test.", address "ns.child.test.", address "other.child.test."]
+          childData = child ++ [ns "child.test." "other.child.test."]
+          respond msg = do
+            first <- atomicModifyIORef' firstAnswer (\b -> (False, b))
+            return $ Just W.defaultResponse
+              { W.header = (W.header msg) { W.flags = W.flags (W.header W.defaultResponse) }
+              , W.question = W.question msg
+              , W.answer = if any ((== BS.pack ".") . W.qname) (W.question msg)
+                  then parent else if any ((== W.DNSKEY) . W.qtype) (W.question msg)
+                    then childData else if first || all ((/= BS.pack "www.child.test.") . W.qname) (W.question msg)
+                      then parentData else filter (not . rootKeys) childData
+              }
+      withSignedWireServer respond $ \cfg requests -> do
+        actual <- validatedResults cfg T.A "www.child.test."
+        qs <- requests
+        actual @?= S.singleton (list [TComplex (A (read "192.0.2.30"))], ad 1)
+        let keyQuestions = [W.qname q | msg <- reverse qs, q <- W.question msg, W.qtype q == W.DNSKEY]
+        keyQuestions @?= map BS.pack ["child.test.", "."]
+  , testCase "a large delegation reuses cached addresses outside its child zone" $ do
+      firstAnswer <- newIORef True
+      let childName = BS.pack "child.test."
+          target = BS.pack "www.child.test."
+          servers = [BS.pack ("ns" ++ show i ++ ".other.test.") | i <- [1..13 :: Int]]
+          respond msg = do
+            first <- atomicModifyIORef' firstAnswer (\b -> (False, b))
+            return $ Just W.defaultResponse
+              { W.header = (W.header msg) { W.flags = W.flags (W.header W.defaultResponse) }
+              , W.question = W.question msg
+              , W.answer = [W.ResourceRecord target W.A 1 60 (W.RD_A (read "192.0.2.30")) | not first]
+              , W.authority = [W.ResourceRecord childName W.NS 1 60 (W.RD_NS ns) | first, ns <- servers]
+              , W.additional = [W.ResourceRecord ns W.A 1 60 (W.RD_A (read "127.0.0.1")) | first, ns <- servers]
+              }
+      withWireFixture "wire" respond $ \cfg requests -> do
+        actual <- validatedResults (cfg { queryLimit = 3 }) T.A "www.child.test."
+        qs <- requests
+        actual @?= S.singleton (list [TComplex (A (read "192.0.2.30"))], ad 0)
+        [(W.qname q, W.qtype q) | msg <- reverse qs, q <- W.question msg]
+          @?= [(target, W.A), (BS.pack ".", W.DNSKEY), (target, W.A)]
   , testGroup "addresses cached from every response section"
       [ testCase "answer" $ addressCacheTest "wire" (\rs msg -> msg { W.answer = rs })
       , testCase "authority" $ addressCacheTest "wire" (\rs msg -> msg { W.authority = W.authority msg ++ rs })
@@ -372,21 +431,50 @@ tests = testGroup "Resolvable.Querying"
         qs <- requests
         let questions = [(W.qname q, W.qtype q) | msg <- qs, q <- W.question msg]
         length questions @?= S.size (S.fromList questions)
-  , testCase "delegation boundaries split multiple SOA-free zones on one server" $ do
-      let records = [Named (name' n) (RData IN 60 (A (read "192.0.2.50")))
-                    | n <- ["www.first.test.", "www.second.test."]]
-          accumulated = foldl Z.insert (Z.emptyZone root) (map (fmap RRSet.singleton) records)
-          zones = splitZoneAt (S.fromList $ map name' ["first.test.", "second.test."]) accumulated
-      sort (map Z.zoneName zones) @?= sort (map name' ["first.test.", "second.test."])
-      S.fromList (concatMap Z.allRecords zones) @?= S.fromList records
-  , testCase "a later SOA reassigns accumulated records to its zone" $ do
-      let a = Named (name' "www.test.") (RData IN 60 (A (read "192.0.2.50")))
-          soa = Named (name' "test.") (RData IN 60 (SOA (name' "ns.test.") (name' "hostmaster.test.") 1 60 60 60 60))
-          partial = Z.insert (Z.emptyZone root) (fmap RRSet.singleton a)
-      map Z.zoneName (splitZone partial) @?= [root]
-      let complete = splitZone (Z.insert partial (fmap RRSet.singleton soa))
-      map Z.zoneName complete @?= [name' "test."]
-      S.fromList (concatMap Z.allRecords complete) @?= S.fromList [a, soa]
+  , testGroup "zone cache by origin and apex"
+      [ testCase "starts empty" $ cachedZones emptyZoneCache @?= []
+      , testCase "address-only root hints are rejected" $ do
+          let hints = [Named server (NE.singleton (RData IN 60 (A (read "127.0.0.1"))))]
+          result <- try (resolveWith (defaultQueryConfig { queryLimit = 0 }) [] hints T.A (name' "google.com."))
+            :: IO (Either IOError (Maybe Term, [Query]))
+          case result of
+            Left _ -> return ()
+            Right _ -> assertFailure "missing root NS records must be reported"
+      , testCase "addresses do not discover zones" $ do
+          let records = concatMap (NE.toList . RRSet.toRecords) $
+                rootAddresses [(server, IPv4 (read "127.0.0.1"))]
+              zones = cachedZones (cacheRecords (S.singleton server) records emptyZoneCache)
+          map (toStringName . Z.zoneName) zones @?= [root]
+          sort (map (mapName toStringName) (concatMap Z.allRecords zones)) @?= sort records
+      , testCase "root referrals use the root origin despite discovering a closer child zone" $ do
+          let child = name' "a.gtld-servers.net."
+              ns = Named (name' "com.") (RData IN 60 (NS child))
+              ds = Named (name' "com.") (RData IN 60 (DS (DSData 1 ECDSAP256SHA256 SHA256 BS.empty)))
+              glue = Named child (RData IN 60 (A (read "192.5.6.30")))
+              zones = cachedZones (cacheRecords (S.singleton server) [ns, ds, glue] rootCache)
+              at apex = [mapName toStringName rr | z <- zones, toStringName (Z.zoneName z) == apex,
+                                                  rr <- Z.allRecords z]
+          sort (map (toStringName . Z.zoneName) zones) @?= [root, name' "com."]
+          sort (at root) @?= sort (Named root (RData IN 60 (NS server)) : [ns, ds, glue])
+          at (name' "com.") @?= [ns]
+      , testCase "additional records outside an origin's zones do not create new zones" $ do
+          let child = name' "ns.child.test."
+              ns = Named (name' "child.test.") (RData IN 60 (NS child))
+              answer = Named (name' "www.child.test.") (RData IN 60 (A (read "192.0.2.50")))
+              unrelated = Named (name' "other.test.") (RData IN 60 (A (read "192.0.2.51")))
+              delegated = cacheRecords (S.singleton server) [ns] rootCache
+              zones = cachedZones (cacheRecords (S.singleton child) [answer, unrelated] delegated)
+              records = map (mapName toStringName) (concatMap Z.allRecords zones)
+          assertBool "the child answer is retained" (answer `elem` records)
+          assertBool "unrelated additional data is ignored" (unrelated `notElem` records)
+          sort (map (toStringName . Z.zoneName) zones) @?= sort [root, name' "child.test."]
+      , testCase "repeated responses deduplicate complete RRSets" $ do
+          let records = [Named (name' "www.test.") (RData IN 60 (A (read ip))) |
+                         ip <- ["192.0.2.50", "192.0.2.51"]]
+              cache = cacheRecords (S.singleton server) records rootCache
+              repeated = cacheRecords (S.singleton server) (reverse records) cache
+          cachedZones cache @?= cachedZones repeated
+      ]
   , testCase "successful resolution with multiple starting servers" $ cacheTest True
   , testCase "a response containing a complete proof resolves the query" $
       withWireFixture "wire-complete" (return . completeResponse) $ \cfg _ -> do
@@ -396,6 +484,21 @@ tests = testGroup "Resolvable.Querying"
           Just (rs, _) -> [d | TFunctor "query" [_, _, d, _, _] <- maybeToList rs]
             @?= [list [TComplex (A (read "192.0.2.51"))]]
           Nothing -> assertFailure "resolution did not terminate"
+  , testCase "starting hints are replaced by the advertised root NS set" $
+      withWireFixtureModified "wire-complete"
+        (\msg -> msg { W.additional = W.ResourceRecord (BS.pack ".") W.NS 1 60
+          (W.RD_NS (BS.pack "other.root.")) : W.additional msg })
+        (return . completeResponse) $ \cfg _ -> do
+          actual <- results cfg T.A "alias.test."
+          actual @?= S.singleton (list [TComplex (A (read "192.0.2.51"))])
+  , testCase "missing apex NS records use the complete starting hint set" $
+      withWireFixtureModified "wire-complete"
+        (\msg -> msg { W.additional = filter ((/= W.NS) . W.rrtype) (W.additional msg) })
+        (return . completeResponse) $ \cfg _ -> do
+          let hints = [(name' n, IPv4 (read "127.0.0.1")) | n <- ["ns.root.", "other.root."]]
+          (answer, _) <- resolveFixture cfg hints T.A (name' "alias.test.")
+          [d | TFunctor "query" [_, _, d, _, _] <- maybeToList answer]
+            @?= [list [TComplex (A (read "192.0.2.51"))]]
   , testCase "non-recursive queries and negative response reuse" $ cacheTest False
   , testCase "zero budget sends no queries" $ limitTest 0 1 True
   , testCase "budget is shared across alias lookups" $ limitTest 1 1 True
@@ -413,14 +516,24 @@ tests = testGroup "Resolvable.Querying"
           let questions = [(W.qname q, W.qtype q) | msg <- qs, q <- W.question msg]
           length questions @?= S.size (S.fromList questions)
   , testCase "budget is shared across servers even with retries" $ limitTest 1 2 False
-  , testCase "successful resolution with multiple hinted addresses" $
+  , testCase "root address files supply complete IPv4 and IPv6 RRSets" $
       withWireFixture "wire-complete" (return . completeResponse) $ \cfg _ -> do
         anchors <- fixtureAnchors
-        (answers, _) <- resolveWith cfg anchors
-          [(server, IPv4 (read "127.0.0.2")), (server, IPv4 (read "127.0.0.1"))]
-          T.A (name' "alias.test.")
-        [d | TFunctor "query" [_, _, d, _, _] <- maybeToList answers]
-          @?= [list [TComplex (A (read "192.0.2.51"))]]
+        tmp <- getTemporaryDirectory
+        bracket (openTempFile tmp "dns-regressor-root-addresses")
+          (\(path, _) -> removeFile path) $ \(path, handle) -> do
+            hPutStr handle $ unlines
+              [ "NS.ROOT. 60 IN A 127.0.0.2"
+              , "NS.ROOT. 60 IN A 127.0.0.1"
+              , "NS.ROOT. 60 IN AAAA ::1"
+              , ". 60 IN NS NS.ROOT."
+              ]
+            hClose handle
+            hints <- parseAddrs path
+            sort (map RRSet.rrsetType hints) @?= sort [T.NS, T.A, T.AAAA]
+            (answers, _) <- resolveWith cfg anchors hints T.A (name' "alias.test.")
+            [d | TFunctor "query" [_, _, d, _, _] <- maybeToList answers]
+              @?= [list [TComplex (A (read "192.0.2.51"))]]
   , testCase "retries do not reserve lookup budget" $
       withWireFixture "wire-complete" (return . completeResponse) $ \cfg _ -> do
         actual <- results (cfg { queryLimit = 1, queryRetries = 3 }) T.A "alias.test."

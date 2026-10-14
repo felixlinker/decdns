@@ -14,7 +14,7 @@ import Text.Parsec
 
 import Parsing.State
 import Parsing.Bytes
-import DNS.Record
+import DNS.Record hiding (recordType)
 import qualified DNS.RecordType as T
 import DNS.SEC.Crypto
 import DNS.SEC.Keys

@@ -5,7 +5,8 @@ module Parsing
   , parseTypeM
   , parseRecords
   , parseZoneFiles
-  , parseDS ) where
+  , parseDS
+  , parseAddrs ) where
 
 import Parsing.Name
 import Parsing.Data

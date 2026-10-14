@@ -16,8 +16,10 @@ module DNS.Record
   , RData(..)
   , Record
   , record
+  , recordType
   , StandardRecord
   , canonicalRData
+  , canonicalRecord
   , hasSignersName
   , coversSOA ) where
 
@@ -274,6 +276,9 @@ type StandardRecord = Record String
 record :: Name a -> RData -> Record a
 record = Named
 
+recordType :: Record a -> T.Type
+recordType = toType . rtype . value
+
 instance Show RData where
   show (RData c ttl t) = show ttl ++ " " ++ show c ++ " " ++ show t
 
@@ -349,6 +354,9 @@ instance Serialize Type where
 
 canonicalRData :: RData -> RData
 canonicalRData d@(RData _ _ ty) = d { rtype = canonicalType ty }
+
+canonicalRecord :: StandardRecord -> StandardRecord
+canonicalRecord (Named n d) = Named (canonicalName n) (canonicalRData d)
 
 hasSignersName :: RData -> Name String -> Bool
 hasSignersName (rtype -> RRSIG sig) n = _signersName sig == n

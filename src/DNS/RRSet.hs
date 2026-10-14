@@ -1,4 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module DNS.RRSet
   ( RTypedSet(..)
   , empty
@@ -19,6 +20,7 @@ module DNS.RRSet
   , toRecords
   , rrsetType
   , getAliased
+  , getIP
   , hasType
   , getType
   , nsNames
@@ -28,6 +30,7 @@ import Data.Bifunctor (Bifunctor(bimap))
 import qualified Data.List.NonEmpty as NE
 import Data.Foldable (toList)
 import Data.Functor.Identity (Identity(runIdentity))
+import Data.IP (IP(IPv4, IPv6))
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
 
@@ -112,13 +115,20 @@ getAliased (Named _ ((rtype -> CNAME n) NE.:| [])) = Just n
 getAliased (Named _ ((rtype -> DNAME n) NE.:| [])) = Just n
 getAliased _ = Nothing
 
+getIP :: forall a. RRSet a -> [(Name a, IP)]
+getIP (Named n rs) = concatMap (asIP . rtype) $ NE.toList rs
+  where
+    asIP :: Type -> [(Name a, IP)]
+    asIP (A ip) = [(n, IPv4 ip)]
+    asIP (AAAA ip) = [(n, IPv6 ip)]
+    asIP _ = []
+
 hasType :: T.Type -> RTypedSet a -> Bool
 hasType t = M.member t . rds
 
 getType :: T.Type -> RDataSet -> [RData]
 getType t = maybe [] NE.toList . M.lookup t . rds
 
--- | Canonical NS targets, ordered and deduplicated for set comparison.
 nsNames :: Foldable f => f RData -> [Name String]
 nsNames rs = snub [canonicalName ns | RData _ _ (NS ns) <- toList rs]
 

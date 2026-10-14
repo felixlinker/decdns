@@ -1,6 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Resolvability
   ( RComp(..)
+  , nsesTerm
   , fromZone
   , compileRRSet
   , compileConfig ) where

@@ -2,7 +2,8 @@
 module Parsing.ZoneFile
   ( parseRecords
   , parseZoneFiles
-  , parseDS ) where
+  , parseDS
+  , parseAddrs ) where
 
 import Text.Parsec
 import Control.Applicative (asum)
@@ -135,7 +136,13 @@ parseZoneFileContents wfc source path = do
 parseZoneFiles :: (Zone String -> [Issue String]) -> [FilePath] -> IO [Zone ConstrainedLabel]
 parseZoneFiles wfc = mapM (\path -> parseZoneFileContents wfc path path)
 
-parseDS :: FilePath -> IO [RRSet String]
-parseDS path = do
+parseRRSets :: FilePath -> IO [RRSet String]
+parseRRSets path = do
   recs <- handleParser =<< parseRecords path =<< readFile path
-  return $ maybe [] (filter ((== T.DS) . rrsetType) . allRRSets . fromRecordList) (NE.nonEmpty recs)
+  return $ maybe [] (allRRSets . fromRecordList) (NE.nonEmpty recs)
+
+parseDS :: FilePath -> IO [RRSet String]
+parseDS = fmap (filter ((== T.DS) . rrsetType)) . parseRRSets
+
+parseAddrs :: FilePath -> IO [RRSet String]
+parseAddrs = fmap (filter ((`elem` [T.NS, T.A, T.AAAA]) . rrsetType)) . parseRRSets

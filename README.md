@@ -32,9 +32,10 @@ stack run -- [command] [args]
 
 Available commands are:
 
-- `query ROOT_KEYS TYPE NAME`:
-  Resolve a fully qualified name against real DNS, starting at `a.root-servers.net.`.
-  For example, `stack run -- query root-keys NS com.` or `stack run -- query root-keys A amazon.com.`.
+- `query ROOT_ADDRESSES ROOT_KEYS TYPE NAME`:
+  Resolve a fully qualified name against real DNS, starting with the servers in the root addresses file.
+  For example, `stack run -- query root-addresses root-keys NS com.` or `stack run -- query root-addresses root-keys A amazon.com.`.
+  The root addresses file contains root NS records and their A and AAAA records in zone-file format.
   The root keys file contains root (`.`) DS records in zone-file format.
   These records are considered trusted and used to authenticate the root DNSKEY RRSet.
   Prints the first complete answer and logs network lookups as `%` Prolog comments.

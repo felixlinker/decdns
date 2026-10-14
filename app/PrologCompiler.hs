@@ -18,7 +18,6 @@ import Control.Monad (when)
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
 import Parsing
-import DNS.Name (root, prependLabels)
 import Resolvable.Querying (resolve)
 import Data.Maybe (mapMaybe)
 
@@ -66,12 +65,12 @@ main = do
       parsed <- concatMap (map toStandardRecord . allRecords) <$> parseZones args
       mapM_ print parsed
     "query" -> do
-      let rs = [(prependLabels ["a", "root-servers", "net"] root, read "198.41.0.4")]
-      [keysPath, t, qn] <- return args
+      [addrsPath, keysPath, t, qn] <- return args
+      addrs <- parseAddrs addrsPath
       keys <- parseDS keysPath
       t' <- parseTypeM t
       qn' <- parseNameM qn
-      (as, qs) <- resolve keys rs t' qn'
+      (as, qs) <- resolve keys addrs t' qn'
       putStrLn "% Queried:"
       mapM_ (\q -> putStrLn ("% " ++ show q)) (reverse qs)
       when (null as) (putStrLn "no response")

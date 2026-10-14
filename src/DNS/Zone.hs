@@ -3,6 +3,7 @@ module DNS.Zone
   ( splitZone
   , splitZoneAt
   , splitZones
+  , splitData
   , zoneNameServers
   , apexNameServers
   , collectReferrals ) where
