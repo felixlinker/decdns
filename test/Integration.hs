@@ -22,6 +22,7 @@ import NameConstraint (compileName, ConstrainedLabel)
 import Parsing (parseZoneFiles, parseDS)
 import Resolvable.Dependencies
 import qualified Resolvable.Constraint.Store as Store
+import Resolvable.Constraint.Solving (getSolved)
 import Resolvable.Prolog.Core (Term (TComplex), ad, bot, list, nameTerm, referralZone, resolvable, resolves, top, ttypeTerm, wildcard, wildcards3)
 import Resolvable.Resolvability (compileConfig)
 import Resolvable.Update.Dependencies (computeRegressions)
@@ -66,6 +67,11 @@ tests =
         "resolvability authentication"
         [ testCase "signed authenticates the CNAME chain and child zone" $
             authenticatedResolutionTest signedFiles
+        , testCase "signed facts have fully reduced constraints" $ do
+            results <- resolvableQueries signedFiles
+            forM_ results $ \(Fact _ constraints) ->
+              fmap Store.toBody (getSolved (Store.simplify constraints))
+                @?= Just (Store.toBody constraints)
         , testCase "signed authenticates a TXT record" $ do
             results <- resolvableQueries signedTxtFiles
             assertResolutions signedTxtFiles results
@@ -113,26 +119,16 @@ tests =
         "Resolvable.Update.Dependencies"
         [ testCase "base to new has expected unsigned regression facts" $
             regressionTest newFiles
-              [ Query com RT.CNAME aCom
-              , Query com RT.NS aCom
-              , Query com RT.NS bCom
-              , Query com RT.SOA aCom
-              , Query com RT.SOA bCom ]
+              []
               [ Query com RT.A aCom
               , Query com RT.A bCom
-              , Query com RT.A nsBCom
-              , Query com RT.SOA com ]
+              , Query com RT.A nsBCom ]
         , testCase "base to broken has expected unsigned regression facts" $
             regressionTest brokenFiles
               [ Query com RT.A aCom
               , Query com RT.A bCom
-              , Query com RT.A nsBCom
-              , Query com RT.NS aCom
-              , Query com RT.NS bCom
-              , Query com RT.SOA aCom
-              , Query com RT.SOA bCom ]
-              [ Query com RT.CNAME aCom
-              , Query com RT.SOA com ] ] ]
+              , Query com RT.A nsBCom ]
+              [] ] ]
 
 data ExampleFile = ExampleFile
   { examplePath :: FilePath
