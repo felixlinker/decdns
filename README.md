@@ -36,9 +36,8 @@ Available commands are:
   Resolve a fully qualified name against real DNS, starting at `a.root-servers.net.`.
   For example, `stack run -- query root-keys NS com.` or `stack run -- query root-keys A amazon.com.`.
   The root keys file contains root (`.`) DS records in zone-file format.
-  These records are trusted and used to authenticate the root DNSKEY RRSet.
+  These records are considered trusted and used to authenticate the root DNSKEY RRSet.
   Prints the first complete answer and logs network lookups as `%` Prolog comments.
-  A per-command budget of 10 DNS lookups limits network traffic.
 - `pl-resolvable [names...] -- [zone files...]`:
   Compile a list of zone files to a Prolog program that can reason about resolvability and print it to stdout.
   Resolution will start at the name servers provided as first list of arguments.
