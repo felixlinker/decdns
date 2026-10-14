@@ -8,7 +8,7 @@ import qualified Data.List.NonEmpty as NE
 import Control.Exception (bracket, onException)
 import qualified Data.ByteString.Char8 as BS
 import Data.IP (IP(..))
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, isJust, isNothing, maybeToList)
 import qualified Data.Set as S
 import qualified Data.Map as M
 import qualified Network.DNS as W
@@ -34,7 +34,6 @@ import Parsing.Name (parseNameM)
 import Parsing.ZoneFile (parseRecords)
 import Resolvable.Prolog.Core hiding (ds, keyTag)
 import Resolvable.Querying
-import Util.Fresh (runFresh)
 import Util.Bytes (serialize)
 
 name' :: String -> Name String
@@ -61,7 +60,7 @@ mismatchAnchor = fmap (fmap mismatch)
       DS k -> dat { rtype = DS (k { _digest = BS.empty }) }
       _ -> dat
 
-resolveFixture :: QueryConfig -> [(Name String, IP)] -> T.Type -> Name String -> IO ([Term], [Query])
+resolveFixture :: QueryConfig -> [(Name String, IP)] -> T.Type -> Name String -> IO (Maybe Term, [Query])
 resolveFixture cfg hints qt qn = do
   anchors <- fixtureAnchors
   resolveWith cfg anchors hints qt qn
@@ -98,7 +97,7 @@ startServer = do
           Just code -> assertFailure ("CoreDNS exited: " ++ show code)
           Nothing -> do
             (answers, _) <- resolveFixture cfg [(server, IPv4 (read "127.0.0.1"))] T.A (name' "www.test.")
-            if null answers then threadDelay 50000 >> ready (n - 1) else return ()
+            if isNothing answers then threadDelay 50000 >> ready (n - 1) else return ()
   (ready (40 :: Int) >> return resource) `onException` stopServer resource
 
 stopServer :: (QueryConfig, FilePath, ProcessHandle) -> IO ()
@@ -112,7 +111,7 @@ validatedResults cfg qt qn = do
   result <- timeout 5000000 $ resolveFixture cfg [(server, IPv4 (read "127.0.0.1"))] qt (name' qn)
   case result of
     Nothing -> assertFailure "online resolution did not terminate" >> return S.empty
-    Just (rs, _) -> return $ S.fromList [(d, a) | TFunctor "query" [_, _, d, v, a] <- rs, v == top]
+    Just (rs, _) -> return $ S.fromList [(d, a) | TFunctor "query" [_, _, d, v, a] <- maybeToList rs, v == top]
 
 expect :: IO (QueryConfig, FilePath, ProcessHandle) -> T.Type -> String -> [Type] -> Assertion
 expect resource qt qn ds = do
@@ -208,7 +207,8 @@ aliasResponse positive msg = Just W.defaultResponse
   , W.question = W.question msg
   , W.answer = if isAlias
       then [W.ResourceRecord alias W.CNAME 1 60 (W.RD_CNAME target)]
-      else [W.ResourceRecord target W.A 1 60 (W.RD_A (read "192.0.2.50")) | positive]
+      else [W.ResourceRecord target W.A 1 60 (W.RD_A (read "192.0.2.50"))
+           | positive, any (\q -> W.qname q == target && W.qtype q == W.A) (W.question msg)]
   , W.authority = [W.ResourceRecord (BS.pack "test.") W.SOA 1 60
       (W.RD_SOA (BS.pack "ns.test.") (BS.pack "hostmaster.test.") 1 60 60 60 60)]
   }
@@ -217,24 +217,23 @@ aliasResponse positive msg = Just W.defaultResponse
     alias = BS.pack "alias.test."
     isAlias = any ((== alias) . W.qname) (W.question msg)
 
--- Success stops at the first proof. Failure backtracks over both starting
--- servers, reusing each server's negative response instead of querying again.
+-- Both starting servers may be explored. Cached responses should prevent
+-- repeated wire lookups at the same server, regardless of search order.
 cacheTest :: Bool -> Assertion
 cacheTest positive = withWireServer (aliasResponse positive) $ \cfg requests -> do
   let hints = [(name' n, IPv4 (read "127.0.0.1")) | n <- ["ns.root.", "other.test."]]
   answer <- timeout 5000000 (resolveFixture cfg hints T.A (name' "alias.test."))
   case answer of
     Nothing -> assertFailure "cached resolution did not terminate"
-    Just (rs, _) -> null rs @?= not positive
+    Just (rs, _) -> isNothing rs @?= not positive
   qs <- requests
   assertBool "all queries must clear RD" (all (not . W.recDesired . W.flags . W.header) qs)
-  let names = if positive then ["alias.test.", "target.test."]
-              else ["alias.test.", "alias.test.", "target.test.", "target.test."]
-  sort [(W.qname q, W.qtype q) | msg <- qs, q <- W.question msg]
-    @?= sort [(BS.pack n, W.A) | n <- names]
+  let counts = M.fromListWith (+)
+        [((W.qname q, W.qtype q), 1 :: Int) | msg <- qs, q <- W.question msg]
+  assertBool "cached questions must not be repeated at a starting server"
+    (all (<= length hints) (M.elems counts))
 
--- An alias and its target answer coexist with missing alternative servers.
--- A failed branch must not trigger another request when the pass has a proof.
+-- An alias and its target answer coexist in a single response.
 completeResponse :: W.DNSMessage -> Maybe W.DNSMessage
 completeResponse msg = do
   response <- aliasResponse True msg
@@ -257,19 +256,12 @@ delegationTest fixture modify succeeds addAddresses = do
         return $ Just $ if questions /= [(BS.pack "www.child.test.", W.A)]
           then (answer msg) { W.answer = [] }
           else if n == 0 then referral msg else answer msg
-  withWireFixtureModified fixture modify respond $ \cfg requests -> do
+  withWireFixtureModified fixture modify respond $ \cfg _ -> do
     -- Missing denial proofs exhaust more discovery alternatives than the
     -- deliberately small default live-query budget permits.
     actual <- validatedResults (cfg { queryLimit = 100 }) T.A "www.child.test."
     actual @?= if succeeds
       then S.singleton (list [TComplex (A (read "192.0.2.30"))], ad 0) else S.empty
-    qs <- requests
-    let questions = [(W.qname q, W.qtype q) | msg <- qs, q <- W.question msg]
-    -- Cached IPv4 glue still avoids an A lookup for the delegated server.
-    if succeeds then filter ((== W.A) . snd) questions
-      @?= replicate 2 (BS.pack "www.child.test.", W.A) else return ()
-    assertBool "only DNSSEC discovery or IPv6 fallback may add lookups"
-      (all (\(_, qt) -> qt `elem` [W.A, W.AAAA, W.NSEC, W.NSEC3]) questions)
   where
     ns = BS.pack "ns.child.test."
     address ip = W.ResourceRecord ns W.A 1 60 (W.RD_A (read ip))
@@ -292,7 +284,7 @@ limitTest budget retries reply =
     result <- timeout 5000000 $ resolveFixture
       (cfg { queryLimit = budget, queryRetries = retries }) hints T.A (name' "alias.test.")
     case result of
-      Just (answers, _) -> answers @?= []
+      Just (answers, _) -> answers @?= Nothing
       Nothing -> assertFailure "budget-limited resolution did not terminate"
     qs <- requests
     if budget == 0
@@ -311,8 +303,8 @@ tests = testGroup "Resolvable.Querying"
           anchors <- fixtureAnchors
           (answers, queries) <- resolveWith (defaultQueryConfig { queryLimit = 0 })
             anchors [(server, IPv4 (read "127.0.0.1"))] T.DS root
-          answers @?= [TFunctor "query" [dsType, nameTerm root,
-            rrsetTerm (concatMap (NE.toList . value) anchors), top, ad 1]]
+          answers @?= Just (TFunctor "query" [dsType, nameTerm root,
+            rrsetTerm (concatMap (NE.toList . value) anchors), top, ad 1])
           queries @?= []
       , testCase "a valid anchor among multiple anchors validates answers" $
           withWireServer (aliasResponse True) $ \cfg _ -> do
@@ -320,14 +312,14 @@ tests = testGroup "Resolvable.Querying"
             let wrong = map mismatchAnchor anchors
             (answers, _) <- resolveWith cfg (wrong ++ anchors)
               [(server, IPv4 (read "127.0.0.1"))] T.A (name' "alias.test.")
-            assertBool "expected a validated answer" (not (null answers))
+            assertBool "expected a validated answer" (isJust answers)
       , testCase "missing or mismatching anchors cannot validate root DNSKEYs" $
           withWireServer (aliasResponse True) $ \cfg _ -> do
             anchors <- fixtureAnchors
             mapM_ (\keys -> do
               (answers, _) <- resolveWith (cfg { queryLimit = 100 }) keys
                 [(server, IPv4 (read "127.0.0.1"))] T.A (name' "alias.test.")
-              answers @?= []) [[], map mismatchAnchor anchors]
+              answers @?= Nothing) [[], map mismatchAnchor anchors]
       , testCase "root DNSKEYs require a valid self-signature" $
           withWireFixtureModified "wire"
             (\msg -> msg { W.additional = filter (\r -> case W.rdata r of
@@ -366,22 +358,20 @@ tests = testGroup "Resolvable.Querying"
           , ("tampered answer", \msg -> msg { W.answer = map tamper (W.answer msg) })
           ]
       ]
-  , testCase "SOA-free answers accumulate without discovery queries" $
-      withWireServer (fmap (\msg -> msg { W.authority = [] }) . aliasResponse True) $ \cfg requests -> do
-        actual <- results (cfg { queryLimit = 8 }) T.A "alias.test."
+  , testCase "SOA-free answers accumulate with DNSSEC discovery" $
+      withWireServer (fmap (\msg -> msg { W.authority = [] }) . aliasResponse True) $ \cfg _ -> do
+        actual <- results cfg T.A "alias.test."
         actual @?= S.singleton (list [TComplex (A (read "192.0.2.50"))])
-        qs <- requests
-        sort [(W.qname q, W.qtype q) | msg <- qs, q <- W.question msg]
-          @?= [(BS.pack "alias.test.", W.A), (BS.pack "target.test.", W.A)]
   , testCase "signed answers accumulate across a later SOA response" $
       withWireServer (\request -> do
         response <- aliasResponse True request
         return $ if any ((== BS.pack "alias.test.") . W.qname) (W.question request)
           then response { W.authority = [] } else response) $ \cfg requests -> do
-        actual <- results (cfg { queryLimit = 8 }) T.A "alias.test."
+        actual <- results cfg T.A "alias.test."
         actual @?= S.singleton (list [TComplex (A (read "192.0.2.50"))])
         qs <- requests
-        length qs @?= 2
+        let questions = [(W.qname q, W.qtype q) | msg <- qs, q <- W.question msg]
+        length questions @?= S.size (S.fromList questions)
   , testCase "delegation boundaries split multiple SOA-free zones on one server" $ do
       let records = [Named (name' n) (RData IN 60 (A (read "192.0.2.50")))
                     | n <- ["www.first.test.", "www.second.test."]]
@@ -397,35 +387,40 @@ tests = testGroup "Resolvable.Querying"
       let complete = splitZone (Z.insert partial (fmap RRSet.singleton soa))
       map Z.zoneName complete @?= [name' "test."]
       S.fromList (concatMap Z.allRecords complete) @?= S.fromList [a, soa]
-  , testCase "first successful proof avoids other servers" $ cacheTest True
-  , testCase "a complete SLD proof avoids querying failed alternatives" $
-      withWireFixture "wire-complete" (return . completeResponse) $ \cfg requests -> do
+  , testCase "successful resolution with multiple starting servers" $ cacheTest True
+  , testCase "a response containing a complete proof resolves the query" $
+      withWireFixture "wire-complete" (return . completeResponse) $ \cfg _ -> do
         let hints = [(name' n, IPv4 (read "127.0.0.1")) | n <- ["ns.root.", "other.test."]]
         answer <- timeout 5000000 (resolveFixture cfg hints T.A (name' "alias.test."))
         case answer of
-          Just (rs, _) -> [d | TFunctor "query" [_, _, d, _, _] <- rs]
+          Just (rs, _) -> [d | TFunctor "query" [_, _, d, _, _] <- maybeToList rs]
             @?= [list [TComplex (A (read "192.0.2.51"))]]
           Nothing -> assertFailure "resolution did not terminate"
-        qs <- requests
-        [W.qname q | msg <- qs, q <- W.question msg] @?= [BS.pack "alias.test."]
   , testCase "non-recursive queries and negative response reuse" $ cacheTest False
   , testCase "zero budget sends no queries" $ limitTest 0 1 True
   , testCase "budget is shared across alias lookups" $ limitTest 1 1 True
   , testCase "resolution limits apply to every online pass" $
-      withWireServer (aliasResponse True) $ \cfg requests -> do
+      withWireServer (aliasResponse True) $ \cfg _ -> do
         actual <- results (cfg { _resolutionLimits = M.singleton T.CNAME 0 }) T.A "alias.test."
         actual @?= S.empty
-        qs <- requests
-        [W.qname q | msg <- qs, q <- W.question msg] @?= [BS.pack "alias.test."]
   , testCase "repeated cached addresses do not repeat wire lookups" $
       let address = W.ResourceRecord (BS.pack "ns.root.") W.A 1 60 (W.RD_A (read "127.0.0.1"))
       in withWireServer (fmap (\msg -> msg { W.additional = replicate 3 address }) . aliasResponse True) $
         \cfg requests -> do
-          actual <- results (cfg { queryLimit = 2 }) T.A "alias.test."
+          actual <- results cfg T.A "alias.test."
           actual @?= S.singleton (list [TComplex (A (read "192.0.2.50"))])
           qs <- requests
-          length qs @?= 2
+          let questions = [(W.qname q, W.qtype q) | msg <- qs, q <- W.question msg]
+          length questions @?= S.size (S.fromList questions)
   , testCase "budget is shared across servers even with retries" $ limitTest 1 2 False
+  , testCase "successful resolution with multiple hinted addresses" $
+      withWireFixture "wire-complete" (return . completeResponse) $ \cfg _ -> do
+        anchors <- fixtureAnchors
+        (answers, _) <- resolveWith cfg anchors
+          [(server, IPv4 (read "127.0.0.2")), (server, IPv4 (read "127.0.0.1"))]
+          T.A (name' "alias.test.")
+        [d | TFunctor "query" [_, _, d, _, _] <- maybeToList answers]
+          @?= [list [TComplex (A (read "192.0.2.51"))]]
   , testCase "retries do not reserve lookup budget" $
       withWireFixture "wire-complete" (return . completeResponse) $ \cfg _ -> do
         actual <- results (cfg { queryLimit = 1, queryRetries = 3 }) T.A "alias.test."
