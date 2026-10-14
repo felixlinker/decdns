@@ -61,7 +61,7 @@ mismatchAnchor = fmap (fmap mismatch)
       DS k -> dat { rtype = DS (k { _digest = BS.empty }) }
       _ -> dat
 
-resolveFixture :: QueryConfig -> [(Name String, IP)] -> T.Type -> Name String -> IO ([Term], [(Name String, T.Type, Name String)])
+resolveFixture :: QueryConfig -> [(Name String, IP)] -> T.Type -> Name String -> IO ([Term], [Query])
 resolveFixture cfg hints qt qn = do
   anchors <- fixtureAnchors
   resolveWith cfg anchors hints qt qn

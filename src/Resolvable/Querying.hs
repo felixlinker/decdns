@@ -2,6 +2,7 @@
 -- | SLD resolution with a per-run rule base populated by direct DNS queries.
 module Resolvable.Querying
   ( QueryConfig(..)
+  , Query
   , defaultQueryConfig
   , resolve
   , resolveWith
@@ -54,7 +55,11 @@ defaultQueryConfig = QueryConfig 53 3000000 2 10 limits
     limits :: M.Map T.Type Int
     limits = M.fromList [(T.CNAME, 10), (T.DNAME, 10), (T.NS, 20)]
 
-type Query = (Name String, T.Type, Name String)
+newtype Query = Query (Name String, T.Type, Name String)
+  deriving (Eq, Ord)
+
+instance Show Query where
+  show (Query (ns, t, n)) = unwords ['@' : show ns, show t, show n]
 
 data QueryState = QueryState
   { dnsData :: M.Map (Name String) (S.Set StandardRecord)
@@ -152,14 +157,13 @@ getIPs ns = liftRuleBase $ getsState (snub . M.findWithDefault [] ns . addresses
 goalToQuery :: Goal (Maybe T.Type) [Term] -> Maybe Query
 goalToQuery (Goal [] _ _) = Nothing
 goalToQuery (Goal (h:_) _ _) = case toView h of
-  TVResolves r -> maybeExcept $ (,,)
-      <$> asName (resolvesNS r) <*> asTType (resolvesQType r) <*> asName (resolvesQName r)
+  TVResolves r -> maybeExcept $ fmap Query $ (,,) <$> asName (resolvesNS r) <*> asTType (resolvesQType r) <*> asName (resolvesQName r)
   _ -> Nothing
 
 dnsLookup :: Goal (Maybe T.Type) [Term] -> OnlineSolver Bool
 dnsLookup = maybe (return False) dnsLookup' . goalToQuery
   where
-    dnsLookup' q@(ns, qt, qn) = do
+    dnsLookup' q@(Query (ns, qt, qn)) = do
       seen <- checkQueried q
       if seen then return False else do
         ips <- getIPs ns

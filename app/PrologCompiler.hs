@@ -14,7 +14,7 @@ import Util
 import Data.List (uncons)
 import qualified Data.Set as S
 import Resolvable.Update.Dependencies (computeRegressions)
-import Control.Monad (when, foldM_)
+import Control.Monad (when)
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
 import Parsing.Config (parseZoneFiles)
@@ -66,7 +66,7 @@ main = do
       qn' <- parseNameM qn
       (as, qs) <- resolve keys rs t' qn'
       putStrLn "% Queried:"
-      foldM_ (\_ q -> putStrLn ("% " ++ show q)) () qs
+      mapM_ (\q -> putStrLn ("% " ++ show q)) (reverse qs)
       when (null as) (putStrLn "no response")
       mapM_ print as
     _ -> fail "unknown command"
