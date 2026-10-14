@@ -208,7 +208,7 @@ runOnline g u = do
   -- assignments, so retry the original goal rather than an old partial proof.
   (us, failures) <- liftRuleBase $ runSLD $ do
     rs <- getRules
-    sld (S.toList rs) g u
+    sldSome (S.toList rs) g u
   if null us then queryFailures failures else return us
   where
     queryFailures [] = return []

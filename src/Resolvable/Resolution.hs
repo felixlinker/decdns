@@ -1,10 +1,12 @@
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Resolvable.Resolution
   ( Solver
   , Goal(..)
   , goal
   , sld
-  , sldFirst
+  , sldAll
+  , sldSome
   , runSLD ) where
 
 import Control.Monad (when, guard)
@@ -13,6 +15,7 @@ import qualified Control.Monad.Trans.State as St
 import Data.Maybe (mapMaybe, maybeToList, catMaybes)
 import Data.List (uncons, partition)
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import qualified Resolvable.Constraint.Store as Store
 import Resolvable.Constraint.Solving
@@ -21,15 +24,22 @@ import Resolvable.Prolog.TermView
 import Resolvable.Unification hiding (toList)
 import Util.Fresh
 
-type Failures k m = St.StateT [Goal k [Term]] m
+type Failures k m = St.StateT (S.Set (Goal k [Term])) m
 
 type Solver k m a = Store.SimplifyCache (FreshT (Failures k m)) a
 
 liftFailures :: Monad m => Failures k m a -> Solver k m a
 liftFailures = lift . lift
 
-failed :: Monad m => Goal k [Term] -> Solver k m ()
-failed = liftFailures . St.modify . (:)
+whenNotFailed :: (Monad m, Ord k) => Goal k [Term] -> Solver k m [a] -> Solver k m [a]
+whenNotFailed g m = do
+  hasFailed <- liftFailures $ St.gets (S.member (canonicalGoal g))
+  if hasFailed
+    then return []
+    else m
+
+failed :: (Monad m, Ord k) => Goal k [Term] -> Solver k m ()
+failed = liftFailures . St.modify . S.insert . canonicalGoal
 
 type Limits k = M.Map k Int
 
@@ -62,6 +72,9 @@ awayG (Goal ts limits st) = do
   (ts', u) <- awayT ts
   return (Goal ts' limits (apply u st), u)
 
+canonicalGoal :: Goal k [Term] -> Goal k [Term]
+canonicalGoal g = fst $ runFresh $ awayG g
+
 resolution :: (Monad m, Ord a) => [Rule a] -> Goal a [Term] -> Unifier -> Solver a m [(Goal a [Term], Unifier)]
 resolution _ g@(Goal [] _ _) u = return [(g, u)]
 resolution rs g@(Goal (p:_) _ _) u = do
@@ -89,17 +102,29 @@ resolutionStep rs (Goal (p:t) limits st) = case toView p of
       limits' <- checkLimits annotation limits
       return (apply u (Goal (b' ++ t) limits' (stR <> st)), u)
 
-sld :: (Monad m, Ord k) => [Rule k] -> Goal k [Term] -> Unifier -> Solver k m [Unifier]
-sld _ (Goal [] _ _) u = return [u]
+sld :: (Monad m, Ord k) => [Rule k] -> Goal k [Term] -> Unifier -> Solver k m ([Unifier], [(Goal k [Term], Unifier)])
+sld _ (Goal [] _ _) u = return ([u], [])
 sld rs g u = do
   (g', u') <- lift $ awayG g
-  gs <- resolution rs g' (u ~> u')
+  gs <- whenNotFailed g $ resolution rs g' (u ~> u')
   let (done, rec) = partition (finished . fst) gs
-  recGs <- concat <$> mapM (uncurry (sld rs)) rec
-  return $ map snd done ++ recGs
+  when (null done) (failed g)
+  return (map snd done, rec)
 
-sldFirst :: (Monad m, Ord k) => [Rule k] -> Goal k [Term] -> Unifier -> Solver k m (Maybe Unifier)
-sldFirst rs g u = fmap fst . uncons <$> sld rs g u
+sldAll :: (Monad m, Ord k) => [Rule k] -> Goal k [Term] -> Unifier -> Solver k m [Unifier]
+sldAll rs g u = do
+  (done, rec) <- sld rs g u
+  recGs <- concat <$> mapM (uncurry $ sldAll rs) rec
+  return $ done ++ recGs
 
-runSLD :: Monad m => Solver k m a -> m (a, [Goal k [Term]])
-runSLD = (`St.runStateT` []) . (`evalFreshT` 0) . Store.evalCached
+sldSome :: forall k m. (Monad m, Ord k) => [Rule k] -> Goal k [Term] -> Unifier -> Solver k m (Maybe Unifier)
+sldSome rs g0 u0 = aux [(g0, u0)]
+  where
+    aux :: [(Goal k [Term], Unifier)] -> Solver k m (Maybe Unifier)
+    aux [] = return Nothing
+    aux ((g, u) : gs) = do
+      (done, rec) <- sld rs g u
+      maybe (aux (rec ++ gs)) (return . Just . fst) (uncons done)
+
+runSLD :: Monad m => Solver k m a -> m (a, S.Set (Goal k [Term]))
+runSLD = (`St.runStateT` S.empty) . (`evalFreshT` 0) . Store.evalCached
