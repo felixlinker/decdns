@@ -6,7 +6,7 @@ module Parsing.ZoneFile
 
 import Text.Parsec
 import Control.Applicative (asum)
-import Control.Monad (when)
+import Control.Monad (when, unless)
 import Data.Functor (($>))
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (catMaybes)
@@ -128,6 +128,7 @@ parseZoneFileContents wfc source path = do
     wellformed :: Zone String -> IO ()
     wellformed zone = do
       let issues = wfc zone
+      unless (null issues) (putStrLn $ unwords ["parsing", path])
       mapM_ (hPrint stderr) issues
       when (any isFatal issues) (fail "fatal error encountered")
 
