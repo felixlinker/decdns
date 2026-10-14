@@ -7,9 +7,12 @@ module Util.Monad
   , failLeftS
   , handleError
   , handleMaybe
-  , handleErrorS ) where
+  , handleErrorS
+  , firstP
+  , first ) where
 
 import Control.Monad.Trans.Except (Except, ExceptT, throwE, runExcept)
+import Data.Maybe (fromMaybe)
 
 one :: Functor f => f a -> f [a]
 one = fmap return
@@ -37,3 +40,12 @@ handleMaybe e = handleError . exceptMaybe e
 
 handleErrorS :: (MonadFail m) => Except String a -> m a
 handleErrorS = failLeftS . runExcept
+
+firstP :: Monad m => (b -> Bool) -> [a] -> (a -> m b) -> m (Maybe b)
+firstP _ [] _ = return Nothing
+firstP p (h:t) m = do
+  b <- m h
+  if p b then return (Just b) else firstP p t m
+
+first :: Monad m => [a] -> (a -> m Bool) -> m Bool
+first as = fmap (fromMaybe False) . firstP id as

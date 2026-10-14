@@ -8,14 +8,14 @@ module Resolvable.Querying
   , resolveWith
   ) where
 
-import Control.Monad (unless, when)
+import Control.Monad (unless, when, (>=>), join)
 import Control.Monad.Trans.Class (lift)
 import qualified Control.Monad.Trans.State as St
 import qualified Control.Monad.Trans.Except as Ex
 import qualified Data.ByteString.Char8 as BS
 import Data.Bifunctor (Bifunctor(bimap))
 import Data.IP (IP(..))
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, isJust)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Network.DNS as W
@@ -32,7 +32,7 @@ import Resolvable.Prolog.TermView
 import Resolvable.Resolution
 import Resolvable.Unification
 import Util.Fresh
-import Util.Monad (maybeExcept)
+import Util.Monad (maybeExcept, first, firstP)
 import Util.Map (add)
 import Util.List (snub)
 import NameConstraint (compileWildcardsLiteral)
@@ -168,7 +168,7 @@ dnsLookup = maybe (return False) dnsLookup' . goalToQuery
       if seen then return False else do
         ips <- getIPs ns
         cfg <- getCfg
-        or <$> mapM (\ip -> dnsQuery cfg ns ip qt qn) ips
+        first ips (\ip -> dnsQuery cfg ns ip qt qn)
 
 dnsQuery :: QueryConfig -> Name String -> IP -> T.Type -> Name String
             -> OnlineSolver Bool
@@ -202,24 +202,22 @@ rootSRule ns =
   in Rule Nothing (queryT q n d v a)
        [resolves (nameTerm ns) q z n d v a, z \= referralZone]
 
-runOnline :: Goal (Maybe T.Type) [Term] -> Unifier -> OnlineSolver [Unifier]
-runOnline g u = do
-  -- Each pass has its own failure stack. Recompilation can change zone
-  -- assignments, so retry the original goal rather than an old partial proof.
-  (us, failures) <- liftRuleBase $ runSLD $ do
-    rs <- getRules
-    sldSome (S.toList rs) g u
-  if null us then queryFailures failures else return us
+runOnline :: T.Type -> Name String -> Goal (Maybe T.Type) [Term] -> Unifier
+          -> OnlineSolver (Maybe Unifier)
+runOnline qt qn g u = do
+  rs <- getRules
+  us <- sldSome (S.toList rs) g u
+  failures <- clearFailures
+  if null us then do
+    join <$> firstP isJust (S.toList failures)
+      (dnsLookup >=> (\new -> if new then runOnline qt qn g u else return Nothing))
+  else return us
   where
-    queryFailures [] = return []
-    queryFailures (failed:rest) = do
-      new <- dnsLookup failed
-      if new then runOnline g u else queryFailures rest
 
-resolve :: [RRSet String] -> [(Name String, IP)] -> T.Type -> Name String -> IO ([Term], [Query])
+resolve :: [RRSet String] -> [(Name String, IP)] -> T.Type -> Name String -> IO (Maybe Term, [Query])
 resolve = resolveWith defaultQueryConfig
 
-resolveWith :: QueryConfig -> [RRSet String] -> [(Name String, IP)] -> T.Type -> Name String -> IO ([Term], [Query])
+resolveWith :: QueryConfig -> [RRSet String] -> [(Name String, IP)] -> T.Type -> Name String -> IO (Maybe Term, [Query])
 resolveWith cfg anchors hints qt qn
   | queryPort cfg < 1 || queryPort cfg > 65535 = ioError (userError "DNS port must be between 1 and 65535")
   | queryTimeout cfg <= 0 || queryRetries cfg <= 0 = ioError (userError "DNS timeout and retries must be positive")
@@ -229,6 +227,6 @@ resolveWith cfg anchors hints qt qn
           initial = QueryState M.empty [] addrs anchors
             (M.keys addrs) cfg (queryLimit cfg)
           q = queryT (ttypeTerm qt) (nameTerm (canonicalName qn)) (TVar "Result") top (TVar "Validated")
-      (result, qstack) <- runOnlineSolverT initial (uncurry runOnline $ goal (resolutionLimits cfg) q)
-      us <- either (const $ return []) return result
-      return (snub (map (`apply` q) us), qstack)
+      (result, qstack) <- runOnlineSolverT initial (uncurry (runOnline qt qn) $ goal (resolutionLimits cfg) q)
+      us <- either (const $ return Nothing) return result
+      return ((`apply` q) <$> us, qstack)
