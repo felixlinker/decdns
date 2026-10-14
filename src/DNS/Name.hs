@@ -25,8 +25,6 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as CBS
 import Data.Char (toLower)
-import Control.Monad (guard)
-import Data.Maybe (catMaybes)
 import Util.Bytes (Serialize(..), withLength)
 
 class Label a where
@@ -117,13 +115,8 @@ isSubDomain (Name l1) (Name l2) = NE.toList l2 `isSuffixOf` NE.toList l1
 
 intersection :: Eq a => Name a -> Name a -> Maybe (Name a)
 intersection (Name (NE.reverse -> l1)) (Name (NE.reverse -> l2)) = do
-    let prefix = catMaybes $ NE.toList $ NE.zipWith zipper l1 l2
+    let prefix = map fst $ NE.takeWhile (uncurry (==)) $ NE.zip l1 l2
     Name <$> NE.nonEmpty (reverse prefix)
-  where
-    zipper :: Eq a => a -> a -> Maybe a
-    zipper a1 a2 = do
-      guard (a1 == a2)
-      return a1
 
 -- https://datatracker.ietf.org/doc/html/rfc4034#section-6.2
 canonicalName :: Name String -> Name String

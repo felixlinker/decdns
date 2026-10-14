@@ -16,10 +16,12 @@ import DNS.ZoneFileSpec (genLabel, genName, genAbsoluteName)
 tests :: TestTree
 tests =
   testGroup
-    "ZoneFile"
+    "DNS.Name"
     [ testProperty "isSubDomain is reflexive" propIsSubDomainReflexive
     , testProperty "isSubDomain holds for prefixed names" propIsSubDomainPrefix
     , testProperty "isSubDomain rejects different TLD" propIsSubDomainDiffTld
+    , testProperty "intersecting same names is identity" intersectIdentity
+    , testProperty "intersection agrees with isSubDomain" intersectSubDomainRelation
     , testProperty "canonicalCompare is antisymmetric" propCanonicalCompareAntisymmetric
     , testProperty "canonicalCompare orders by TLD first" propCanonicalCompareTldFirst
     , testProperty "show absolute names with trailing dot" propShowAbsoluteNameEndsWithDot
@@ -107,6 +109,21 @@ propShowAbsoluteNameEndsWithDot =
 propShowRelativeNameDoesNotEndWithDot :: Property
 propShowRelativeNameDoesNotEndWithDot =
   forAll genName $ \(show -> n) -> counterexample n (last n =/= '.')
+
+intersectIdentity :: Property
+intersectIdentity = forAll genName $ \n -> intersection n n === Just n
+
+intersectSubDomainRelation :: Property
+intersectSubDomainRelation =
+  forAll genName $ \n1@(Name (NE.last -> last1)) ->
+    forAll genName $ \n2@(Name (NE.last -> last2)) ->
+      let maybeCommonPrefix = intersection n1 n2
+      in  maybe (last1 =/= last2)
+                (\pref -> counterexample (showCex n1 n2 pref) $ isSubDomain n1 pref && isSubDomain n2 pref)
+                maybeCommonPrefix
+  where
+    showCex :: Name String -> Name String -> Name String -> String
+    showCex n1 n2 pref = unwords [show n1, "/\\", show n2, "=", show pref]
 
 genDifferentLabels :: Gen (String, String)
 genDifferentLabels = do
