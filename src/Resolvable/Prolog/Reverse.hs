@@ -12,7 +12,7 @@ module Resolvable.Prolog.Reverse
   , asRRSetData) where
 
 import Control.Monad.Trans.Except
-import Control.Monad ((<=<))
+import Control.Monad ((<=<), when)
 import qualified Data.ByteString as BS
 import qualified Data.List.NonEmpty as NE
 
@@ -141,6 +141,7 @@ asRRSetData t = case toView t of
     Just alg' <- return $ nsec3DigestFromInt algI
     TVInt flags' <- toViewM flags
     TVInt iter' <- toViewM iter
+    when (iter' < 0) (throwE "negative NSEC3 iteration count")
     TVString saltHex <- toViewM salt
     salt' <- fromHex saltHex
     TVString nextHashedOwnerHex <- toViewM nextHashedOwner
@@ -152,6 +153,7 @@ asRRSetData t = case toView t of
     Just alg' <- return $ nsec3DigestFromInt algI
     TVInt flags' <- toViewM flags
     TVInt iter' <- toViewM iter
+    when (iter' < 0) (throwE "negative NSEC3 iteration count")
     TVString saltHex <- toViewM salt
     salt' <- fromHex saltHex
     return $ NSEC3PARAM alg' (nsec3FlagsFromInt flags') iter' salt'
