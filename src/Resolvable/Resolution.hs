@@ -7,6 +7,7 @@ module Resolvable.Resolution
   , sld
   , sldAll
   , sldSome
+  , clearFailures
   , runSLD ) where
 
 import Control.Monad (when, guard)
@@ -30,6 +31,12 @@ type Solver k m a = Store.SimplifyCache (FreshT (Failures k m)) a
 
 liftFailures :: Monad m => Failures k m a -> Solver k m a
 liftFailures = lift . lift
+
+clearFailures :: Monad m => Solver k m (S.Set (Goal k [Term]))
+clearFailures = liftFailures $ do
+  failures <- St.get
+  St.put S.empty
+  return failures
 
 whenNotFailed :: (Monad m, Ord k) => Goal k [Term] -> Solver k m [a] -> Solver k m [a]
 whenNotFailed g m = do
