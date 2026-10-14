@@ -1,25 +1,30 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TupleSections #-}
 module Parsing.ZoneFile
-  ( ServedZone
-  , parseRecords
-  , parseZoneFile ) where
+  ( parseRecords
+  , parseZoneFiles
+  , parseDS ) where
 
 import Text.Parsec
 import Control.Applicative (asum)
-import qualified Data.List as L
-import Data.Either (isLeft, fromLeft)
+import Control.Monad (when)
 import Data.Functor (($>))
+import qualified Data.List.NonEmpty as NE
+import Data.Maybe (catMaybes)
+import System.IO (hPrint, stderr)
 
 import Parsing.State
 import Parsing.Tokens
 import Parsing.Name
 import Parsing.Data
+import NameConstraint (ConstrainedLabel, compileWildcards)
 import DNS.Name (Name, Named(Named))
 import DNS.Record (StandardRecord, RData(..), Record)
-import Parsing.Dig
-import Data.Maybe (catMaybes)
+import qualified DNS.RecordType as T
+import DNS.RRSet (RRSet, rrsetType)
+import DNS.Wellformedness (Issue, isFatal)
+import DNS.ZoneFile (Zone, fromRecordList, allRRSets)
+import Util.Parsing (handleParser)
+import Util.Monad (handleMaybe)
 
 origin :: Stream s m Char => Parser s m (Name String)
 origin = do
@@ -106,34 +111,30 @@ line = asum $ map try
   , setTTL $> Nothing
   , Just <$> record ]
 
-nsHintOrLine :: Stream s m Char => Parser s m (Maybe (Either StandardRecord [Name String]))
-nsHintOrLine = choice [right (try received), right (try served), left line]
-  where
-    left :: Monad m => m (Maybe a) -> m (Maybe (Either a b))
-    left = fmap (fmap Left)
-
-    right :: Monad m => m b -> m (Maybe (Either a b))
-    right = fmap (Just . Right)
-
-type ServedZone = (Name String, [StandardRecord])
-
 records :: Stream s m Char => Parser s m [StandardRecord]
 records = catMaybes <$> many line
-
-zoneFile :: Stream s m Char => Parser s m [ServedZone]
-zoneFile = do
-  parsed <- catMaybes <$> many nsHintOrLine
-  group [] parsed
-  where
-    group :: [ServedZone] -> [Either StandardRecord [Name String]] -> Parser s m [ServedZone]
-    group acc [] = return acc
-    group acc l = do
-      let (map (fromLeft undefined) -> recs, other) = span isLeft l
-      (Right ns, r) <- maybeFail "missing name server info" $ L.uncons other
-      group (map (, recs) ns ++ acc) r
 
 parseRecords :: Stream s m Char => SourceName -> s -> m (Either ParseError [StandardRecord])
 parseRecords = runParserT (records <* eof) emptyState
 
-parseZoneFile :: Stream s m Char => SourceName -> s -> m (Either ParseError [ServedZone])
-parseZoneFile = runParserT (zoneFile <* eof) emptyState
+parseZoneFileContents :: (Zone String -> [Issue String]) -> SourceName -> FilePath -> IO (Zone ConstrainedLabel)
+parseZoneFileContents wfc source path = do
+  content <- readFile path
+  recs <- handleParser =<< parseRecords source content
+  z <- handleMaybe "empty zone file" $ fromRecordList <$> NE.nonEmpty recs
+  wellformed z
+  return $ compileWildcards z
+  where
+    wellformed :: Zone String -> IO ()
+    wellformed zone = do
+      let issues = wfc zone
+      mapM_ (hPrint stderr) issues
+      when (any isFatal issues) (fail "fatal error encountered")
+
+parseZoneFiles :: (Zone String -> [Issue String]) -> [FilePath] -> IO [Zone ConstrainedLabel]
+parseZoneFiles wfc = mapM (\path -> parseZoneFileContents wfc path path)
+
+parseDS :: FilePath -> IO [RRSet String]
+parseDS path = do
+  recs <- handleParser =<< parseRecords path =<< readFile path
+  return $ maybe [] (filter ((== T.DS) . rrsetType) . allRRSets . fromRecordList) (NE.nonEmpty recs)

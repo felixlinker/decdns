@@ -1,12 +1,10 @@
 module Resolvable.Update.Resolvability
-  ( NameServersConfig
-  , compileConfigs ) where
+  ( compileConfigs ) where
 
 import qualified Data.Set as S
 
 import Resolvable.Prolog.Core
 import Resolvable.Prolog.Symbols
-import Resolvable.Resolvability
 import Util.Fresh (Fresh)
 
 compileConfigs :: Ord a => Fresh (S.Set (Rule a)) -> Fresh (S.Set (Rule a)) -> Fresh (S.Set (Rule a))

@@ -1,4 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
 module Util.TreeSpec (tests) where
 
 import qualified Data.List as L
@@ -31,6 +30,7 @@ tests =
     , testCase "merge keeps values from both trees" mergesValues
     , testCase "allNamed supplies the name of every node" allNamedSuppliesNames
     , testCase "allNamed rejects a predicate failure below the root" allNamedRejectsFailure
+    , rootsTests
     ]
 
 genTree :: Gen (T.Node String [Int])
@@ -132,3 +132,21 @@ allNamedRejectsFailure =
   where
     org = mkName ["example", "com", ""]
     tree = T.Node org (M.singleton "www" (T.leaf org))
+
+trees :: [(T.Node String [Int], S.Set [Int])]
+trees =
+  [ (T.leaf [], S.empty)
+  , (T.leaf [0], S.singleton [0])
+  , (T.leafAt ["a", "b"] [0], S.singleton [0])
+  , (T.insertNode ["c", "d"] (T.leaf [1]) (T.leafAt ["a", "b"] [0]), S.fromList [[1], [0]])
+  , (T.insertNode ["a"] (T.leaf [1]) (T.leaf [0]), S.singleton [0])
+  ]
+
+rootsTests :: TestTree
+rootsTests = testGroup "nonEmptyRoots tests"
+  $ zipWith mkTest [(0 :: Int)..] trees
+  where
+    mkTest :: Int -> (T.Node String [Int], S.Set [Int]) -> TestTree
+    mkTest no (tree, expected) = testCase (show no) $
+      let
+      in  S.fromList (T.nonEmptyRoots tree) @?= expected

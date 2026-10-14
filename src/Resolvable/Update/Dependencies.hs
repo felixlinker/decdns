@@ -33,7 +33,7 @@ resolvableFromResolves :: Term -> Maybe Term
 resolvableFromResolves (toView -> TVResolves r)
   | resolvesZone r == referralZone = Nothing
   | otherwise = Just $ resolvable
-    (resolvesNS r)
+    (resolvesZone r)
     (resolvesQType r)
     (resolvesQName r)
     (resolvesVerify r)

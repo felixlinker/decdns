@@ -86,7 +86,7 @@ toView (TFunctor n args)
     [ ns, qtype, zone, qname, d, ver, adb ] -> TVResolves $ Resolves ns qtype zone qname d ver adb
     _ -> undefined
   | n == resolvableSym = case args of
-    [ ns, qtype, qname, ver, auth ] -> TVResolvable ns qtype qname ver auth
+    [ zone, qtype, qname, ver, auth ] -> TVResolvable zone qtype qname ver auth
     _ -> undefined
   | n == isNameSym = case args of
       [ nam ] -> TVIsName nam
@@ -172,7 +172,7 @@ fromView (TVMember a b) = member a b
 fromView (TVNeq a b) = a \= b
 fromView (TVLeq a b) = a =< b
 fromView (TVResolves (Resolves ns qtype zone qname d ver adb)) = resolves ns qtype zone qname d ver adb
-fromView (TVResolvable ns qtype qname ver auth) = resolvable ns qtype qname ver auth
+fromView (TVResolvable zone qtype qname ver auth) = resolvable zone qtype qname ver auth
 fromView (TVIsName nam) = isName nam
 fromView (TVRRSIGValid nam dat sig key) = rrsigValid nam dat sig key
 fromView (TVDigestValid nam dnskeyTerm dsTerm) = digestValid nam dnskeyTerm dsTerm

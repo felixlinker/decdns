@@ -199,9 +199,9 @@ genTTL = elements [100, 200]
 genZone :: Gen (Zone String)
 genZone = do
   org <- genAbsoluteName
-  soa <- fmap RRSet.singleton <$> genSOARecord org
+  apexData <- genApex org
   recs <- map (fmap RRSet.singleton) <$> listOf (genRecord org)
-  return $ foldl insert (emptyZone org) (soa : recs)
+  return $ foldl insert (emptyZone org) (apexData : recs)
 
 genAbsRecord :: Gen StandardRecord
 genAbsRecord = genRecord =<< genAbsoluteName
@@ -222,8 +222,8 @@ genRecord org = oneof $ map ($ org)
   , genZONEMDRecord
   ]
 
-genSOARecord :: Name String -> Gen StandardRecord
-genSOARecord org = do
+genApex :: Name String -> Gen (Named String RRSet.RDataSet)
+genApex org = do
   ttl <- genTTL
   mname <- genAbsoluteName
   rname <- genAbsoluteName
@@ -232,8 +232,9 @@ genSOARecord org = do
   retry <- chooseInt (0, 86400)
   expire <- chooseInt (0, 2000000000)
   minimumTtl <- chooseInt (0, 86400)
-  pure $
-    Named org (RData IN ttl (SOA mname rname serial refresh retry expire minimumTtl))
+  let soa = RData IN ttl (SOA mname rname serial refresh retry expire minimumTtl)
+  let ns =  RData IN ttl (NS mname)
+  return $ Named org $ RRSet.fromList [soa, ns]
 
 genNSRecord :: Name String -> Gen StandardRecord
 genNSRecord org = do

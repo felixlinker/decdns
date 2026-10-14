@@ -29,4 +29,4 @@ foldrWith f acc = foldr aux ([], acc)
       in (a':accL, accB')
 
 snub :: Ord a => [a] -> [a]
-snub = S.toList . S.fromList
+snub = S.toAscList . S.fromList

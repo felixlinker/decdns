@@ -93,7 +93,6 @@ library
       NameConstraint
       Parsing
       Parsing.Bytes
-      Parsing.Config
       Parsing.Data
       Parsing.Dig
       Parsing.Name

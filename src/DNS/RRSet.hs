@@ -11,25 +11,30 @@ module DNS.RRSet
   , RDataSet
   , insert
   , singleton
+  , fromList
   , flattenData
   , RRSet
   , StdRRSet
   , canonicalRRSet
   , toRecords
   , rrsetType
+  , getAliased
   , hasType
   , getType
+  , nsNames
   , dropType ) where
 
+import Data.Bifunctor (Bifunctor(bimap))
 import qualified Data.List.NonEmpty as NE
+import Data.Foldable (toList)
+import Data.Functor.Identity (Identity(runIdentity))
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as MM
 
 import DNS.Name
 import DNS.Record
 import qualified DNS.RecordType as T
-import Data.Bifunctor (Bifunctor(bimap))
-import Data.Functor.Identity (Identity(runIdentity))
+import Util.List (snub)
 
 newtype RTypedSet a = RDS
   { rds :: M.Map T.Type (NE.NonEmpty a) }
@@ -90,6 +95,9 @@ insert rd = RDS . M.alter (Just . maybe (NE.singleton rd) (rd NE.<|)) (toType $ 
 singleton :: RData -> RDataSet
 singleton rd = RDS $ M.singleton (toType $ rtype rd) (NE.singleton rd)
 
+fromList :: [RData] -> RDataSet
+fromList = foldr insert (RDS M.empty)
+
 flattenData :: RTypedSet a -> [a]
 flattenData = concatMap NE.toList . M.elems . rds
 
@@ -99,11 +107,20 @@ toRecords (Named n sets) = Named n <$> sets
 rrsetType :: RRSet a -> T.Type
 rrsetType = toType . rtype . NE.head . value
 
+getAliased :: RRSet a -> Maybe (Name String)
+getAliased (Named _ ((rtype -> CNAME n) NE.:| [])) = Just n
+getAliased (Named _ ((rtype -> DNAME n) NE.:| [])) = Just n
+getAliased _ = Nothing
+
 hasType :: T.Type -> RTypedSet a -> Bool
 hasType t = M.member t . rds
 
 getType :: T.Type -> RDataSet -> [RData]
 getType t = maybe [] NE.toList . M.lookup t . rds
+
+-- | Canonical NS targets, ordered and deduplicated for set comparison.
+nsNames :: Foldable f => f RData -> [Name String]
+nsNames rs = snub [canonicalName ns | RData _ _ (NS ns) <- toList rs]
 
 dropType :: T.Type -> RTypedSet a -> RTypedSet a
 dropType t = modify (M.delete t)

@@ -3,8 +3,9 @@ module Parsing
   , parseNameM
   , parseType
   , parseTypeM
-  , parseZoneFile
-  , ServedZone ) where
+  , parseRecords
+  , parseZoneFiles
+  , parseDS ) where
 
 import Parsing.Name
 import Parsing.Data

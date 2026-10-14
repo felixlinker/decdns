@@ -3,8 +3,11 @@ module DNS.Zone
   ( splitZone
   , splitZoneAt
   , splitZones
+  , zoneNameServers
+  , apexNameServers
   , collectReferrals ) where
 
+import Control.Monad (guard)
 import qualified Control.Monad.Trans.State as St
 import Control.Arrow (first)
 import qualified Data.Map as M
@@ -20,6 +23,15 @@ import qualified DNS.RecordType as T
 import DNS.RRSet
 
 import qualified Util.Tree as Tr
+
+zoneNameServers :: Zone a -> [[Name String]]
+zoneNameServers (Zone _ r) = Prelude.map (nsNames . getType T.NS) $ Tr.nonEmptyRoots r
+
+apexNameServers :: Zone a -> Maybe (NE.NonEmpty (Name String))
+apexNameServers z = do
+  (nses, others) <- L.uncons (zoneNameServers z)
+  guard (Prelude.null others)
+  NE.nonEmpty nses
 
 insertNonEmpty :: Ord k => k -> [a] -> M.Map k (NE.NonEmpty a) -> M.Map k (NE.NonEmpty a)
 insertNonEmpty k mv = M.alter (const $ NE.nonEmpty mv) k

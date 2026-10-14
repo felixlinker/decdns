@@ -1,8 +1,8 @@
 module PrologCompiler (main) where
 
-import DNS.ZoneFile (allRecords)
+import DNS.ZoneFile (allRecords, Zone)
 import DNS.Wellformedness ( zoneWellformed )
-import NameConstraint (toStandardRecord)
+import NameConstraint (toStandardRecord, ConstrainedLabel)
 import Resolvable.Prolog.Core
 import Resolvable.Resolvability
 import Resolvable.Dependencies (computeResolvable, toRule)
@@ -17,11 +17,9 @@ import Resolvable.Update.Dependencies (computeRegressions)
 import Control.Monad (when)
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
-import Parsing.Config (parseZoneFiles)
-import DNS.Name (root, prependLabels)
+import Parsing
+import DNS.Name (Name, root, prependLabels)
 import Resolvable.Querying (resolve)
-import Parsing.Name (parseNameM)
-import Parsing (parseTypeM)
 
 main :: IO ()
 main = do
@@ -56,7 +54,7 @@ main = do
         computeRegressions oldRecsC newRecsC
       mapM_ print $ S.map toRule regs
     "parse-only" -> do
-      parsed <- concatMap (map toStandardRecord . allRecords . snd) <$> parseZones args
+      parsed <- concatMap (map toStandardRecord . allRecords) <$> parseZones args
       mapM_ print parsed
     "query" -> do
       let rs = [(prependLabels ["a", "root-servers", "net"] root, read "198.41.0.4")]
@@ -71,7 +69,7 @@ main = do
       mapM_ print as
     _ -> fail "unknown command"
   where
-    parseZones :: [FilePath] -> IO NameServersConfig
+    parseZones :: [FilePath] -> IO [Zone ConstrainedLabel]
     parseZones = parseZoneFiles zoneWellformed
 
     popArg :: [String] -> IO (String, [String])

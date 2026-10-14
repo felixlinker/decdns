@@ -1,16 +1,12 @@
 module Util
   ( sepBy
-  , parseZoneFileZones
-  , parseStdin
-  , parseNames
-  , parseDS ) where
+  , parseNames ) where
 
 import Control.Monad ((<=<))
 import Data.List (uncons)
 import GHC.Base (failIO)
 
 import Parsing (parseName)
-import Parsing.Config (parseStdin, parseZoneFileZones, parseDS)
 import DNS.Name (Name)
 import Util.Parsing (handleParser)
 

@@ -67,6 +67,7 @@ responseWellformed z@(Zone _ r) = wellformed z ++ catMaybes
 zoneWellformed :: Zone String -> [Issue String]
 zoneWellformed z@(Zone _ r@(Tr.Node rd _)) = wellformed z ++ catMaybes
   [ expect (RRSet.hasType T.SOA rd) (Error "zone misses SOA record")
+  , expect (RRSet.hasType T.NS rd) (Error "zone misses apex NS records")
   , expect (checkDNAME False r) (Error "CNAME next to DNAME or records below DNAME")
   , expect (rrsigLabelCount False z) (Error "RRSIG has illegal label count")
   , expect (noDNSSECKey (dataNoApex z)) (Error "DNSKEY with non-apex owner name") ]

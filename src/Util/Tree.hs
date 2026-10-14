@@ -9,6 +9,7 @@ module Util.Tree
   , emptyNode
   , prune
   , get
+  , nonEmptyRoots
   , adjustF
   , adjust
   , insertNode
@@ -87,6 +88,11 @@ merge = fmerge (<>)
 get :: Ord k => [k] -> Node k v -> Maybe v
 get [] (Node i _) = Just i
 get (h:t) (Node _ cs) = get t =<< M.lookup h cs
+
+nonEmptyRoots :: forall k f v. Foldable f => Node k (f v) -> [f v]
+nonEmptyRoots (Node vs cs)
+  | not (Prelude.null vs) = [vs]
+  | otherwise = concatMap nonEmptyRoots cs
 
 adjustF :: forall f k v. (Applicative f, Ord k) => ([k] -> Node k v -> f (Node k v)) -> [k] -> Node k v -> f (Node k v)
 adjustF nf = go

@@ -484,10 +484,10 @@ dataTerm t = TFunctor (ttypeSym $ toType t) $ case t of
   ZONEMD serial scheme hashAlgorithm digest -> [TInt serial, TInt scheme, TInt hashAlgorithm, hexTerm digest]
 
 resolves :: Term -> Term -> Term -> Term -> Term -> Term -> Term -> Term
-resolves ns qtype zone qname d ver adb = TFunctor resolvesSym [ ns, qtype, zone, qname, d, ver, adb ]
+resolves servers qtype zone qname d ver adb = TFunctor resolvesSym [ servers, qtype, zone, qname, d, ver, adb ]
 
 resolvable :: Term -> Term -> Term -> Term -> Term -> Term
-resolvable ns qtype qname ver auth = TFunctor resolvableSym [ ns, qtype, qname, ver, auth ]
+resolvable zone qtype qname ver auth = TFunctor resolvableSym [ zone, qtype, qname, ver, auth ]
 
 referralZone :: Term
 referralZone = TAtom "referral"

@@ -1,6 +1,7 @@
 module Util.Monad
   ( one
   , foreachM
+  , exceptUnsafe
   , exceptMaybe
   , maybeExcept
   , failLeft
@@ -19,6 +20,9 @@ one = fmap return
 
 foreachM :: (Monad m, Monoid b) => [a] -> (a -> m b) -> m b
 foreachM t f = mconcat <$> mapM f t
+
+exceptUnsafe :: (a -> Except String b) -> a -> b
+exceptUnsafe f = either error id . runExcept . f
 
 exceptMaybe :: Monad m => e -> Maybe a -> ExceptT e m a
 exceptMaybe e = maybe (throwE e) return
