@@ -12,7 +12,7 @@ module Resolvable.Resolution
 import Control.Monad (when, guard)
 import Control.Monad.Trans.Class (lift)
 import qualified Control.Monad.Trans.State as St
-import Data.Maybe (mapMaybe, maybeToList, catMaybes)
+import Data.Maybe (mapMaybe, maybeToList, catMaybes, isNothing)
 import Data.List (uncons, partition)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -108,13 +108,13 @@ sld rs g u = do
   (g', u') <- lift $ awayG g
   gs <- whenNotFailed g $ resolution rs g' (u ~> u')
   let (done, rec) = partition (finished . fst) gs
-  when (null done) (failed g)
   return (map snd done, rec)
 
 sldAll :: (Monad m, Ord k) => [Rule k] -> Goal k [Term] -> Unifier -> Solver k m [Unifier]
 sldAll rs g u = do
   (done, rec) <- sld rs g u
   recGs <- concat <$> mapM (uncurry $ sldAll rs) rec
+  when (null done && null recGs) (failed g)
   return $ done ++ recGs
 
 sldSome :: forall k m. (Monad m, Ord k) => [Rule k] -> Goal k [Term] -> Unifier -> Solver k m (Maybe Unifier)
@@ -124,7 +124,12 @@ sldSome rs g0 u0 = aux [(g0, u0)]
     aux [] = return Nothing
     aux ((g, u) : gs) = do
       (done, rec) <- sld rs g u
-      maybe (aux (rec ++ gs)) (return . Just . fst) (uncons done)
+      maybe (aux (rec ++ gs) >>= maybeFailed)
+            (return . Just . fst)
+            (uncons done)
+      where
+        maybeFailed :: Maybe Unifier -> Solver k m (Maybe Unifier)
+        maybeFailed mu = when (isNothing mu) (failed g) >> return mu
 
 runSLD :: Monad m => Solver k m a -> m (a, S.Set (Goal k [Term]))
 runSLD = (`St.runStateT` S.empty) . (`evalFreshT` 0) . Store.evalCached
