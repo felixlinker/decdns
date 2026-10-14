@@ -51,7 +51,7 @@ resolutionLimits :: QueryConfig -> M.Map (Maybe T.Type) Int
 resolutionLimits = M.mapKeys Just . _resolutionLimits
 
 defaultQueryConfig :: QueryConfig
-defaultQueryConfig = QueryConfig 53 3000000 2 10 limits
+defaultQueryConfig = QueryConfig 53 3000000 2 100 limits
   where
     limits :: M.Map T.Type Int
     limits = M.fromList [(T.CNAME, 10), (T.DNAME, 10), (T.NS, 20)]
