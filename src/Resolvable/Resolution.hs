@@ -124,10 +124,15 @@ sldSome rs g0 u0 = aux [(g0, u0)]
     aux [] = return Nothing
     aux ((g, u) : gs) = do
       (done, rec) <- sld rs g u
-      maybe (aux (rec ++ gs) >>= maybeFailed)
+      maybe (recAux rec)
             (return . Just . fst)
             (uncons done)
       where
+        recAux :: [(Goal k [Term], Unifier)] -> Solver k m (Maybe Unifier)
+        recAux rec = do
+          r1 <- maybeFailed =<< aux rec
+          maybe (aux gs) (return . Just) r1
+
         maybeFailed :: Maybe Unifier -> Solver k m (Maybe Unifier)
         maybeFailed mu = when (isNothing mu) (failed g) >> return mu
 
