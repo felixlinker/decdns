@@ -114,7 +114,6 @@ library
       Resolvable.Unification
       Resolvable.Update.Dependencies
       Resolvable.Update.Disunification
-      Resolvable.Update.Resolvability
       Util.Bool
       Util.Bytes
       Util.CondensationGraph
