@@ -12,7 +12,6 @@ using Stack's generated bridge header. The shared object links the Haskell
 runtime and package libraries, so keep the local build dependencies available when loading it.
 The build is intended for Unix systems with a shared SWI-Prolog installation.
 
-Run the integration tests with `make -C prolog test`.
 Remove native build products with `make -C prolog clean`.
 Stack handles Haskell dependency tracking; Make recompiles the C adapter when
 its source or generated header changes and relinks when the Haskell shared

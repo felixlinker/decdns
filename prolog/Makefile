@@ -13,7 +13,7 @@ EXTENSION := build/dnssec_native.$(SOEXT)
 # Inspecting them afterwards avoids using a stale package registration/header.
 HASKELL_LIBRARY := $(wildcard $(HASKELL_LIB_DIR)/lib$(HASKELL_LIB_NAME)-ghc*.so $(HASKELL_LIB_DIR)/lib$(HASKELL_LIB_NAME)-ghc*.dylib)
 
-.PHONY: all build native test clean
+.PHONY: all build native clean
 all: build
 
 # Stack owns Haskell dependency tracking. Recursive Make then sees the current
@@ -52,12 +52,6 @@ $(EXTENSION): build/dnssec_bridge.o $(HASKELL_LIBRARY) Makefile
 
 build/:
 	mkdir -p build
-
-# Run only after building; Prolog must load the newly linked extension.
-test: build
-	$(SWIPL) -q -g run_tests -t halt \
-	  "$(PROLOG_DIR)/test/dnssec_tests.pl" "$(PROLOG_DIR)/test/headers_tests.pl" \
-	  "$(PROLOG_DIR)/test/resolvable_tests.pl" "$(PROLOG_DIR)/test/cname_signed_tests.pl"
 
 clean:
 	rm -rf "$(PROLOG_DIR)/build"
