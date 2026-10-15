@@ -13,6 +13,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (runExcept)
 import Data.Either (fromRight)
 import Data.Foldable (Foldable(foldl'))
+import Data.Functor.Identity (Identity)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe (listToMaybe, mapMaybe, catMaybes, isJust, fromMaybe)
@@ -22,6 +23,7 @@ import Resolvable.Constraint.Solving (getSolved)
 import Resolvable.Prolog.Core
 import Resolvable.Prolog.TermView
 import Resolvable.Resolvability (RComp(rid))
+import Resolvable.Resolution
 import Resolvable.Unification
 import qualified Util.Graph as G
 import qualified Util.CondensationGraph as CG
@@ -29,9 +31,9 @@ import Util.Monad (exceptMaybe)
 import Util.Fixpoint
 import Util.Fresh
 
-type Solver a = Store.SimplifyCache Fresh a
+type CSolver a = Solver Identity a
 
-awayR :: Rule a -> Fresh (Rule a)
+awayR :: Monad m => Rule a -> FreshT m (Rule a)
 awayR (Rule a h b) = do
   fr <- fst <$> awayT (h:b)
   case fr of
@@ -53,7 +55,7 @@ match _ _ = False
 
 type ResolutionOrder = G.Graph Int
 
-resolutionOrder :: S.Set (Rule RComp) -> Fresh ResolutionOrder
+resolutionOrder :: Monad m => S.Set (Rule RComp) -> FreshT m ResolutionOrder
 resolutionOrder rs =
   let (facts, rs') = S.partition (not. any isResolves . rbody) rs
       gInit = foldr ((`G.insert` S.empty) . getId) G.empty facts
@@ -62,7 +64,7 @@ resolutionOrder rs =
     getId :: Rule RComp -> Int
     getId = rid . rannotation
 
-    go :: ResolutionOrder -> Rule RComp -> Fresh ResolutionOrder
+    go :: Monad m => ResolutionOrder -> Rule RComp -> FreshT m ResolutionOrder
     go ord r = do
       r' <- awayR r
       return $ G.insert (getId r) (S.map getId $ S.filter (match r') rs) ord
@@ -96,7 +98,7 @@ instance Show Fact where
 toRule :: Fact -> Rule ()
 toRule (Fact f cs) = Rule () f (Store.toBody cs)
 
-solveBody :: S.Set Fact -> Rule a -> Solver (S.Set Fact)
+solveBody :: S.Set Fact -> Rule a -> CSolver (S.Set Fact)
 solveBody fs r = do
   Rule _ h b <- lift $ awayR r
   let (st, b') = Store.partitionConstraints b
@@ -104,7 +106,7 @@ solveBody fs r = do
   facts <- catMaybes <$> mapM (uncurry $ toFact h) us
   return $ S.fromList facts
   where
-    toFact :: Term -> Unifier -> Store.ConstraintStore -> Solver (Maybe Fact)
+    toFact :: Term -> Unifier -> Store.ConstraintStore -> CSolver (Maybe Fact)
     toFact h u st = do
       reduced <- getSolved <$> Store.simplifyCached (apply u st)
       return $ Fact (apply u h) <$> reduced
@@ -128,15 +130,15 @@ solveBody fs r = do
         choices
       _ -> error "unsupported atom encountered"
 
-solveFixpoint :: forall a t. Traversable t => S.Set Fact -> t (Rule a) -> Solver (S.Set Fact)
+solveFixpoint :: forall a t. Traversable t => S.Set Fact -> t (Rule a) -> CSolver (S.Set Fact)
 solveFixpoint prog addFrom = fixpointSetM step prog
   where
-    step :: S.Set Fact -> Solver (S.Set Fact)
+    step :: S.Set Fact -> CSolver (S.Set Fact)
     step acc = do
       solved <- mapM (solveBody acc) addFrom
       return $ S.unions solved
 
-solve :: forall a t. Traversable t => S.Set Fact -> t (Rule a) -> Solver (S.Set Fact)
+solve :: forall a t. Traversable t => S.Set Fact -> t (Rule a) -> CSolver (S.Set Fact)
 solve kb addFrom = do
   solved <- mapM (solveBody kb) addFrom
   return $ foldr S.union kb solved
@@ -153,7 +155,7 @@ immediateConsequences (S.filter (isResolves . rhead) -> rs) = Store.evalCached $
     getRules :: S.Set (S.Set Int) -> [Rule RComp]
     getRules = concatMap (mapMaybe (`M.lookup` rules) . S.toList) . S.toList
 
-    rec :: S.Set Int -> CG.CondensationGraph Int -> S.Set Fact -> Solver (S.Set Fact)
+    rec :: S.Set Int -> CG.CondensationGraph Int -> S.Set Fact -> CSolver (S.Set Fact)
     rec recursive ord acc
       | G.null ord = pure acc
       | otherwise = do

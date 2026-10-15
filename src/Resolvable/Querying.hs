@@ -83,7 +83,7 @@ data QueryState = QueryState
 
 type RuleBase = Ex.ExceptT String (St.StateT QueryState IO)
 
-type OnlineSolver a = Solver (Maybe T.Type) RuleBase a
+type OnlineSolver a = RSolver (Maybe T.Type) RuleBase a
 
 type OnlineGoal = SLDGoal (Maybe T.Type)
 
