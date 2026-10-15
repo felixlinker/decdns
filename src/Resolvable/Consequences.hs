@@ -13,9 +13,9 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (runExcept)
 import Data.Either (fromRight)
 import Data.Foldable (Foldable(foldl'))
-import Data.Functor.Identity (Identity)
+import Data.Functor.Identity (Identity(Identity), runIdentity)
 import qualified Data.Set as S
-import Data.Maybe (listToMaybe, mapMaybe, catMaybes, isJust, fromMaybe)
+import Data.Maybe (listToMaybe, mapMaybe, catMaybes, isJust)
 
 import qualified Resolvable.Constraint.Store as Store
 import Resolvable.Constraint.Solving (getSolved)
@@ -65,21 +65,18 @@ resolutionOrder rs =
       return $ G.insert r (S.filter (match r') rs) ord
 
 data Fact = Fact Term Store.ConstraintStore
+  deriving (Eq, Ord)
 
-equivFacts :: Fact -> Fact -> Bool
-equivFacts (Fact f1 c1) (Fact f2 c2) = fromMaybe False $ do
-  u <- unify f1 f2
-  return $ isRenaming u && apply u c1 == apply u c2
+awayF :: Monad m => Fact -> FreshT m Fact
+awayF (Fact h st) = do
+  (runIdentity -> h', u) <- awayT (Identity h)
+  return $ Fact h' (apply u st)
 
-instance Eq Fact where
-  (==) = equivFacts
+canonFact :: Fact -> Fact
+canonFact = runFresh . awayF
 
-instance Ord Fact where
-  compare f1@(Fact t1 c1) f2@(Fact t2 c2)
-    | f1 == f2 = EQ
-    | otherwise = case compare t1 t2 of
-      EQ -> compare c1 c2
-      comp -> comp
+factSet :: Foldable f => f Fact -> S.Set Fact
+factSet = foldr (S.insert . canonFact) S.empty
 
 instance Unify Fact where
   extendUnifier (Fact f _) (Fact f' _) = extendUnifier f f'
@@ -99,7 +96,7 @@ solveBody fs r = do
   let (st, b') = Store.partitionConstraints b
   let us = foldl' solvePredicate [(identity, st)] b'
   facts <- catMaybes <$> mapM (uncurry $ toFact h) us
-  return $ S.fromList facts
+  return $ factSet facts
   where
     toFact :: Term -> Unifier -> Store.ConstraintStore -> CSolver (Maybe Fact)
     toFact h u st = do
