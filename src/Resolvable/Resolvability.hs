@@ -147,7 +147,8 @@ resolvableStep roots nses (nameWithoutSynthesis -> zone) rrset@(Named n rs) = go
                   , nsecUnsigned ownerNoSynth dNSEC
                   , resolves nses t zone n' d bot (ad 0) ]
             , do  -- NSEC3 for owner for unsigned subzone
-                (nTail, t, d, nNSEC, dNSEC) <- freshVars5 ("N", "T", "D", "N_NSEC", "D_NSEC")
+                (nTail, t, d, nsecV, dNSEC) <- freshVars5 ("N", "T", "D", "N_NSEC", "D_NSEC")
+                let nNSEC = injectLast nsecV zone
                 let n'' = captureListTail nTail ownerNoSynth
                 rann <- rannot r
                 return $ S.singleton $ Rule rann (resolves nses t zone n'' d top (ad 0))
@@ -157,8 +158,10 @@ resolvableStep roots nses (nameWithoutSynthesis -> zone) rrset@(Named n rs) = go
                   , nsec3Unsigned ownerNoSynth nNSEC dNSEC
                   , resolves nses t zone n'' d bot (ad 0) ]
             , do  -- NSEC3 closest encloser proof for unsigned subzone
-              (nTail, t, d, nNSEC, nNSEC', dNSEC, dNSEC') <- freshVars7 ("N", "T", "D", "N_NSEC", "N_NSEC", "D_NSEC", "D_NSEC")
+              (nTail, t, d, nsecV, nsecV', dNSEC, dNSEC') <- freshVars7 ("N", "T", "D", "N_NSEC", "N_NSEC", "D_NSEC", "D_NSEC")
               let n'' = captureListTail nTail ownerNoSynth
+              let nNSEC = injectLast nsecV zone
+              let nNSEC' = injectLast nsecV' zone
               rann <- rannot r
               return $ S.singleton $ Rule rann (resolves nses t zone n'' d top (ad 0))
                 [ t \= dsType
