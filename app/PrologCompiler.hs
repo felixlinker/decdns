@@ -5,7 +5,7 @@ import DNS.Wellformedness ( zoneWellformed )
 import NameConstraint (toStandardRecord, ConstrainedLabel)
 import Resolvable.Prolog.Core
 import Resolvable.Resolvability
-import Resolvable.Dependencies (computeResolvable, toRule)
+import Resolvable.Consequences (immediateConsequences, toRule)
 import Util.Fresh (runFresh)
 import Util.Monad (failLeftS)
 
@@ -38,7 +38,7 @@ main = do
       (roots, zones) <- sepBy "--" args'
       rootServers <- parseNames roots
       cfg <- parseZones zones
-      let res = runFresh $ computeResolvable =<< compileConfig rootServers keys cfg
+      let res = runFresh $ immediateConsequences =<< compileConfig rootServers keys cfg
       putStrLn $ showKnowledgeBase $ map toRule $ S.toList res
     "resolvable" -> do
       keysPath:args' <- return args
@@ -46,7 +46,7 @@ main = do
       (roots, zones) <- sepBy "--" args'
       rootServers <- parseNames roots
       cfg <- parseZones zones
-      let res = runFresh $ computeResolvable =<< compileConfig rootServers keys cfg
+      let res = runFresh $ immediateConsequences =<< compileConfig rootServers keys cfg
       putStrLn $ showKnowledgeBase $ mapMaybe (fmap toRule . resolvableQuery) $ S.toList res
     "regressions" -> do
       keysPath:args' <- return args

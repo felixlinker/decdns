@@ -88,10 +88,10 @@ library
       Parsing.Tokens
       Parsing.ZoneFile
       Prolog.Bridge
+      Resolvable.Consequences
       Resolvable.Constraint.Neqs
       Resolvable.Constraint.Solving
       Resolvable.Constraint.Store
-      Resolvable.Dependencies
       Resolvable.Prolog.Core
       Resolvable.Prolog.Reverse
       Resolvable.Prolog.Symbols

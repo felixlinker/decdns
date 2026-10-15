@@ -1,12 +1,12 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Resolvable.Dependencies
+module Resolvable.Consequences
   ( ResolutionOrder
   , resolutionOrder
   , Fact(..)
   , toRule
-  , computeResolvable ) where
+  , immediateConsequences ) where
 
 import Control.Monad (foldM, guard)
 import Control.Monad.Trans.Class (lift)
@@ -141,9 +141,8 @@ solve kb addFrom = do
   solved <- mapM (solveBody kb) addFrom
   return $ foldr S.union kb solved
 
--- TODO: Rename to immediate consequences
-computeResolvable :: S.Set (Rule RComp) -> Fresh (S.Set Fact)
-computeResolvable (S.filter (isResolves . rhead) -> rs) = Store.evalCached $ do
+immediateConsequences :: S.Set (Rule RComp) -> Fresh (S.Set Fact)
+immediateConsequences (S.filter (isResolves . rhead) -> rs) = Store.evalCached $ do
   ord <- lift $ resolutionOrder rs
   let recursive = S.filter (\i -> i `S.member` G.next ord i) (G.elems ord)
   rec recursive (CG.fromGraph ord) S.empty

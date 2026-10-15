@@ -20,7 +20,7 @@ import DNS.Zone (apexNameServers, splitZone)
 import DNS.ZoneFile (zoneName, Zone)
 import NameConstraint (compileName, ConstrainedLabel)
 import Parsing (parseZoneFiles, parseDS)
-import Resolvable.Dependencies
+import Resolvable.Consequences
 import qualified Resolvable.Constraint.Store as Store
 import Resolvable.Constraint.Solving (getSolved)
 import Resolvable.Prolog.Core (Term (TComplex), ad, bot, list, nameTerm, referralZone, resolvable, resolves, top, ttypeTerm, wildcard, wildcards3)
@@ -556,7 +556,7 @@ resolvableQueries files = do
   (roots, keys, zones) <- loadConfig files
   return $ runFresh $ do
         rules <- compileConfig roots keys zones
-        computeResolvable rules
+        immediateConsequences rules
 
 loadZones :: [FilePath] -> IO [Zone ConstrainedLabel]
 loadZones files = concatMap splitZone <$> parseZoneFiles (concatMap zoneWellformed . splitZone) files

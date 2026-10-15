@@ -7,7 +7,7 @@ module Resolvable.Update.DisunificationSpec
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
 
-import Resolvable.Dependencies
+import Resolvable.Consequences
 import qualified Resolvable.Constraint.Store as Store
 import Resolvable.Prolog.Core (Term(..), list, listWithTail, (\=))
 import Resolvable.Update.Disunification (withouts)

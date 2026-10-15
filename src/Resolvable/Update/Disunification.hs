@@ -7,7 +7,7 @@ import qualified Data.Map as M
 
 import qualified Resolvable.Constraint.Store as Store
 import Resolvable.Constraint.Solving (getSolved)
-import Resolvable.Dependencies
+import Resolvable.Consequences
 import qualified Resolvable.Unification as U
 import Resolvable.Prolog.Core
 import Resolvable.Prolog.TermView
