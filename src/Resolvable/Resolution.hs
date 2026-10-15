@@ -128,7 +128,7 @@ sld rs g u = do
   return (map snd done, rec)
 
 factsFirst :: [Rule k] -> [Rule k]
-factsFirst = uncurry (++) . partition (not . null . snd . Store.partitionConstraints . rbody)
+factsFirst = uncurry (++) . partition (null . snd . Store.partitionConstraints . rbody)
 
 sldAll :: forall m k. (Monad m, Ord k) => [Rule k] -> SLDGoal k -> Unifier -> RSolver k m [Unifier]
 sldAll (factsFirst -> rs) = aux
