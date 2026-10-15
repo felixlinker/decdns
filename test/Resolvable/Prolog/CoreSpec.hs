@@ -2,6 +2,7 @@ module Resolvable.Prolog.CoreSpec (tests) where
 
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (testCase, (@?=))
+import Test.Tasty.QuickCheck
 
 import Resolvable.Prolog.Core
 
@@ -9,7 +10,8 @@ tests :: TestTree
 tests =
   testGroup
     "Resolvable.Prolog.Core"
-    [ testGroup
+    [ testProperty "rule equality and ordering ignore annotations" propRuleAnnotationIgnored
+    , testGroup
         "minNameLength"
         [ testCase "variable name" $
             minNameLength (TVar "Name") @?= 1
@@ -25,3 +27,15 @@ tests =
             minNameLength (listWithTail [TVar "Label", TAtom "www"] (TVar "Suffix")) @?= 7
         ]
     ]
+
+genRule :: Gen (Rule Int)
+genRule = (`fact` TAtom "head") <$> arbitrary
+
+propRuleAnnotationIgnored :: Int -> Property
+propRuleAnnotationIgnored annotation =
+  forAll genRule $ \rule ->
+    let updated = rule { rannotation = annotation }
+    in conjoin
+        [ (rule == updated) === True
+        , compare rule updated === EQ
+        ]

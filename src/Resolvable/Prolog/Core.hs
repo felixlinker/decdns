@@ -351,7 +351,12 @@ data Rule a = Rule
   { rannotation :: a
   , rhead :: Term
   , rbody :: [Term] }
-  deriving (Eq, Ord)
+
+instance Eq (Rule a) where
+  Rule _ h1 b1 == Rule _ h2 b2 = h1 == h2 && b1 == b2
+
+instance Ord (Rule a) where
+  compare (Rule _ h1 b1) (Rule _ h2 b2) = compare (h1, b1) (h2, b2)
 
 instance Functor Rule where
   fmap f (Rule a h b) = Rule (f a) h b
