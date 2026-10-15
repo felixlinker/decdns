@@ -16,7 +16,8 @@ copyright:           "2025 Author name here"
 description:         Please see the README on GitHub at <https://github.com/githubuser/dns-regressor#readme>
 
 extra-source-files:
-- test/fixtures/querying/*
+- root-addresses
+- root-keys
 - examples/cname/**/*
 - examples/dname/**/*
 - examples/dnssec/**/*
@@ -83,5 +84,3 @@ tests:
     - HUnit
     - directory
     - filepath
-    - process
-    - network

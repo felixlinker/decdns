@@ -6,10 +6,6 @@ module Resolvable.Querying
   , defaultQueryConfig
   , resolve
   , resolveWith
-  , ZoneCache
-  , emptyZoneCache
-  , cacheRecords
-  , cachedZones
   ) where
 
 import Control.Monad (unless, when)
