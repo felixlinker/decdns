@@ -107,7 +107,7 @@ whenNotQueried q m = do
 checkQueryBudget :: RuleBase ()
 checkQueryBudget = do
   qs <- getsState remainingQueries
-  when (qs < 0) (Ex.throwE "exhausted query budget")
+  when (qs <= 0) (Ex.throwE "exhausted query budget")
   modState (\qst -> qst { remainingQueries = qs - 1 })
 
 liftRuleBase :: RuleBase a -> OnlineSolver a
