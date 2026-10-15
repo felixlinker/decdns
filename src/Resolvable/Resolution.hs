@@ -75,7 +75,7 @@ checkLimits ann ls = do
 instance Apply a => Apply (Goal k a) where
   apply u (Goal ts limits st) = Goal (apply u ts) limits (apply u st)
 
-instance Show (Goal k [Term]) where
+instance Show (SLDGoal k) where
   show (Goal a _ st) = ":- " ++ intercalate ", " (map show $ a ++ Store.toBody st) ++ "."
 
 instance Functor (Goal k) where
@@ -92,14 +92,14 @@ awayG (Goal ts limits st) = do
 canonicalGoal :: SLDGoal k -> SLDGoal k
 canonicalGoal g = fst $ runFresh $ awayG g
 
-resolution :: (Monad m, Ord a) => [Rule a] -> Goal a [Term] -> Unifier -> RSolver a m [(Goal a [Term], Unifier)]
+resolution :: (Monad m, Ord a) => [Rule a] -> SLDGoal a -> Unifier -> RSolver a m [(SLDGoal a, Unifier)]
 resolution _ g@(Goal [] _ _) u = return [(g, u)]
 resolution rs g@(Goal (p:_) _ _) u = do
   gs <- catMaybes <$> mapM (uncurry simplify) (resolutionStep rs g)
   when (null gs && isResolves p) (failed g)
   return gs
   where
-    simplify :: Monad m => Goal a [Term] -> Unifier -> RSolver a m (Maybe (Goal a [Term], Unifier))
+    simplify :: Monad m => SLDGoal a -> Unifier -> RSolver a m (Maybe (SLDGoal a, Unifier))
     simplify (Goal ts limits st) u' = do
       st' <- getSolved <$> Store.simplifyCached st
       return $ (, u ~> u') . Goal ts limits <$> st'
