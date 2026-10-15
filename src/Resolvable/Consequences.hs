@@ -14,7 +14,6 @@ import Control.Monad.Trans.Except (runExcept)
 import Data.Either (fromRight)
 import Data.Foldable (Foldable(foldl'))
 import Data.Functor.Identity (Identity)
-import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe (listToMaybe, mapMaybe, catMaybes, isJust, fromMaybe)
 
@@ -22,7 +21,6 @@ import qualified Resolvable.Constraint.Store as Store
 import Resolvable.Constraint.Solving (getSolved)
 import Resolvable.Prolog.Core
 import Resolvable.Prolog.TermView
-import Resolvable.Resolvability (RComp(rid))
 import Resolvable.Resolution
 import Resolvable.Unification
 import qualified Util.Graph as G
@@ -40,7 +38,7 @@ awayR (Rule a h b) = do
     (h':b') -> return $ Rule a h' b'
     _ -> undefined
 
-match :: Rule RComp -> Rule RComp -> Bool
+match :: Rule a -> Rule a -> Bool
 match (Rule _ (toView -> TVResolves {}) b) (Rule _ h@(toView -> TVResolves {}) _) = isJust $ do
   let (st, b') = Store.partitionConstraints b
   (_, u) <- listToMaybe $ mapMaybe unifyBodyPredicate b'
@@ -53,21 +51,18 @@ match (Rule _ (toView -> TVResolves {}) b) (Rule _ h@(toView -> TVResolves {}) _
       return (p, u)
 match _ _ = False
 
-type ResolutionOrder = G.Graph Int
+type ResolutionOrder a = G.Graph (Rule a)
 
-resolutionOrder :: Monad m => S.Set (Rule RComp) -> FreshT m ResolutionOrder
+resolutionOrder :: forall m a. Monad m => S.Set (Rule a) -> FreshT m (ResolutionOrder a)
 resolutionOrder rs =
   let (facts, rs') = S.partition (not. any isResolves . rbody) rs
-      gInit = foldr ((`G.insert` S.empty) . getId) G.empty facts
+      gInit = foldr (`G.insert` S.empty) G.empty facts
   in  foldM go gInit rs'
   where
-    getId :: Rule RComp -> Int
-    getId = rid . rannotation
-
-    go :: Monad m => ResolutionOrder -> Rule RComp -> FreshT m ResolutionOrder
+    go :: ResolutionOrder a -> Rule a -> FreshT m (ResolutionOrder a)
     go ord r = do
       r' <- awayR r
-      return $ G.insert (getId r) (S.map getId $ S.filter (match r') rs) ord
+      return $ G.insert r (S.filter (match r') rs) ord
 
 data Fact = Fact Term Store.ConstraintStore
 
@@ -143,24 +138,18 @@ solve kb addFrom = do
   solved <- mapM (solveBody kb) addFrom
   return $ foldr S.union kb solved
 
-immediateConsequences :: S.Set (Rule RComp) -> Fresh (S.Set Fact)
+immediateConsequences :: S.Set (Rule a) -> Fresh (S.Set Fact)
 immediateConsequences (S.filter (isResolves . rhead) -> rs) = Store.evalCached $ do
   ord <- lift $ resolutionOrder rs
   let recursive = S.filter (\i -> i `S.member` G.next ord i) (G.elems ord)
   rec recursive (CG.fromGraph ord) S.empty
   where
-    rules :: M.Map Int (Rule RComp)
-    rules = M.fromList $ map (\r -> (rid $ rannotation r, r)) $ S.toList rs
-
-    getRules :: S.Set (S.Set Int) -> [Rule RComp]
-    getRules = concatMap (mapMaybe (`M.lookup` rules) . S.toList) . S.toList
-
-    rec :: S.Set Int -> CG.CondensationGraph Int -> S.Set Fact -> CSolver (S.Set Fact)
+    rec :: S.Set (Rule a) -> CG.CondensationGraph (Rule a) -> S.Set Fact -> CSolver (S.Set Fact)
     rec recursive ord acc
       | G.null ord = pure acc
       | otherwise = do
           let leaves = G.leaves ord
-          let leafRules = getRules leaves
+          let leafRules = S.toList $ S.unions leaves
           acc' <- if any ((> 1) . S.size) leaves || any (`S.member` recursive) (S.unions leaves)
             then solveFixpoint acc leafRules
             else solve acc leafRules
