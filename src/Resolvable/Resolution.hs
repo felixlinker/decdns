@@ -75,8 +75,8 @@ checkLimits ann ls = do
 instance Apply a => Apply (Goal k a) where
   apply u (Goal ts limits st) = Goal (apply u ts) limits (apply u st)
 
-instance Show a => Show (Goal k a) where
-  show (Goal a _ _) = "Goal " ++ show a
+instance Show (Goal k [Term]) where
+  show (Goal a _ st) = ":- " ++ intercalate ", " (map show $ a ++ Store.toBody st) ++ "."
 
 instance Functor (Goal k) where
   fmap f (Goal as st limits) = Goal (f as) st limits
