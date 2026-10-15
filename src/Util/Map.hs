@@ -1,12 +1,16 @@
 module Util.Map
-  ( groupBy
+  ( groupByWith
+  , groupBy
   , alterDefF
   , add ) where
 
 import qualified Data.Map as M
 
+groupByWith :: (Ord k, Foldable t) => (a -> (k, b)) -> t a -> M.Map k [b]
+groupByWith f = foldr (\a -> let (k, v) = f a in M.alter (Just . maybe [v] (v:)) k) M.empty
+
 groupBy :: (Ord k, Foldable t) => (a -> k) -> t a -> M.Map k [a]
-groupBy f = foldr (\a -> M.alter (Just . maybe [a] (a:)) (f a)) M.empty
+groupBy f = groupByWith (\a -> (f a, a))
 
 whenDefined :: Applicative f => (a -> f a) -> Maybe a -> f (Maybe a)
 whenDefined f = maybe (pure Nothing) (fmap Just . f)
