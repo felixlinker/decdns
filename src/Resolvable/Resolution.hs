@@ -1,5 +1,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns #-}
 module Resolvable.Resolution
   ( Solver
   , Goal(..)
@@ -121,15 +122,21 @@ sld rs g u = do
   let (done, rec) = partition (finished . fst) gs
   return (map snd done, rec)
 
-sldAll :: (Monad m, Ord k) => [Rule k] -> SLDGoal k -> Unifier -> Solver k m [Unifier]
-sldAll rs g u = do
-  (done, rec) <- sld rs g u
-  recGs <- concat <$> mapM (uncurry $ sldAll rs) rec
-  when (null done && null recGs) (failed g)
-  return $ done ++ recGs
+factsFirst :: [Rule k] -> [Rule k]
+factsFirst = uncurry (++) . partition (null . rbody)
+
+sldAll :: forall m k. (Monad m, Ord k) => [Rule k] -> SLDGoal k -> Unifier -> Solver k m [Unifier]
+sldAll (factsFirst -> rs) = aux
+  where
+    aux :: SLDGoal k -> Unifier -> Solver k m [Unifier]
+    aux g u = do
+      (done, rec) <- sld rs g u
+      recGs <- concat <$> mapM (uncurry $ sldAll rs) rec
+      when (null done && null recGs) (failed g)
+      return $ done ++ recGs
 
 sldSome :: forall k m. (Monad m, Ord k) => [Rule k] -> SLDGoal k -> Unifier -> Solver k m (Maybe Unifier)
-sldSome rs g0 u0 = aux [(g0, u0)]
+sldSome (factsFirst -> rs) g0 u0 = aux [(g0, u0)]
   where
     aux :: [(SLDGoal k, Unifier)] -> Solver k m (Maybe Unifier)
     aux [] = return Nothing
