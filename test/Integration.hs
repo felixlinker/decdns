@@ -3,384 +3,405 @@ module Integration (tests) where
 import Control.Monad (forM_)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (runExceptT)
-import Data.Maybe (isJust)
-import Data.List (isPrefixOf, nub, sort)
 import qualified Data.Set as S
-import System.Directory (listDirectory)
-import System.FilePath (takeDirectory, (</>))
+import System.FilePath ((</>))
 
-import DNS.Name (Name, root, toStringName)
+import DNS.Name (Name, root)
 import DNS.NameSpec (mkName)
-import DNS.Record (Type (DNAME, NS, SOA))
 import DNS.RRSet (RRSet)
 import qualified DNS.RecordType as RT
 import DNS.Wellformedness (zoneWellformed)
 import DNS.Zone (splitZone)
-import DNS.ZoneFile (zoneName, Zone)
-import NameConstraint (compileName, ConstrainedLabel)
+import DNS.ZoneFile (Zone)
+import NameConstraint (ConstrainedLabel)
 import Parsing (parseZoneFiles, parseDS)
 import Resolvable.Consequences
 import qualified Resolvable.Constraint.Store as Store
 import Resolvable.Constraint.Solving (getSolved)
-import Resolvable.Prolog.Core (Term (TComplex), ad, bot, list, nameTerm, referralZone, resolvable, resolves, top, ttypeTerm, wildcard, wildcards3)
+import Resolvable.Prolog.Core
 import Resolvable.Resolvability (compileConfig)
 import Resolvable.Update.Dependencies (computeRegressions)
 import qualified Resolvable.Unification as U
-import Test.Tasty (TestTree, testGroup)
+import Test.Tasty (TestTree, testGroup, withResource)
 import Test.Tasty.HUnit (Assertion, assertBool, testCase, (@?=))
-import Util.Fresh (runFresh)
+import Util.Fresh (runFresh, runFreshT)
 import Util.Monad (failLeft)
+import Data.Maybe (fromMaybe)
+import Resolvable.Unification (away)
+
+wc1, wc2 :: Term
+wc1 = TVar "Wildcard1"
+wc2 = TVar "Wildcard2"
 
 tests :: TestTree
-tests =
-  testGroup
-    "Examples"
-    [ testGroup "Parsing/DNS.ZoneFile/Wellformedness" $
-        map exampleFileTest exampleFiles
-    , testGroup "resolvability"
-        (map exampleConfigTest exampleConfigs ++
-          [ testCase "handles an NS delegation loop" $ do
-              exactResolutionTest nsLoopFiles
-                [ resolves (list [nameTerm nsCom]) (ttypeTerm RT.NS) referralZone (nameTerm com)
-                    (list [TComplex (NS rootNet)]) bot (ad 0)
-                , resolves (list [nameTerm rootNet]) (ttypeTerm RT.NS) referralZone (nameTerm com)
-                    (list [TComplex (NS nsCom)]) bot (ad 0) ]
-              misconfigurationLoopTest nsLoopFiles [] [Query dnsRoot RT.A aCom]
-          , testCase "handles a CNAME loop" $
-              misconfigurationLoopTest cnameLoopFiles
-                [Query com RT.CNAME aCom, Query com RT.CNAME bCom]
-                [Query com RT.A aCom, Query com RT.A bCom]
-          , testCase "handles an empty DNAME loop" $
-              exactResolutionTest dnameLoopEmptyFiles
-                [ resolves (list [nameTerm nsCom]) (ttypeTerm RT.DNAME) (nameTerm com) (nameTerm aaCom)
-                    (list [TComplex (DNAME bCom)]) bot (ad 0)
-                , resolves (list [nameTerm nsCom]) (ttypeTerm RT.DNAME) (nameTerm com) (nameTerm bCom)
-                    (list [TComplex (DNAME aCom)]) bot (ad 0)
-                , resolves (list [nameTerm nsCom]) (ttypeTerm RT.NS) (nameTerm com) (nameTerm com)
-                    (list [TComplex (NS nsCom)]) bot (ad 0)
-                , resolves (list [nameTerm nsCom]) (ttypeTerm RT.SOA) (nameTerm com) (nameTerm com)
-                    (list [TComplex (SOA nsCom exampleCom 0 0 0 0 0)]) bot (ad 0)
-                ]
-          ])
-    , testGroup
-        "resolvability authentication"
-        [ testCase "signed authenticates the CNAME chain and child zone" $
-            authenticatedResolutionTest signedFiles
-        , testCase "signed facts have fully reduced constraints" $ do
-            results <- resolvableQueries signedFiles
-            forM_ results $ \(Fact _ constraints) ->
-              fmap Store.toBody (getSolved (Store.simplify constraints))
-                @?= Just (Store.toBody constraints)
-        , testCase "signed authenticates a TXT record" $ do
-            results <- resolvableQueries signedTxtFiles
-            assertResolutions signedTxtFiles results
-              [authenticated com RT.TXT com]
-              []
-        , testCase "signed authenticates an apex NS RRset" $ do
-            results <- resolvableQueries signedNsFiles
-            assertResolutions signedNsFiles results
-              [ authenticated exampleZone RT.NS exampleZone
-              , authenticated exampleZone RT.NS exampleZone]
-              []
-        , testCase "signed-new authenticates answers synthesized from a wildcard" $
-            authenticatedWildcardResolutionTest signedNewFiles
-        , testCase "signed wildcard records authenticate synthesized answers" $ do
-            results <- resolvableQueries signedWildcardFiles
-            assertResolutions signedWildcardFiles results
-              [authenticated com RT.A aCom]
-              []
-        , testCase "signed records with asterisk labels in owner names authenticate" $ do
-            results <- resolvableQueries signedWildcardFiles
-            assertResolutions signedWildcardFiles results
-              [authenticated com RT.A xWildcardCom]
-              []
-        , testCase "signed-nsec3 authenticates the CNAME chain and child zone" $
-            authenticatedResolutionTest signedNsec3Files
-        , testCase "partially-signed authenticates unsigned child zone through NSEC" $
-            authenticatedUnsignedDelegationTest partiallySignedFiles
-        , testCase "partially-signed-nsec3 authenticates unsigned child zone through NSEC3 owner proof" $
-            authenticatedUnsignedDelegationTest partiallySignedNsec3Files
-        , testCase "partially-signed-nsec3-oo filters invalid NSEC3 unsigned-delegation proof" $
-            doesNotAuthenticateUnsignedDelegationTest partiallySignedNsec3OOFiles
-        , testCase "signed does not authenticate the child zone as unsigned through NSEC" $
-            signedDelegationDoesNotUseUnsignedProofTest signedFiles
-        , testCase "signed-nsec3 does not authenticate the child zone as unsigned through NSEC3" $
-            signedDelegationDoesNotUseUnsignedProofTest signedNsec3Files
-        , testCase "base does not authenticate unsigned answers" $ do
-            results <- resolvableQueries baseFiles
-            assertResolutions baseFiles results []
-              [ authenticated com RT.A aCom
-              , authenticated com RT.A bCom
-              , authenticated com RT.CNAME aCom
-              , authenticated com RT.NS bCom
-              , authenticated bCom RT.A bCom ] ]
-    , testGroup
-        "Resolvable.Update.Dependencies"
-        [ testCase "base to new has expected unsigned regression facts" $
-            regressionTest newFiles
-              []
-              [ Query com RT.A aCom
-              , Query com RT.A bCom
-              , Query com RT.A nsBCom ]
-        , testCase "base to broken has expected unsigned regression facts" $
-            regressionTest brokenFiles
-              [ Query com RT.A aCom
-              , Query com RT.A bCom
-              , Query com RT.A nsBCom ]
-              [] ] ]
+tests = testGroup "Examples"
+  [ testGroup "resolvability" $ map exampleConfigTest exampleConfigs
+  , testCase "signed facts have fully reduced constraints" $ do
+      results <- resolvableQueries cnameSigned
+      forM_ results $ \(Fact _ constraints) ->
+        fmap Store.toBody (getSolved (Store.simplify constraints))
+          @?= Just (Store.toBody constraints)
+  , testGroup "Resolvable.Update.Dependencies"
+      [ testCase "base to new has expected unsigned regression facts" $
+          regressionTest cnameNew []
+            [ resolvable (nameTerm com) (ttypeTerm RT.A) (nameTerm aCom) wc1 wc2
+            , resolvable (nameTerm com) (ttypeTerm RT.A) (nameTerm bCom) wc1 wc2
+            , resolvable (nameTerm com) (ttypeTerm RT.A) (nameTerm nsBCom) wc1 wc2 ]
+      , testCase "base to broken has expected unsigned regression facts" $
+          regressionTest cnameBroken
+            [ resolvable (nameTerm com) (ttypeTerm RT.A) (nameTerm aCom) wc1 wc2
+            , resolvable (nameTerm com) (ttypeTerm RT.A) (nameTerm bCom) wc1 wc2
+            , resolvable (nameTerm com) (ttypeTerm RT.A) (nameTerm nsBCom) wc1 wc2 ] []
+      ]
+  ]
 
-data ExampleFile = ExampleFile
-  { examplePath :: FilePath
-  , expectedZones :: [Name String]
-  }
-
-exampleFiles :: [ExampleFile]
-exampleFiles =
-  [ ExampleFile "examples/cname/base/ns.com." [com]
-  , ExampleFile "examples/cname/base/ns.b.com." [bCom]
-  , ExampleFile "examples/cname/new/ns.com." [com]
-  , ExampleFile "examples/cname/broken/ns.com." [com]
-  , ExampleFile "examples/cname/partially-signed/ns.com." [com]
-  , ExampleFile "examples/cname/partially-signed/ns.b.com." [bCom]
-  , ExampleFile "examples/cname/signed/ns.com." [com]
-  , ExampleFile "examples/cname/signed/ns.b.com." [bCom]
-  , ExampleFile "examples/cname/signed-new/ns.com." [com]
-  , ExampleFile "examples/cname/signed-non-zone-key/ns.com." [com]
-  , ExampleFile "examples/cname/signed-non-zone-key/ns.b.com." [bCom]
-  , ExampleFile "examples/cname/partially-signed-nsec3/ns.com." [com]
-  , ExampleFile "examples/cname/partially-signed-nsec3/ns.b.com." [bCom]
-  , ExampleFile "examples/cname/partially-signed-nsec3-oo/ns.com." [com]
-  , ExampleFile "examples/cname/partially-signed-nsec3-oo/ns.b.com." [bCom]
-  , ExampleFile "examples/cname/signed-nsec3/ns.com." [com]
-  , ExampleFile "examples/cname/signed-nsec3/ns.b.com." [bCom]
-  , ExampleFile "examples/dnssec/txt/ns.com." [com]
-  , ExampleFile "examples/dnssec/ns/example." [exampleZone]
-  , ExampleFile "examples/dnssec/wildcard/ns.com." [com]
-  , ExampleFile "examples/ns/self-deleg/ns.com." [com, subACom]
-  , ExampleFile "examples/ns/sub-self-deleg/root.net." [dnsRoot, rootNet]
-  , ExampleFile "examples/ns/sub-self-deleg/ns.net." [net]
-  , ExampleFile "examples/ns/cyclic-deleg/root.net." [dnsRoot]
-  , ExampleFile "examples/ns/cyclic-deleg/ns.net." [net]
-  , ExampleFile "examples/ns/cyclic-deleg/root.com." [dnsRoot]
-  , ExampleFile "examples/dname/loop-empty/ns.net." [com]
-  , ExampleFile "examples/dname/loop-non-empty/ns.net." [com] ]
-
+-- Paths are relative to examples/configName; an absolute DS path is also allowed.
+-- The root zone identifies the NS RRSet used as starting servers.
 data ExampleConfig = ExampleConfig
-  { configName :: String
+  { configName :: FilePath
+  , configRootDS :: FilePath
+  , configRootZone :: Name String
   , configFiles :: [FilePath]
-  , expectedQueries :: [Query]
-  , unexpectedQueries :: [Query]
+  , expectedQueries :: [Term]
+  , unexpectedQueries :: [Term]
   }
 
 exampleConfigs :: [ExampleConfig]
 exampleConfigs =
-  [ ExampleConfig
-      "base"
-      baseFiles
-      [ Query com RT.A aCom
-      , Query com RT.A bCom
-      , Query com RT.CNAME aCom
-      , Query com RT.NS aCom
-      , Query com RT.NS bCom
-      , Query com RT.SOA aCom
-      , Query com RT.SOA bCom
-      , Query bCom RT.A bCom ]
-      [Query com RT.TXT aCom]
-  , ExampleConfig
-      "new"
-      newFiles
-      [ Query com RT.A aCom
-      , Query com RT.A bCom
-      , Query com RT.A nsBCom
-      , Query com RT.SOA com ]
-      [ Query com RT.CNAME aCom
-      , Query com RT.NS bCom ]
-  , ExampleConfig
-      "broken"
-      brokenFiles
-      [ Query com RT.CNAME aCom
-      , Query com RT.SOA com ]
-      [ Query com RT.A aCom
-      , Query com RT.A bCom
-      , Query com RT.NS bCom ]
-  , ExampleConfig
-      "partially-signed"
-      partiallySignedFiles
-      [ Query com RT.A aCom
-      , Query com RT.A bCom
-      , Query com RT.CNAME aCom
-      , Query com RT.DNSKEY com
-      , Query com RT.NSEC aCom ]
-      [Query com RT.TXT aCom]
-  , ExampleConfig
-      "signed"
-      signedFiles
-      [ Query com RT.A aCom
-      , Query com RT.A bCom
-      , Query com RT.CNAME aCom
-      , Query com RT.DNSKEY com
-      , Query com RT.DNSKEY bCom
-      , Query com RT.DS bCom ]
-      [Query com RT.TXT aCom]
-  , ExampleConfig
-      "signed-non-zone-key"
-      signedNonZoneKeyFiles
-      [ Query com RT.A aCom
-      , Query com RT.A bCom
-      , Query com RT.CNAME aCom
-      , Query com RT.DNSKEY com
-      , Query com RT.DNSKEY bCom
-      , Query com RT.DS bCom ]
-      [Query com RT.TXT aCom]
-  , ExampleConfig
-      "partially-signed-nsec3"
-      partiallySignedNsec3Files
-      [ Query com RT.A aCom
-      , Query com RT.A bCom
-      , Query com RT.CNAME aCom
-      , Query com RT.DNSKEY com
-      , Query com RT.NSEC3PARAM com ]
-      [Query com RT.TXT aCom]
-  , ExampleConfig
-      "partially-signed-nsec3-oo"
-      partiallySignedNsec3OOFiles
-      [ Query com RT.A aCom
-      , Query com RT.A bCom
-      , Query com RT.CNAME aCom
-      , Query com RT.DNSKEY com
-      , Query com RT.NSEC3PARAM com ]
-      [Query com RT.TXT aCom]
-  , ExampleConfig
-      "signed-nsec3"
-      signedNsec3Files
-      [ Query com RT.A aCom
-      , Query com RT.A bCom
-      , Query com RT.CNAME aCom
-      , Query com RT.DNSKEY com
-      , Query com RT.DNSKEY bCom
-      , Query com RT.DS bCom
-      , Query com RT.NSEC3PARAM com ]
-      [Query com RT.TXT aCom]
-  , ExampleConfig
-      "dnssec/ns"
-      signedNsFiles
-      [Query exampleZone RT.NS exampleZone]
-      []
-  , ExampleConfig
-      "ns/self-deleg"
-      selfDelegFiles
-      [ Query com RT.NS com
-      , Query com RT.SOA com
-      , Query com RT.A nsCom
-      , Query com RT.NS subACom
-      , Query com RT.SOA subACom
-      , Query com RT.A subACom ]
-      [Query com RT.TXT subACom]
-  , ExampleConfig
-      "ns/sub-self-deleg"
-      subSelfDelegFiles
-      [ Query dnsRoot RT.NS dnsRoot
-      , Query dnsRoot RT.SOA dnsRoot
-      , Query dnsRoot RT.NS net
-      , Query dnsRoot RT.A nsNet
-      , Query net RT.NS net
-      , Query net RT.SOA net
-      , Query net RT.NS rootNet
-      , Query net RT.A rootNet
-      , Query dnsRoot RT.NS rootNet
-      , Query dnsRoot RT.SOA rootNet
-      , Query dnsRoot RT.A rootNet
-      , Query net RT.A subRootNet ]
-      [Query dnsRoot RT.TXT subRootNet]
-  , ExampleConfig
-      "dname/loop-non-empty"
-      dnameLoopNonEmptyFiles
-      [Query com RT.TXT aSubSubSubCom]
-      [] ]
+  [ cnameBase
+  , cnameNew
+  , cnameBroken
+  , cnamePartiallySigned
+  , cnameSigned
+  , cnameSignedNonZoneKey
+  , cnamePartiallySignedNsec3
+  , cnamePartiallySignedNsec3Oo
+  , cnameSignedNsec3
+  , dnssecNs
+  , nsSelfDeleg
+  , nsSubSelfDeleg
+  , dnameLoopNonEmpty
+  , cnameSignedNew
+  , dnssecTxt
+  , dnssecWildcard
+  , nsLoop
+  , cnameLoop
+  , dnameLoopEmpty
+  ]
 
-baseFiles, newFiles, brokenFiles, partiallySignedFiles, signedFiles, signedNewFiles, signedNonZoneKeyFiles :: [FilePath]
-selfDelegFiles, subSelfDelegFiles, nsLoopFiles, cnameLoopFiles :: [FilePath]
-dnameLoopEmptyFiles, dnameLoopNonEmptyFiles :: [FilePath]
-partiallySignedNsec3Files, partiallySignedNsec3OOFiles, signedNsec3Files, signedNsFiles, signedTxtFiles, signedWildcardFiles :: [FilePath]
-baseFiles =
-  [ "examples/cname/base/ns.com."
-  , "examples/cname/base/ns.b.com." ]
+wc :: Maybe a
+wc = Nothing
 
-newFiles = ["examples/cname/new/ns.com."]
+gr :: a -> Maybe a
+gr = Just
 
-brokenFiles = ["examples/cname/broken/ns.com."]
+validate :: Maybe Term
+validate = Just top
 
-partiallySignedFiles =
-  [ "examples/cname/partially-signed/ns.com."
-  , "examples/cname/partially-signed/ns.b.com." ]
+noValidate :: Maybe Term
+noValidate = Just bot
 
-signedFiles =
-  [ "examples/cname/signed/ns.com."
-  , "examples/cname/signed/ns.b.com." ]
+ad0 :: Maybe Term
+ad0 = Just $ ad 0
 
-signedNewFiles = ["examples/cname/signed-new/ns.com."]
+ad1 :: Maybe Term
+ad1 = Just $ ad 1
 
-signedNonZoneKeyFiles =
-  [ "examples/cname/signed-non-zone-key/ns.com."
-  , "examples/cname/signed-non-zone-key/ns.b.com." ]
+cnameBase :: ExampleConfig
+cnameBase =
+  ExampleConfig
+    "cname/base"
+    "/dev/null"
+    com
+    ["ns.com.", "ns.b.com."]
+    [ query wc wc wc wc wc
+    , query wc (gr RT.A) (gr aCom) noValidate ad0
+    , query (gr com) wc (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.A) wc noValidate ad0
+    , query (gr com) (gr RT.A) (gr aCom) wc ad0
+    , query (gr com) (gr RT.A) (gr aCom) noValidate wc
+    , query (gr com) (gr RT.A) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.A) (gr bCom) noValidate ad0
+    , query (gr com) (gr RT.CNAME) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.NS) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.NS) (gr bCom) noValidate ad0
+    , query (gr com) (gr RT.SOA) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.SOA) (gr bCom) noValidate ad0
+    , query (gr bCom) (gr RT.A) (gr bCom) noValidate ad0 ]
+    [ query (gr com) (gr RT.TXT) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.A) (gr aCom) validate ad1
+    , query (gr com) (gr RT.A) (gr bCom) validate ad1
+    , query (gr com) (gr RT.CNAME) (gr aCom) validate ad1
+    , query (gr com) (gr RT.NS) (gr bCom) validate ad1
+    , query (gr bCom) (gr RT.A) (gr bCom) validate ad1
+    , query (gr com) (gr RT.NS) (gr com) validate ad1
+    , query (gr bCom) (gr RT.NS) (gr bCom) validate ad1 ]
 
-partiallySignedNsec3Files =
-  [ "examples/cname/partially-signed-nsec3/ns.com."
-  , "examples/cname/partially-signed-nsec3/ns.b.com." ]
+cnameNew :: ExampleConfig
+cnameNew =
+  ExampleConfig
+    "cname/new"
+    "/dev/null"
+    com
+    ["ns.com."]
+    [ query (gr com) (gr RT.A) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.A) (gr bCom) noValidate ad0
+    , query (gr com) (gr RT.A) (gr nsBCom) noValidate ad0
+    , query (gr com) (gr RT.SOA) (gr com) noValidate ad0 ]
+    [ query (gr com) (gr RT.CNAME) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.NS) (gr bCom) noValidate ad0
+    , query (gr com) (gr RT.NS) (gr com) validate ad1 ]
 
-partiallySignedNsec3OOFiles =
-  [ "examples/cname/partially-signed-nsec3-oo/ns.com."
-  , "examples/cname/partially-signed-nsec3-oo/ns.b.com." ]
+cnameBroken :: ExampleConfig
+cnameBroken =
+  ExampleConfig
+    "cname/broken"
+    "/dev/null"
+    com
+    ["ns.com."]
+    [ query (gr com) (gr RT.CNAME) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.SOA) (gr com) noValidate ad0 ]
+    [ query (gr com) (gr RT.A) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.A) (gr bCom) noValidate ad0
+    , query (gr com) (gr RT.NS) (gr bCom) noValidate ad0
+    , query (gr com) (gr RT.NS) (gr com) validate ad1 ]
 
-signedNsec3Files =
-  [ "examples/cname/signed-nsec3/ns.com."
-  , "examples/cname/signed-nsec3/ns.b.com." ]
+cnamePartiallySigned :: ExampleConfig
+cnamePartiallySigned =
+  ExampleConfig
+    "cname/partially-signed"
+    "dsset-com."
+    com
+    ["ns.com.", "ns.b.com."]
+    [ query (gr com) (gr RT.A) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.A) (gr bCom) noValidate ad0
+    , query (gr com) (gr RT.CNAME) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.DNSKEY) (gr com) noValidate ad0
+    , query (gr com) (gr RT.NSEC) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.A) (gr bCom) validate ad0
+    , query (gr com) (gr RT.A) (gr nsBCom) validate ad0 ]
+    [ query (gr com) (gr RT.TXT) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.A) (gr bCom) validate ad1
+    , query (gr com) (gr RT.A) (gr nsBCom) validate ad1
+    , query (gr com) (gr RT.DS) (gr bCom) validate ad1
+    , query (gr bCom) (gr RT.NS) (gr bCom) validate ad1 ]
 
-signedNsFiles = ["examples/dnssec/ns/example."]
+cnameSigned :: ExampleConfig
+cnameSigned =
+  ExampleConfig
+    "cname/signed"
+    "dsset-com."
+    com
+    ["ns.com.", "ns.b.com."]
+    [ query (gr com) (gr RT.A) (gr bCom) validate ad1
+    , query (gr com) (gr RT.A) (gr nsBCom) validate ad1
+    , query (gr com) (gr RT.DS) (gr bCom) validate ad1
+    , query (gr com) (gr RT.A) (gr aCom) validate ad1
+    , query (gr com) (gr RT.CNAME) (gr aCom) validate ad1
+    , query (gr com) (gr RT.DNSKEY) (gr com) validate ad1
+    , query (gr com) (gr RT.DNSKEY) (gr bCom) validate ad1 ]
+    [ query (gr com) (gr RT.TXT) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.A) (gr bCom) validate ad0
+    , query (gr com) (gr RT.A) (gr nsBCom) validate ad0 ]
 
-signedTxtFiles = ["examples/dnssec/txt/ns.com."]
+cnameSignedNonZoneKey :: ExampleConfig
+cnameSignedNonZoneKey =
+  ExampleConfig
+    "cname/signed-non-zone-key"
+    "dsset-com."
+    com
+    ["ns.com.", "ns.b.com."]
+    [ query (gr com) (gr RT.A) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.A) (gr bCom) noValidate ad0
+    , query (gr com) (gr RT.CNAME) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.DNSKEY) (gr com) noValidate ad0
+    , query (gr com) (gr RT.DNSKEY) (gr bCom) noValidate ad0
+    , query (gr com) (gr RT.DS) (gr bCom) noValidate ad0 ]
+    [ query (gr com) (gr RT.TXT) (gr aCom) noValidate ad0 ]
 
-signedWildcardFiles = ["examples/dnssec/wildcard/ns.com."]
+cnamePartiallySignedNsec3 :: ExampleConfig
+cnamePartiallySignedNsec3 =
+  ExampleConfig
+    "cname/partially-signed-nsec3"
+    "dsset-com."
+    com
+    ["ns.com.", "ns.b.com."]
+    [ query (gr com) (gr RT.A) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.A) (gr bCom) noValidate ad0
+    , query (gr com) (gr RT.CNAME) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.DNSKEY) (gr com) noValidate ad0
+    , query (gr com) (gr RT.NSEC3PARAM) (gr com) noValidate ad0
+    , query (gr com) (gr RT.A) (gr bCom) validate ad0
+    , query (gr com) (gr RT.A) (gr nsBCom) validate ad0 ]
+    [ query (gr com) (gr RT.TXT) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.A) (gr bCom) validate ad1
+    , query (gr com) (gr RT.A) (gr nsBCom) validate ad1
+    , query (gr com) (gr RT.DS) (gr bCom) validate ad1
+    , query (gr bCom) (gr RT.NS) (gr bCom) validate ad1 ]
 
-selfDelegFiles = ["examples/ns/self-deleg/ns.com."]
+cnamePartiallySignedNsec3Oo :: ExampleConfig
+cnamePartiallySignedNsec3Oo =
+  ExampleConfig
+    "cname/partially-signed-nsec3-oo"
+    "dsset-com."
+    com
+    ["ns.com.", "ns.b.com."]
+    [ query (gr com) (gr RT.A) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.A) (gr bCom) noValidate ad0
+    , query (gr com) (gr RT.CNAME) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.DNSKEY) (gr com) noValidate ad0
+    , query (gr com) (gr RT.NSEC3PARAM) (gr com) noValidate ad0 ]
+    [ query (gr com) (gr RT.TXT) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.A) (gr bCom) validate ad0
+    , query (gr com) (gr RT.A) (gr nsBCom) validate ad0
+    , query (gr com) (gr RT.A) (gr bCom) validate ad1
+    , query (gr com) (gr RT.A) (gr nsBCom) validate ad1
+    , query (gr com) (gr RT.DS) (gr bCom) validate ad1
+    , query (gr bCom) (gr RT.NS) (gr bCom) validate ad1 ]
 
-subSelfDelegFiles =
-  [ "examples/ns/sub-self-deleg/root.net."
-  , "examples/ns/sub-self-deleg/ns.net." ]
+cnameSignedNsec3 :: ExampleConfig
+cnameSignedNsec3 =
+  ExampleConfig
+    "cname/signed-nsec3"
+    "dsset-com."
+    com
+    ["ns.com.", "ns.b.com."]
+    [ query (gr com) (gr RT.A) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.A) (gr bCom) noValidate ad0
+    , query (gr com) (gr RT.CNAME) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.DNSKEY) (gr com) noValidate ad0
+    , query (gr com) (gr RT.DNSKEY) (gr bCom) noValidate ad0
+    , query (gr com) (gr RT.DS) (gr bCom) noValidate ad0
+    , query (gr com) (gr RT.NSEC3PARAM) (gr com) noValidate ad0
+    , query (gr com) (gr RT.A) (gr bCom) validate ad1
+    , query (gr com) (gr RT.A) (gr nsBCom) validate ad1
+    , query (gr com) (gr RT.DS) (gr bCom) validate ad1
+    , query (gr com) (gr RT.A) (gr aCom) validate ad1
+    , query (gr com) (gr RT.CNAME) (gr aCom) validate ad1
+    , query (gr com) (gr RT.DNSKEY) (gr com) validate ad1
+    , query (gr com) (gr RT.DNSKEY) (gr bCom) validate ad1 ]
+    [ query (gr com) (gr RT.TXT) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.A) (gr bCom) validate ad0
+    , query (gr com) (gr RT.A) (gr nsBCom) validate ad0 ]
 
-nsLoopFiles =
-  [ "examples/ns/loop/ns.com."
-  , "examples/ns/loop/root.net." ]
+dnssecNs :: ExampleConfig
+dnssecNs =
+  ExampleConfig
+    "dnssec/ns"
+    "dsset-example."
+    exampleZone
+    ["example."]
+    [ query (gr exampleZone) (gr RT.NS) (gr exampleZone) noValidate ad0
+    , query (gr exampleZone) (gr RT.NS) (gr exampleZone) validate ad1 ]
+    []
 
-cnameLoopFiles = ["examples/cname/loop/ns.com."]
+nsSelfDeleg :: ExampleConfig
+nsSelfDeleg =
+  ExampleConfig
+    "ns/self-deleg"
+    "/dev/null"
+    com
+    ["ns.com."]
+    [ query (gr com) (gr RT.NS) (gr com) noValidate ad0
+    , query (gr com) (gr RT.SOA) (gr com) noValidate ad0
+    , query (gr com) (gr RT.A) (gr nsCom) noValidate ad0
+    , query (gr com) (gr RT.NS) (gr subACom) noValidate ad0
+    , query (gr com) (gr RT.SOA) (gr subACom) noValidate ad0
+    , query (gr com) (gr RT.A) (gr subACom) noValidate ad0 ]
+    [ query (gr com) (gr RT.TXT) (gr subACom) noValidate ad0
+    , query (gr com) (gr RT.NS) (gr com) validate ad1
+    , query (gr subACom) (gr RT.NS) (gr subACom) validate ad1 ]
 
-dnameLoopEmptyFiles = ["examples/dname/loop-empty/ns.net."]
+nsSubSelfDeleg :: ExampleConfig
+nsSubSelfDeleg =
+  ExampleConfig
+    "ns/sub-self-deleg"
+    "/dev/null"
+    dnsRoot
+    ["root.net.", "ns.net."]
+    [ query (gr dnsRoot) (gr RT.NS) (gr dnsRoot) noValidate ad0
+    , query (gr dnsRoot) (gr RT.SOA) (gr dnsRoot) noValidate ad0
+    , query (gr dnsRoot) (gr RT.NS) (gr net) noValidate ad0
+    , query (gr dnsRoot) (gr RT.A) (gr nsNet) noValidate ad0
+    , query (gr net) (gr RT.NS) (gr net) noValidate ad0
+    , query (gr net) (gr RT.SOA) (gr net) noValidate ad0
+    , query (gr net) (gr RT.NS) (gr rootNet) noValidate ad0
+    , query (gr net) (gr RT.A) (gr rootNet) noValidate ad0
+    , query (gr dnsRoot) (gr RT.NS) (gr rootNet) noValidate ad0
+    , query (gr dnsRoot) (gr RT.SOA) (gr rootNet) noValidate ad0
+    , query (gr dnsRoot) (gr RT.A) (gr rootNet) noValidate ad0
+    , query (gr net) (gr RT.A) (gr subRootNet) noValidate ad0 ]
+    [ query (gr dnsRoot) (gr RT.TXT) (gr subRootNet) noValidate ad0
+    , query (gr dnsRoot) (gr RT.NS) (gr dnsRoot) validate ad1
+    , query (gr net) (gr RT.NS) (gr net) validate ad1
+    , query (gr rootNet) (gr RT.NS) (gr rootNet) validate ad1 ]
 
-dnameLoopNonEmptyFiles = ["examples/dname/loop-non-empty/ns.net."]
+dnameLoopNonEmpty :: ExampleConfig
+dnameLoopNonEmpty =
+  ExampleConfig
+    "dname/loop-non-empty"
+    "/dev/null"
+    com
+    ["ns.net."]
+    [ query (gr com) (gr RT.TXT) (gr aSubSubSubCom) noValidate ad0 ]
+    [ query (gr com) (gr RT.NS) (gr com) validate ad1 ]
 
-data Query = Query (Name String) RT.Type (Name String)
-  deriving Eq
+cnameSignedNew :: ExampleConfig
+cnameSignedNew =
+  ExampleConfig
+    "cname/signed-new" "dsset-com." com ["ns.com."]
+    [ query (gr com) (gr RT.A) (gr aCom) validate ad1
+    , query (gr com) (gr RT.A) (gr bCom) validate ad1
+    , query (gr com) (gr RT.A) (gr nsBCom) validate ad1
+    , query (gr com) (gr RT.DNSKEY) (gr com) validate ad1 ]
+    -- The wildcard cannot synthesize an answer at an existing owner.
+    [ query (gr com) (gr RT.A) (gr com) noValidate ad0 ]
 
-instance Show Query where
-  show (Query zone rtype qname) =
-    "query " ++ show rtype ++ " " ++ show qname ++ " from zone " ++ show zone
+dnssecTxt :: ExampleConfig
+dnssecTxt =
+  ExampleConfig
+    "dnssec/txt" "dsset-com." com ["ns.com."]
+    [ query (gr com) (gr RT.TXT) (gr com) validate ad1 ]
+    []
 
-data Resolution = Resolution Query Term Term
-  deriving Eq
+dnssecWildcard :: ExampleConfig
+dnssecWildcard =
+  ExampleConfig
+    "dnssec/wildcard" "dsset-com." com ["ns.com."]
+    [ query (gr com) (gr RT.A) (gr aCom) validate ad1
+    , query (gr com) (gr RT.A) (gr xWildcardCom) validate ad1 ]
+    [ query (gr com) (gr RT.A) (gr com) noValidate ad0 ]
 
-instance Show Resolution where
-  show (Resolution query verification auth) =
-    show query ++ " with verified=" ++ show verification ++ " and auth=" ++ show auth
+nsLoop :: ExampleConfig
+nsLoop =
+  ExampleConfig
+    "ns/loop" "/dev/null" dnsRoot ["ns.com.", "root.net."]
+    []
+    [ query (gr dnsRoot) (gr RT.A) (gr aCom) noValidate ad0
+    , query (gr dnsRoot) (gr RT.NS) (gr dnsRoot) validate ad1 ]
 
-authenticated :: Name String -> RT.Type -> Name String -> Resolution
-authenticated ns rtype qname =
-  Resolution (Query ns rtype qname) top (ad 1)
+cnameLoop :: ExampleConfig
+cnameLoop =
+  ExampleConfig
+    "cname/loop" "/dev/null" com ["ns.com."]
+    [ query (gr com) (gr RT.CNAME) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.CNAME) (gr bCom) noValidate ad0]
+    [ query (gr com) (gr RT.A) (gr aCom) noValidate ad0
+    , query (gr com) (gr RT.A) (gr bCom) noValidate ad0
+    , query (gr com) (gr RT.NS) (gr com) validate ad1 ]
 
-authenticatedUnsigned :: Name String -> RT.Type -> Name String -> Resolution
-authenticatedUnsigned ns rtype qname =
-  Resolution (Query ns rtype qname) top (ad 0)
-
-dnsRoot, com, net, exampleZone, aCom, bCom, aaCom, subACom, aSubSubSubCom, exampleCom, xWildcardCom :: Name String
+dnameLoopEmpty :: ExampleConfig
+dnameLoopEmpty =
+  ExampleConfig
+    "dname/loop-empty" "/dev/null" com ["ns.net."]
+    [ query (gr com) (gr RT.DNAME) (gr aaCom) noValidate ad0
+    , query (gr com) (gr RT.DNAME) (gr bCom) noValidate ad0
+    , query (gr com) (gr RT.NS) (gr com) noValidate ad0
+    , query (gr com) (gr RT.SOA) (gr com) noValidate ad0 ]
+    [ query (gr com) (gr RT.A) (gr aaCom) noValidate ad0
+    , query (gr com) (gr RT.A) (gr bCom) noValidate ad0
+    , query (gr com) (gr RT.NS) (gr com) validate ad1 ]
+dnsRoot, com, net, exampleZone, aCom, bCom, aaCom, subACom, aSubSubSubCom, xWildcardCom :: Name String
 rootNet, subRootNet, nsCom, nsBCom, nsNet :: Name String
 dnsRoot = root
 com = mkName ["com", ""]
@@ -391,7 +412,6 @@ bCom = mkName ["b", "com", ""]
 aaCom = mkName ["a", "a", "com", ""]
 subACom = mkName ["sub", "a", "com", ""]
 aSubSubSubCom = mkName ["a", "sub", "sub", "sub", "com", ""]
-exampleCom = mkName ["example", "com", ""]
 xWildcardCom = mkName ["x", "*", "com", ""]
 rootNet = mkName ["root", "net", ""]
 subRootNet = mkName ["sub", "root", "net", ""]
@@ -399,160 +419,41 @@ nsCom = mkName ["ns", "com", ""]
 nsBCom = mkName ["ns", "b", "com", ""]
 nsNet = mkName ["ns", "net", ""]
 
-exampleFileTest :: ExampleFile -> TestTree
-exampleFileTest example =
-  testCase (examplePath example) $ do
-    config <- loadZones [examplePath example]
-    map zoneName config
-      @?= map compileName (expectedZones example)
-
 exampleConfigTest :: ExampleConfig -> TestTree
-exampleConfigTest example =
-  testCase (configName example) $ do
-    results <- resolvableQueries (configFiles example)
-    assertQueries
-      (configFiles example)
-      results
-      (expectedQueries example)
-      (unexpectedQueries example)
+exampleConfigTest config = withResource (resolvableQueries config) (const $ return ()) $ \consequences ->
+  testGroup (configName config)
+    [ testCase ((if expected then "has solution: " else "has no solution: ") ++ show term)
+        (consequences >>= assertMatch expected term)
+    | (expected, terms) <- [(True, expectedQueries config), (False, unexpectedQueries config)]
+    , term <- terms
+    ]
 
-misconfigurationLoopTest :: [FilePath] -> [Query] -> [Query] -> Assertion
-misconfigurationLoopTest files expected unexpected = do
-  results <- resolvableQueries files
-  assertQueries files results expected unexpected
-
-exactResolutionTest :: [FilePath] -> [Term] -> Assertion
-exactResolutionTest files expected = do
-  results <- resolvableQueries files
-  forM_ expected $ \resolution ->
-    assertBool
-      (show resolution ++ " was not resolvable for zones:\n" ++ showZoneFiles files)
-      (any (coversTerm resolution) results)
-
-authenticatedResolutionTest :: [FilePath] -> Assertion
-authenticatedResolutionTest files = do
-  results <- resolvableQueries files
-  assertResolutions files results
-    [ authenticated com RT.A aCom
-    , authenticated com RT.A bCom
-    , authenticated com RT.A nsBCom
-    , authenticated com RT.CNAME aCom
-    , authenticated com RT.DNSKEY com
-    , authenticated com RT.DNSKEY bCom
-    , authenticated com RT.DS bCom ]
-    []
-
-authenticatedWildcardResolutionTest :: [FilePath] -> Assertion
-authenticatedWildcardResolutionTest files = do
-  results <- resolvableQueries files
-  assertResolutions files results
-    [ authenticated com RT.A aCom
-    , authenticated com RT.A bCom
-    , authenticated com RT.A nsBCom
-    , authenticated com RT.DNSKEY com ]
-    []
-
-authenticatedUnsignedDelegationTest :: [FilePath] -> Assertion
-authenticatedUnsignedDelegationTest files = do
-  results <- resolvableQueries files
-  assertResolutions files results
-    [ authenticatedUnsigned com RT.A bCom
-    , authenticatedUnsigned com RT.A nsBCom ]
-    [ authenticated com RT.A bCom
-    , authenticated com RT.A nsBCom
-    , authenticated com RT.DS bCom ]
-
-signedDelegationDoesNotUseUnsignedProofTest :: [FilePath] -> Assertion
-signedDelegationDoesNotUseUnsignedProofTest files = do
-  results <- resolvableQueries files
-  assertResolutions files results
-    [ authenticated com RT.A bCom
-    , authenticated com RT.A nsBCom
-    , authenticated com RT.DS bCom ]
-    [ authenticatedUnsigned com RT.A bCom
-    , authenticatedUnsigned com RT.A nsBCom ]
-
-doesNotAuthenticateUnsignedDelegationTest :: [FilePath] -> Assertion
-doesNotAuthenticateUnsignedDelegationTest files = do
-  results <- resolvableQueries files
-  assertResolutions files results []
-    [ authenticatedUnsigned com RT.A bCom
-    , authenticatedUnsigned com RT.A nsBCom
-    , authenticated com RT.A bCom
-    , authenticated com RT.A nsBCom
-    , authenticated com RT.DS bCom ]
-
-regressionTest :: [FilePath] -> [Query] -> [Query] -> Assertion
-regressionTest newConfig expected unexpected = do
-  (oldRoots, oldKeys, oldZones) <- loadConfig baseFiles
-  (newRoots, newKeys, newZones) <- loadConfig newConfig
-  regressions <- failLeft $
-    runFresh $
-      runExceptT $
-        do
-          oldRules <- compileConfig oldRoots oldKeys oldZones
-          newRules <- compileConfig newRoots newKeys newZones
-          computeRegressions oldRules newRules
-  assertResolvableQueries (baseFiles ++ newConfig) regressions expected unexpected
-
-assertQueries :: [FilePath] -> S.Set Fact -> [Query] -> [Query] -> Assertion
-assertQueries = assertQueriesWith queryTerm
-
-assertResolvableQueries :: [FilePath] -> S.Set Fact -> [Query] -> [Query] -> Assertion
-assertResolvableQueries = assertQueriesWith resolvableQueryTerm
-
-assertQueriesWith :: (Query -> Term) -> [FilePath] -> S.Set Fact -> [Query] -> [Query] -> Assertion
-assertQueriesWith toTerm files results expected unexpected = do
-  forM_ expected $ \query ->
-    assertBool
-      (show query ++ " was not resolvable for zones:\n" ++ showZoneFiles files)
-      (any (coversTerm (toTerm query)) results)
-  forM_ unexpected $ \query ->
-    assertBool
-      (show query ++ " was wrongly resolvable for zones:\n" ++ showZoneFiles files)
-      (not (any (coversTerm (toTerm query)) results))
-
-assertResolutions :: [FilePath] -> S.Set Fact -> [Resolution] -> [Resolution] -> Assertion
-assertResolutions files results expected unexpected = do
-  forM_ expected $ \resolution ->
-    assertBool
-      (show resolution ++ " was not resolvable for zones:\n" ++ showZoneFiles files)
-      (any (coversResolution resolution) results)
-  forM_ unexpected $ \resolution ->
-    assertBool
-      (show resolution ++ " was wrongly resolvable for zones:\n" ++ showZoneFiles files)
-      (not (any (coversResolution resolution) results))
-
-showZoneFiles :: [FilePath] -> String
-showZoneFiles = unlines . map ("  " ++)
-
-coversResolution :: Resolution -> Fact -> Bool
-coversResolution = coversTerm . resolutionTerm
+assertMatch :: Bool -> Term -> S.Set Fact -> Assertion
+assertMatch expected term facts =
+  assertBool (show term ++ if expected then " had no matching fact" else " unexpectedly matched a fact")
+    (any (coversTerm term) facts == expected)
 
 coversTerm :: Term -> Fact -> Bool
-coversTerm expected (Fact actual constraints) =
-  isJust $ do
-    u <- U.unify actual expected
-    Store.solve $ Store.simplify $ U.apply u constraints
+coversTerm t f = maybe False fst $ (`runFreshT` 0) $ do
+  (expected, _) <- away t
+  Fact actual constraints <- awayF f
+  u <- lift $ U.unify actual expected
+  return $ fromMaybe False $ Store.solve (Store.simplify (U.apply u constraints))
 
-queryTerm :: Query -> Term
-queryTerm (Query zone rtype qname) = runFresh $ do
+query :: Maybe (Name String) -> Maybe RT.Type -> Maybe (Name String) -> Maybe Term -> Maybe Term -> Term
+query mZone mRtype mQname mVerification mAuth = runFresh $ do
   servers <- wildcard
-  (wc1, wc2, wc3) <- wildcards3
-  return $ resolves servers (ttypeTerm rtype) (nameTerm zone) (nameTerm qname) wc1 wc2 wc3
+  zone <- maybe wildcard (return . nameTerm) mZone
+  rtype <- maybe wildcard (return . ttypeTerm) mRtype
+  qname <- maybe wildcard (return . nameTerm) mQname
+  dat <- wildcard
+  ver <- maybe wildcard return mVerification
+  auth <- maybe wildcard return mAuth
+  return $ resolves servers rtype zone qname dat ver auth
 
-resolvableQueryTerm :: Query -> Term
-resolvableQueryTerm (Query zone rtype qname) = runFresh $ resolvable (nameTerm zone) (ttypeTerm rtype) (nameTerm qname) <$> wildcard <*> wildcard
-
-resolutionTerm :: Resolution -> Term
-resolutionTerm (Resolution (Query zone rtype qname) verification auth) = runFresh $ do
-  servers <- wildcard
-  wc <- wildcard
-  return $ resolves servers (ttypeTerm rtype) (nameTerm zone) (nameTerm qname) wc verification auth
-
-resolvableQueries :: [FilePath] -> IO (S.Set Fact)
-resolvableQueries files = do
-  (roots, keys, zones) <- loadConfig files
+resolvableQueries :: ExampleConfig -> IO (S.Set Fact)
+resolvableQueries config = do
+  (roots, keys, zones) <- loadConfig config
   failLeft $ runFresh $ runExceptT $ do
     rules <- compileConfig roots keys zones
     lift $ immediateConsequences rules
@@ -560,15 +461,21 @@ resolvableQueries files = do
 loadZones :: [FilePath] -> IO [Zone ConstrainedLabel]
 loadZones files = concatMap splitZone <$> parseZoneFiles (concatMap zoneWellformed . splitZone) files
 
-loadConfig :: [FilePath] -> IO (Name String, [RRSet String], [Zone ConstrainedLabel])
-loadConfig files = do
-  cfg <- loadZones files
-  roots <- case cfg of
-    zone : _ -> return (toStringName $ zoneName zone)
-    _ -> fail "configuration has no starting zones"
-  keys <- concat <$> mapM loadKeys (nub $ map takeDirectory files)
-  return (roots, keys, cfg)
+loadConfig :: ExampleConfig -> IO (Name String, [RRSet String], [Zone ConstrainedLabel])
+loadConfig config = do
+  zones <- loadZones (map (directory </>) (configFiles config))
+  keys <- parseDS (directory </> configRootDS config)
+  return (configRootZone config, keys, zones)
   where
-    loadKeys directory = do
-      paths <- filter ("dsset-" `isPrefixOf`) . sort <$> listDirectory directory
-      concat <$> mapM (parseDS . (directory </>)) paths
+    directory = "examples" </> configName config
+
+regressionTest :: ExampleConfig -> [Term] -> [Term] -> Assertion
+regressionTest newConfig expected unexpected = do
+  (oldRoots, oldKeys, oldZones) <- loadConfig cnameBase
+  (newRoots, newKeys, newZones) <- loadConfig newConfig
+  regressions <- failLeft $ runFresh $ runExceptT $ do
+    oldRules <- compileConfig oldRoots oldKeys oldZones
+    newRules <- compileConfig newRoots newKeys newZones
+    computeRegressions oldRules newRules
+  forM_ expected $ \term -> assertMatch True term regressions
+  forM_ unexpected $ \term -> assertMatch False term regressions
