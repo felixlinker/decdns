@@ -187,8 +187,8 @@ nsAddrs :: Name String -> ZoneCache -> [IP]
 nsAddrs n zc = M.findWithDefault [] n (knownAddresses zc)
 
 goalToQueries :: OnlineGoal -> [Query]
-goalToQueries (Goal [] _ _) = []
-goalToQueries (Goal (h:_) _ _) = case toView h of
+goalToQueries (Goal _ [] _) = []
+goalToQueries (Goal _ (h:_) _) = case toView h of
   TVResolves r -> snub $ mapMaybe
     (\ns -> maybeExcept $ Query origin <$> ((,,) <$> asName ns <*> asTType (resolvesQType r) <*> asName (resolvesQName r)))
     nses

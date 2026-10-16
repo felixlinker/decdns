@@ -58,14 +58,13 @@ failed = liftFailures . St.modify . S.insert . canonicalGoal
 
 type Limits k = M.Map k Int
 
--- | The remaining rule budgets belong to this search branch.
-data Goal k a = Goal a (Limits k) Store.ConstraintStore
+data Goal v a = Goal v a Store.ConstraintStore
   deriving (Eq, Ord)
 
-type SLDGoal k = Goal k [Term]
+type SLDGoal k = Goal (Limits k) [Term]
 
 finished :: Foldable f => Goal k (f a) -> Bool
-finished (Goal gs _ _) = null gs
+finished (Goal _ gs _) = null gs
 
 checkLimits :: Ord k => k -> Limits k -> Maybe (Limits k)
 checkLimits ann ls = do
@@ -73,28 +72,28 @@ checkLimits ann ls = do
   return $ M.adjust (subtract 1) ann ls
 
 instance Apply a => Apply (Goal k a) where
-  apply u (Goal ts limits st) = Goal (apply u ts) limits (apply u st)
+  apply u (Goal limits ts st) = Goal limits (apply u ts) (apply u st)
 
 instance Show (SLDGoal k) where
-  show (Goal a _ st) = ":- " ++ intercalate ", " (map show $ a ++ Store.toBody st) ++ "."
+  show (Goal _ a st) = ":- " ++ intercalate ", " (map show $ a ++ Store.toBody st) ++ "."
 
 instance Functor (Goal k) where
-  fmap f (Goal as st limits) = Goal (f as) st limits
+  fmap f (Goal limits as st) = Goal limits (f as) st
 
 goal :: Limits k -> Term -> (SLDGoal k, Unifier)
-goal limits g0 = (Goal [g0] limits Store.empty, termIdentity g0)
+goal limits g0 = (Goal limits [g0] Store.empty, termIdentity g0)
 
 awayG :: Monad m => SLDGoal k -> FreshT m (SLDGoal k, Unifier)
-awayG (Goal ts limits st) = do
+awayG (Goal limits ts st) = do
   (ts', u) <- awayT ts
-  return (Goal ts' limits (apply u st), u)
+  return (Goal limits ts' (apply u st), u)
 
 canonicalGoal :: SLDGoal k -> SLDGoal k
 canonicalGoal g = fst $ runFresh $ awayG g
 
 resolution :: (Monad m, Ord a) => [Rule a] -> SLDGoal a -> Unifier -> RSolver a m [(SLDGoal a, Unifier)]
-resolution _ g@(Goal [] _ _) u = return [(g, u)]
-resolution rs g@(Goal (p:_) _ _) u = do
+resolution _ g@(Goal _ [] _) u = return [(g, u)]
+resolution rs g@(Goal _ (p:_) _) u = do
   gs <- catMaybes <$> mapM (uncurry simplify) (resolutionStep rs g)
   when (null gs && isResolves p) (failed g)
   return gs
@@ -104,23 +103,24 @@ resolution rs g@(Goal (p:_) _ _) u = do
       st' <- getSolved <$> Store.simplifyCached st
       return $ (, u ~> u') . Goal ts limits <$> st'
 
-resolutionStep :: Ord k => [Rule k] -> SLDGoal k -> [(SLDGoal k, Unifier)]
-resolutionStep _ g@(Goal [] _ _) = [(g, identity)]
-resolutionStep rs (Goal (p:t) limits st) = case toView p of
+resolutionStep :: forall k. Ord k => [Rule k] -> SLDGoal k -> [(SLDGoal k, Unifier)]
+resolutionStep _ g@(Goal _ [] _) = [(g, identity)]
+resolutionStep rs (Goal limits (p:t) st) = case toView p of
   TVMember x l -> do
     l' <- maybeToList $ collectList l
     u <- mapMaybe (unify x) l'
-    return (apply u (Goal t limits st), u)
+    return (apply u (Goal limits t st), u)
   _ -> mapMaybe unifyRule rs
   where
+    unifyRule :: Rule k -> Maybe (SLDGoal k, Unifier)
     unifyRule (Rule annotation h b) = do
       let (stR, b') = Store.partitionConstraints b
       u <- unify p h
       limits' <- checkLimits annotation limits
-      return (apply u (Goal (b' ++ t) limits' (stR <> st)), u)
+      return (apply u (Goal limits' (b' ++ t) (stR <> st)), u)
 
 sld :: (Monad m, Ord k) => [Rule k] -> SLDGoal k -> Unifier -> RSolver k m ([Unifier], [(SLDGoal k, Unifier)])
-sld _ (Goal [] _ _) u = return ([u], [])
+sld _ (Goal _ [] _) u = return ([u], [])
 sld rs g u = do
   (g', u') <- lift $ awayG g
   gs <- whenNotFailed g $ resolution rs g' (u ~> u')

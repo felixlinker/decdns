@@ -18,7 +18,9 @@ import Resolvable.Prolog.Core
 import Resolvable.Resolution
 import Resolvable.Unification (Unifier, apply)
 
-type SolverF m a = [Rule ()] -> Goal () [Term] -> Unifier -> RSolver () m a
+type StubLimits = M.Map () Int
+
+type SolverF m a = [Rule ()] -> Goal StubLimits [Term] -> Unifier -> RSolver () m a
 
 stubSLD :: Monad m => SolverF m a -> Maybe Int -> [Rule ()] -> Term -> m a
 stubSLD sldF limits kb g =
