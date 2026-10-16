@@ -34,8 +34,7 @@ main = do
   defaultMain $
     testGroup
       "dns-regressor"
-      [ QueryingSpec.tests
-      , UnificationSpec.tests
+      [ UnificationSpec.tests
       , PrologCoreSpec.tests
       , ResolvabilitySpec.tests
       , DisunificationSpec.tests
@@ -59,4 +58,5 @@ main = do
       , FreshSpec.tests
       , FixpointSpec.tests
       , ResolutionSpec.tests
+      , QueryingSpec.tests
       ]
