@@ -1,0 +1,7 @@
+$ORIGIN c.de.
+$TTL 1200
+@ IN SOA ns.c.de. example.de. 2026010101 0 0 0 0
+@ IN NS ns.c.de.
+
+@ IN TXT "hello"
+ns IN A 1.2.3.4
