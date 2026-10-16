@@ -85,7 +85,7 @@ type RuleBase = Ex.ExceptT String (St.StateT QueryState IO)
 
 type OnlineSolver a = RSolver (Maybe T.Type) RuleBase a
 
-type OnlineGoal = SLDGoal (Maybe T.Type)
+type OnlineGoal = BoundedGoal (Maybe T.Type)
 
 runOnlineSolverT :: QueryState -> OnlineSolver a -> IO (Either String a, [Query], [Z.Zone String])
 runOnlineSolverT qst0 slv =
