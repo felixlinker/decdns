@@ -26,39 +26,36 @@ main = do
   (cmd, args) <- popArg =<< getArgs
   case cmd of
     "pl-resolvable" -> do
-      keysPath:args' <- return args
+      keysPath:rootZ:zones <- return args
       keys <- parseDS keysPath
-      (roots, zones) <- sepBy "--" args'
-      rootServers <- parseNames roots
+      rootZoneName <- parseNameM rootZ
       cfg <- parseZones zones
-      putStr (showKnowledgeBase $ S.toList $ runFresh $ compileConfig rootServers keys cfg)
+      rules <- failLeftS $ runFresh $ runExceptT $ compileConfig rootZoneName keys cfg
+      putStr (showKnowledgeBase $ S.toList rules)
     "resolves" -> do
-      keysPath:args' <- return args
+      keysPath:rootZ:zones <- return args
       keys <- parseDS keysPath
-      (roots, zones) <- sepBy "--" args'
-      rootServers <- parseNames roots
+      rootZoneName <- parseNameM rootZ
       cfg <- parseZones zones
-      let res = runFresh $ immediateConsequences =<< compileConfig rootServers keys cfg
+      res <- failLeftS $ runFresh $ runExceptT $ compileConfig rootZoneName keys cfg >>= lift . immediateConsequences
       putStrLn $ showKnowledgeBase $ map toRule $ S.toList res
     "resolvable" -> do
-      keysPath:args' <- return args
+      keysPath:rootZ:zones <- return args
       keys <- parseDS keysPath
-      (roots, zones) <- sepBy "--" args'
-      rootServers <- parseNames roots
+      rootZoneName <- parseNameM rootZ
       cfg <- parseZones zones
-      let res = runFresh $ immediateConsequences =<< compileConfig rootServers keys cfg
+      res <- failLeftS $ runFresh $ runExceptT $ compileConfig rootZoneName keys cfg >>= lift . immediateConsequences
       putStrLn $ showKnowledgeBase $ mapMaybe (fmap toRule . resolvableQuery) $ S.toList res
     "regressions" -> do
-      keysPath:args' <- return args
+      keysPath:rootZ:args' <- return args
       keys <- parseDS keysPath
-      (sroots, args'') <- sepBy "--" args'
-      roots <- parseNames sroots
-      (old, new) <- sepBy "--" args''
+      rootZoneName <- parseNameM rootZ
+      (old, new) <- sepBy "--" args'
       oldRecs <- parseZones old
       newRecs <- parseZones new
       regs <- failLeftS $ runFresh $ runExceptT $ do
-        oldRecsC <- lift $ compileConfig roots keys oldRecs
-        newRecsC <- lift $ compileConfig roots keys newRecs
+        oldRecsC <- compileConfig rootZoneName keys oldRecs
+        newRecsC <- compileConfig rootZoneName keys newRecs
         computeRegressions oldRecsC newRecsC
       mapM_ print $ S.map toRule regs
     "parse-only" -> do

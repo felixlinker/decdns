@@ -122,8 +122,9 @@ getRules = do
   let dat = dnsData qst
       rootNSes = nameServers root dat
       zones = map compileWildcardsLiteral $ cachedZones dat
-      -- Can use map monotonic because rule ordering ignores annotation
-      rs = S.mapMonotonic annot $ runFresh $ compileConfig rootNSes (trustAnchors qst) zones
+  compiled <- either Ex.throwE return $ runFresh $ Ex.runExceptT $ compileConfig root (trustAnchors qst) zones
+  -- Can use map monotonic because rule ordering ignores annotation
+  let rs = S.mapMonotonic annot compiled
   return $ S.insert (rootRule rootNSes) rs
   where
     annot :: Rule RComp -> Rule (Maybe T.Type)

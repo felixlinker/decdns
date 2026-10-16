@@ -6,6 +6,9 @@ module Resolvable.Resolvability
   , compileRRSet
   , compileConfig ) where
 
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Except (ExceptT, throwE)
+import Data.List (find)
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as S
@@ -285,10 +288,14 @@ fromZone roots z = do
     comp :: Bool -> ConstrainedRRSet -> Fresh (S.Set (Rule RComp))
     comp = compileRRSet roots zoneNSesT (zoneName z)
 
-compileConfig :: [Name String] -> [RRSet String] -> [Zone ConstrainedLabel] -> Fresh (S.Set (Rule RComp))
-compileConfig roots dsData zones = do
-  trustedKeys <- mapM trustedKey dsData
-  rs <- mconcat <$> mapM (fromZone rootsTs) zones
+compileConfig :: Name String -> [RRSet String] -> [Zone ConstrainedLabel] -> ExceptT String Fresh (S.Set (Rule RComp))
+compileConfig rootZoneName dsData zones = do
+  roots <- maybe (throwE "no root zone data") return $ do
+    z <- find isRootZone zones
+    nsesTerm <$> apexNameServers z
+  trustedKeys <- mapM (lift . trustedKey) dsData
+  rs <- mconcat <$> mapM (lift . fromZone roots) zones
   return $ foldr S.insert rs trustedKeys
   where
-    rootsTs = maybe (error "invariant error") nsesTerm $ NE.nonEmpty roots
+    isRootZone :: Label a => Zone a -> Bool
+    isRootZone = (== rootZoneName) . canonicalName . toStringName . zoneName

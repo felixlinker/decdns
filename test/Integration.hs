@@ -4,19 +4,18 @@ import Control.Monad (forM_)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (runExceptT)
 import Data.Maybe (isJust)
-import qualified Data.List.NonEmpty as NE
 import Data.List (isPrefixOf, nub, sort)
 import qualified Data.Set as S
 import System.Directory (listDirectory)
 import System.FilePath (takeDirectory, (</>))
 
-import DNS.Name (Name, root)
+import DNS.Name (Name, root, toStringName)
 import DNS.NameSpec (mkName)
 import DNS.Record (Type (DNAME, NS, SOA))
 import DNS.RRSet (RRSet)
 import qualified DNS.RecordType as RT
 import DNS.Wellformedness (zoneWellformed)
-import DNS.Zone (apexNameServers, splitZone)
+import DNS.Zone (splitZone)
 import DNS.ZoneFile (zoneName, Zone)
 import NameConstraint (compileName, ConstrainedLabel)
 import Parsing (parseZoneFiles, parseDS)
@@ -491,8 +490,8 @@ regressionTest newConfig expected unexpected = do
     runFresh $
       runExceptT $
         do
-          oldRules <- lift $ compileConfig oldRoots oldKeys oldZones
-          newRules <- lift $ compileConfig newRoots newKeys newZones
+          oldRules <- compileConfig oldRoots oldKeys oldZones
+          newRules <- compileConfig newRoots newKeys newZones
           computeRegressions oldRules newRules
   assertResolvableQueries (baseFiles ++ newConfig) regressions expected unexpected
 
@@ -554,19 +553,19 @@ resolutionTerm (Resolution (Query zone rtype qname) verification auth) = runFres
 resolvableQueries :: [FilePath] -> IO (S.Set Fact)
 resolvableQueries files = do
   (roots, keys, zones) <- loadConfig files
-  return $ runFresh $ do
-        rules <- compileConfig roots keys zones
-        immediateConsequences rules
+  failLeft $ runFresh $ runExceptT $ do
+    rules <- compileConfig roots keys zones
+    lift $ immediateConsequences rules
 
 loadZones :: [FilePath] -> IO [Zone ConstrainedLabel]
 loadZones files = concatMap splitZone <$> parseZoneFiles (concatMap zoneWellformed . splitZone) files
 
-loadConfig :: [FilePath] -> IO ([Name String], [RRSet String], [Zone ConstrainedLabel])
+loadConfig :: [FilePath] -> IO (Name String, [RRSet String], [Zone ConstrainedLabel])
 loadConfig files = do
   cfg <- loadZones files
   roots <- case cfg of
-    zone : _ | Just servers <- apexNameServers zone -> return (NE.toList servers)
-    _ -> fail "configuration has no starting name servers"
+    zone : _ -> return (toStringName $ zoneName zone)
+    _ -> fail "configuration has no starting zones"
   keys <- concat <$> mapM loadKeys (nub $ map takeDirectory files)
   return (roots, keys, cfg)
   where
