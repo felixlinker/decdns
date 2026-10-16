@@ -1,0 +1,1 @@
+coredns -conf ./conf
