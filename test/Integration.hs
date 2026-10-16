@@ -24,14 +24,10 @@ import Resolvable.Update.Dependencies (computeRegressions)
 import qualified Resolvable.Unification as U
 import Test.Tasty (TestTree, testGroup, withResource)
 import Test.Tasty.HUnit (Assertion, assertBool, testCase, (@?=))
-import Util.Fresh (runFresh, runFreshT)
+import Util.Fresh (Fresh, runFresh, runFreshT)
 import Util.Monad (failLeft)
 import Data.Maybe (fromMaybe)
 import Resolvable.Unification (away)
-
-wc1, wc2 :: Term
-wc1 = TVar "Wildcard1"
-wc2 = TVar "Wildcard2"
 
 tests :: TestTree
 tests = testGroup "Examples"
@@ -41,17 +37,21 @@ tests = testGroup "Examples"
       forM_ results $ \(Fact _ constraints) ->
         fmap Store.toBody (getSolved (Store.simplify constraints))
           @?= Just (Store.toBody constraints)
-  , testGroup "Resolvable.Update.Dependencies"
-      [ testCase "base to new has expected unsigned regression facts" $
-          regressionTest cnameNew []
-            [ resolvable (nameTerm com) (ttypeTerm RT.A) (nameTerm aCom) wc1 wc2
-            , resolvable (nameTerm com) (ttypeTerm RT.A) (nameTerm bCom) wc1 wc2
-            , resolvable (nameTerm com) (ttypeTerm RT.A) (nameTerm nsBCom) wc1 wc2 ]
+  , testGroup "regressions"
+      [ testCase "unchanged configuration has no regressions" $
+          regressionTest cnameBase cnameBase [] [regression wc wc wc wc wc]
+      , testCase "base to new has expected unsigned regression facts" $
+          regressionTest cnameBase cnameNew []
+            [ regression (gr com) (gr RT.A) (gr aCom) wc wc
+            , regression (gr com) (gr RT.A) (gr bCom) wc wc
+            , regression (gr com) (gr RT.A) (gr nsBCom) wc wc ]
       , testCase "base to broken has expected unsigned regression facts" $
-          regressionTest cnameBroken
-            [ resolvable (nameTerm com) (ttypeTerm RT.A) (nameTerm aCom) wc1 wc2
-            , resolvable (nameTerm com) (ttypeTerm RT.A) (nameTerm bCom) wc1 wc2
-            , resolvable (nameTerm com) (ttypeTerm RT.A) (nameTerm nsBCom) wc1 wc2 ] []
+          regressionTest cnameBase cnameBroken
+            [ regression wc wc wc wc wc
+            , regression (gr com) (gr RT.A) (gr aCom) noValidate ad0
+            , regression (gr com) (gr RT.A) (gr bCom) wc wc
+            , regression (gr com) (gr RT.A) (gr nsBCom) wc wc ]
+            [ regression (gr com) (gr RT.A) (gr aCom) validate ad1 ]
       ]
   ]
 
@@ -468,13 +468,23 @@ coversTerm t f = maybe False fst $ (`runFreshT` 0) $ do
 query :: Maybe (Name String) -> Maybe RT.Type -> Maybe (Name String) -> Maybe Term -> Maybe Term -> Term
 query mZone mRtype mQname mVerification mAuth = runFresh $ do
   servers <- wildcard
+  (zone, rtype, qname, ver, auth) <- queryTerms mZone mRtype mQname mVerification mAuth
+  dat <- wildcard
+  return $ resolves servers rtype zone qname dat ver auth
+
+regression :: Maybe (Name String) -> Maybe RT.Type -> Maybe (Name String) -> Maybe Term -> Maybe Term -> Term
+regression mZone mRtype mQname mVerification mAuth = runFresh $ do
+  (zone, rtype, qname, ver, auth) <- queryTerms mZone mRtype mQname mVerification mAuth
+  return $ resolvable zone rtype qname ver auth
+
+queryTerms :: Maybe (Name String) -> Maybe RT.Type -> Maybe (Name String) -> Maybe Term -> Maybe Term -> Fresh (Term, Term, Term, Term, Term)
+queryTerms mZone mRtype mQname mVerification mAuth = do
   zone <- maybe wildcard (return . nameTerm) mZone
   rtype <- maybe wildcard (return . ttypeTerm) mRtype
   qname <- maybe wildcard (return . nameTerm) mQname
-  dat <- wildcard
   ver <- maybe wildcard return mVerification
   auth <- maybe wildcard return mAuth
-  return $ resolves servers rtype zone qname dat ver auth
+  return (zone, rtype, qname, ver, auth)
 
 resolvableQueries :: ExampleConfig -> IO (S.Set Fact)
 resolvableQueries config = do
@@ -494,9 +504,9 @@ loadConfig config = do
   where
     directory = "examples" </> configName config
 
-regressionTest :: ExampleConfig -> [Term] -> [Term] -> Assertion
-regressionTest newConfig expected unexpected = do
-  (oldRoots, oldKeys, oldZones) <- loadConfig cnameBase
+regressionTest :: ExampleConfig -> ExampleConfig -> [Term] -> [Term] -> Assertion
+regressionTest oldConfig newConfig expected unexpected = do
+  (oldRoots, oldKeys, oldZones) <- loadConfig oldConfig
   (newRoots, newKeys, newZones) <- loadConfig newConfig
   regressions <- failLeft $ runFresh $ runExceptT $ do
     oldRules <- compileConfig oldRoots oldKeys oldZones
