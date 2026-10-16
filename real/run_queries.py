@@ -12,7 +12,7 @@ REPO_DIR = REAL_DIR.parent
 QUERIES = REAL_DIR / "100k_mixed.txt"
 TOOL_OUTPUT = REAL_DIR / "tool"
 DIG_OUTPUT = REAL_DIR / "dig"
-TOOL_TIMEOUT_SECONDS = 15
+TOOL_TIMEOUT_SECONDS = 30
 
 
 def run_and_save(command: list[str], output_path: Path, timeout: int | None = None) -> None:
