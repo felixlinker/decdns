@@ -21,13 +21,14 @@ import Control.Monad.Trans.Class (lift)
 import qualified Control.Monad.Trans.State.Strict as St
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
+import Data.Bifunctor (Bifunctor(bimap), first)
+import Data.Functor.Identity (Identity(Identity, runIdentity))
 import Data.List (intercalate)
 import Data.Maybe (fromMaybe, isJust, isNothing)
 
 import Resolvable.Prolog.Core
 import Util.List (zipWithStrict)
 import Util.Fresh
-import Data.Bifunctor (Bifunctor(bimap))
 
 newtype Unifier = Unifier (M.Map Term Term)
   deriving Eq
@@ -178,5 +179,5 @@ awayT t = do
           St.modify (M.insert varName n)
           return n
 
-away :: (Traversable t) => t Term -> Fresh (t Term, Unifier)
-away = awayT
+away :: Monad m => Term -> FreshT m (Term, Unifier)
+away = fmap (first runIdentity) . awayT . Identity

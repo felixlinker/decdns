@@ -5,6 +5,7 @@ module Resolvable.Consequences
   ( ResolutionOrder
   , resolutionOrder
   , Fact(..)
+  , awayF
   , toRule
   , immediateConsequences ) where
 
@@ -13,7 +14,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (runExcept)
 import Data.Either (fromRight)
 import Data.Foldable (Foldable(foldl'))
-import Data.Functor.Identity (Identity(Identity), runIdentity)
+import Data.Functor.Identity (Identity)
 import qualified Data.Set as S
 import Data.Maybe (listToMaybe, mapMaybe, catMaybes, isJust)
 
@@ -69,7 +70,7 @@ data Fact = Fact Term Store.ConstraintStore
 
 awayF :: Monad m => Fact -> FreshT m Fact
 awayF (Fact h st) = do
-  (runIdentity -> h', u) <- awayT (Identity h)
+  (h', u) <- away h
   return $ Fact h' (apply u st)
 
 canonFact :: Fact -> Fact
