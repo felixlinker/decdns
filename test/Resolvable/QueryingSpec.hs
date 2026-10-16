@@ -19,7 +19,7 @@ liveQuery domain = do
   hints <- parseAddrs "root-addresses"
   anchors <- parseDS "root-keys"
   qn <- parseNameM domain
-  (answer, queries) <- maybe (fail "timeout") return =<< timeout 15000000 (resolveWith cfg anchors hints T.A qn)
+  (answer, queries, _) <- maybe (fail "timeout") return =<< timeout 15000000 (resolveWith cfg anchors hints T.A qn)
   case answer of
     Just (TFunctor "query" [qt, name, records, _, _]) -> do
       qt @?= ttypeTerm T.A

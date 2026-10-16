@@ -39,7 +39,7 @@ import Resolvable.Unification hiding (toList)
 import Util.Fresh
 import Util.Monad (maybeExcept, first)
 import Util.List (snub)
-import NameConstraint (compileWildcardsLiteral, ConstrainedLabel)
+import NameConstraint (compileWildcardsLiteral)
 import DNS.RRSet (RRSet)
 import DNS.ZoneFile (fromRecordList)
 import Util.Map (add, groupBy, groupByWith)
@@ -87,9 +87,12 @@ type OnlineSolver a = RSolver (Maybe T.Type) RuleBase a
 
 type OnlineGoal = SLDGoal (Maybe T.Type)
 
-runOnlineSolverT :: QueryState -> OnlineSolver a -> IO (Either String a, [Query])
-runOnlineSolverT qst =
-  fmap (fmap queried) . (`St.runStateT` qst) . Ex.runExceptT . fmap fst . runSLD
+runOnlineSolverT :: QueryState -> OnlineSolver a -> IO (Either String a, [Query], [Z.Zone String])
+runOnlineSolverT qst0 slv =
+  let solved = St.runStateT (Ex.runExceptT $ fst <$> runSLD slv) qst0
+  in do
+    (sol, qst) <- solved
+    return (sol, queried qst, cachedZones (dnsData qst))
 
 getsState :: (QueryState -> a) -> RuleBase a
 getsState = lift . St.gets
@@ -118,7 +121,7 @@ getRules = do
   qst <- lift St.get
   let dat = dnsData qst
       rootNSes = nameServers root dat
-      zones = cachedZones dat
+      zones = map compileWildcardsLiteral $ cachedZones dat
       -- Can use map monotonic because rule ordering ignores annotation
       rs = S.mapMonotonic annot $ runFresh $ compileConfig rootNSes (trustAnchors qst) zones
   return $ S.insert (rootRule rootNSes) rs
@@ -172,9 +175,9 @@ nameServers owner (ZoneCache cached) = maybe [] S.toList $ do
   unless (null rest) (error "invariant error")
   return nses
 
-cachedZones :: ZoneCache -> [Z.Zone ConstrainedLabel]
+cachedZones :: ZoneCache -> [Z.Zone String]
 cachedZones (recordsByZone -> M.elems -> cache) =
-  mapMaybe (fmap (compileWildcardsLiteral . fromRecordList) . NE.nonEmpty . S.toList) cache
+  mapMaybe (fmap fromRecordList . NE.nonEmpty . S.toList) cache
 
 knownAddresses :: ZoneCache -> M.Map (Name String) [IP]
 knownAddresses cache =
@@ -279,10 +282,10 @@ runOnline qt qn g u = do
         first (sortFailures qs qt qn (S.toList failures)) dnsLookup
       if discovered then runOnline qt qn g u else return Nothing
 
-resolve :: [RRSet String] -> [RRSet String] -> T.Type -> Name String -> IO (Maybe Term, [Query])
+resolve :: [RRSet String] -> [RRSet String] -> T.Type -> Name String -> IO (Maybe Term, [Query], [Z.Zone String])
 resolve = resolveWith defaultQueryConfig
 
-resolveWith :: QueryConfig -> [RRSet String] -> [RRSet String] -> T.Type -> Name String -> IO (Maybe Term, [Query])
+resolveWith :: QueryConfig -> [RRSet String] -> [RRSet String] -> T.Type -> Name String -> IO (Maybe Term, [Query], [Z.Zone String])
 resolveWith cfg anchors hints qt qn
   | queryPort cfg < 1 || queryPort cfg > 65535 = fail "DNS port must be between 1 and 65535"
   | queryTimeout cfg <= 0 || queryRetries cfg <= 0 = fail "DNS timeout and retries must be positive"
@@ -290,9 +293,9 @@ resolveWith cfg anchors hints qt qn
   | otherwise = do
       let (q, g0, u0) = queryG (resolutionLimits cfg) qt qn
       zc <- zoneCache
-      (result, qs) <- runOnlineSolverT (qst zc) $ runOnline qt qn g0 u0
+      (result, qs, zs) <- runOnlineSolverT (qst zc) $ runOnline qt qn g0 u0
       answer <- either (\err -> putStrLn (unwords ["error:", err]) $> Nothing) return result
-      return ((`apply` q) <$> answer, qs)
+      return ((`apply` q) <$> answer, qs, zs)
     where
       zoneCache :: IO ZoneCache
       zoneCache =
