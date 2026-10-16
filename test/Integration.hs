@@ -87,6 +87,7 @@ exampleConfigs =
   , nsLoop
   , cnameLoop
   , dnameLoopEmpty
+  , dnameMappedDelegation
   ]
 
 wc :: Maybe a
@@ -401,8 +402,15 @@ dnameLoopEmpty =
     [ query (gr com) (gr RT.A) (gr aaCom) noValidate ad0
     , query (gr com) (gr RT.A) (gr bCom) noValidate ad0
     , query (gr com) (gr RT.NS) (gr com) validate ad1 ]
+
+dnameMappedDelegation :: ExampleConfig
+dnameMappedDelegation =
+  ExampleConfig "dname/mapped-delegation" "/dev/null" fnniFnniNet ["zone"]
+    [ query wc (gr RT.SOA) (gr fnniFnniFnniFnniNet) wc wc ]
+    []
+
 dnsRoot, com, net, exampleZone, aCom, bCom, aaCom, subACom, aSubSubSubCom, xWildcardCom :: Name String
-rootNet, subRootNet, nsCom, nsBCom, nsNet :: Name String
+rootNet, subRootNet, nsCom, nsBCom, nsNet, fnniFnniNet, fnniFnniFnniFnniNet :: Name String
 dnsRoot = root
 com = mkName ["com", ""]
 net = mkName ["net", ""]
@@ -418,6 +426,8 @@ subRootNet = mkName ["sub", "root", "net", ""]
 nsCom = mkName ["ns", "com", ""]
 nsBCom = mkName ["ns", "b", "com", ""]
 nsNet = mkName ["ns", "net", ""]
+fnniFnniNet = mkName ["fnni", "fnni", "net", ""]
+fnniFnniFnniFnniNet = mkName ["fnni", "fnni", "fnni", "fnni", "net", ""]
 
 exampleConfigTest :: ExampleConfig -> TestTree
 exampleConfigTest config = withResource (resolvableQueries config) (const $ return ()) $ \consequences ->
