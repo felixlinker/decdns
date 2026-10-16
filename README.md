@@ -59,7 +59,3 @@ and symbolically about all supplied zones. Resolution starts at the apex of the
 - `parse-only [zone files...]`:
   Parses the list of zone files and prints all records to stdout.
   This command is supposed to aid debugging.
-
-## Structure
-
-Note that the contents of `visualizer` are fully vibe coded, and are only intended for debugging purposes.
