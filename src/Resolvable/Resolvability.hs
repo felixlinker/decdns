@@ -234,7 +234,7 @@ resolvableStep roots nses (nameWithoutSynthesis -> zone) rrset@(Named n rs) = go
             rann <- rannot r
             return $ S.singleton $ Rule rann
               (resolves nses dnskeyType zone ownerNoSynth d top (ad 1))
-              [resolves nses dnskeyType zone ownerNoSynth d bot (ad 0)
+              [ resolves nses dnskeyType zone ownerNoSynth d bot (ad 0)
               , resolves roots dsType parentZone ownerNoSynth d_DS top (ad 1)
               , member k d
               , member kRef d_DS
@@ -247,10 +247,10 @@ resolvableStep roots nses (nameWithoutSynthesis -> zone) rrset@(Named n rs) = go
             return $ S.singleton $ Rule rann
               (resolves nses (ttypeTerm cov) zone n' d top (ad 1))
               (cs ++  [ isName n'
-                            , resolves nses (ttypeTerm cov) zone n' d bot (ad 0)
-                            , resolves nses dnskeyType zone sigName d_KEY top (ad 1)
-                            , member k d_KEY
-                            , rrsigValid ownerNoSynth d (TComplex (RRSIG sig)) k ])
+                      , resolves nses (ttypeTerm cov) zone n' d bot (ad 0)
+                      , resolves nses dnskeyType zone sigName d_KEY top (ad 1)
+                      , member k d_KEY
+                      , rrsigValid ownerNoSynth d (TComplex (RRSIG sig)) k ])
       T.A -> return S.empty
       T.AAAA -> return S.empty
       T.TXT -> return S.empty
