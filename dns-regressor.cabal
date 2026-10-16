@@ -64,6 +64,47 @@ extra-source-files:
     examples/ns/self-deleg/ns.com.
     examples/ns/sub-self-deleg/ns.net.
     examples/ns/sub-self-deleg/root.net.
+    examples/misconfigs/cyclic-zones/new/com.
+    examples/misconfigs/cyclic-zones/new/net.
+    examples/misconfigs/cyclic-zones/new/root
+    examples/misconfigs/cyclic-zones/old/com.
+    examples/misconfigs/cyclic-zones/old/net.
+    examples/misconfigs/cyclic-zones/old/root
+    examples/misconfigs/deleg-inconsistency/new/b.com.
+    examples/misconfigs/deleg-inconsistency/new/com.
+    examples/misconfigs/deleg-inconsistency/old/b.com.
+    examples/misconfigs/deleg-inconsistency/old/com.
+    examples/misconfigs/denic/new/a.de
+    examples/misconfigs/denic/new/b.de
+    examples/misconfigs/denic/new/c.de
+    examples/misconfigs/denic/new/de
+    examples/misconfigs/denic/new/dsset-de.
+    examples/misconfigs/denic/old/a.de
+    examples/misconfigs/denic/old/b.de
+    examples/misconfigs/denic/old/c.de
+    examples/misconfigs/denic/old/de
+    examples/misconfigs/denic/old/dsset-de.
+    examples/misconfigs/denic/README.md
+    examples/misconfigs/lame-deleg/new/com.
+    examples/misconfigs/lame-deleg/new/root
+    examples/misconfigs/lame-deleg/old/net.
+    examples/misconfigs/lame-deleg/old/root
+    examples/misconfigs/no-glue/new/net.
+    examples/misconfigs/no-glue/new/root
+    examples/misconfigs/no-glue/old/net.
+    examples/misconfigs/no-glue/old/root
+    examples/misconfigs/rewrite-blackholing/new/com.
+    examples/misconfigs/rewrite-blackholing/new/net.
+    examples/misconfigs/rewrite-blackholing/new/root
+    examples/misconfigs/rewrite-blackholing/old/com.
+    examples/misconfigs/rewrite-blackholing/old/net.
+    examples/misconfigs/rewrite-blackholing/old/root
+    examples/misconfigs/rewrite-loop/new/com.
+    examples/misconfigs/rewrite-loop/new/net.
+    examples/misconfigs/rewrite-loop/new/root
+    examples/misconfigs/rewrite-loop/old/com.
+    examples/misconfigs/rewrite-loop/old/net.
+    examples/misconfigs/rewrite-loop/old/root
 
 source-repository head
   type: git

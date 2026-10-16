@@ -40,18 +40,55 @@ tests = testGroup "Examples"
   , testGroup "regressions"
       [ testCase "unchanged configuration has no regressions" $
           regressionTest cnameBase cnameBase [] [regression wc wc wc wc wc]
-      , testCase "base to new has expected unsigned regression facts" $
-          regressionTest cnameBase cnameNew []
-            [ regression (gr com) (gr RT.A) (gr aCom) wc wc
-            , regression (gr com) (gr RT.A) (gr bCom) wc wc
-            , regression (gr com) (gr RT.A) (gr nsBCom) wc wc ]
       , testCase "base to broken has expected unsigned regression facts" $
           regressionTest cnameBase cnameBroken
-            [ regression wc wc wc wc wc
-            , regression (gr com) (gr RT.A) (gr aCom) noValidate ad0
-            , regression (gr com) (gr RT.A) (gr bCom) wc wc
-            , regression (gr com) (gr RT.A) (gr nsBCom) wc wc ]
-            [ regression (gr com) (gr RT.A) (gr aCom) validate ad1 ]
+            [ regression wc (gr RT.A) (gr aCom) noValidate wc
+            , regression wc (gr RT.A) (gr bCom) noValidate wc ]
+            [ regression wc (gr RT.A) (gr aCom) validate wc ]
+      , testCase "cyclic-zones loses root access but preserves direct zone access" $
+          regressionTest cyclicZonesOld cyclicZonesNew
+            [ regression wc (gr RT.TXT) (gr exampleCom) noValidate ad0 ]
+            []
+      , testCase "deleg-inconsistency loses parent access and the removed child address" $
+          regressionTest delegInconsistencyOld delegInconsistencyNew
+            [ regression wc (gr RT.A) (gr aCom) noValidate ad0
+            , regression wc (gr RT.A) (gr bCom) noValidate ad0 ]
+            []
+      , testCase "denic loses only validation using the missing keys" $
+          regressionTest denicOld denicNew
+            [ regression wc (gr RT.A) (gr nsADe) validate wc
+            , regression wc (gr RT.A) (gr nsBDe) validate wc
+            , regression wc (gr RT.TXT) (gr aDe) validate wc
+            , regression wc (gr RT.TXT) (gr bDe) validate wc
+            , regression wc (gr RT.A) (gr xDe) validate ad1
+            , regression wc (gr RT.A) (gr yDe) validate ad1 ]
+            [ regression wc wc wc noValidate wc
+            , regression wc wc (gr cDe) wc wc
+            , regression wc wc (gr zDe) wc wc ]
+      , testCase "lame-deleg loses the old zone from both starting zones" $
+          regressionTest lameDelegOld lameDelegNew
+            [ regression wc (gr RT.TXT) (gr exampleNet) wc wc ]
+            [ regression wc wc (gr exampleCom) wc wc ]
+      , testCase "no-glue loses root access but preserves direct zone access" $
+          regressionTest noGlueOld noGlueNew
+            [ regression wc (gr RT.TXT) (gr exampleNet) wc wc ]
+            [ regression (gr net) wc (gr exampleNet) wc wc ]
+      , testCase "rewrite-blackholing loses the target and both aliases" $
+          regressionTest rewriteBlackholingOld rewriteBlackholingNew
+            [ regression (gr dnsRoot) (gr RT.TXT) (gr exampleCom) wc wc
+            , regression (gr dnsRoot) (gr RT.TXT) (gr aNet) wc wc
+            , regression (gr dnsRoot) (gr RT.TXT) (gr bNet) wc wc
+            , regression (gr com) (gr RT.TXT) (gr exampleCom) wc wc
+            , regression (gr net) (gr RT.TXT) (gr aNet) wc wc
+            , regression (gr net) (gr RT.TXT) (gr bNet) wc wc ]
+            []
+      , testCase "rewrite-loop loses both names in the loop" $
+          regressionTest rewriteLoopOld rewriteLoopNew
+            [ regression (gr dnsRoot) (gr RT.TXT) (gr exampleCom) wc wc
+            , regression (gr dnsRoot) (gr RT.TXT) (gr aNet) wc wc
+            , regression (gr com) (gr RT.TXT) (gr exampleCom) wc wc
+            , regression (gr net) (gr RT.TXT) (gr aNet) wc wc ]
+            []
       ]
   ]
 
@@ -419,12 +456,71 @@ dnameSequence =
     , query wc (gr RT.TXT) (gr xLabelA) wc wc ]
     [ query wc (gr RT.TXT) (gr xA) wc wc ]
 
-dnsRoot, com, net, exampleZone, aCom, bCom, aaaaCom, subACom, aSubSubSubCom, xWildcardCom :: Name String
+cyclicZonesOld :: ExampleConfig
+cyclicZonesOld =
+  ExampleConfig "misconfigs/cyclic-zones/old" "/dev/null" dnsRoot ["root", "com.", "net."] [] []
+
+cyclicZonesNew :: ExampleConfig
+cyclicZonesNew =
+  ExampleConfig "misconfigs/cyclic-zones/new" "/dev/null" dnsRoot ["root", "com.", "net."] [] []
+
+delegInconsistencyOld :: ExampleConfig
+delegInconsistencyOld =
+  ExampleConfig "misconfigs/deleg-inconsistency/old" "/dev/null" com ["com.", "b.com."] [] []
+
+delegInconsistencyNew :: ExampleConfig
+delegInconsistencyNew =
+  ExampleConfig "misconfigs/deleg-inconsistency/new" "/dev/null" com ["com.", "b.com."] [] []
+
+denicOld :: ExampleConfig
+denicOld =
+  ExampleConfig "misconfigs/denic/old" "dsset-de." de ["de", "a.de", "b.de", "c.de"] [] []
+
+denicNew :: ExampleConfig
+denicNew =
+  ExampleConfig "misconfigs/denic/new" "dsset-de." de ["de", "a.de", "b.de", "c.de"] [] []
+
+lameDelegOld :: ExampleConfig
+lameDelegOld =
+  ExampleConfig "misconfigs/lame-deleg/old" "/dev/null" dnsRoot ["root", "net."] [] []
+
+lameDelegNew :: ExampleConfig
+lameDelegNew =
+  ExampleConfig "misconfigs/lame-deleg/new" "/dev/null" dnsRoot ["root", "com."] [] []
+
+noGlueOld :: ExampleConfig
+noGlueOld =
+  ExampleConfig "misconfigs/no-glue/old" "/dev/null" dnsRoot ["root", "net."] [] []
+
+noGlueNew :: ExampleConfig
+noGlueNew =
+  ExampleConfig "misconfigs/no-glue/new" "/dev/null" dnsRoot ["root", "net."] [] []
+
+rewriteBlackholingOld :: ExampleConfig
+rewriteBlackholingOld =
+  ExampleConfig "misconfigs/rewrite-blackholing/old" "/dev/null" dnsRoot ["root", "com.", "net."] [] []
+
+rewriteBlackholingNew :: ExampleConfig
+rewriteBlackholingNew =
+  ExampleConfig "misconfigs/rewrite-blackholing/new" "/dev/null" dnsRoot ["root", "com.", "net."] [] []
+
+rewriteLoopOld :: ExampleConfig
+rewriteLoopOld =
+  ExampleConfig "misconfigs/rewrite-loop/old" "/dev/null" dnsRoot ["root", "com.", "net."] [] []
+
+rewriteLoopNew :: ExampleConfig
+rewriteLoopNew =
+  ExampleConfig "misconfigs/rewrite-loop/new" "/dev/null" dnsRoot ["root", "com.", "net."] [] []
+
+dnsRoot, com, net, de, exampleZone, aCom, bCom, aaaaCom, subACom, aSubSubSubCom, xWildcardCom :: Name String
 rootNet, subRootNet, nsCom, nsBCom, nsNet, fnniFnniNet, fnniFnniFnniFnniNet, subExample :: Name String
 labelA, xA, xLabelA :: Name String
+exampleCom, exampleNet, aNet, bNet :: Name String
+aDe, bDe, cDe, nsADe, nsBDe, xDe, yDe, zDe :: Name String
 dnsRoot = root
 com = mkName ["com", ""]
 net = mkName ["net", ""]
+de = mkName ["de", ""]
 exampleZone = mkName ["example", ""]
 aCom = mkName ["a", "com", ""]
 bCom = mkName ["b", "com", ""]
@@ -443,6 +539,18 @@ subExample = mkName ["sub", "example", ""]
 labelA = mkName ["_label", "a", ""]
 xA = mkName ["x", "a", ""]
 xLabelA = mkName ["x", "_label", "a", ""]
+exampleCom = mkName ["example", "com", ""]
+exampleNet = mkName ["example", "net", ""]
+aNet = mkName ["a", "net", ""]
+bNet = mkName ["b", "net", ""]
+aDe = mkName ["a", "de", ""]
+bDe = mkName ["b", "de", ""]
+cDe = mkName ["c", "de", ""]
+nsADe = mkName ["ns", "a", "de", ""]
+nsBDe = mkName ["ns", "b", "de", ""]
+xDe = mkName ["x", "de", ""]
+yDe = mkName ["y", "de", ""]
+zDe = mkName ["z", "de", ""]
 
 exampleConfigTest :: ExampleConfig -> TestTree
 exampleConfigTest config = withResource (resolvableQueries config) (const $ return ()) $ \consequences ->
