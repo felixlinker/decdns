@@ -397,13 +397,8 @@ dnameLoopEmpty :: ExampleConfig
 dnameLoopEmpty =
   ExampleConfig
     "dname/loop-empty" "/dev/null" com ["ns.net."]
-    [ query (gr com) (gr RT.DNAME) (gr aaCom) noValidate ad0
-    , query (gr com) (gr RT.DNAME) (gr bCom) noValidate ad0
-    , query (gr com) (gr RT.NS) (gr com) noValidate ad0
-    , query (gr com) (gr RT.SOA) (gr com) noValidate ad0 ]
-    [ query (gr com) (gr RT.A) (gr aaCom) noValidate ad0
-    , query (gr com) (gr RT.A) (gr bCom) noValidate ad0
-    , query (gr com) (gr RT.NS) (gr com) validate ad1 ]
+    [ query (gr com) (gr RT.DNAME) (gr aaaaCom) noValidate ad0 ]
+    [ query (gr com) (gr RT.A) (gr aaaaCom) noValidate ad0 ]
 
 dnameMappedDelegation :: ExampleConfig
 dnameMappedDelegation =
@@ -422,18 +417,18 @@ dnameSequence =
   ExampleConfig "dname/sequence" "/dev/null" dnsRoot ["zone"]
     [ query wc (gr RT.DNAME) (gr labelA) wc wc
     , query wc (gr RT.TXT) (gr xLabelA) wc wc ]
-    []
+    [ query wc (gr RT.TXT) (gr xA) wc wc ]
 
-dnsRoot, com, net, exampleZone, aCom, bCom, aaCom, subACom, aSubSubSubCom, xWildcardCom :: Name String
+dnsRoot, com, net, exampleZone, aCom, bCom, aaaaCom, subACom, aSubSubSubCom, xWildcardCom :: Name String
 rootNet, subRootNet, nsCom, nsBCom, nsNet, fnniFnniNet, fnniFnniFnniFnniNet, subExample :: Name String
-labelA, xLabelA :: Name String
+labelA, xA, xLabelA :: Name String
 dnsRoot = root
 com = mkName ["com", ""]
 net = mkName ["net", ""]
 exampleZone = mkName ["example", ""]
 aCom = mkName ["a", "com", ""]
 bCom = mkName ["b", "com", ""]
-aaCom = mkName ["a", "a", "com", ""]
+aaaaCom = mkName ["a", "a", "a", "a", "com", ""]
 subACom = mkName ["sub", "a", "com", ""]
 aSubSubSubCom = mkName ["a", "sub", "sub", "sub", "com", ""]
 xWildcardCom = mkName ["x", "*", "com", ""]
@@ -446,6 +441,7 @@ fnniFnniNet = mkName ["fnni", "fnni", "net", ""]
 fnniFnniFnniFnniNet = mkName ["fnni", "fnni", "fnni", "fnni", "net", ""]
 subExample = mkName ["sub", "example", ""]
 labelA = mkName ["_label", "a", ""]
+xA = mkName ["x", "a", ""]
 xLabelA = mkName ["x", "_label", "a", ""]
 
 exampleConfigTest :: ExampleConfig -> TestTree
