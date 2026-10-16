@@ -47,15 +47,16 @@ main = do
       res <- failLeftS $ runFresh $ runExceptT $ compileConfig rootZoneName keys cfg >>= lift . immediateConsequences
       putStrLn $ showKnowledgeBase $ mapMaybe (fmap toRule . resolvableQuery) $ S.toList res
     "regressions" -> do
-      keysPath:rootZ:args' <- return args
-      keys <- parseDS keysPath
+      keysPathOld:keysPathNew:rootZ:args' <- return args
+      keysOld <- parseDS keysPathOld
+      keysNew <- parseDS keysPathNew
       rootZoneName <- parseNameM rootZ
       (old, new) <- sepBy "--" args'
       oldRecs <- parseZones old
       newRecs <- parseZones new
       regs <- failLeftS $ runFresh $ runExceptT $ do
-        oldRecsC <- compileConfig rootZoneName keys oldRecs
-        newRecsC <- compileConfig rootZoneName keys newRecs
+        oldRecsC <- compileConfig rootZoneName keysOld oldRecs
+        newRecsC <- compileConfig rootZoneName keysNew newRecs
         computeRegressions oldRecsC newRecsC
       mapM_ print $ S.map toRule regs
     "parse-only" -> do

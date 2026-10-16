@@ -39,20 +39,20 @@ Available commands are:
   The root keys file contains root (`.`) DS records in zone-file format.
   These records are considered trusted and used to authenticate the root DNSKEY RRSet.
   Prints the first complete answer and logs network lookups as `%` Prolog comments.
-- `pl-resolvable ROOT_KEYS ROOT_ZONE_NAME -- [zone files...]`:
+- `pl-resolvable ROOT_KEYS ROOT_ZONE_NAME [zone files...]`:
   Compile a list of zone files to a Prolog program that can reason about resolvability and print it to stdout.
   Resolution starts at the apex of the zone `ROOT_ZONE_NAME`, as with `resolvable`.
-- `resolvable ROOT_KEYS ROOT_ZONE_NAME -- [zone files...]`: Reason statically
+- `resolvable ROOT_KEYS ROOT_ZONE_NAME [zone files...]`: Reason statically
 and symbolically about all supplied zones. Resolution starts at the apex of the
   zone `ROOT_ZONE_NAME`, which must be supplied as one of the input zone files.
   `ROOT_ZONE_NAME` must be fully qualified, for example `com.` or `.`. The root
   keys file contains trusted DS records in zone-file format; it may be empty.
   Output is printed to stdout as facts.
-- `resolves ROOT_KEYS ROOT_ZONE_NAME -- [zone files...]`:
+- `resolves ROOT_KEYS ROOT_ZONE_NAME [zone files...]`:
   Accepts the same arguments as `resolvable`, and prints the full resolution facts,
   including nameservers, answer data, verification, and authentication status.
-- `regressions ROOT_KEYS ROOT_ZONE_NAME -- [old zone files...] -- [new zone
-  files...]`: Compile a list of old and new zone files to a Prolog program and
+- `regressions ROOT_KEYS_OLD ROOT_KEYS_NEW ROOT_ZONE_NAME [old zone files...] -- [new zone files...]`:
+  Compile a list of old and new zone files to a Prolog program and
   compute regressions in resolvability. Arguments are as with the previous
   command, but the list of zone files reflect the old and new configuration
   respectively. Output is printed to stdout as Prolog facts.
