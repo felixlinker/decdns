@@ -1,0 +1,8 @@
+$ORIGIN b.com.
+@ 1200 IN SOA ns1.b.com. example.com. 0 0 0 0 0
+@ 1200 IN NS ns1.b.com.
+@ 1200 IN NS ns2.b.com.
+
+@ 1200 IN A 1.2.3.4
+ns1 1200 IN A 1.2.3.4
+ns2 1200 IN A 1.2.3.4

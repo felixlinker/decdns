@@ -1,0 +1,6 @@
+$ORIGIN net.
+$TTL 1200
+@ IN SOA ns.net. example.net. 0 0 0 0 0
+@ IN NS ns.net.
+ns IN A 1.2.3.4
+root-ns IN A 1.2.3.4

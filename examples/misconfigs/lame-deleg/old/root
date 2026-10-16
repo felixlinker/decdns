@@ -1,0 +1,8 @@
+$TTL 1200
+. IN SOA root-ns.net. example.com. 0 0 0 0 0
+. IN NS root-ns.net.
+
+root-ns.net. IN A 1.2.3.4
+net. IN NS ns.net.
+ns.net. IN A 1.2.3.4
+
