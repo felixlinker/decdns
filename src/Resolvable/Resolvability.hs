@@ -204,10 +204,8 @@ resolvableStep roots nses (nameWithoutSynthesis -> zone) rrset@(Named n rs) = go
           -- Do not expect wildcard neq constraints on DNAME records
           rann <- rannot r
           return $ Rule rann (resolves nses t zone n' d bot (ad 0))
-              -- TODO: I believe I can delete the t \= dnameType restriction
-              -- because a query for a DNAME record will never trigger this rule
             (dnssecTypeNeqs t ++
-              [  t \= dnameType, targetZone \= referralZone
+              [ targetZone \= referralZone
               , isName n'
               , resolves roots t targetZone (rewrite dname) d bot (ad 0) ])
         , do  -- Authenticated
@@ -218,7 +216,7 @@ resolvableStep roots nses (nameWithoutSynthesis -> zone) rrset@(Named n rs) = go
           rann <- rannot r
           return $ Rule rann (resolves nses t zone n' d top a)
             (dnssecTypeNeqs t ++
-              [ t \= dnameType, targetZone \= referralZone
+              [ targetZone \= referralZone
               , isName n'
               , resolves nses dnameType zone ownerNoSynth (rrsetTerm rs) top (ad 1)
               , resolves roots t targetZone (rewrite dname) d top a ]) ]
