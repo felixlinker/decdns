@@ -72,15 +72,20 @@ def main() -> None:
             raise ValueError(f"expected NAME TYPE on line {line_number}: {line!r}")
         name, record_type = fields
 
-        run_and_save(
-            ["dns-regressor-prolog", "query", "root-addresses", "root-keys", record_type, name],
-            TOOL_OUTPUT / f"{line_number}.txt",
-            timeout=args.timeout,
-        )
-        run_and_save(
-            ["dig", "+trace", name, record_type],
-            DIG_OUTPUT / f"{line_number}.txt",
-        )
+        tool_output_path = TOOL_OUTPUT / f"{line_number}.txt"
+        if not tool_output_path.exists():
+            run_and_save(
+                ["dns-regressor-prolog", "query", "root-addresses", "root-keys", record_type, name],
+                tool_output_path,
+                timeout=args.timeout,
+            )
+
+        dig_output_path = DIG_OUTPUT / f"{line_number}.txt"
+        if not dig_output_path.exists():
+            run_and_save(
+                ["dig", "+trace", name, record_type],
+                dig_output_path,
+            )
 
         print(f"Finished query on line {line_number}", flush=True)
 
