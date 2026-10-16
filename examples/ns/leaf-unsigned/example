@@ -1,0 +1,66 @@
+; File written on Fri Oct 16 13:09:55 2026
+; dnssec-signzone version 9.20.29
+example.		1200	IN SOA	ns.example. example.net. (
+					0          ; serial
+					0          ; refresh (0 seconds)
+					0          ; retry (0 seconds)
+					0          ; expire (0 seconds)
+					0          ; minimum (0 seconds)
+					)
+			1200	RRSIG	SOA 13 1 1200 (
+					20261115100955 20261016100955 5053 example.
+					AfWl/R7ZqFCQNpv8cME8MHJH9TN3v4sLILzY
+					XiOYlbGYCVzBGOws5BfjhgQ7bwB0NHdnzquR
+					fFtPV/4uc0si/Q== )
+			1200	NS	ns.example.
+			1200	RRSIG	NS 13 1 1200 (
+					20261115100955 20261016100955 5053 example.
+					/R+yqEFvaFQnGE3W3w3GEweTW4dXvxqwfmIp
+					BUPlVjEDE1T1mi23CQ/R1oKLz+qiH07es0lk
+					ViLaTsglhTxvVA== )
+			0	NSEC	ns.example. NS SOA RRSIG NSEC DNSKEY
+			0	RRSIG	NSEC 13 1 0 (
+					20261115100955 20261016100955 5053 example.
+					zEodzhs6C9WfmTFo2+l27B/umb1cITM39Wbt
+					wCNoQIhQn/0hMJ79vGTvfn0D7/pqHstwTIKH
+					249lrm+587VYPQ== )
+			1200	DNSKEY	256 3 13 (
+					ZQPSsDkTbS995jtBZ4oFzNh/NVw69rYQajkl
+					31s8REUwjbqGLeCRqF0Npl7Cs+7RJm3bcFJ+
+					zY/Je1Kd2E9m2g==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 5053
+			1200	DNSKEY	257 3 13 (
+					U8T6D6GsweJXRn2X27Iym26BMLonkClWiOPZ
+					P877JgYzHUE7Ue4iPGkdFcRg2GZO/mAcxezZ
+					mINxrjGA+nQEvA==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 20819
+			1200	RRSIG	DNSKEY 13 1 1200 (
+					20261115100955 20261016100955 5053 example.
+					BzxNQXeDZDUDjimRxPU6AOigLN1mlw6z1VRa
+					BW92D6jTTUyF8rjckMXJhc4d7E+lO34hUPeq
+					mBB+fx1X24llYg== )
+			1200	RRSIG	DNSKEY 13 1 1200 (
+					20261115100955 20261016100955 20819 example.
+					JwMRJ0GJrjMPpU/rRqIoiIKBcFFJc6pcBdA5
+					9CyamekgHC6SqMF3drSA5KJFoPD2PV161sbs
+					ytf1iXX1/UWk0w== )
+ns.example.		1200	IN A	5.6.7.8
+			1200	RRSIG	A 13 2 1200 (
+					20261115100955 20261016100955 5053 example.
+					Wgmy9oMaCAc9jmOcBi7g4Qk3PDdsMFPP0haE
+					dzp3KInYSK65hYCdWULpSkl8RhxxyKzejSqn
+					Ds5OidmJbeEf2g== )
+			0	NSEC	sub.example. A RRSIG NSEC
+			0	RRSIG	NSEC 13 2 0 (
+					20261115100955 20261016100955 5053 example.
+					DkWcjm2/J6DBBYWi9jjQT5NpRw32jcy7EmXp
+					tk1h9y0Y40g0LDU7jEgXTPuhiRM9s4GMS+qN
+					wdaNyuk7NK4xmQ== )
+sub.example.		1200	IN NS	ns.sub.example.
+			0	NSEC	example. NS RRSIG NSEC
+			0	RRSIG	NSEC 13 2 0 (
+					20261115100955 20261016100955 5053 example.
+					U/BJqeAs2eVZTRgu8jNABKA4dY7JbCrpLpYi
+					ovOH8olCr7GBX6eLJbRYQ2FWXHEV1dJp323B
+					3DRqCVtcCLj5Mg== )
+ns.sub.example.		1200	IN A	9.10.11.12

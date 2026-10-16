@@ -88,6 +88,7 @@ exampleConfigs =
   , cnameLoop
   , dnameLoopEmpty
   , dnameMappedDelegation
+  , leafUnsigned
   ]
 
 wc :: Maybe a
@@ -409,8 +410,14 @@ dnameMappedDelegation =
     [ query wc (gr RT.SOA) (gr fnniFnniFnniFnniNet) wc wc ]
     []
 
+leafUnsigned :: ExampleConfig
+leafUnsigned =
+  ExampleConfig "ns/leaf-unsigned" "dsset-root" dnsRoot ["root", "example", "sub.example"]
+    [ query wc (gr RT.TXT) (gr subExample) validate ad0 ]
+    [ query wc (gr RT.TXT) (gr subExample) validate ad1 ]
+
 dnsRoot, com, net, exampleZone, aCom, bCom, aaCom, subACom, aSubSubSubCom, xWildcardCom :: Name String
-rootNet, subRootNet, nsCom, nsBCom, nsNet, fnniFnniNet, fnniFnniFnniFnniNet :: Name String
+rootNet, subRootNet, nsCom, nsBCom, nsNet, fnniFnniNet, fnniFnniFnniFnniNet, subExample :: Name String
 dnsRoot = root
 com = mkName ["com", ""]
 net = mkName ["net", ""]
@@ -428,6 +435,7 @@ nsBCom = mkName ["ns", "b", "com", ""]
 nsNet = mkName ["ns", "net", ""]
 fnniFnniNet = mkName ["fnni", "fnni", "net", ""]
 fnniFnniFnniFnniNet = mkName ["fnni", "fnni", "fnni", "fnni", "net", ""]
+subExample = mkName ["sub", "example", ""]
 
 exampleConfigTest :: ExampleConfig -> TestTree
 exampleConfigTest config = withResource (resolvableQueries config) (const $ return ()) $ \consequences ->

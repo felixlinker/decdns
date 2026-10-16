@@ -54,6 +54,10 @@ extra-source-files:
     examples/ns/cyclic-deleg/ns.net.
     examples/ns/cyclic-deleg/root.com.
     examples/ns/cyclic-deleg/root.net.
+    examples/ns/leaf-unsigned/dsset-root
+    examples/ns/leaf-unsigned/example
+    examples/ns/leaf-unsigned/root
+    examples/ns/leaf-unsigned/sub.example
     examples/ns/loop/ns.com.
     examples/ns/loop/root.net.
     examples/ns/self-deleg/ns.com.

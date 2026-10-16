@@ -1,0 +1,6 @@
+$ORIGIN sub.example.
+@ 1200 IN SOA ns.sub.example. example.net. 0 0 0 0 0
+@ 1200 IN NS ns.sub.example.
+
+ns 1200 IN A 9.10.11.12
+@ 1200 IN TXT "hello"

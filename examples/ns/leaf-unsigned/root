@@ -1,0 +1,66 @@
+; File written on Fri Oct 16 13:09:55 2026
+; dnssec-signzone version 9.20.29
+.			1200	IN SOA	ns. example.net. (
+					0          ; serial
+					0          ; refresh (0 seconds)
+					0          ; retry (0 seconds)
+					0          ; expire (0 seconds)
+					0          ; minimum (0 seconds)
+					)
+			1200	RRSIG	SOA 13 0 1200 (
+					20261115100955 20261016100955 40549 .
+					MOwnThVOkWa/uFPwyjBR3nfWKDYLASitd4SR
+					0jaFUv/bZBGX+a+vXBE9jIwTzrt8OehZRMcp
+					5D/saNIvaKmdbQ== )
+			1200	NS	ns.
+			1200	RRSIG	NS 13 0 1200 (
+					20261115100955 20261016100955 40549 .
+					JZqhiKLH/nZIbvzdzWphCKTFKvZNCyNYIqjg
+					g3jix/KCbOe9Bqbi+fZbAK0Q7qR8LX1cKn6m
+					yKRdC50FG+pMhA== )
+			0	NSEC	example. NS SOA RRSIG NSEC DNSKEY
+			0	RRSIG	NSEC 13 0 0 (
+					20261115100955 20261016100955 40549 .
+					Y+L/3XsTLJDh23h5nJedFzrujWRx5pvBCykl
+					/es3dqt4XIBtiooWGeihvOs1zBDG6arJ5b1L
+					dFRGt7C+OGyFXg== )
+			1200	DNSKEY	256 3 13 (
+					gLKlY2vKU9HF0wDdZZDO5YHGmb3JTuEgAxTL
+					tDElrGC5IzMyMcSMZ2wtK3xdaGz1R7IyHay1
+					2mA79XhLiqj65A==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 40549
+			1200	DNSKEY	257 3 13 (
+					kepdn3KNo1FQhPnMwD7UVMXg80MJDkRo0Jut
+					fT65OFzqZGE87A4kG2yQyosXhPqLwN/orPPa
+					+LM7pyyTfCU+Mg==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 16843
+			1200	RRSIG	DNSKEY 13 0 1200 (
+					20261115100955 20261016100955 16843 .
+					TElR1ockkKYSq4/rDMpvSodN3BWYOLoWhYb9
+					GZjTnvez3uUAs1aStUV3ZFWIQK60tLsVAYMh
+					/RxQqi/kU0snmw== )
+			1200	RRSIG	DNSKEY 13 0 1200 (
+					20261115100955 20261016100955 40549 .
+					VXDpNlIZcQQiQP5zxvjpHohK088ydWfTfwFh
+					1MP/gobd/3agYsRxJZi3IzYZsRzuh8A1S2N/
+					i9EHURUwTXVLqg== )
+example.		1200	IN NS	ns.example.
+			0	NSEC	ns. NS RRSIG NSEC
+			0	RRSIG	NSEC 13 1 0 (
+					20261115100955 20261016100955 40549 .
+					XExZc5i8TAX2crQPj3EzgayD1P/3v2LxCy1n
+					WgFPnivBUjhWqfPloSggfdhv85WPse8JHPWr
+					dzgg8Md7kWPu6A== )
+ns.example.		1200	IN A	5.6.7.8
+ns.			1200	IN A	1.2.3.4
+			1200	RRSIG	A 13 1 1200 (
+					20261115100955 20261016100955 40549 .
+					m867eSFRJfUqCloVFKlRk2/d3PNjlfJl4ELa
+					DcLX019qZcz7J6NX6YzwdnLoJihtumnvNFDu
+					yx8ETa43r0lXAw== )
+			0	NSEC	. A RRSIG NSEC
+			0	RRSIG	NSEC 13 1 0 (
+					20261115100955 20261016100955 40549 .
+					0QAHLtDUeYgIUqfJCI/ChTzYsm1GMX1R1ER5
+					POEUQBvXI1Ikf2K/mEuR2DEhNZjtp9c6CHyP
+					6yvcoItj7L2+Mw== )
