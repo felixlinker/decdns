@@ -89,6 +89,7 @@ exampleConfigs =
   , dnameLoopEmpty
   , dnameMappedDelegation
   , leafUnsigned
+  , dnameSequence
   ]
 
 wc :: Maybe a
@@ -416,8 +417,16 @@ leafUnsigned =
     [ query wc (gr RT.TXT) (gr subExample) validate ad0 ]
     [ query wc (gr RT.TXT) (gr subExample) validate ad1 ]
 
+dnameSequence :: ExampleConfig
+dnameSequence =
+  ExampleConfig "dname/sequence" "/dev/null" dnsRoot ["zone"]
+    [ query wc (gr RT.DNAME) (gr labelA) wc wc
+    , query wc (gr RT.TXT) (gr xLabelA) wc wc ]
+    []
+
 dnsRoot, com, net, exampleZone, aCom, bCom, aaCom, subACom, aSubSubSubCom, xWildcardCom :: Name String
 rootNet, subRootNet, nsCom, nsBCom, nsNet, fnniFnniNet, fnniFnniFnniFnniNet, subExample :: Name String
+labelA, xLabelA :: Name String
 dnsRoot = root
 com = mkName ["com", ""]
 net = mkName ["net", ""]
@@ -436,6 +445,8 @@ nsNet = mkName ["ns", "net", ""]
 fnniFnniNet = mkName ["fnni", "fnni", "net", ""]
 fnniFnniFnniFnniNet = mkName ["fnni", "fnni", "fnni", "fnni", "net", ""]
 subExample = mkName ["sub", "example", ""]
+labelA = mkName ["_label", "a", ""]
+xLabelA = mkName ["x", "_label", "a", ""]
 
 exampleConfigTest :: ExampleConfig -> TestTree
 exampleConfigTest config = withResource (resolvableQueries config) (const $ return ()) $ \consequences ->

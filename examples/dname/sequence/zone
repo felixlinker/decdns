@@ -1,0 +1,9 @@
+$ORIGIN .
+@ 1200 IN SOA ns.net. example.com. 2026101701 0 0 0 0
+@ 1200 IN NS ns.net.
+ns.net 1200 IN A 1.2.3.4
+
+a     1200 IN DNAME b.
+_label.b   1200 IN DNAME c.
+
+*.c   1200 IN TXT "hello"
