@@ -192,6 +192,7 @@ library
 executable dns-regressor-prolog
   main-is: PrologCompiler.hs
   other-modules:
+      Arguments
       Util
       Paths_dns_regressor
   autogen-modules:
@@ -211,6 +212,7 @@ executable dns-regressor-prolog
     , iproute
     , lens
     , memory
+    , optparse-applicative
     , parsec
     , time
     , transformers

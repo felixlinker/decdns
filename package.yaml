@@ -67,6 +67,7 @@ executables:
     - -main-is PrologCompiler
     dependencies:
     - dns-regressor
+    - optparse-applicative
 
 tests:
   dns-regressor-test:

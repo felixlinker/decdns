@@ -1,29 +1,31 @@
 module PrologCompiler (main) where
 
+import Arguments
 import DNS.ZoneFile (allRecords, Zone)
 import DNS.Wellformedness ( zoneWellformed )
 import NameConstraint (toStandardRecord, ConstrainedLabel)
-import Resolvable.Prolog.Core
-import Resolvable.Resolvability
+import Parsing
 import Resolvable.Consequences (immediateConsequences, toRule)
+import Resolvable.Prolog.Core
+import Resolvable.Querying (resolve)
+import Resolvable.Resolvability
+import Resolvable.Update.Dependencies (computeRegressions, resolvableQuery)
 import Util.Fresh (runFresh)
 import Util.Monad (failLeftS)
-
-import System.Environment (getArgs)
 import Util
-import Data.List (uncons)
-import qualified Data.Set as S
-import Resolvable.Update.Dependencies (computeRegressions, resolvableQuery)
+
 import Control.Monad (when)
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
-import Parsing
-import Resolvable.Querying (resolve)
 import Data.Maybe (mapMaybe)
+import qualified Data.Set as S
+import System.Environment (getArgs)
+import qualified System.Timeout as Sys
 
 main :: IO ()
 main = do
-  (cmd, args) <- popArg =<< getArgs
+  (_options, commandArgs) <- parseArguments =<< getArgs
+  (cmd, args) <- popArg commandArgs
   case cmd of
     "pl-resolvable" -> do
       keysPath:rootZ:zones <- return args
@@ -51,7 +53,7 @@ main = do
       keysOld <- parseDS keysPathOld
       keysNew <- parseDS keysPathNew
       rootZoneName <- parseNameM rootZ
-      (old, new) <- sepBy "--" args'
+      (old, new) <- sepBy "::" args'
       oldRecs <- parseZones old
       newRecs <- parseZones new
       regs <- failLeftS $ runFresh $ runExceptT $ do
@@ -68,7 +70,10 @@ main = do
       keys <- parseDS keysPath
       t' <- parseTypeM t
       qn' <- parseNameM qn
-      (as, _, _) <- resolve keys addrs t' qn'
+      let time = if timeout _options <= 0
+          then fmap Just
+          else Sys.timeout (timeout _options * (10 :: Int) Prelude.^ (6 :: Int))
+      (as, _, _) <- maybe (fail "timeout") return =<< time (resolve keys addrs t' qn')
       when (null as) (putStrLn "no response")
       mapM_ print as
     _ -> fail "unknown command"
@@ -77,4 +82,5 @@ main = do
     parseZones = parseZoneFiles zoneWellformed
 
     popArg :: [String] -> IO (String, [String])
-    popArg = maybe (fail "too few arguments") return . uncons
+    popArg [] = fail "too few arguments"
+    popArg (cmd:args) = return (cmd, args)
