@@ -12,7 +12,7 @@ import Resolvable.Prolog.Core
 import Resolvable.Querying
 
 cfg :: QueryConfig
-cfg = defaultQueryConfig { queryLimit = 10 }
+cfg = defaultQueryConfig { queryLimit = 10, qtrace = const (return ()) }
 
 liveQuery :: String -> Assertion
 liveQuery domain = do

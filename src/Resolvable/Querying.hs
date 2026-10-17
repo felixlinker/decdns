@@ -51,13 +51,14 @@ data QueryConfig = QueryConfig
   , queryRetries :: Int
   , queryLimit :: Int  -- ^ Lookup budget, shared across servers and addresses.
   , _resolutionLimits :: M.Map T.Type Int
-  } deriving (Eq, Show)
+  , qtrace :: String -> IO ()
+  }
 
 resolutionLimits :: QueryConfig -> M.Map (Maybe T.Type) Int
 resolutionLimits = M.mapKeys Just . _resolutionLimits
 
 defaultQueryConfig :: QueryConfig
-defaultQueryConfig = QueryConfig 53 3000000 2 100 limits
+defaultQueryConfig = QueryConfig 53 3000000 2 100 limits putStrLn
   where
     limits :: M.Map T.Type Int
     limits = M.fromList [(T.CNAME, 10), (T.DNAME, 10), (T.NS, 20)]
@@ -82,6 +83,9 @@ data QueryState = QueryState
   }
 
 type RuleBase = Ex.ExceptT String (St.StateT QueryState IO)
+
+liftIO :: IO a -> RuleBase a
+liftIO = lift . lift
 
 type OnlineSolver a = RSolver (Maybe T.Type) RuleBase a
 
@@ -206,13 +210,17 @@ dnsLookup = (`first` lookupQuery) . goalToQueries
       whenNotQueried q (first (nsAddrs ns (dnsData qst)) (dnsQuery q))
 
 dnsQuery :: Query -> IP -> RuleBase Bool
-dnsQuery (Query origin (_, qt, qn)) ip = do
-  qst <- lift St.get
+dnsQuery q@(Query origin (_, qt, qn)) ip = do
+  cfg <- getsState config
   checkQueryBudget
-  result <- lift $ lift $ queryServer (config qst) ip qt qn
+  liftIO $ qtrace cfg $ unwords ["% Querying: ", show q]
+  result <- liftIO $ queryServer cfg ip qt qn
   either  (const $ return False)
           (\resp -> do
               let records = mapMaybe fromResourceRecord (W.answer resp ++ W.authority resp ++ W.additional resp)
+              liftIO $ do
+                qtrace cfg "% Caching data:"
+                mapM_ (\r -> qtrace cfg $ unwords ["%   ", show r]) records
               modState (\st -> st { dnsData = cacheRecords origin records (dnsData st) })
               return True)
           result

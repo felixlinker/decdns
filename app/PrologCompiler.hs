@@ -1,6 +1,6 @@
 module PrologCompiler (main) where
 
-import DNS.ZoneFile (allRecords, Zone, AZone (zoneName))
+import DNS.ZoneFile (allRecords, Zone)
 import DNS.Wellformedness ( zoneWellformed )
 import NameConstraint (toStandardRecord, ConstrainedLabel)
 import Resolvable.Prolog.Core
@@ -68,14 +68,7 @@ main = do
       keys <- parseDS keysPath
       t' <- parseTypeM t
       qn' <- parseNameM qn
-      (as, qs, zs) <- resolve keys addrs t' qn'
-      putStrLn "% Queried:"
-      mapM_ (\q -> putStrLn ("% " ++ show q)) (reverse qs)
-      putStrLn "% Data:"
-      mapM_ (\z -> do
-        putStrLn $ unwords ["% zone:", show (zoneName z)]
-        mapM_ (\s -> putStrLn $ "% " ++ show s) (allRecords z))
-        zs
+      (as, _, _) <- resolve keys addrs t' qn'
       when (null as) (putStrLn "no response")
       mapM_ print as
     _ -> fail "unknown command"
