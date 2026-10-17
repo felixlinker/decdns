@@ -75,7 +75,7 @@ def main() -> None:
         tool_output_path = TOOL_OUTPUT / f"{line_number}.txt"
         if not tool_output_path.exists():
             run_and_save(
-                ["dns-regressor-prolog", "query", "root-addresses", "root-keys", record_type, name],
+                ["/usr/bin/time" ,"-al", "dns-regressor-prolog", "query", "root-addresses", "root-keys", record_type, name],
                 tool_output_path,
                 timeout=args.timeout,
             )
