@@ -15,25 +15,18 @@ DIG_OUTPUT = REAL_DIR / "dig"
 TOOL_TIMEOUT_SECONDS = 30
 
 
-def run_and_save(command: list[str], output_path: Path, timeout: int | None = None) -> None:
-    try:
-        result = subprocess.run(
-            command,
-            cwd=REPO_DIR,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            timeout=timeout,
-            check=False,
-        )
-        output = result.stdout
-        if result.returncode != 0:
-            output += f"\n[command exited with status {result.returncode}]\n"
-    except subprocess.TimeoutExpired as error:
-        output = error.stdout or ""
-        if isinstance(output, bytes):
-            output = output.decode(errors="replace")
-        output += f"\n[command timed out after {timeout} seconds]\n"
+def run_and_save(command: list[str], output_path: Path) -> None:
+    result = subprocess.run(
+        command,
+        cwd=REPO_DIR,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=False,
+    )
+    output = result.stdout
+    if result.returncode != 0:
+        output += f"\n[command exited with status {result.returncode}]\n"
 
     output_path.write_text(output)
 
@@ -48,7 +41,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--timeout",
-        type=float,
+        type=int,
         default=TOOL_TIMEOUT_SECONDS,
         metavar="SECONDS",
         help=f"tool query timeout in seconds (default: {TOOL_TIMEOUT_SECONDS})",
@@ -75,9 +68,8 @@ def main() -> None:
         tool_output_path = TOOL_OUTPUT / f"{line_number}.txt"
         if not tool_output_path.exists():
             run_and_save(
-                ["/usr/bin/time" ,"-al", "dns-regressor-prolog", "query", "root-addresses", "root-keys", record_type, name],
+                ["/usr/bin/time", "-al", "dns-regressor-prolog", "--timeout", str(args.timeout), "query", "root-addresses", "root-keys", record_type, name ],
                 tool_output_path,
-                timeout=args.timeout,
             )
 
         dig_output_path = DIG_OUTPUT / f"{line_number}.txt"
