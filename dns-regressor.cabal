@@ -152,8 +152,6 @@ library
       Util.Bool
       Util.Bytes
       Util.CondensationGraph
-      Util.Debug
-      Util.Debug.Stub
       Util.Except
       Util.Fixpoint
       Util.Fresh
