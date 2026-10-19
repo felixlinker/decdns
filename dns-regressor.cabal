@@ -61,8 +61,10 @@ extra-source-files:
     examples/ns/leaf-unsigned/sub.example
     examples/ns/loop/ns.com.
     examples/ns/loop/root.net.
-    examples/ns/self-deleg/ns.com.
-    examples/ns/sub-self-deleg/ns.net.
+    examples/ns/self-deleg/com.
+    examples/ns/self-deleg/sub.a.com.
+    examples/ns/sub-self-deleg/net.
+    examples/ns/sub-self-deleg/root
     examples/ns/sub-self-deleg/root.net.
     examples/misconfigs/cyclic-zones/new/com.
     examples/misconfigs/cyclic-zones/new/net.

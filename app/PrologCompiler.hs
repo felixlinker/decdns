@@ -2,7 +2,7 @@ module PrologCompiler (main) where
 
 import Arguments
 import DNS.ZoneFile (allRecords, Zone)
-import DNS.Wellformedness ( zoneWellformed )
+import DNS.Wellformedness ( Issue, isFatal, zoneWellformed )
 import NameConstraint (toStandardRecord, ConstrainedLabel)
 import Parsing
 import Resolvable.Consequences (immediateConsequences, toRule)
@@ -14,7 +14,8 @@ import Util.Fresh (runFresh)
 import Util.Monad (failLeftS)
 import Util
 
-import Control.Monad (when)
+import Control.Monad (when, unless)
+import System.IO (hPrint, hPutStrLn, stderr)
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
 import Data.Maybe (mapMaybe)
@@ -79,7 +80,17 @@ main = do
     _ -> fail "unknown command"
   where
     parseZones :: [FilePath] -> IO [Zone ConstrainedLabel]
-    parseZones = parseZoneFiles zoneWellformed
+    parseZones paths = do
+      parsed <- parseZoneFiles zoneWellformed paths
+      mapM_ printIssues (zip paths (map snd parsed))
+      when (any (any isFatal . snd) parsed)
+        (fail "fatal error encountered")
+      return (map fst parsed)
+
+    printIssues :: (FilePath, [Issue String]) -> IO ()
+    printIssues (path, issues) = do
+      unless (null issues) (hPutStrLn stderr $ unwords ["parsing", path])
+      mapM_ (hPrint stderr) issues
 
     popArg :: [String] -> IO (String, [String])
     popArg [] = fail "too few arguments"

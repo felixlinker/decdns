@@ -7,11 +7,9 @@ module Parsing.ZoneFile
 
 import Text.Parsec
 import Control.Applicative (asum)
-import Control.Monad (when, unless)
 import Data.Functor (($>))
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (catMaybes)
-import System.IO (hPrint, stderr)
 
 import Parsing.State
 import Parsing.Tokens
@@ -22,7 +20,7 @@ import DNS.Name (Name, Named(Named))
 import DNS.Record (StandardRecord, RData(..), Record)
 import qualified DNS.RecordType as T
 import DNS.RRSet (RRSet, rrsetType)
-import DNS.Wellformedness (Issue, isFatal)
+import DNS.Wellformedness (Issue)
 import DNS.ZoneFile (Zone, fromRecordList, allRRSets)
 import Util.Parsing (handleParser)
 import Util.Monad (handleMaybe)
@@ -118,22 +116,14 @@ records = catMaybes <$> many line
 parseRecords :: Stream s m Char => SourceName -> s -> m (Either ParseError [StandardRecord])
 parseRecords = runParserT (records <* eof) emptyState
 
-parseZoneFileContents :: (Zone String -> [Issue String]) -> SourceName -> FilePath -> IO (Zone ConstrainedLabel)
+parseZoneFileContents :: (Zone String -> [Issue String]) -> SourceName -> FilePath -> IO (Zone ConstrainedLabel, [Issue String])
 parseZoneFileContents wfc source path = do
   content <- readFile path
   recs <- handleParser =<< parseRecords source content
   z <- handleMaybe "empty zone file" $ fromRecordList <$> NE.nonEmpty recs
-  wellformed z
-  return $ compileWildcards z
-  where
-    wellformed :: Zone String -> IO ()
-    wellformed zone = do
-      let issues = wfc zone
-      unless (null issues) (putStrLn $ unwords ["parsing", path])
-      mapM_ (hPrint stderr) issues
-      when (any isFatal issues) (fail "fatal error encountered")
+  return (compileWildcards z, wfc z)
 
-parseZoneFiles :: (Zone String -> [Issue String]) -> [FilePath] -> IO [Zone ConstrainedLabel]
+parseZoneFiles :: (Zone String -> [Issue String]) -> [FilePath] -> IO [(Zone ConstrainedLabel, [Issue String])]
 parseZoneFiles wfc = mapM (\path -> parseZoneFileContents wfc path path)
 
 parseRRSets :: FilePath -> IO [RRSet String]

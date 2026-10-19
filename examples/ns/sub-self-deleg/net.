@@ -5,4 +5,3 @@ ns 1200 IN A 1.2.3.5
 
 root 1200 IN NS root.net.
 root 1200 IN A 1.2.3.4
-;; Served by ns.net.

@@ -11,7 +11,6 @@ import DNS.NameSpec (mkName)
 import DNS.RRSet (RRSet)
 import qualified DNS.RecordType as RT
 import DNS.Wellformedness (zoneWellformed)
-import DNS.Zone (splitZone)
 import DNS.ZoneFile (Zone)
 import NameConstraint (ConstrainedLabel)
 import Parsing (parseZoneFiles, parseDS)
@@ -341,7 +340,7 @@ nsSelfDeleg =
     "ns/self-deleg"
     "/dev/null"
     com
-    ["ns.com."]
+    ["com.", "sub.a.com."]
     [ query (gr com) (gr RT.NS) (gr com) noValidate ad0
     , query (gr com) (gr RT.SOA) (gr com) noValidate ad0
     , query (gr com) (gr RT.A) (gr nsCom) noValidate ad0
@@ -358,7 +357,7 @@ nsSubSelfDeleg =
     "ns/sub-self-deleg"
     "/dev/null"
     dnsRoot
-    ["root.net.", "ns.net."]
+    ["root", "net.", "root.net."]
     [ query (gr dnsRoot) (gr RT.NS) (gr dnsRoot) noValidate ad0
     , query (gr dnsRoot) (gr RT.SOA) (gr dnsRoot) noValidate ad0
     , query (gr dnsRoot) (gr RT.NS) (gr net) noValidate ad0
@@ -603,9 +602,15 @@ resolvableQueries config = do
 
 loadConfig :: ExampleConfig -> IO (Name String, [RRSet String], [Zone ConstrainedLabel])
 loadConfig config = do
-  zones <- parseZoneFiles zoneWellformed (map (directory </>) (configFiles config))
-  keys <- parseDS (directory </> configRootDS config)
-  return (configRootZone config, keys, zones)
+  parsed <- parseZoneFiles zoneWellformed (map (directory </>) (configFiles config))
+  let issues = map snd parsed
+  if all null issues then do
+    let zones = map fst parsed
+    keys <- parseDS (directory </> configRootDS config)
+    return (configRootZone config, keys, zones)
+  else
+    let errs = filter (not . null . snd) $ zip (configFiles config) issues
+    in  fail $ unlines ["the following well-formedness errors were encountered", show errs]
   where
     directory = "examples" </> configName config
 
