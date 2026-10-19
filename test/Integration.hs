@@ -601,12 +601,9 @@ resolvableQueries config = do
     rules <- compileConfig roots keys zones
     lift $ immediateConsequences rules
 
-loadZones :: [FilePath] -> IO [Zone ConstrainedLabel]
-loadZones files = concatMap splitZone <$> parseZoneFiles (concatMap zoneWellformed . splitZone) files
-
 loadConfig :: ExampleConfig -> IO (Name String, [RRSet String], [Zone ConstrainedLabel])
 loadConfig config = do
-  zones <- loadZones (map (directory </>) (configFiles config))
+  zones <- parseZoneFiles zoneWellformed (map (directory </>) (configFiles config))
   keys <- parseDS (directory </> configRootDS config)
   return (configRootZone config, keys, zones)
   where
