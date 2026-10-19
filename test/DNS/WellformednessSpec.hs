@@ -1,6 +1,7 @@
 module DNS.WellformednessSpec (tests) where
 
 import qualified Data.ByteString as BS
+import qualified Data.List.NonEmpty as NE
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit
 
@@ -9,9 +10,11 @@ import DNS.Record
 import qualified DNS.RRSet as RRSet
 import qualified DNS.RecordType as T
 import DNS.SEC.Crypto (AlgorithmType (RSASHA256))
+import DNS.ZoneFile (fromRecordList)
 import DNS.ZoneFileSpec (named, zoneFromList)
 import DNS.NameSpec (mkName)
 import DNS.Wellformedness (Issue (Warning), isFatal, zoneWellformed)
+import Parsing.ZoneFile (parseRecords)
 
 tests :: TestTree
 tests =
@@ -30,7 +33,20 @@ tests =
     , testCase "rejects a signer below the owner for ordinary RRSIG records" rejectsSignerBelowOwner
     , testCase "requires an SOA RRSIG signer to equal its owner" requiresSOASignerAtOwner
     , testCase "requires a DNSKEY RRSIG signer to equal its owner" requiresDNSKEYSignerAtOwner
+    , testGroup "reports issues in zone files" (map reportsWellformednessIssues malformedZoneFiles)
     ]
+
+malformedZoneFiles :: [FilePath]
+malformedZoneFiles =
+  [ "examples/wellformedness/ns-wc"
+  ]
+
+reportsWellformednessIssues :: FilePath -> TestTree
+reportsWellformednessIssues path = testCase path $ do
+  contents <- readFile path
+  records <- either (assertFailure . show) return =<< parseRecords path contents
+  zone <- maybe (assertFailure "zone file contains no records") (return . fromRecordList) (NE.nonEmpty records)
+  not (null $ zoneWellformed zone) @?= True
 
 allowsDNSSECAlongsideCNAME :: Assertion
 allowsDNSSECAlongsideCNAME = do
