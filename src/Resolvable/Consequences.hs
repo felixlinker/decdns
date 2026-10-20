@@ -7,7 +7,8 @@ module Resolvable.Consequences
   , Fact(..)
   , awayF
   , toRule
-  , immediateConsequences ) where
+  , immediateConsequences
+  , allResolvable ) where
 
 import Control.Monad (foldM, guard)
 import Control.Monad.Trans.Class (lift)
@@ -29,6 +30,8 @@ import qualified Util.CondensationGraph as CG
 import Util.Monad (exceptMaybe)
 import Util.Fixpoint
 import Util.Fresh
+import DNS.Name (Name)
+import qualified DNS.RecordType as T
 
 type CSolver a = Solver Identity a
 
@@ -152,3 +155,26 @@ immediateConsequences (S.filter (isResolves . rhead) -> rs) = Store.evalCached $
             then solveFixpoint acc leafRules
             else solve acc leafRules
           rec recursive (foldr G.remove ord leaves) acc'
+
+allResolvable :: Name String -> S.Set Fact -> S.Set Fact
+allResolvable (nameTerm -> startZone) = foldr aux S.empty . S.toList
+  where
+    aux :: Fact -> S.Set Fact -> S.Set Fact
+    aux f acc = maybe acc (`S.insert` acc) (resolvableFact startZone f)
+
+-- TODO: Restrict neqs to variables that occur in new head term
+resolvableFact :: Term -> Fact -> Maybe Fact
+resolvableFact startZone (Fact t neqs) = (`Fact` neqs) <$> resolvableFromResolves startZone t
+
+resolvableFromResolves :: Term -> Term -> Maybe Term
+resolvableFromResolves startZone (toView -> TVResolves r@(Resolves { resolvesZone = z, resolvesQType = qt }))
+  -- Do not report referral data as resolvable
+  | z /= startZone = Nothing
+  -- Do not report structural records as resolvable
+  | qt `elem` map ttypeTerm [T.CNAME, T.DNAME, T.SOA, T.NS, T.DS, T.DNSKEY, T.NSEC, T.NSEC3, T.NSEC3PARAM, T.RRSIG] = Nothing
+  | otherwise = Just $ resolvable
+    (resolvesQType r)
+    (resolvesQName r)
+    (resolvesVerify r)
+    (resolvesAD r)
+resolvableFromResolves _ _ = Nothing

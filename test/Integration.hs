@@ -19,7 +19,7 @@ import qualified Resolvable.Constraint.Store as Store
 import Resolvable.Constraint.Solving (getSolved)
 import Resolvable.Prolog.Core
 import Resolvable.Resolvability (compileConfig)
-import Resolvable.Update.Dependencies (computeRegressions)
+import Resolvable.Update.Disunification (computeRegressions)
 import qualified Resolvable.Unification as U
 import Test.Tasty (TestTree, testGroup, withResource)
 import Test.Tasty.HUnit (Assertion, assertBool, testCase, (@?=))
@@ -68,10 +68,10 @@ tests = testGroup "Examples"
           regressionTest lameDelegOld lameDelegNew
             [ regression wc (gr RT.TXT) (gr exampleNet) wc wc ]
             [ regression wc wc (gr exampleCom) wc wc ]
-      , testCase "no-glue loses root access but preserves direct zone access" $
+      , testCase "no-glue loses root access" $
           regressionTest noGlueOld noGlueNew
             [ regression wc (gr RT.TXT) (gr exampleNet) wc wc ]
-            [ regression (gr net) wc (gr exampleNet) wc wc ]
+            []
       , testCase "rewrite-blackholing loses the target and both aliases" $
           regressionTest rewriteBlackholingOld rewriteBlackholingNew
             [ regression (gr dnsRoot) (gr RT.TXT) (gr exampleCom) wc wc
@@ -581,8 +581,8 @@ query mZone mRtype mQname mVerification mAuth = runFresh $ do
 
 regression :: Maybe (Name String) -> Maybe RT.Type -> Maybe (Name String) -> Maybe Term -> Maybe Term -> Term
 regression mZone mRtype mQname mVerification mAuth = runFresh $ do
-  (zone, rtype, qname, ver, auth) <- queryTerms mZone mRtype mQname mVerification mAuth
-  return $ resolvable zone rtype qname ver auth
+  (_, rtype, qname, ver, auth) <- queryTerms mZone mRtype mQname mVerification mAuth
+  return $ resolvable rtype qname ver auth
 
 queryTerms :: Maybe (Name String) -> Maybe RT.Type -> Maybe (Name String) -> Maybe Term -> Maybe Term -> Fresh (Term, Term, Term, Term, Term)
 queryTerms mZone mRtype mQname mVerification mAuth = do
@@ -621,6 +621,8 @@ regressionTest oldConfig newConfig expected unexpected = do
   regressions <- failLeft $ runFresh $ runExceptT $ do
     oldRules <- compileConfig oldRoots oldKeys oldZones
     newRules <- compileConfig newRoots newKeys newZones
-    computeRegressions oldRules newRules
+    oldFacts <- lift $ allResolvable oldRoots <$> immediateConsequences oldRules
+    newFacts <- lift $ allResolvable newRoots <$> immediateConsequences newRules
+    return $ computeRegressions oldFacts newFacts
   forM_ expected $ \term -> assertMatch True term regressions
   forM_ unexpected $ \term -> assertMatch False term regressions

@@ -5,11 +5,11 @@ import DNS.ZoneFile (allRecords, Zone, AZone (zoneName))
 import DNS.Wellformedness ( Issue, isFatal, zoneWellformed )
 import NameConstraint (toStandardRecord, ConstrainedLabel)
 import Parsing
-import Resolvable.Consequences (immediateConsequences, toRule)
+import Resolvable.Consequences (allResolvable, immediateConsequences, toRule)
 import Resolvable.Prolog.Core
 import Resolvable.Querying (resolve)
 import Resolvable.Resolvability
-import Resolvable.Update.Dependencies (computeRegressions, resolvableQuery)
+import Resolvable.Update.Disunification (computeRegressions)
 import Util.Fresh (runFresh)
 import Util.Monad (failLeftS)
 import Util
@@ -18,7 +18,6 @@ import Control.Monad (when, unless)
 import System.IO (hPrint, hPutStrLn, stderr)
 import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Class (lift)
-import Data.Maybe (mapMaybe)
 import qualified Data.Set as S
 import System.Environment (getArgs)
 import qualified System.Timeout as Sys
@@ -34,6 +33,7 @@ main = do
       rootZoneName <- parseNameM rootZ
       cfg <- parseZones zones
       rules <- failLeftS $ runFresh $ runExceptT $ compileConfig rootZoneName keys cfg
+      print $ fact () (TFunctor "starting_zone" [nameTerm rootZoneName])
       putStr (showKnowledgeBase $ S.toList rules)
     "resolves" -> do
       keysPath:rootZ:zones <- return args
@@ -48,7 +48,7 @@ main = do
       rootZoneName <- parseNameM rootZ
       cfg <- parseZones zones
       res <- failLeftS $ runFresh $ runExceptT $ compileConfig rootZoneName keys cfg >>= lift . immediateConsequences
-      putStrLn $ showKnowledgeBase $ mapMaybe (fmap toRule . resolvableQuery) $ S.toList res
+      putStrLn $ showKnowledgeBase $ map toRule $ S.toList $ allResolvable rootZoneName res
     "regressions" -> do
       keysPathOld:keysPathNew:rootZ:args' <- return args
       keysOld <- parseDS keysPathOld
@@ -60,7 +60,9 @@ main = do
       regs <- failLeftS $ runFresh $ runExceptT $ do
         oldRecsC <- compileConfig rootZoneName keysOld oldRecs
         newRecsC <- compileConfig rootZoneName keysNew newRecs
-        computeRegressions oldRecsC newRecsC
+        oldFacts <- lift $ allResolvable rootZoneName <$> immediateConsequences oldRecsC
+        newFacts <- lift $ allResolvable rootZoneName <$> immediateConsequences newRecsC
+        return $ computeRegressions oldFacts newFacts
       mapM_ print $ S.map toRule regs
     "parse-only" -> do
       parsed <- parseZones args

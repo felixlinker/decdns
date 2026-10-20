@@ -1,9 +1,11 @@
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Update.Disunification
-  ( withouts ) where
+  ( withouts
+  , computeRegressions ) where
 
 import Data.Maybe (mapMaybe, fromMaybe)
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import qualified Resolvable.Constraint.Store as Store
 import Resolvable.Constraint.Solving (getSolved)
@@ -63,3 +65,7 @@ without pos@(Fact t _) neg@(Fact t' _)
 
 withouts :: Fact -> [Fact] -> [Fact]
 withouts q = foldr (\nq -> concatMap (`without` nq)) [q]
+
+computeRegressions :: S.Set Fact -> S.Set Fact -> S.Set Fact
+computeRegressions (S.toList -> resOld) (S.toList -> resNew) =
+  S.fromList $ concatMap (`withouts` resNew) resOld
