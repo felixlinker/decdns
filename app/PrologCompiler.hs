@@ -1,7 +1,7 @@
 module PrologCompiler (main) where
 
 import Arguments
-import DNS.ZoneFile (allRecords, Zone)
+import DNS.ZoneFile (allRecords, Zone, AZone (zoneName))
 import DNS.Wellformedness ( Issue, isFatal, zoneWellformed )
 import NameConstraint (toStandardRecord, ConstrainedLabel)
 import Parsing
@@ -63,8 +63,8 @@ main = do
         computeRegressions oldRecsC newRecsC
       mapM_ print $ S.map toRule regs
     "parse-only" -> do
-      parsed <- concatMap (map toStandardRecord . allRecords) <$> parseZones args
-      mapM_ print parsed
+      parsed <- parseZones args
+      mapM_ printZone parsed
     "query" -> do
       [addrsPath, keysPath, t, qn] <- return args
       addrs <- parseAddrs addrsPath
@@ -79,6 +79,11 @@ main = do
       mapM_ print as
     _ -> fail "unknown command"
   where
+    printZone :: Zone ConstrainedLabel -> IO ()
+    printZone z = do
+      putStrLn $ unwords ["% Zone", show $ zoneName z]
+      mapM_ (print . toStandardRecord) $ allRecords z
+
     parseZones :: [FilePath] -> IO [Zone ConstrainedLabel]
     parseZones paths = do
       parsed <- parseZoneFiles zoneWellformed paths
