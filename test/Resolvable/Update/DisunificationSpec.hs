@@ -20,7 +20,7 @@ import Data.Maybe (fromMaybe)
 tests :: TestTree
 tests =
   testGroup
-    "Resolvable.Update.NegatedQuery"
+    "Resolvable.Update.Disunification"
     minusTests
 
 minusTests :: [TestTree]
@@ -61,22 +61,22 @@ minusTests =
       , [ qC ["com", "X"] ["X" != "a"] ] )
     , ( qC ["com", "X"] ["X" != "a"]
       , [q ["com", "b"]]
-      , [ qC ["com", "X"] ["X" != "a", ("X" != "b")] ] )
-    , ( qC ["com", "X"] [("X" != "a")]
+      , [ qC ["com", "X"] ["X" != "a", "X" != "b"] ] )
+    , ( qC ["com", "X"] ["X" != "a"]
       , [q ["com", "Y"]]
       , [] )
-    , ( qC ["com", "X"] [("X" != "a")]
-      , [qC ["com", "Y"] [("Y" != "a")]]
+    , ( qC ["com", "X"] ["X" != "a"]
+      , [qC ["com", "Y"] ["Y" != "a"]]
       , [] )
-    , ( qC ["com", "X"] [("X" != "a")]
-      , [qC ["com", "Y"] [("Y" != "a"), ("Y" != "b")]]
+    , ( qC ["com", "X"] ["X" != "a"]
+      , [qC ["com", "Y"] ["Y" != "a", "Y" != "b"]]
       , [ q ["com", "b"] ] )
     , ( q ["com", "X", "Y"]
       , [q ["com", "a", "b"]]
-      , [ qC ["com", "X", "Y"] [("X" != "a")], qC ["com", "X", "Y"] ["Y" != "b"] ] )
+      , [ qC ["com", "X", "Y"] ["X" != "a"], qC ["com", "X", "Y"] ["Y" != "b"] ] )
     , ( q ["com", "X", "Y"]
       , [q ["com", "Z", "Z"]]
-      , [ qC ["com", "X", "Y"] [("X" != "Y")] ] ) ]
+      , [ qC ["com", "X", "Y"] ["X" != "Y"] ] ) ]
   where
     mkTestCase (q', n, expected) =
       testCase (show q' ++ " without " ++ intercalate " and " (map show n)) $
