@@ -491,8 +491,8 @@ dataTerm t = TFunctor (ttypeSym $ toType t) $ case t of
 resolves :: Term -> Term -> Term -> Term -> Term -> Term -> Term -> Term
 resolves servers qtype zone qname d ver adb = TFunctor resolvesSym [ servers, qtype, zone, qname, d, ver, adb ]
 
-resolvable :: Term -> Term -> Term -> Term -> Term
-resolvable qtype qname ver auth = TFunctor resolvableSym [ qtype, qname, ver, auth ]
+resolvable :: Term -> Term -> Term -> Term
+resolvable qtype qname ver = TFunctor resolvableSym [ qtype, qname, ver ]
 
 referralZone :: Term
 referralZone = TAtom "referral"

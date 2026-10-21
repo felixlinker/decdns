@@ -38,55 +38,50 @@ tests = testGroup "Examples"
           @?= Just (Store.toBody constraints)
   , testGroup "regressions"
       [ testCase "unchanged configuration has no regressions" $
-          regressionTest cnameBase cnameBase [] [regression wc wc wc wc wc]
+          regressionTest cnameBase cnameBase [] [regression wc wc wc]
       , testCase "base to broken has expected unsigned regression facts" $
           regressionTest cnameBase cnameBroken
-            [ regression wc (gr RT.A) (gr aCom) noValidate wc
-            , regression wc (gr RT.A) (gr bCom) noValidate wc ]
-            [ regression wc (gr RT.A) (gr aCom) validate wc ]
+            [ regression (gr RT.A) (gr aCom) noValidate
+            , regression (gr RT.A) (gr bCom) noValidate ]
+            [ regression (gr RT.A) (gr aCom) validate ]
       , testCase "cyclic-zones loses root access but preserves direct zone access" $
           regressionTest cyclicZonesOld cyclicZonesNew
-            [ regression wc (gr RT.TXT) (gr exampleCom) noValidate ad0 ]
+            [ regression (gr RT.TXT) (gr exampleCom) noValidate ]
             []
       , testCase "deleg-inconsistency loses parent access and the removed child address" $
           regressionTest delegInconsistencyOld delegInconsistencyNew
-            [ regression wc (gr RT.A) (gr aCom) noValidate ad0
-            , regression wc (gr RT.A) (gr bCom) noValidate ad0 ]
+            [ regression (gr RT.A) (gr aCom) noValidate
+            , regression (gr RT.A) (gr bCom) noValidate ]
             []
       , testCase "denic loses only validation using the missing keys" $
           regressionTest denicOld denicNew
-            [ regression wc (gr RT.A) (gr nsADe) validate wc
-            , regression wc (gr RT.A) (gr nsBDe) validate wc
-            , regression wc (gr RT.TXT) (gr aDe) validate wc
-            , regression wc (gr RT.TXT) (gr bDe) validate wc
-            , regression wc (gr RT.A) (gr xDe) validate ad1
-            , regression wc (gr RT.A) (gr yDe) validate ad1 ]
-            [ regression wc wc wc noValidate wc
-            , regression wc wc (gr cDe) wc wc
-            , regression wc wc (gr zDe) wc wc ]
+            [ regression (gr RT.A) (gr nsADe) validate
+            , regression (gr RT.A) (gr nsBDe) validate
+            , regression (gr RT.TXT) (gr aDe) validate
+            , regression (gr RT.TXT) (gr bDe) validate
+            , regression (gr RT.A) (gr xDe) validate
+            , regression (gr RT.A) (gr yDe) validate ]
+            [ regression wc wc noValidate
+            , regression wc (gr cDe) wc
+            , regression wc (gr zDe) wc ]
       , testCase "lame-deleg loses the old zone from both starting zones" $
           regressionTest lameDelegOld lameDelegNew
-            [ regression wc (gr RT.TXT) (gr exampleNet) wc wc ]
-            [ regression wc wc (gr exampleCom) wc wc ]
+            [ regression (gr RT.TXT) (gr exampleNet) wc ]
+            [ regression wc (gr exampleCom) wc ]
       , testCase "no-glue loses root access" $
           regressionTest noGlueOld noGlueNew
-            [ regression wc (gr RT.TXT) (gr exampleNet) wc wc ]
+            [ regression (gr RT.TXT) (gr exampleNet) wc ]
             []
       , testCase "rewrite-blackholing loses the target and both aliases" $
           regressionTest rewriteBlackholingOld rewriteBlackholingNew
-            [ regression (gr dnsRoot) (gr RT.TXT) (gr exampleCom) wc wc
-            , regression (gr dnsRoot) (gr RT.TXT) (gr aNet) wc wc
-            , regression (gr dnsRoot) (gr RT.TXT) (gr bNet) wc wc
-            , regression (gr com) (gr RT.TXT) (gr exampleCom) wc wc
-            , regression (gr net) (gr RT.TXT) (gr aNet) wc wc
-            , regression (gr net) (gr RT.TXT) (gr bNet) wc wc ]
+            [ regression (gr RT.TXT) (gr exampleCom) wc
+            , regression (gr RT.TXT) (gr aNet) wc
+            , regression (gr RT.TXT) (gr bNet) wc ]
             []
       , testCase "rewrite-loop loses both names in the loop" $
           regressionTest rewriteLoopOld rewriteLoopNew
-            [ regression (gr dnsRoot) (gr RT.TXT) (gr exampleCom) wc wc
-            , regression (gr dnsRoot) (gr RT.TXT) (gr aNet) wc wc
-            , regression (gr com) (gr RT.TXT) (gr exampleCom) wc wc
-            , regression (gr net) (gr RT.TXT) (gr aNet) wc wc ]
+            [ regression (gr RT.TXT) (gr exampleCom) wc
+            , regression (gr RT.TXT) (gr aNet) wc ]
             []
       ]
   ]
@@ -579,10 +574,10 @@ query mZone mRtype mQname mVerification mAuth = runFresh $ do
   dat <- wildcard
   return $ resolves servers rtype zone qname dat ver auth
 
-regression :: Maybe (Name String) -> Maybe RT.Type -> Maybe (Name String) -> Maybe Term -> Maybe Term -> Term
-regression mZone mRtype mQname mVerification mAuth = runFresh $ do
-  (_, rtype, qname, ver, auth) <- queryTerms mZone mRtype mQname mVerification mAuth
-  return $ resolvable rtype qname ver auth
+regression :: Maybe RT.Type -> Maybe (Name String) -> Maybe Term -> Term
+regression mRtype mQname mVerification = runFresh $ do
+  (_, rtype, qname, ver, _) <- queryTerms Nothing mRtype mQname mVerification Nothing
+  return $ resolvable rtype qname ver
 
 queryTerms :: Maybe (Name String) -> Maybe RT.Type -> Maybe (Name String) -> Maybe Term -> Maybe Term -> Fresh (Term, Term, Term, Term, Term)
 queryTerms mZone mRtype mQname mVerification mAuth = do

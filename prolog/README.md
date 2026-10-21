@@ -36,7 +36,7 @@ swipl prolog/resolvable.pl output.pl
 ```
 
 `resolvable.pl` imports the DNSSEC constraints and provides
-`all_resolvable/1`, `print_all_resolvable/0`, and `resolvable/4` in the same `user` module as the
+`all_resolvable/1`, `print_all_resolvable/0`, and `resolvable/3` in the same `user` module as the
 generated clauses. For example, with `pl/cname-signed.pl` loaded:
 
 ```prolog

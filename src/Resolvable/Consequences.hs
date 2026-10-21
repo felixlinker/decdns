@@ -176,5 +176,4 @@ resolvableFromResolves startZone (toView -> TVResolves r@(Resolves { resolvesZon
     (resolvesQType r)
     (resolvesQName r)
     (resolvesVerify r)
-    (resolvesAD r)
 resolvableFromResolves _ _ = Nothing
