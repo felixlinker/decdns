@@ -13,7 +13,7 @@ import DNS.SEC.Crypto (AlgorithmType (RSASHA256))
 import DNS.ZoneFile (fromRecordList)
 import DNS.ZoneFileSpec (named, zoneFromList)
 import DNS.NameSpec (mkName)
-import DNS.Wellformedness (Issue (Warning), isFatal, zoneWellformed)
+import DNS.Wellformedness (Issue (Error), isFatal, zoneWellformed)
 import Parsing.ZoneFile (parseRecords)
 
 tests :: TestTree
@@ -23,8 +23,8 @@ tests =
     [ testCase "allows DNSSEC records alongside CNAME" allowsDNSSECAlongsideCNAME
     , testCase "rejects non-DNSSEC records alongside CNAME" rejectsOtherRecordsAlongsideCNAME
     , testCase "allows glue below NS zone cut" allowsGlueBelowNSZoneCut
-    , testCase "warns about CNAME below NS zone cut" warnsAboutCNAMEBelowNSZoneCut
-    , testCase "warns about records other than delegation data at NS zone cut" warnsAboutOtherRecordsAtNSZoneCut
+    , testCase "rejects CNAME below NS zone cut" rejectsCNAMEBelowNSZoneCut
+    , testCase "rejects records other than delegation data at NS zone cut" rejectsOtherRecordsAtNSZoneCut
     , testCase "rejects multiple CNAME records at one owner" rejectsMultipleCNAMEs
     , testCase "rejects multiple DNAME records at one owner" rejectsMultipleDNAMEs
     , testCase "rejects NS records at wildcard leaves" rejectsWildcardNS
@@ -71,13 +71,13 @@ allowsGlueBelowNSZoneCut = do
     cut = "child" <| org
     glueName = "ns" <| cut
 
-warnsAboutCNAMEBelowNSZoneCut :: Assertion
-warnsAboutCNAMEBelowNSZoneCut = do
+rejectsCNAMEBelowNSZoneCut :: Assertion
+rejectsCNAMEBelowNSZoneCut = do
   zone <- zoneFromList
     [ apex org
     , named cut (RData IN 300 (NS ("ns" <| cut)))
     , named alias (RData IN 300 (CNAME (mkName ["target", "example", "net", ""]))) ]
-  zoneWellformed zone @?= [Warning "illegal record at or below zone cut"]
+  zoneWellformed zone @?= [Error "illegal record at or below zone cut"]
   where
     org = mkName ["example", "com", ""]
     cut = "child" <| org
@@ -95,13 +95,13 @@ rejectsOtherRecordsAlongsideCNAME = do
     alias = "alias" <| org
     target = mkName ["target", "example", "net", ""]
 
-warnsAboutOtherRecordsAtNSZoneCut :: Assertion
-warnsAboutOtherRecordsAtNSZoneCut = do
+rejectsOtherRecordsAtNSZoneCut :: Assertion
+rejectsOtherRecordsAtNSZoneCut = do
   zone <- zoneFromList
     [ apex org
     , named cut (RData IN 300 (NS ("ns" <| cut)))
     , named cut (RData IN 300 (TXT "...")) ]
-  zoneWellformed zone @?= [Warning "illegal record at or below zone cut"]
+  zoneWellformed zone @?= [Error "illegal record at or below zone cut"]
   where
     org = mkName ["example", "com", ""]
     cut = "child" <| org
