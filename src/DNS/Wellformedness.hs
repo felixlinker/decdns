@@ -48,7 +48,7 @@ wellformed :: Zone String -> [Issue String]
 wellformed z@(Zone org r) = catMaybes
   [ expect (checkCNAME z) (Error "CNAME record accompanied by records other than NSEC or RRSIG")
   , expect (not $ any (RRSet.hasType T.SOA) (dataNoApex z)) (Error "zone SOA record below apex")
-  , expect (checkZoneCuts $ dataNoApex z) (Warning "illegal record at or below zone cut")
+  , expect (checkZoneCuts $ dataNoApex z) (Error "illegal record at or below zone cut")
   , expect (singletonTypes r) (Error "more than one CNAME, DNAME, NSEC or SOA record at owner name")
   , expect (wildcardRestrictions z) (Error "DNAME, DS or NS wildcard record")
   , expect (rrsigSignerName org r) (Error "RRSIG has illegal signer name")
