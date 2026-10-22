@@ -189,12 +189,13 @@ resolvableStep roots nses (nameWithoutSynthesis -> zone) rrset@(Named n rs) = go
         , do  -- Authenticated
           (n', cs) <- synth n
           (t, d, a, aCNAME, aAlias, targetZone) <- freshVars6 ("T", "D", "AD_Answer", "AD_CNAME", "AD_Alias", "Z")
+          cnameZone <- wildcard
           targetAlias <- wildcard
           rann <- rannot r
           return $ Rule rann (resolves nses t zone n' d top top a)
             (cs ++ dnssecTypeNeqs t ++
               [ t \= cnameType, targetZone \= referralZone
-              , resolves nses cnameType zone ownerNoSynth (rrsetTerm rs) bot top aCNAME
+              , resolves roots cnameType cnameZone ownerNoSynth (rrsetTerm rs) bot top aCNAME
               , resolves roots t targetZone cname d targetAlias top aAlias
               , minTerm aCNAME aAlias a ]) ]
       T.DNAME ->
@@ -214,6 +215,7 @@ resolvableStep roots nses (nameWithoutSynthesis -> zone) rrset@(Named n rs) = go
               , resolves roots t targetZone (rewrite dname) d targetAlias bot (ad 0) ])
         , do  -- Authenticated
           (l, nTail, t, d, a, aDNAME, aAlias, targetZone) <- freshVars8 ("L", "N", "T", "D", "A_Answer", "A_DNAME", "A_Alias", "Z")
+          dnameZone <- wildcard
           let rewrite = injectLast l . captureListTail nTail
           let n' = rewrite ownerNoSynth
           -- Do not expect wildcard neq constraints on DNAME records
@@ -223,7 +225,7 @@ resolvableStep roots nses (nameWithoutSynthesis -> zone) rrset@(Named n rs) = go
             (dnssecTypeNeqs t ++
               [ targetZone \= referralZone
               , isName n'
-              , resolves nses dnameType zone ownerNoSynth (rrsetTerm rs) bot top aDNAME
+              , resolves roots dnameType dnameZone ownerNoSynth (rrsetTerm rs) bot top aDNAME
               , resolves roots t targetZone (rewrite dname) d targetAlias top aAlias
               , minTerm aDNAME aAlias a ]) ]
       -- TODO: Check that sigName is the name of the zone containing the record;
