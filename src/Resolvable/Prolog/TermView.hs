@@ -35,6 +35,7 @@ instance Show (G.Graph Resolves) where
 data TermView = TVList Term Term
               | TVMember Term Term
               | TVNeq Term Term
+              | TVMin Term Term Term
               | TVLeq Term Term
               | TVResolves Resolves
               | TVResolvable Term Term Term
@@ -79,6 +80,9 @@ toView (TFunctor n args)
     _ -> undefined
   | n == neqSym = case args of
     [ a, b ] -> TVNeq a b
+    _ -> undefined
+  | n == minSym = case args of
+    [ a, b, c ] -> TVMin a b c
     _ -> undefined
   | n == leqSym = case args of
     [ a, b ] -> TVLeq a b
@@ -171,6 +175,7 @@ fromView :: TermView -> Term
 fromView (TVList a b) = TFunctor listSym [ a, b ]
 fromView (TVMember a b) = member a b
 fromView (TVNeq a b) = a \= b
+fromView (TVMin a b c) = minTerm a b c
 fromView (TVLeq a b) = a =< b
 fromView (TVResolves (Resolves ns qtype zone qname d alias ver adb)) = resolves ns qtype zone qname d alias ver adb
 fromView (TVResolvable qtype qname ver) = resolvable qtype qname ver

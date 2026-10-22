@@ -69,6 +69,8 @@ module Resolvable.Prolog.Core
   , top
   , bot
   , ad
+  , minTerm
+  , minFacts
   , isName
   , rrsigValid
   , digestValid
@@ -563,3 +565,9 @@ minNameLength t =
     -- 2 because we don't permit empty labels within the name.
     labelLength (TVar _)  = 2
     labelLength _ = 0 -- Technically undefined
+
+minTerm :: Term -> Term -> Term -> Term
+minTerm a b c = TFunctor minSym [a, b, c]
+
+minFacts :: [Term]
+minFacts = [minTerm (ad a) (ad b) (ad (min a b)) | a <- [0, 1], b <- [0, 1]]

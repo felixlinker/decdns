@@ -138,6 +138,7 @@ resolution rs g@(Goal _ (p:_) _) u = do
 resolutionStep :: forall k. Ord k => [Rule k] -> BoundedGoal k -> [(BoundedGoal k, Unifier)]
 resolutionStep _ g@(Goal _ [] _) = [(g, identity)]
 resolutionStep rs (Goal limits (p:t) st) = case toView p of
+  TVMin {} -> resolutionStep rs (Goal limits (member p (list minFacts) : t) st)
   TVMember x l -> do
     l' <- maybeToList $ collectList l
     u <- mapMaybe (unify x) l'

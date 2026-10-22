@@ -3,6 +3,7 @@ module Resolvable.Prolog.Symbols
   , listSym
   , memberSym
   , neqSym
+  , minSym
   , leqSym
   , negSym
   , resolvesSym
@@ -63,3 +64,6 @@ nsec3UnsignedSym = "nsec3Unsigned"
 
 keyTagSym :: String
 keyTagSym = "keyTag"
+
+minSym :: String
+minSym = "min"

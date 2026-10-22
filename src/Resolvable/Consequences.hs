@@ -122,6 +122,7 @@ solveBody fs r = do
           []
           fs)
         choices
+      TVMin {} -> solvePredicate choices (member p (list minFacts))
       TVMember x l -> concatMap
         (\(u, accSt) -> fromRight [] $ runExcept $ do
           l' <- exceptMaybe "member" (collectList $ apply u l)
