@@ -20,13 +20,14 @@ data Resolves = Resolves
   , resolvesZone :: Term
   , resolvesQName :: Term
   , resolvesData :: Term
+  , resolvesAlias :: Term
   , resolvesVerify :: Term
   , resolvesAD :: Term
   }
   deriving (Eq, Ord)
 
 instance Show Resolves where
-  show (Resolves ns qtype zone qname dat ver adb) = show $ resolves ns qtype zone qname dat ver adb
+  show (Resolves ns qtype zone qname dat alias ver adb) = show $ resolves ns qtype zone qname dat alias ver adb
 
 instance Show (G.Graph Resolves) where
   show po = unlines (map (\(l, r) -> show r ++ " < " ++ show l) (G.toFlatList po))
@@ -83,7 +84,7 @@ toView (TFunctor n args)
     [ a, b ] -> TVLeq a b
     _ -> undefined
   | n == resolvesSym = case args of
-    [ ns, qtype, zone, qname, d, ver, adb ] -> TVResolves $ Resolves ns qtype zone qname d ver adb
+    [ ns, qtype, zone, qname, d, alias, ver, adb ] -> TVResolves $ Resolves ns qtype zone qname d alias ver adb
     _ -> undefined
   | n == resolvableSym = case args of
     [ qtype, qname, ver ] -> TVResolvable qtype qname ver
@@ -171,7 +172,7 @@ fromView (TVList a b) = TFunctor listSym [ a, b ]
 fromView (TVMember a b) = member a b
 fromView (TVNeq a b) = a \= b
 fromView (TVLeq a b) = a =< b
-fromView (TVResolves (Resolves ns qtype zone qname d ver adb)) = resolves ns qtype zone qname d ver adb
+fromView (TVResolves (Resolves ns qtype zone qname d alias ver adb)) = resolves ns qtype zone qname d alias ver adb
 fromView (TVResolvable qtype qname ver) = resolvable qtype qname ver
 fromView (TVIsName nam) = isName nam
 fromView (TVRRSIGValid nam dat sig key) = rrsigValid nam dat sig key

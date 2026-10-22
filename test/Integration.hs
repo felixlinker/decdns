@@ -601,7 +601,8 @@ query mZone mRtype mQname mVerification mAuth = runFresh $ do
   servers <- wildcard
   (zone, rtype, qname, ver, auth) <- queryTerms mZone mRtype mQname mVerification mAuth
   dat <- wildcard
-  return $ resolves servers rtype zone qname dat ver auth
+  alias <- wildcard
+  return $ resolves servers rtype zone qname dat alias ver auth
 
 regression :: Maybe RT.Type -> Maybe (Name String) -> Maybe Term -> Term
 regression mRtype mQname mVerification = runFresh $ do

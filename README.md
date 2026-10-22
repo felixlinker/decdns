@@ -50,7 +50,7 @@ and symbolically about all supplied zones. Resolution starts at the apex of the
   Output is printed to stdout as facts.
 - `resolves ROOT_KEYS ROOT_ZONE_NAME [zone files...]`:
   Accepts the same arguments as `resolvable`, and prints the full resolution facts,
-  including nameservers, answer data, verification, and authentication status.
+  including nameservers, answer data, alias following, verification, and authentication status.
 - `regressions ROOT_KEYS_OLD ROOT_KEYS_NEW ROOT_ZONE_NAME [old zone files...] :: [new zone files...]`:
   Compile a list of old and new zone files to a Prolog program and
   compute regressions in resolvability. Arguments are as with the previous

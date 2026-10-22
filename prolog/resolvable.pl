@@ -4,4 +4,4 @@ resolvable(Q, N, V) :-
   starting_zone(Z),
   dif(Q, soa), dif(Q, ns), dif(Q, cname), dif(Q, dname),
   dif(Q, ds), dif(Q, dnskey), dif(Q, nsec), dif(Q, nsec3), dif(Q, nsec3param), dif(Q, rrsig),
-  resolves(_, Q, Z, N, _, V, _).
+  resolves(_, Q, Z, N, _, _, V, _).

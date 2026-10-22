@@ -488,8 +488,8 @@ dataTerm t = TFunctor (ttypeSym $ toType t) $ case t of
   DS (DSData tag alg digT dig) -> [TInt tag, algTerm alg, digestTerm digT, hexTerm dig]
   ZONEMD serial scheme hashAlgorithm digest -> [TInt serial, TInt scheme, TInt hashAlgorithm, hexTerm digest]
 
-resolves :: Term -> Term -> Term -> Term -> Term -> Term -> Term -> Term
-resolves servers qtype zone qname d ver adb = TFunctor resolvesSym [ servers, qtype, zone, qname, d, ver, adb ]
+resolves :: Term -> Term -> Term -> Term -> Term -> Term -> Term -> Term -> Term
+resolves servers qtype zone qname d alias ver adb = TFunctor resolvesSym [ servers, qtype, zone, qname, d, alias, ver, adb ]
 
 resolvable :: Term -> Term -> Term -> Term
 resolvable qtype qname ver = TFunctor resolvableSym [ qtype, qname, ver ]
