@@ -3,7 +3,8 @@ module Resolvable.Update.Disunification
   ( withouts
   , computeRegressions ) where
 
-import Data.Maybe (mapMaybe, fromMaybe)
+import Control.Monad ((<=<))
+import Data.Maybe (mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -12,59 +13,43 @@ import Resolvable.Constraint.Solving (getSolved)
 import Resolvable.Consequences
 import qualified Resolvable.Unification as U
 import Resolvable.Prolog.Core
-import Resolvable.Prolog.TermView
 
-toNeq :: Term -> Maybe (Term, Term)
-toNeq (toView -> TVNeq a b) = Just (a, b)
--- Dropping isName constraints is permitted
-toNeq (toView -> TVIsName {}) = Nothing
-toNeq _ = error "residual, unsolved constraints"
+unifySimplified :: Fact -> Fact -> Maybe U.Unifier
+unifySimplified f1 f2 = do
+  u <- U.unify f1 f2
+  _ <- applySimplify u f1
+  return u
 
-negateFact :: Fact -> Maybe [Term]
-negateFact (Fact t (mapMaybe toNeq . Store.toBody -> neqs))
-  | null neqs = Nothing
-  -- Treat failing unification as undefined because we know that CU.toList will
-  -- return variables as left term, which always succeeds.
-  | otherwise = Just $ map (maybe undefined (`U.apply` t) . uncurry U.unify) neqs
+extendUnif :: U.Unify a => U.Unifier -> a -> a -> Maybe U.Unifier
+extendUnif u t1 t2 = U.extendUnifier t1 t2 u
 
--- @unified a b@ "intersects" a with b.
-unified :: Fact -> Term -> Maybe Fact
-unified (Fact t st) t' = do
-  u <- U.unify t t'
-  st' <- getSolved $ Store.simplify $ U.apply u st
-  return $ Fact (U.apply u t) st'
-
--- @disunified a b@ "subtracts" b from a. Assumes that intersection of b and a
--- is non-empty.
-disunified :: Fact -> Term -> [Fact]
-disunified (Fact t st) t' = fromMaybe [] $ do
-  (U.Unifier (M.toList -> u)) <- U.filterRenamings . U.restrict (vars t) <$> U.unify t t'
-  -- The above unifier is the intersection of @t@ and @t'@. As we want to
-  -- subtract @t'@, we treat the the unifier as a conjuction of assignments, the
-  -- negation of which is a disjunction of inequalites, which we add to the
-  -- constraints below.
-  return $ mapMaybe (fmap (Fact t) . addNeq) u
+disunify :: Fact -> Fact -> [Fact]
+disunify base@(Fact t st) neg@(Fact _ (Store.CStore negNeqs _)) =
+  -- If the two facts to not unify, there is no thing to subtract.
+  maybe [base] negCases (unifySimplified base neg)
   where
+    -- If they unify, there are two cases. Either, the heads don't unify, or
+    -- the heads unify but one of the constraints is false.
+    negCases :: U.Unifier -> [Fact]
+    negCases u = notUnified u ++ notConstraints u
+
     addNeq :: (Term, Term) -> Maybe Store.ConstraintStore
     addNeq (a, b) = getSolved . Store.simplify =<< Store.add st (a \= b)
 
-without :: Fact -> Fact -> [Fact]
-without pos@(Fact t _) neg@(Fact t' _)
-  | U.unifies t t' =
-            -- If @neg@ does not contain inequalities, we subtract @t'@ from
-            -- @pos@ by disunification.
-      maybe (disunified pos t')
-            -- If @neg@ contains inequalities, we can easliy create its inverse
-            -- by treating the inequalites as disjunction of assignments. In
-            -- that case, we only need to unify @pos@ with each disjunct.
-            (mapMaybe (unified pos))
-            (negateFact neg)
-  -- If the intersection of t and t' is empty, we need not consider t' for
-  -- subtraction.
-  | otherwise = [pos]
+    -- We describe when the heads don't unify by negating the unifier as it
+    -- applies to @t@ (i.e., restricting it).
+    notUnified :: U.Unifier -> [Fact]
+    notUnified u =
+      let U.Unifier (M.toList -> toNegate) = U.filterRenamings $ U.restrict (vars t) u
+      in mapMaybe (fmap (Fact t) . addNeq) toNegate
+
+    -- We negate each subtract constraint only if it is an inequality. This is
+    -- because all other constraints would be false for resolvable queries.
+    notConstraints :: U.Unifier -> [Fact]
+    notConstraints u = mapMaybe ((`applySimplify` base) <=< uncurry (extendUnif u) . U.apply u) negNeqs
 
 withouts :: Fact -> [Fact] -> [Fact]
-withouts q = foldr (\nq -> concatMap (`without` nq)) [q]
+withouts q = foldr (\nq -> concatMap (`disunify` nq)) [q]
 
 computeRegressions :: S.Set Fact -> S.Set Fact -> S.Set Fact
 computeRegressions (S.toList -> resOld) (S.toList -> resNew) =

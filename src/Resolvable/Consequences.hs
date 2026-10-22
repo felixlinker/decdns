@@ -5,6 +5,7 @@ module Resolvable.Consequences
   ( ResolutionOrder
   , resolutionOrder
   , Fact(..)
+  , applySimplify
   , awayF
   , toRule
   , immediateConsequences
@@ -87,6 +88,11 @@ instance Unify Fact where
 
 instance Apply Fact where
   apply u (Fact t st) = Fact (apply u t) (apply u st)
+
+applySimplify :: Unifier -> Fact -> Maybe Fact
+applySimplify u f =
+  let Fact t st = apply u f
+  in  Fact t <$> getSolved (Store.simplify st)
 
 instance Show Fact where
   show = show . toRule
