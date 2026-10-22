@@ -2,6 +2,9 @@
 set -eu
 case "$1" in
   proxy)
+    if [ "${DNS_RESET_CACHE:-0}" = 1 ]; then
+      rm -f /recordings/dns.sqlite /recordings/dns.sqlite-wal /recordings/dns.sqlite-shm
+    fi
     ip rule add fwmark 1 lookup 100
     ip route add local 0.0.0.0/0 dev lo table 100
     for protocol in udp tcp; do

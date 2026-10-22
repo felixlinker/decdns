@@ -8,9 +8,9 @@ RUN stack --system-ghc --no-install-ghc build --copy-bins --local-bin-path /out 
 
 FROM debian:bookworm-slim AS harness
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-dnspython bind9-dnsutils iproute2 iptables ca-certificates libgmp10 libnuma1 \
+    python3 python3-dnspython bind9-dnsutils iproute2 iptables ca-certificates libgmp10 libnuma1 time \
     && rm -rf /var/lib/apt/lists/*
-COPY testing/dns /opt/dns-test
+COPY real/docker /opt/dns-test
 WORKDIR /opt/dns-test
 ENTRYPOINT ["/bin/sh", "/opt/dns-test/entrypoint.sh"]
 

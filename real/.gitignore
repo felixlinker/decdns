@@ -1,2 +1,4 @@
 dig/
 tool/
+recordings/
+__pycache__/

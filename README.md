@@ -22,9 +22,6 @@ We do not use SWI-Prolog reasoning, however, as SWI-Prolog's reasoning about neg
 
 ## Available commands
 
-For reproducible comparisons of querying mode with `dig +trace`, see the
-[Docker DNS recording and replay environment](testing/dns/README.md).
-
 The tool reasons statically about DNS zone files, as described above, and it requires zone files as arguments.
 Zone files must be provided as paths to files (or globs), and the respective file name indicates the name server's name serving the contents of that file.
 The arguments are as follows:

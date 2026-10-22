@@ -1,12 +1,12 @@
-name: dns-regressor-test
+name: dns-regressor-evaluation
 services:
   proxy:
     init: true
     build:
       context: ../..
-      dockerfile: testing/dns/Dockerfile
+      dockerfile: real/docker/Dockerfile
       target: harness
-    image: dns-regressor-dns-test
+    image: dns-regressor-dns-proxy
     command: [proxy]
     cap_add: [NET_ADMIN]
     sysctls:
@@ -14,40 +14,40 @@ services:
       net.ipv4.conf.default.rp_filter: 0
       net.ipv6.conf.all.disable_ipv6: 1
     environment:
-      DNS_MODE: ${DNS_MODE:-record}
+      DNS_MODE: record
+      DNS_RESET_CACHE: '1'
     volumes:
-      - ${DNS_RECORDINGS:-./recordings}:/recordings
+      - ${DNS_RECORDINGS:-../recordings}:/recordings
     healthcheck:
       test: [CMD, python3, -c, "import socket; s=socket.create_connection(('127.0.0.1',5300),1); s.close()"]
       interval: 2s
       timeout: 2s
       retries: 15
-  client:
-    init: true
-    image: dns-regressor-dns-test
-    command: [client, sleep, infinity]
-    user: '10000:10000'
-    cap_drop: [ALL]
-    network_mode: service:proxy
-    depends_on:
-      proxy:
-        condition: service_healthy
-    volumes:
-      - ../..:/work:ro
-      - ./resolv.conf:/etc/resolv.conf:ro
-    working_dir: /work
-  tool:
+  evaluation:
     init: true
     cpus: 2
     mem_limit: 2g
-    profiles: [tool]
     build:
       context: ../..
-      dockerfile: testing/dns/Dockerfile
+      dockerfile: real/docker/Dockerfile
       target: tool
     image: dns-regressor-dns-tool
-    command: [client, dns-regressor-prolog, --help]
-    user: '10000:10000'
+    command:
+      - client
+      - python3
+      - -u
+      - /work/real/run_queries.py
+      - --tool-output
+      - /results/tool
+      - --dig-output
+      - /results/dig
+      - --timeout
+      - ${EVALUATION_TIMEOUT:-30}
+      - --dig-timeout
+      - ${EVALUATION_DIG_TIMEOUT:-30}
+      - --limit
+      - ${EVALUATION_LIMIT:-100000}
+    user: '10000:${EVALUATION_GID:-10000}'
     cap_drop: [ALL]
     network_mode: service:proxy
     depends_on:
@@ -56,4 +56,6 @@ services:
     volumes:
       - ../..:/work:ro
       - ./resolv.conf:/etc/resolv.conf:ro
+      - ${EVALUATION_OUTPUT:-..}/tool:/results/tool
+      - ${EVALUATION_OUTPUT:-..}/dig:/results/dig
     working_dir: /work
