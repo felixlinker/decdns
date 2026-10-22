@@ -1,0 +1,59 @@
+name: dns-regressor-test
+services:
+  proxy:
+    init: true
+    build:
+      context: ../..
+      dockerfile: testing/dns/Dockerfile
+      target: harness
+    image: dns-regressor-dns-test
+    command: [proxy]
+    cap_add: [NET_ADMIN]
+    sysctls:
+      net.ipv4.conf.all.rp_filter: 0
+      net.ipv4.conf.default.rp_filter: 0
+      net.ipv6.conf.all.disable_ipv6: 1
+    environment:
+      DNS_MODE: ${DNS_MODE:-record}
+    volumes:
+      - ${DNS_RECORDINGS:-./recordings}:/recordings
+    healthcheck:
+      test: [CMD, python3, -c, "import socket; s=socket.create_connection(('127.0.0.1',5300),1); s.close()"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+  client:
+    init: true
+    image: dns-regressor-dns-test
+    command: [client, sleep, infinity]
+    user: '10000:10000'
+    cap_drop: [ALL]
+    network_mode: service:proxy
+    depends_on:
+      proxy:
+        condition: service_healthy
+    volumes:
+      - ../..:/work:ro
+      - ./resolv.conf:/etc/resolv.conf:ro
+    working_dir: /work
+  tool:
+    init: true
+    cpus: 2
+    mem_limit: 2g
+    profiles: [tool]
+    build:
+      context: ../..
+      dockerfile: testing/dns/Dockerfile
+      target: tool
+    image: dns-regressor-dns-tool
+    command: [client, dns-regressor-prolog, --help]
+    user: '10000:10000'
+    cap_drop: [ALL]
+    network_mode: service:proxy
+    depends_on:
+      proxy:
+        condition: service_healthy
+    volumes:
+      - ../..:/work:ro
+      - ./resolv.conf:/etc/resolv.conf:ro
+    working_dir: /work
