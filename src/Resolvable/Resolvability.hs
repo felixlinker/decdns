@@ -188,14 +188,15 @@ resolvableStep roots nses (nameWithoutSynthesis -> zone) rrset@(Named n rs) = go
               , resolves roots t targetZone cname d targetAlias bot (ad 0) ])
         , do  -- Authenticated
           (n', cs) <- synth n
-          (t, d, a, targetZone) <- freshVars4 ("T", "D", "A", "Z")
+          (t, d, a, aCNAME, aAlias, targetZone) <- freshVars6 ("T", "D", "AD_Answer", "AD_CNAME", "AD_Alias", "Z")
           targetAlias <- wildcard
           rann <- rannot r
           return $ Rule rann (resolves nses t zone n' d top top a)
             (cs ++ dnssecTypeNeqs t ++
               [ t \= cnameType, targetZone \= referralZone
-              , resolves nses cnameType zone ownerNoSynth (rrsetTerm rs) bot top (ad 1)
-              , resolves roots t targetZone cname d targetAlias top a ]) ]
+              , resolves nses cnameType zone ownerNoSynth (rrsetTerm rs) bot top aCNAME
+              , resolves roots t targetZone cname d targetAlias top aAlias
+              , minTerm aCNAME aAlias a ]) ]
       T.DNAME ->
         let dname = maybe (error "invariant error") nameTerm (getAliased rrset)
         in S.fromList <$> sequence
@@ -212,7 +213,7 @@ resolvableStep roots nses (nameWithoutSynthesis -> zone) rrset@(Named n rs) = go
               , isName n'
               , resolves roots t targetZone (rewrite dname) d targetAlias bot (ad 0) ])
         , do  -- Authenticated
-          (l, nTail, t, d, a, targetZone) <- freshVars6 ("L", "N", "T", "D", "A", "Z")
+          (l, nTail, t, d, a, aDNAME, aAlias, targetZone) <- freshVars8 ("L", "N", "T", "D", "A_Answer", "A_DNAME", "A_Alias", "Z")
           let rewrite = injectLast l . captureListTail nTail
           let n' = rewrite ownerNoSynth
           -- Do not expect wildcard neq constraints on DNAME records
@@ -222,8 +223,9 @@ resolvableStep roots nses (nameWithoutSynthesis -> zone) rrset@(Named n rs) = go
             (dnssecTypeNeqs t ++
               [ targetZone \= referralZone
               , isName n'
-              , resolves nses dnameType zone ownerNoSynth (rrsetTerm rs) bot top (ad 1)
-              , resolves roots t targetZone (rewrite dname) d targetAlias top a ]) ]
+              , resolves nses dnameType zone ownerNoSynth (rrsetTerm rs) bot top aDNAME
+              , resolves roots t targetZone (rewrite dname) d targetAlias top aAlias
+              , minTerm aDNAME aAlias a ]) ]
       -- TODO: Check that sigName is the name of the zone containing the record;
       -- does that mean there ex. a corresponding SOA record? Could be, but seems
       -- technically wrong as there could be intermediate SOA records. It could be
