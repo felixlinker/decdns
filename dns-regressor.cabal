@@ -51,6 +51,10 @@ extra-source-files:
     examples/dnssec/cname-attack/net.
     examples/dnssec/cname-attack/README.md
     examples/dnssec/cname-attack/root
+    examples/dnssec/cname-unsigned/com.
+    examples/dnssec/cname-unsigned/dsset
+    examples/dnssec/cname-unsigned/net.
+    examples/dnssec/cname-unsigned/root
     examples/dnssec/ns/dsset-example.
     examples/dnssec/ns/example.
     examples/dnssec/txt/dsset-com.

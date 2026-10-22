@@ -115,6 +115,7 @@ exampleConfigs =
   , cnameSignedNew
   , dnssecTxt
   , dnssecCnameAttack
+  , dnssecCnameUnsigned
   , dnssecWildcard
   , nsLoop
   , cnameLoop
@@ -406,6 +407,15 @@ dnssecCnameAttack =
     []
     [ query wc (gr RT.TXT) (gr exampleCom) validate wc
     , query wc (gr RT.TXT) (gr exampleNet) validate wc ]
+
+dnssecCnameUnsigned :: ExampleConfig
+dnssecCnameUnsigned =
+  ExampleConfig
+    "dnssec/cname-unsigned" "dsset" dnsRoot ["root", "com.", "net."]
+    [ query wc (gr RT.TXT) (gr exampleCom) validate ad0
+    , query wc (gr RT.TXT) (gr exampleNet) validate ad0 ]
+    [ query wc (gr RT.TXT) (gr exampleCom) validate ad1
+    , query wc (gr RT.TXT) (gr exampleNet) validate ad1 ]
 
 dnssecWildcard :: ExampleConfig
 dnssecWildcard =
