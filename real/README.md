@@ -1,5 +1,7 @@
 # Evaluate live DNS queries
 
+**NOTE: This directory is mostly Agent-maintained.**
+
 Run from the repository root:
 
 ```sh
