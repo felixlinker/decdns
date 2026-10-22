@@ -118,6 +118,7 @@ exampleConfigs =
   , dnssecCnameUnsigned
   , dnssecWildcard
   , nsLoop
+  , nsAddrAlias
   , cnameLoop
   , dnameLoopEmpty
   , dnameMappedDelegation
@@ -433,6 +434,13 @@ nsLoop =
     [ query (gr dnsRoot) (gr RT.A) (gr aCom) noValidate ad0
     , query (gr dnsRoot) (gr RT.NS) (gr dnsRoot) validate ad1 ]
 
+nsAddrAlias :: ExampleConfig
+nsAddrAlias =
+  ExampleConfig
+    "ns/ns-alias" "/dev/null" dnsRoot ["root", "com.", "net."]
+    [ query (gr dnsRoot) (gr RT.A) (gr nsComCom) wc wc ]
+    [ query (gr dnsRoot) (gr RT.TXT) (gr exampleNet) wc wc ]
+
 cnameLoop :: ExampleConfig
 cnameLoop =
   ExampleConfig
@@ -530,6 +538,7 @@ rootNet, subRootNet, nsCom, nsBCom, nsNet, fnniFnniNet, fnniFnniFnniFnniNet, sub
 labelA, xA, xLabelA :: Name String
 exampleCom, exampleNet, aNet, bNet :: Name String
 aDe, bDe, cDe, nsADe, nsBDe, xDe, yDe, zDe :: Name String
+nsComCom :: Name String
 dnsRoot = root
 com = mkName ["com", ""]
 net = mkName ["net", ""]
@@ -564,6 +573,7 @@ nsBDe = mkName ["ns", "b", "de", ""]
 xDe = mkName ["x", "de", ""]
 yDe = mkName ["y", "de", ""]
 zDe = mkName ["z", "de", ""]
+nsComCom = mkName ["ns-com", "com", ""]
 
 exampleConfigTest :: ExampleConfig -> TestTree
 exampleConfigTest config = withResource (resolvableQueries config) (const $ return ()) $ \consequences ->

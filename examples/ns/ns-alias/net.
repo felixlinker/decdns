@@ -1,0 +1,6 @@
+$ORIGIN net.
+$TTL 1200
+@ IN SOA ns-net.com. example.com. 0 0 0 0 0
+@ IN NS ns-net.com.
+
+example IN TXT "hello"
