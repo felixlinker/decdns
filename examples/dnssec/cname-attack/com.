@@ -1,0 +1,70 @@
+; File written on Thu Oct 22 10:15:32 2026
+; dnssec-signzone version 9.20.29
+com.			1200	IN SOA	ns.com. example.com. (
+					0          ; serial
+					0          ; refresh (0 seconds)
+					0          ; retry (0 seconds)
+					0          ; expire (0 seconds)
+					0          ; minimum (0 seconds)
+					)
+			1200	RRSIG	SOA 13 1 1200 (
+					20261121071532 20261022071532 7179 com.
+					HxGaQ9/4NJMOnwCEHQDbaIxsg6BlPeJcPDJp
+					vruNFiHMDVp0V4nQGYqul/y1YeG/UdLDH8fC
+					mFDkzLoS+fOghQ== )
+			1200	NS	ns.com.
+			1200	RRSIG	NS 13 1 1200 (
+					20261121071532 20261022071532 7179 com.
+					+Q0V1JazR0lkjhBNO47rcQn+/o1Ew9RkbPw/
+					oIlL2FCWTCsG25RuR6SbxyOxZZ7Pa4v2m9IH
+					THI5iILIexwBHA== )
+			0	NSEC	example.com. NS SOA RRSIG NSEC DNSKEY
+			0	RRSIG	NSEC 13 1 0 (
+					20261121071532 20261022071532 7179 com.
+					5797JPlVZ66Dj69SElS4nEtzjj/rqSuJIfFa
+					qHB/MdJcAOCGvdpd9scj8Zcy6MR7ZLGlnUic
+					dOlTLA+Od8/mtQ== )
+			1200	DNSKEY	256 3 13 (
+					8a3LbBxUpVpdOqZtzv57WFr+QtY7EdfhHNKB
+					hr24XI1s4EqKNxuI7d/c/1BF/TfGbtpISxxZ
+					jzZNmyWJQbr11Q==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 7179
+			1200	DNSKEY	257 3 13 (
+					9Zwv0c/J19fetd/e/xRiCi+b0gpHcW35yF4D
+					8FXvu+kAkSgOYBqDJj+LPp28UjNzsoBQmKWU
+					7WEQ4t+Yto1LmQ==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 34954
+			1200	RRSIG	DNSKEY 13 1 1200 (
+					20261121071532 20261022071532 7179 com.
+					ECxnLjIfMWy2b3COeFsDczBCumRxnf1+6gOv
+					i8KFr9xP0Y0+YIVm59RYbPEz2T96Jpth0s2I
+					A2F0Wy/B9aLwRw== )
+			1200	RRSIG	DNSKEY 13 1 1200 (
+					20261121071532 20261022071532 34954 com.
+					wr5xgoQhSw/2zGIdIr0WoUOjFhM1bwW9VgGo
+					jxV/ji4dsavd7JWFQOv0zERb+7U6q09XzXu9
+					pCJ++iKW2yaEeQ== )
+example.com.		1200	IN TXT	"hello"
+			1200	RRSIG	TXT 13 2 1200 (
+					20261121071532 20261022071532 7179 com.
+					AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+					AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+					AAAAAAAAAAAAAA== )
+			0	NSEC	ns.com. TXT RRSIG NSEC
+			0	RRSIG	NSEC 13 2 0 (
+					20261121071532 20261022071532 7179 com.
+					5Rvrycq1V8kfyHAUNv53vp3W63ShXCUIAm00
+					NOPSVOVweLpDTkI6xSGIReltxnCV+GIGTU41
+					+Llxk5WRFqzHeg== )
+ns.com.			1200	IN A	1.2.3.4
+			1200	RRSIG	A 13 2 1200 (
+					20261121071532 20261022071532 7179 com.
+					SuWAgpAgcg4fdbA3n3VG/qx60nMkkGMAUlnC
+					DrPyA28NQ37V+l10Kd+6tLJw4KBj1Y6IL1xu
+					BHKItH19hew8Qw== )
+			0	NSEC	com. A RRSIG NSEC
+			0	RRSIG	NSEC 13 2 0 (
+					20261121071532 20261022071532 7179 com.
+					tvQBn7VFu+3Mln91AlbNhDwmZ9HIa17DW787
+					lU4eTljPvUuEJ29t55RYL/4G+YenOomzlUYE
+					NP5x6txVJAc+nA== )

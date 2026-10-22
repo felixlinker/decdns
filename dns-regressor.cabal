@@ -46,6 +46,11 @@ extra-source-files:
     examples/dname/loop-non-empty/ns.net.
     examples/dname/mapped-delegation/zone
     examples/dname/sequence/zone
+    examples/dnssec/cname-attack/com.
+    examples/dnssec/cname-attack/dsset
+    examples/dnssec/cname-attack/net.
+    examples/dnssec/cname-attack/README.md
+    examples/dnssec/cname-attack/root
     examples/dnssec/ns/dsset-example.
     examples/dnssec/ns/example.
     examples/dnssec/txt/dsset-com.
