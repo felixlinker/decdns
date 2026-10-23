@@ -83,6 +83,10 @@ tests = testGroup "Examples"
             [ regression (gr RT.TXT) (gr exampleCom) wc
             , regression (gr RT.TXT) (gr aNet) wc ]
             []
+      , testCase "wildcard to DNAME can have regressions" $
+          regressionTest shortLongWildcard shortLongDNAME
+            [ regression wc (gr longShort) wc ]
+            [ regression wc (gr shortShort) wc ]
       ]
   ]
 
@@ -533,12 +537,20 @@ rewriteLoopNew :: ExampleConfig
 rewriteLoopNew =
   ExampleConfig "misconfigs/rewrite-loop/new" "/dev/null" dnsRoot ["root", "com.", "net."] [] []
 
+shortLongWildcard :: ExampleConfig
+shortLongWildcard =
+  ExampleConfig "dname/wildcard-to-dname/old" "/dev/null" dnsRoot ["root"] [] []
+
+shortLongDNAME :: ExampleConfig
+shortLongDNAME =
+  ExampleConfig "dname/wildcard-to-dname/new" "/dev/null" dnsRoot ["root"] [] []
+
 dnsRoot, com, net, de, exampleZone, aCom, bCom, aaaaCom, subACom, aSubSubSubCom, xWildcardCom :: Name String
 rootNet, subRootNet, nsCom, nsBCom, nsNet, fnniFnniNet, fnniFnniFnniFnniNet, subExample :: Name String
 labelA, xA, xLabelA :: Name String
 exampleCom, exampleNet, aNet, bNet :: Name String
 aDe, bDe, cDe, nsADe, nsBDe, xDe, yDe, zDe :: Name String
-nsComCom :: Name String
+nsComCom, short, long, longShort, shortShort :: Name String
 dnsRoot = root
 com = mkName ["com", ""]
 net = mkName ["net", ""]
@@ -574,6 +586,18 @@ xDe = mkName ["x", "de", ""]
 yDe = mkName ["y", "de", ""]
 zDe = mkName ["z", "de", ""]
 nsComCom = mkName ["ns-com", "com", ""]
+short = mkName ["short", ""]
+long = mkName ["looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong", ""]
+longShort = mkName $ replicate n "x" ++ ["short", ""]
+  where
+    -- Technically subtracting length of root label twice, but is okay becase
+    -- the lo...ong label is long enough.
+    n = (255 - minNameLength (nameTerm short)) `div` 2
+shortShort = mkName $ replicate n "x" ++ ["short", ""]
+  where
+    -- Technically subtracting length of root label twice, but is okay becase
+    -- the lo...ong label is long enough.
+    n = (255 - minNameLength (nameTerm long) - minNameLength (nameTerm short)) `div` 2
 
 exampleConfigTest :: ExampleConfig -> TestTree
 exampleConfigTest config = withResource (resolvableQueries config) (const $ return ()) $ \consequences ->

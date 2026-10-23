@@ -9,7 +9,7 @@ import Test.Tasty.HUnit (testCase, (@?=))
 
 import Resolvable.Consequences
 import qualified Resolvable.Constraint.Store as Store
-import Resolvable.Prolog.Core (Term(..), list, listWithTail, (\=))
+import Resolvable.Prolog.Core
 import Resolvable.Update.Disunification (withouts)
 
 import Control.Monad (foldM)
@@ -79,7 +79,13 @@ minusTests =
       , [ qC ["com", "X", "Y"] ["X" != "Y"] ] )
     , ( q ["com", "X", "Y"]
       , [ qC ["com", "a", "Z"] ["Z" != "b"] ]
-      , [ qC ["com", "X", "Y"] ["X" != "a"], q ["com", "a", "b"] ] ) ]
+      , [ qC ["com", "X", "Y"] ["X" != "a"], q ["com", "a", "b"] ] )
+    , ( q ["com", "X"]
+      , [qC ["com", "Y"] [isName (TVar "Y")]]
+      , [ qC ["com", "Y"] [nott (isName (TVar "Y"))] ] )
+    , ( qC ["com", "X"] [isName (TVar "X")]
+      , [qC ["com", "Y"] [isName (TVar "Y")]]
+      , [] ) ]
   where
     mkTestCase (q', n, expected) =
       testCase (show q' ++ " without " ++ intercalate " and " (map show n)) $
@@ -88,9 +94,12 @@ minusTests =
 q :: [String] -> Fact
 q = (`qC` [])
 
+labelList :: [String] -> Term
+labelList = list . map fromString
+
 qC :: [String] -> [Term] -> Fact
-qC (map fromString -> ts) neqs =
-  Fact (TFunctor "p" [list ts]) (store neqs)
+qC (labelList -> ls) neqs =
+  Fact (TFunctor "p" [ls]) (store neqs)
 
 qTail :: [String] -> String -> [Term] -> Fact
 qTail (map fromString -> ts) (fromString -> tailVar) neqs =

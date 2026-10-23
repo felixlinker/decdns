@@ -1,4 +1,5 @@
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
 module Resolvable.Constraint.Store
   ( ConstraintStore(..)
   , partitionConstraints
@@ -126,12 +127,17 @@ isConstraint t = case toView t of
 null :: ConstraintStore -> Bool
 null (CStore ns o) = Prelude.null ns && Prelude.null o
 
+doubleNeg :: Term -> Term
+doubleNeg t = case toView t of
+  TVNot (toView -> TVNot c) -> doubleNeg c
+  _ -> t
+
 syntacticNots :: [Term] -> Solved [Term]
 syntacticNots [] = Satisfiable []
-syntacticNots (h:t) = case toView h of
-  TVNot c | c `elem` t  -> Unsatisfiable
-  _ | nott h `elem` t   -> Unsatisfiable
-    | otherwise         -> Satisfiable (h:) <*> syntacticNots t
+syntacticNots ((doubleNeg -> h):r) = case toView h of
+  TVNot c | c `elem` r  -> Unsatisfiable
+  _ | nott h `elem` r   -> Unsatisfiable
+    | otherwise         -> Satisfiable (h:) <*> syntacticNots r
 
 simplify :: ConstraintStore -> Solved ConstraintStore
 simplify = runIdentity . simplifyWithCache (Identity . simplifyT)

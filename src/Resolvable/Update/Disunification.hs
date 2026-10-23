@@ -24,7 +24,7 @@ extendUnif :: U.Unify a => U.Unifier -> a -> a -> Maybe U.Unifier
 extendUnif u t1 t2 = U.extendUnifier t1 t2 u
 
 disunify :: Fact -> Fact -> [Fact]
-disunify base@(Fact t st) neg@(Fact _ (Store.CStore negNeqs _)) =
+disunify base@(Fact t st) neg@(Fact _ (Store.CStore negNeqs negCs)) =
   -- If the two facts to not unify, there is no thing to subtract.
   maybe [base] negCases (unifySimplified base neg)
   where
@@ -43,10 +43,10 @@ disunify base@(Fact t st) neg@(Fact _ (Store.CStore negNeqs _)) =
       let U.Unifier (M.toList -> toNegate) = U.filterRenamings $ U.restrict (vars t) u
       in mapMaybe (fmap (Fact t) . addNeq) toNegate
 
-    -- We negate each subtract constraint only if it is an inequality. This is
-    -- because all other constraints would be false for resolvable queries.
     notConstraints :: U.Unifier -> [Fact]
-    notConstraints u = mapMaybe ((`applySimplify` base) <=< uncurry (extendUnif u) . U.apply u) negNeqs
+    notConstraints u =
+          mapMaybe ((`applySimplify` base) <=< uncurry (extendUnif u) . U.apply u) negNeqs
+      ++  mapMaybe ((applySimplify u . Fact t <=< Store.add st) . nott) negCs
 
 withouts :: Fact -> [Fact] -> [Fact]
 withouts q = foldr (\nq -> concatMap (`disunify` nq)) [q]

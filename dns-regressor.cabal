@@ -46,6 +46,8 @@ extra-source-files:
     examples/dname/loop-non-empty/ns.net.
     examples/dname/mapped-delegation/zone
     examples/dname/sequence/zone
+    examples/dname/wildcard-to-dname/new/root
+    examples/dname/wildcard-to-dname/old/root
     examples/dnssec/cname-attack/com.
     examples/dnssec/cname-attack/dsset
     examples/dnssec/cname-attack/net.
