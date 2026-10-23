@@ -111,9 +111,22 @@ resolvableStep roots nses (nameWithoutSynthesis -> zone) rrset@(Named n rs) = go
                 (glueServers, glueZone) <- glueCase
                 glueData <- wildcard
                 return (S.singleton $ Rule rann (resolves nses t zone n' d alias v a)
-                  [ isName n'
+                  [ t \= dsType
+                  , isName n'
                   , resolves glueServers glueType glueZone (nameTerm s) glueData bot bot (ad 0)
                   , resolves delegatedT t ownerNoSynth n' d alias v a ])
+            -- Note: Below is a temporary rule for performance
+            ,  foreachM [aType, aaaaType] $ \glueType -> foreachM delegated $ \s -> foreachM (glueCases s) $ \glueCase ->
+              do
+                (l, nTail, d, v, a, alias) <- freshVars6 ("L", "N", "D", "V", "A", "Alias")
+                let n' = injectLast l $ captureListTail nTail ownerNoSynth
+                rann <- rannot r
+                (glueServers, glueZone) <- glueCase
+                glueData <- wildcard
+                return (S.singleton $ Rule rann (resolves nses dsType zone n' d alias v a)
+                  [ isName n'
+                  , resolves glueServers glueType glueZone (nameTerm s) glueData bot bot (ad 0)
+                  , resolves delegatedT dsType ownerNoSynth n' d alias v a ])
             , do  -- NSEC for unsigned subzone
                 (nTail, t, d, dNSEC) <- freshVars4 ("N", "T", "D", "D_NSEC")
                 let n' = captureListTail nTail ownerNoSynth
