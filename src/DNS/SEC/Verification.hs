@@ -144,7 +144,7 @@ verifyClosestEncloserProof (canonicalName -> qname) hashedClosestEncloser closes
     nonExHash <- findNonExHash Nothing qname closestEncloserHash
     let Name (b32' NE.:| _) = hashedOwner
     hashedOwnerHash <- fromB32 b32'
-    return (hashedOwnerHash < nonExHash && nonExHash < next)
+    return $ hashedOwnerHash < nonExHash && (nonExHash < next || next < hashedOwnerHash)
   where
     -- Find the original name of the closest encloser given the closest
     -- encloser's hashed owner name. Return the hash of the immediate child
