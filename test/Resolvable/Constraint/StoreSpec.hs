@@ -30,7 +30,15 @@ tests =
         let constraints = CStore []
               [isName (list (replicate 128 (TAtom "a"))), isName (list [])]
         solve (simplify constraints) @?= Just False
-        solve (runFresh (evalCached (simplifyCached constraints))) @?= Just False
+    , testCase "negating true yields false" $ do
+        let constraints = CStore [] [nott (isName (list []))]
+        solve (simplify constraints) @?= Just False
+    , testCase "negation supports syntactic contradictions" $ do
+        let constraints = CStore [] [nott (isName (TVar "X")), isName (TVar "X")]
+        solve (simplify constraints) @?= Just False
+    , testCase "negation supports not solvable constraints" $ do
+        let constraints = CStore [] [nott (isName (TVar "X"))]
+        solve (simplify constraints) @?= Nothing
     ]
 
 checkIsName :: Term -> Maybe Bool

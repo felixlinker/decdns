@@ -26,13 +26,9 @@ import qualified Resolvable.Unification as U
 import qualified Resolvable.Constraint.Neqs as N
 import Resolvable.Constraint.Solving as Solving
 
-data Constraint =
-    Dif Term Term
-  | Complex Term
-  deriving (Eq, Ord)
-
 simplifyTEx :: Term -> Ex.Except String Bool
 simplifyTEx t = case toView t of
+  TVNot c -> not <$> simplifyTEx c
   TVIsName n
     | minNameLength n > 255 -> return False
     | ground n -> return True
@@ -85,10 +81,6 @@ simplifyTCached t = do
               (\b -> St.modify (M.insert t b) >> return (resultToSolved b))
               (Ex.runExcept $ simplifyTEx t)
 
-instance U.Apply Constraint where
-  apply u (Dif a b) = Dif (U.apply u a) (U.apply u b)
-  apply u (Complex t) = Complex (U.apply u t)
-
 data ConstraintStore = CStore N.Neqs [Term]
   deriving (Eq, Ord)
 
@@ -97,7 +89,6 @@ instance U.Apply ConstraintStore where
 
 instance Semigroup ConstraintStore where
   CStore ns os <> CStore ns' os' = CStore (ns <> ns') (os <> os')
-
 
 partitionConstraints :: [Term] -> (ConstraintStore, [Term])
 partitionConstraints = foldr addConstraint (empty, [])
@@ -114,19 +105,33 @@ toBody (CStore ns os) = N.asPredicates ns ++ os
 add :: ConstraintStore -> Term -> Maybe ConstraintStore
 add (CStore ns os) t = case toView t of
   TVNeq a b -> Just $ CStore (N.addConstraint a b ns) os
-  TVIsName {} -> inOthers
-  TVDigestValid {} -> inOthers
-  TVRRSIGValid {} -> inOthers
-  TVNSECUnsigned {} -> inOthers
-  TVNSEC3Unsigned {} -> inOthers
-  TVClosestEncloser {} -> inOthers
-  _ -> Nothing
+  _ | isConstraint t -> inOthers
+    | otherwise -> Nothing
   where
     inOthers :: Maybe ConstraintStore
     inOthers = Just $ CStore ns (t:os)
 
+isConstraint :: Term -> Bool
+isConstraint t = case toView t of
+  TVNeq {} -> True
+  TVIsName {} -> True
+  TVDigestValid {} -> True
+  TVRRSIGValid {} -> True
+  TVNSECUnsigned {} -> True
+  TVNSEC3Unsigned {} -> True
+  TVClosestEncloser {} -> True
+  TVNot constraint -> isConstraint constraint
+  _ -> False
+
 null :: ConstraintStore -> Bool
 null (CStore ns o) = Prelude.null ns && Prelude.null o
+
+syntacticNots :: [Term] -> Solved [Term]
+syntacticNots [] = Satisfiable []
+syntacticNots (h:t) = case toView h of
+  TVNot c | c `elem` t  -> Unsatisfiable
+  _ | nott h `elem` t   -> Unsatisfiable
+    | otherwise         -> Satisfiable (h:) <*> syntacticNots t
 
 simplify :: ConstraintStore -> Solved ConstraintStore
 simplify = runIdentity . simplifyWithCache (Identity . simplifyT)
@@ -142,8 +147,11 @@ type SimplifyCache m a = St.StateT (M.Map Term Bool) m a
 simplifyWithCache :: Monad m => (Term -> m (Solved (Maybe Term))) -> ConstraintStore -> m (Solved ConstraintStore)
 simplifyWithCache cache (CStore ns ts) = do
   let ns' = N.simplify ns
-  ts' <- fmap catMaybes . sequenceA <$> mapM cache ts
-  return $ CStore <$> ns' <*> ts'
+  case syntacticNots ts of
+    Unsatisfiable -> return Unsatisfiable
+    Satisfiable ts' -> do
+      ts'' <- fmap catMaybes . sequenceA <$> mapM cache ts'
+      return $ CStore <$> ns' <*> ts''
 
 evalCached :: Monad m => SimplifyCache m a -> m a
 evalCached = (`St.evalStateT` M.empty)

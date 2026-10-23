@@ -39,6 +39,7 @@ module Resolvable.Prolog.Core
 
   , (\=)
   , (=<)
+  , nott
   , (\+)
   , showKnowledgeBase
 
@@ -345,6 +346,9 @@ subterm t1 = bool . walk (\t -> Or (t == t1))
 
 (=<) :: Term -> Term -> Term
 (=<) = tBin leqSym
+
+nott :: Term -> Term
+nott = TFunctor notSym . (:[])
 
 (\+) :: Term -> Term
 (\+) t1 = TFunctor negSym [t1]
