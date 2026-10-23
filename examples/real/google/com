@@ -1,0 +1,34 @@
+com. 900    IN SOA a.gtld-servers.net. nstld.verisign-grs.com. 1792766621 1800 900 604800 900
+com. 172800 IN NS l.gtld-servers.net.
+com. 172800 IN NS j.gtld-servers.net.
+com. 172800 IN NS h.gtld-servers.net.
+com. 172800 IN NS d.gtld-servers.net.
+com. 172800 IN NS b.gtld-servers.net.
+com. 172800 IN NS f.gtld-servers.net.
+com. 172800 IN NS k.gtld-servers.net.
+com. 172800 IN NS m.gtld-servers.net.
+com. 172800 IN NS i.gtld-servers.net.
+com. 172800 IN NS g.gtld-servers.net.
+com. 172800 IN NS a.gtld-servers.net.
+com. 172800 IN NS c.gtld-servers.net.
+com. 172800 IN NS e.gtld-servers.net.
+
+google.com. 172800 IN NS ns2.google.com.
+google.com. 172800 IN NS ns1.google.com.
+google.com. 172800 IN NS ns3.google.com.
+google.com. 172800 IN NS ns4.google.com.
+ck0pojmg874ljref7efn8430qvit8bsm.com. 900 IN NSEC3 1 1 0 - CK0Q35HRS4H76G6CHNB9414CJN6S5UPL NS SOA RRSIG DNSKEY NSEC3PARAM
+ck0pojmg874ljref7efn8430qvit8bsm.com. 900 IN RRSIG NSEC3 13 2 900 1793233572 1792624572 65344 com. NnMF+EXBvze1sTUUpWaQAB2Rrr4Yp3JX/GXInoFWLcHsoLanOpO+kLn+8aa52LeZmF+1rGiPUITGSGY3VFlz/Q==
+s84bor4dk28hnhplc218o483voood5d8.com. 900 IN NSEC3 1 1 0 - S84BR9CIB2A20L3ETR1M2415ENPP99L8 NS DS RRSIG
+s84bor4dk28hnhplc218o483voood5d8.com. 900 IN RRSIG NSEC3 13 2 900 1793323364 1792714364 65344 com. 0tE7ucTGA5n7+70QjtcHiGkUN0a6HlFFM37FOu5xX3hcDL8kIRTjLg+B02UL2TV5Ml779Fc+9JslQR4xLO1OBA==
+ns2.google.com. 172800 IN AAAA 2001:4860:4802:34::a
+ns2.google.com. 172800 IN A 216.239.34.10
+ns1.google.com. 172800 IN AAAA 2001:4860:4802:32::a
+ns1.google.com. 172800 IN A 216.239.32.10
+ns3.google.com. 172800 IN AAAA 2001:4860:4802:36::a
+ns3.google.com. 172800 IN A 216.239.36.10
+ns4.google.com. 172800 IN AAAA 2001:4860:4802:38::a
+ns4.google.com. 172800 IN A 216.239.38.10
+com. 86400 IN DNSKEY 256 3 13 vBLLq7dP9BoGpst/jDPHSoy1MHEYoXggjw+7v2yjzLWZg6CadVc4aIUSF2VO2o0Gm0eAIAgOt8seZnzFOEDBcQ==
+com. 86400 IN DNSKEY 257 3 13 tx8EZRAd2+K/DJRV0S+hbBzaRPS/G6JVNBitHzqpsGlz8huE61Ms9ANe6NSDLKJtiTBqfTJWDAywEp1FCsEINQ==
+com. 86400 IN RRSIG DNSKEY 13 1 86400 1793282555 1791986255 19718 com. JnjZr424TVrVkNTm5gQYJDULvLOhAp5p85x0TryQRB6xNx4z00uyv7OPYAY2siDFtLxzEZJcWe/hMWdXIjPBTA==

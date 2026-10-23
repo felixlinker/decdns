@@ -1,0 +1,86 @@
+.                        86278   IN   SOA   a.root-servers.net. nstld.verisign-grs.com. 2026102300 1800 900 604800 86400
+.                        3600000 IN   NS    A.ROOT-SERVERS.NET.
+A.ROOT-SERVERS.NET.      3600000 IN   A     198.41.0.4
+A.ROOT-SERVERS.NET.      3600000 IN   AAAA  2001:503:ba3e::2:30
+.                        3600000 IN   NS    B.ROOT-SERVERS.NET.
+B.ROOT-SERVERS.NET.      3600000 IN   A     170.247.170.2
+B.ROOT-SERVERS.NET.      3600000 IN   AAAA  2801:1b8:10::b
+.                        3600000 IN   NS    C.ROOT-SERVERS.NET.
+C.ROOT-SERVERS.NET.      3600000 IN   A     192.33.4.12
+C.ROOT-SERVERS.NET.      3600000 IN   AAAA  2001:500:2::c
+.                        3600000 IN   NS    D.ROOT-SERVERS.NET.
+D.ROOT-SERVERS.NET.      3600000 IN   A     199.7.91.13
+D.ROOT-SERVERS.NET.      3600000 IN   AAAA  2001:500:2d::d
+.                        3600000 IN   NS    E.ROOT-SERVERS.NET.
+E.ROOT-SERVERS.NET.      3600000 IN   A     192.203.230.10
+E.ROOT-SERVERS.NET.      3600000 IN   AAAA  2001:500:a8::e
+.                        3600000 IN   NS    F.ROOT-SERVERS.NET.
+F.ROOT-SERVERS.NET.      3600000 IN   A     192.5.5.241
+F.ROOT-SERVERS.NET.      3600000 IN   AAAA  2001:500:2f::f
+.                        3600000 IN   NS    G.ROOT-SERVERS.NET.
+G.ROOT-SERVERS.NET.      3600000 IN   A     192.112.36.4
+G.ROOT-SERVERS.NET.      3600000 IN   AAAA  2001:500:12::d0d
+.                        3600000 IN   NS    H.ROOT-SERVERS.NET.
+H.ROOT-SERVERS.NET.      3600000 IN   A     198.97.190.53
+H.ROOT-SERVERS.NET.      3600000 IN   AAAA  2001:500:1::53
+.                        3600000 IN   NS    I.ROOT-SERVERS.NET.
+I.ROOT-SERVERS.NET.      3600000 IN   A     192.36.148.17
+I.ROOT-SERVERS.NET.      3600000 IN   AAAA  2001:7fe::53
+.                        3600000 IN   NS    J.ROOT-SERVERS.NET.
+J.ROOT-SERVERS.NET.      3600000 IN   A     192.58.128.30
+J.ROOT-SERVERS.NET.      3600000 IN   AAAA  2001:503:c27::2:30
+.                        3600000 IN   NS    K.ROOT-SERVERS.NET.
+K.ROOT-SERVERS.NET.      3600000 IN   A     193.0.14.129
+K.ROOT-SERVERS.NET.      3600000 IN   AAAA  2001:7fd::1
+.                        3600000 IN   NS    L.ROOT-SERVERS.NET.
+L.ROOT-SERVERS.NET.      3600000 IN   A     199.7.83.42
+L.ROOT-SERVERS.NET.      3600000 IN   AAAA  2001:500:9f::42
+.                        3600000 IN   NS    M.ROOT-SERVERS.NET.
+M.ROOT-SERVERS.NET.      3600000 IN   A     202.12.27.33
+M.ROOT-SERVERS.NET.      3600000 IN   AAAA  2001:dc3::35
+
+com. 172800 IN NS l.gtld-servers.net.
+com. 172800 IN NS j.gtld-servers.net.
+com. 172800 IN NS h.gtld-servers.net.
+com. 172800 IN NS d.gtld-servers.net.
+com. 172800 IN NS b.gtld-servers.net.
+com. 172800 IN NS f.gtld-servers.net.
+com. 172800 IN NS k.gtld-servers.net.
+com. 172800 IN NS m.gtld-servers.net.
+com. 172800 IN NS i.gtld-servers.net.
+com. 172800 IN NS g.gtld-servers.net.
+com. 172800 IN NS a.gtld-servers.net.
+com. 172800 IN NS c.gtld-servers.net.
+com. 172800 IN NS e.gtld-servers.net.
+com. 86400 IN DS 19718 13 2 8ACBB0CD28F41250A80A491389424D341522D946B0DA0C0291F2D3D771D7805A
+com. 86400 IN RRSIG DS 8 1 86400 1793854800 1792728000 8763 . WQGkg3rNQYjlrFU+8IuMmACT/DOxAX2xLbAmzDF88EXwF7QKA1dkPnszA4Ufv3LP0Hm3LjUOpLO/2rkZ2I1N69eFCN5I7aHV1oxZ2KVwy7ZaDgN5abTZ/sUqVIIiEP46LXpfmsD/nPJEMWuWAaiDKBIvHE1xineFG+H8JR9GLHXWFxJgUpdnstaUMtW46Bc+fllQ3/3V5yQzV0alWPXn/IRFcZKI4mMlVa7YZ49PyiFnMUkamkMFIL5Aw0rJNq9SbxtHrn52LjCKU2WyRZSKKzf7SXbXMjTS8hxRdz4LIE+FuUQcscudBfzi511nNKO1t2SfgBJJe9w8K9zq494bXg==
+l.gtld-servers.net. 172800 IN A 192.41.162.30
+l.gtld-servers.net. 172800 IN AAAA 2001:500:d937::30
+j.gtld-servers.net. 172800 IN A 192.48.79.30
+j.gtld-servers.net. 172800 IN AAAA 2001:502:7094::30
+h.gtld-servers.net. 172800 IN A 192.54.112.30
+h.gtld-servers.net. 172800 IN AAAA 2001:502:8cc::30
+d.gtld-servers.net. 172800 IN A 192.31.80.30
+d.gtld-servers.net. 172800 IN AAAA 2001:500:856e::30
+b.gtld-servers.net. 172800 IN A 192.33.14.30
+b.gtld-servers.net. 172800 IN AAAA 2001:503:231d::2:30
+f.gtld-servers.net. 172800 IN A 192.35.51.30
+f.gtld-servers.net. 172800 IN AAAA 2001:503:d414::30
+k.gtld-servers.net. 172800 IN A 192.52.178.30
+k.gtld-servers.net. 172800 IN AAAA 2001:503:d2d::30
+m.gtld-servers.net. 172800 IN A 192.55.83.30
+m.gtld-servers.net. 172800 IN AAAA 2001:501:b1f9::30
+i.gtld-servers.net. 172800 IN A 192.43.172.30
+i.gtld-servers.net. 172800 IN AAAA 2001:503:39c1::30
+g.gtld-servers.net. 172800 IN A 192.42.93.30
+g.gtld-servers.net. 172800 IN AAAA 2001:503:eea3::30
+a.gtld-servers.net. 172800 IN A 192.5.6.30
+a.gtld-servers.net. 172800 IN AAAA 2001:503:a83e::2:30
+c.gtld-servers.net. 172800 IN A 192.26.92.30
+c.gtld-servers.net. 172800 IN AAAA 2001:503:83eb::30
+e.gtld-servers.net. 172800 IN A 192.12.94.30
+e.gtld-servers.net. 172800 IN AAAA 2001:502:1ca1::30
+. 172800 IN DNSKEY 256 3 8 AwEAAcorNxNc9t0ue1ZenPjVMRujlQ2YLBJ0pR/4XMjHby9vr03cRxFSKnWpxeg5PL384D9VeqdS1bjrGyTsHtoagzI3NiXFd8sjHMOnZxu5pp/+UBIg7tasYgVMMdUiM1Yu/c+t30d1Qw/v6NYLNnOnywTu6HuUh7Y1sZRq/GZcrxLENXHQoyKpOrOr8R3+qd6wK69IKB80ZBZtkX9rdEqKJk+yYXjEZzZ0zkAFthmNgCreAoU9PVlU66dyOsaLjf3wKUlUm9SNOKs+tK6LuSmRbK6+1T/tPaRaMBSEuv2G6vXfnJ1uyMbGvtpRn/YDcvTjrp6DzE6XyF44QdwJ3oKx4ek=
+. 172800 IN DNSKEY 257 3 8 AwEAAaz/tAm8yTn4Mfeh5eyI96WSVexTBAvkMgJzkKTOiW1vkIbzxeF3+/4RgWOq7HrxRixHlFlExOLAJr5emLvN7SWXgnLh4+B5xQlNVz8Og8kvArMtNROxVQuCaSnIDdD5LKyWbRd2n9WGe2R8PzgCmr3EgVLrjyBxWezF0jLHwVN8efS3rCj/EWgvIWgb9tarpVUDK/b58Da+sqqls3eNbuv7pr+eoZG+SrDK6nWeL3c6H5Apxz7LjVc1uTIdsIXxuOLYA4/ilBmSVIzuDWfdRUfhHdY6+cn8HFRm+2hM8AnXGXws9555KrUB5qihylGa8subX2Nn6UwNR1AkUTV74bU=
+. 172800 IN DNSKEY 257 3 8 AwEAAa96jeuknZlaeSrvyAJj6ZHv28hhOKkx3rLGXVaC6rXTsDc449/cidltpkyGwCJNnOAlFNKF2jBosZBU5eeHspaQWOmOElZsjICMQMC3aeHbGiShvZsx4wMYSjH8e7Vrhbu6irwCzVBApESjbUdpWWmEnhathWu1jo+siFUiRAAxm9qyJNg/wOZqqzL/dL/q8PkcRU5oUKEpUge71M3ej2/7CPqpdVwuMoTvoB+ZOT4YeGyxMvHmbrxlFzGOHOijtzN+u1TQNatX2XBuzZNQ1K+s2CXkPIZo7s6JgZyvaBevYtxPvYLw4z9mR7K2vaF18UYH9Z9GNUUeayffKC73PYc=
+. 172800 IN RRSIG DNSKEY 8 0 172800 1794355200 1792540800 38696 . VHYFWQzxvfICyEMAwDCqNJCoASexi9RUJqXLc8rsaEpX4x2J2YkgxJzMHN1HsXXmnLC7eqbdERKWI5wm/KzoFhDzY4F4TZB91tzN3gTDdDlIWvJi2GeUxfWj5MK/FalRoE9QX8EMjkVJPjqbxoeJ7yog7Yy+3z5vo4e+OeqcPHniyc90+cxo6fE6nLeFIQxicSrEBLkPMX7jA2ipXynVxJepQT/Qkzos7HL0N1xeHR3z3nfeH2JyFKz9moc6fSb4x0gDf9cbnFNJ5vbIttuxCEMcC4oWa/HNHPYeYHKKaLJ040QmaQGBJG59X77u0+FznsPxHLOdUjTQ9Ab4UvTYIA==

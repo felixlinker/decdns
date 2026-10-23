@@ -1,0 +1,19 @@
+google.com. 59 IN SOA ns1.google.com. dns-admin.google.com. 1005474929 900 900 1800 60
+google.com. 172800 IN NS ns2.google.com.
+google.com. 172800 IN NS ns1.google.com.
+google.com. 172800 IN NS ns3.google.com.
+google.com. 172800 IN NS ns4.google.com.
+google.com. 300 IN A 172.217.208.113
+google.com. 300 IN A 172.217.208.101
+google.com. 300 IN A 172.217.208.100
+google.com. 300 IN A 172.217.208.138
+google.com. 300 IN A 172.217.208.102
+google.com. 300 IN A 172.217.208.139
+ns2.google.com. 172800 IN AAAA 2001:4860:4802:34::a
+ns2.google.com. 172800 IN A 216.239.34.10
+ns1.google.com. 172800 IN AAAA 2001:4860:4802:32::a
+ns1.google.com. 172800 IN A 216.239.32.10
+ns3.google.com. 172800 IN AAAA 2001:4860:4802:36::a
+ns3.google.com. 172800 IN A 216.239.36.10
+ns4.google.com. 172800 IN AAAA 2001:4860:4802:38::a
+ns4.google.com. 172800 IN A 216.239.38.10

@@ -129,6 +129,7 @@ exampleConfigs =
   , leafUnsigned
   , dnameSequence
   , sibblings
+  , google
   ]
 
 wc :: Maybe a
@@ -489,6 +490,12 @@ sibblings =
     , query (gr dnsRoot) (gr RT.TXT) (gr bExample) wc wc ]
     []
 
+google :: ExampleConfig
+google =
+  ExampleConfig "real/google" "root-keys" dnsRoot ["root", "com", "google.com"]
+    [ query (gr dnsRoot) (gr RT.A) (gr googleCom) wc wc ]
+    []
+
 cyclicZonesOld :: ExampleConfig
 cyclicZonesOld =
   ExampleConfig "misconfigs/cyclic-zones/old" "/dev/null" dnsRoot ["root", "com.", "net."] [] []
@@ -558,7 +565,7 @@ rootNet, subRootNet, nsCom, nsBCom, nsNet, fnniFnniNet, fnniFnniFnniFnniNet, sub
 labelA, xA, xLabelA :: Name String
 exampleCom, exampleNet, aNet, bNet :: Name String
 aDe, bDe, cDe, nsADe, nsBDe, xDe, yDe, zDe :: Name String
-nsComCom, short, long, longShort, shortShort :: Name String
+nsComCom, googleCom, short, long, longShort, shortShort :: Name String
 dnsRoot = root
 com = mkName ["com", ""]
 net = mkName ["net", ""]
@@ -596,6 +603,7 @@ xDe = mkName ["x", "de", ""]
 yDe = mkName ["y", "de", ""]
 zDe = mkName ["z", "de", ""]
 nsComCom = mkName ["ns-com", "com", ""]
+googleCom = mkName ["google", "com", ""]
 short = mkName ["short", ""]
 long = mkName ["looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong", ""]
 longShort = mkName $ replicate n "x" ++ ["short", ""]
