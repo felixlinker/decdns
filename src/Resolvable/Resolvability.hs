@@ -92,8 +92,9 @@ resolvableStep roots nses (nameWithoutSynthesis -> zone) rrset@(Named n rs) = go
     ownerNoSynth :: Term
     ownerNoSynth = nameWithoutSynthesis n
 
-    glueCases :: [Fresh (Term, Term)]
-    glueCases = [ return (nses, referralZone), (roots,) <$> wildcard ]
+    glueCases :: Name String -> [Fresh (Term, Term)]
+    glueCases delegated =
+      return (nses, referralZone) : [ (roots,) <$> wildcard | not (isSubDomain delegated (toStringName n)) ]
 
     go :: T.Type -> Fresh (S.Set (Rule RComp))
     go r = case r of
@@ -102,7 +103,7 @@ resolvableStep roots nses (nameWithoutSynthesis -> zone) rrset@(Named n rs) = go
         let delegated = nsNames rs
             delegatedT = nsesTerm delegated
         in mconcat <$> sequence
-          [ foreachM [aType, aaaaType] $ \glueType -> foreachM glueCases $ \glueCase -> foreachM delegated $ \s ->
+          [ foreachM [aType, aaaaType] $ \glueType -> foreachM delegated $ \s -> foreachM (glueCases s) $ \glueCase ->
               do
                 (nTail, t, d, v, a, alias) <- freshVars6 ("N", "T", "D", "V", "A", "Alias")
                 let n' = captureListTail nTail ownerNoSynth
