@@ -61,7 +61,7 @@ defaultQueryConfig :: QueryConfig
 defaultQueryConfig = QueryConfig 53 3000000 2 100 limits putStrLn
   where
     limits :: M.Map T.Type Int
-    limits = M.fromList [(T.CNAME, 10), (T.DNAME, 10), (T.NS, 20)]
+    limits = M.fromList [(T.CNAME, 5), (T.DNAME, 5), (T.NS, 10)]
 
 type Origin = S.Set (Name String)
 
