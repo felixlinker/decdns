@@ -77,6 +77,10 @@ extra-source-files:
     examples/ns/ns-alias/root
     examples/ns/self-deleg/com.
     examples/ns/self-deleg/sub.a.com.
+    examples/ns/sibblings/a.example
+    examples/ns/sibblings/b.example
+    examples/ns/sibblings/example
+    examples/ns/sibblings/root
     examples/ns/sub-self-deleg/net.
     examples/ns/sub-self-deleg/root
     examples/ns/sub-self-deleg/root.net.

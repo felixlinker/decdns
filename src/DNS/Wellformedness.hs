@@ -45,8 +45,9 @@ dataNoApex (Zone _ (Tr.Node _ rcs)) = Tr.Node RRSet.empty rcs
 -- * Enfore tautologies on NSEC(3) bitmaps
 -- * There must be the corresponding data for every RRSIG
 wellformed :: Zone String -> [Issue String]
-wellformed z@(Zone org r) = catMaybes
+wellformed z@(Zone org r@(Tr.Node rd _)) = catMaybes
   [ expect (checkCNAME z) (Error "CNAME record accompanied by records other than NSEC or RRSIG")
+  , expect (not $ RRSet.hasType T.DS rd) (Error "DS record at zone apex")
   , expect (not $ any (RRSet.hasType T.SOA) (dataNoApex z)) (Error "zone SOA record below apex")
   , expect (checkZoneCuts $ dataNoApex z) (Error "illegal record at or below zone cut")
   , expect (singletonTypes r) (Error "more than one CNAME, DNAME, NSEC or SOA record at owner name")

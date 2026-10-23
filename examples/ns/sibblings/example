@@ -1,0 +1,9 @@
+$ORIGIN example.
+$TTL 1200
+@ IN SOA ns. example.com. 0 0 0 0 0
+@ IN NS ns.
+
+a IN NS ns.b.example.
+b IN NS ns.a.example.
+ns.a IN A 1.2.3.4
+ns.b IN A 1.2.3.4

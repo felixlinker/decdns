@@ -1,4 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TupleSections #-}
 module Resolvable.Resolvability
   ( RComp(..)
   , nsesTerm
@@ -80,15 +81,6 @@ resolvableBase nses zone isReferral (Named n rds@((RData _ _ ty) NE.:| _)) =
 dnssecTypeNeqs :: Term -> [Term]
 dnssecTypeNeqs t = map ($ t) [(\= dsType), (\= dnskeyType), (\= rrsigType), (\= nsecType), (\= nsec3Type)]
 
-glueLookup :: ZoneNSesT -> ZoneNSesT -> Term -> Name String -> Name String -> Fresh Term
-glueLookup roots nses glueType owner nsName =
-  let expectGlue = isSubDomain nsName owner
-  in do
-    dIp <- freshVar "D_IP"
-    let glueNS = if expectGlue then nses else roots
-    glueZ <- if expectGlue then return referralZone else wildcard
-    return $ resolves glueNS glueType glueZ (nameTerm nsName) dIp bot bot (ad 0)
-
 resolvableStep :: ZoneNSesT -> ZoneNSesT -> ConstrainedName -> ConstrainedRRSet -> Fresh (S.Set (Rule RComp))
 resolvableStep roots nses (nameWithoutSynthesis -> zone) rrset@(Named n rs) = go (rrsetType rrset)
   where
@@ -100,6 +92,9 @@ resolvableStep roots nses (nameWithoutSynthesis -> zone) rrset@(Named n rs) = go
     ownerNoSynth :: Term
     ownerNoSynth = nameWithoutSynthesis n
 
+    glueCases :: [Fresh (Term, Term)]
+    glueCases = [ return (nses, referralZone), (roots,) <$> wildcard ]
+
     go :: T.Type -> Fresh (S.Set (Rule RComp))
     go r = case r of
       T.NS  | ownerNoSynth == zone -> return S.empty
@@ -107,38 +102,17 @@ resolvableStep roots nses (nameWithoutSynthesis -> zone) rrset@(Named n rs) = go
         let delegated = nsNames rs
             delegatedT = nsesTerm delegated
         in mconcat <$> sequence
-          [ foreachM [aType, aaaaType] $ \glueType -> foreachM delegated $ \s ->
-              do  -- Unauthenticated
-                (nTail, t, d, alias) <- freshVars4 ("N", "T", "D", "Alias")
-                -- Do not expect wildcard neq constraints on NS records
+          [ foreachM [aType, aaaaType] $ \glueType -> foreachM glueCases $ \glueCase -> foreachM delegated $ \s ->
+              do
+                (nTail, t, d, v, a, alias) <- freshVars6 ("N", "T", "D", "V", "A", "Alias")
                 let n' = captureListTail nTail ownerNoSynth
                 rann <- rannot r
-                glueResolves <- glueLookup roots nses glueType (toStringName n) s
-                return $ S.singleton $ Rule rann (resolves nses t zone n' d alias bot (ad 0))
-                  [isName n'
-                  , glueResolves
-                  , resolves delegatedT t ownerNoSynth n' d alias bot (ad 0)]
-          , foreachM [aType, aaaaType] $ \glueType -> foreachM delegated $ \s ->
-              do  -- Validated not-DS
-                (nTail, t, d, a, alias) <- freshVars5 ("N", "T", "D", "A", "Alias")
-                let n' = captureListTail nTail ownerNoSynth
-                rann <- rannot r
-                glueResolves <- glueLookup roots nses glueType (toStringName n) s
-                return (S.singleton $ Rule rann (resolves nses t zone n' d alias top a)
-                  [ t \= dsType
-                  , isName n'
-                  , glueResolves
-                  , resolves delegatedT t ownerNoSynth n' d alias top a ])
-          , foreachM [aType, aaaaType] $ \glueType -> foreachM delegated $ \s ->
-              do  -- Authenticated DS
-                (l, nTail, d, alias) <- freshVars4 ("L", "N", "D", "Alias")
-                let n' = injectLast l $ captureListTail nTail ownerNoSynth
-                rann <- rannot r
-                glueResolves <- glueLookup roots nses glueType (toStringName n) s
-                return (S.singleton $ Rule rann (resolves nses dsType zone n' d alias top (ad 1))
+                (glueServers, glueZone) <- glueCase
+                glueData <- wildcard
+                return (S.singleton $ Rule rann (resolves nses t zone n' d alias v a)
                   [ isName n'
-                  , glueResolves
-                  , resolves delegatedT dsType ownerNoSynth n' d alias top (ad 1) ])
+                  , resolves glueServers glueType glueZone (nameTerm s) glueData bot bot (ad 0)
+                  , resolves delegatedT t ownerNoSynth n' d alias v a ])
             , do  -- NSEC for unsigned subzone
                 (nTail, t, d, dNSEC) <- freshVars4 ("N", "T", "D", "D_NSEC")
                 let n' = captureListTail nTail ownerNoSynth

@@ -128,6 +128,7 @@ exampleConfigs =
   , dnameMappedDelegation
   , leafUnsigned
   , dnameSequence
+  , sibblings
   ]
 
 wc :: Maybe a
@@ -481,6 +482,13 @@ dnameSequence =
     , query wc (gr RT.TXT) (gr xLabelA) wc wc ]
     [ query wc (gr RT.TXT) (gr xA) wc wc ]
 
+sibblings :: ExampleConfig
+sibblings =
+  ExampleConfig "ns/sibblings" "/dev/null" dnsRoot ["root", "example", "a.example", "b.example"]
+    [ query (gr dnsRoot) (gr RT.TXT) (gr aExample) wc wc
+    , query (gr dnsRoot) (gr RT.TXT) (gr bExample) wc wc ]
+    []
+
 cyclicZonesOld :: ExampleConfig
 cyclicZonesOld =
   ExampleConfig "misconfigs/cyclic-zones/old" "/dev/null" dnsRoot ["root", "com.", "net."] [] []
@@ -545,7 +553,7 @@ shortLongDNAME :: ExampleConfig
 shortLongDNAME =
   ExampleConfig "dname/wildcard-to-dname/new" "/dev/null" dnsRoot ["root"] [] []
 
-dnsRoot, com, net, de, exampleZone, aCom, bCom, aaaaCom, subACom, aSubSubSubCom, xWildcardCom :: Name String
+dnsRoot, com, net, de, exampleZone, aExample, bExample, aCom, bCom, aaaaCom, subACom, aSubSubSubCom, xWildcardCom :: Name String
 rootNet, subRootNet, nsCom, nsBCom, nsNet, fnniFnniNet, fnniFnniFnniFnniNet, subExample :: Name String
 labelA, xA, xLabelA :: Name String
 exampleCom, exampleNet, aNet, bNet :: Name String
@@ -556,6 +564,8 @@ com = mkName ["com", ""]
 net = mkName ["net", ""]
 de = mkName ["de", ""]
 exampleZone = mkName ["example", ""]
+aExample = mkName ["a", "example", ""]
+bExample = mkName ["b", "example", ""]
 aCom = mkName ["a", "com", ""]
 bCom = mkName ["b", "com", ""]
 aaaaCom = mkName ["a", "a", "a", "a", "com", ""]
