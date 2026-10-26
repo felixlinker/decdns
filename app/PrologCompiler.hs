@@ -49,21 +49,6 @@ main = do
       cfg <- parseZones zones
       res <- failLeftS $ runFresh $ runExceptT $ compileConfig rootZoneName keys cfg >>= lift . immediateConsequences
       putStrLn $ showKnowledgeBase $ map toRule $ S.toList $ allResolvable rootZoneName res
-    "regressions" -> do
-      keysPathOld:keysPathNew:rootZ:args' <- return args
-      keysOld <- parseDS keysPathOld
-      keysNew <- parseDS keysPathNew
-      rootZoneName <- parseNameM rootZ
-      (old, new) <- sepBy "::" args'
-      oldRecs <- parseZones old
-      newRecs <- parseZones new
-      regs <- failLeftS $ runFresh $ runExceptT $ do
-        oldRecsC <- compileConfig rootZoneName keysOld oldRecs
-        newRecsC <- compileConfig rootZoneName keysNew newRecs
-        oldFacts <- lift $ allResolvable rootZoneName <$> immediateConsequences oldRecsC
-        newFacts <- lift $ allResolvable rootZoneName <$> immediateConsequences newRecsC
-        return $ computeRegressions oldFacts newFacts
-      mapM_ print $ S.map toRule regs
     "parse-only" -> do
       parsed <- parseZones args
       mapM_ printZone parsed
@@ -79,7 +64,24 @@ main = do
       (as, _, _) <- maybe (fail "timeout") return =<< time (resolve keys addrs t' qn')
       when (null as) (putStrLn "no response")
       mapM_ print as
-    _ -> fail "unknown command"
+    _ | cmd `elem` ["regressions", "gains"] -> do
+        keysPathOld:keysPathNew:rootZ:args' <- return args
+        keysOld <- parseDS keysPathOld
+        keysNew <- parseDS keysPathNew
+        rootZoneName <- parseNameM rootZ
+        (old, new) <- sepBy "::" args'
+        oldRecs <- parseZones old
+        newRecs <- parseZones new
+        changes <- failLeftS $ runFresh $ runExceptT $ do
+          oldRecsC <- compileConfig rootZoneName keysOld oldRecs
+          newRecsC <- compileConfig rootZoneName keysNew newRecs
+          oldFacts <- lift $ allResolvable rootZoneName <$> immediateConsequences oldRecsC
+          newFacts <- lift $ allResolvable rootZoneName <$> immediateConsequences newRecsC
+          let regressions = computeRegressions oldFacts newFacts
+          let gains = computeRegressions newFacts oldFacts
+          return $ if cmd == "regressions" then regressions else gains
+        mapM_ print $ S.map toRule changes
+      | otherwise -> fail "unknown command"
   where
     printZone :: Zone ConstrainedLabel -> IO ()
     printZone z = do
