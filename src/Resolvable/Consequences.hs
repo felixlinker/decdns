@@ -18,10 +18,9 @@ import Data.Either (fromRight)
 import Data.Foldable (Foldable(foldl'))
 import Data.Functor.Identity (Identity)
 import qualified Data.Set as S
-import Data.Maybe (listToMaybe, mapMaybe, catMaybes, isJust)
+import Data.Maybe (listToMaybe, mapMaybe, isJust)
 
 import qualified Resolvable.Constraint.Store as Store
-import Resolvable.Constraint.Solving (getSolved)
 import Resolvable.Prolog.Core
 import Resolvable.Prolog.TermView
 import Resolvable.Resolution
@@ -89,10 +88,10 @@ instance Unify Fact where
 instance Apply Fact where
   apply u (Fact t st) = Fact (apply u t) (apply u st)
 
-applySimplify :: Unifier -> Fact -> Maybe Fact
+applySimplify :: Unifier -> Fact -> [Fact]
 applySimplify u f =
   let Fact t st = apply u f
-  in  Fact t <$> getSolved (Store.simplify st)
+  in  Fact t <$> Store.simplify st
 
 instance Show Fact where
   show = show . toRule
@@ -105,12 +104,12 @@ solveBody fs r = do
   Rule _ h b <- lift $ awayR r
   let (st, b') = Store.partitionConstraints b
   let us = foldl' solvePredicate [(identity, st)] b'
-  facts <- catMaybes <$> mapM (uncurry $ toFact h) us
+  facts <- concat <$> mapM (uncurry $ toFact h) us
   return $ factSet facts
   where
-    toFact :: Term -> Unifier -> Store.ConstraintStore -> CSolver (Maybe Fact)
+    toFact :: Term -> Unifier -> Store.ConstraintStore -> CSolver [Fact]
     toFact h u st = do
-      reduced <- getSolved <$> Store.simplifyCached (apply u st)
+      reduced <- Store.simplifyCached (apply u st)
       return $ Fact (apply u h) <$> reduced
 
     solvePredicate :: [(Unifier, Store.ConstraintStore)] -> Term -> [(Unifier, Store.ConstraintStore)]

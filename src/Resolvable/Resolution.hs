@@ -23,13 +23,12 @@ module Resolvable.Resolution
 import Control.Monad (when, guard)
 import Control.Monad.Trans.Class (lift)
 import qualified Control.Monad.Trans.State as St
-import Data.Maybe (mapMaybe, maybeToList, catMaybes, isNothing)
+import Data.Maybe (mapMaybe, maybeToList, isNothing)
 import Data.List (uncons, partition, intercalate)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
 import qualified Resolvable.Constraint.Store as Store
-import Resolvable.Constraint.Solving
 import Resolvable.Prolog.Core
 import Resolvable.Prolog.TermView
 import Resolvable.Unification hiding (toList)
@@ -126,13 +125,13 @@ canonicalGoal g = fst $ runFresh $ awayG g
 resolution :: (Monad m, Ord a) => [Rule a] -> BoundedGoal a -> Unifier -> RSolver a m [(BoundedGoal a, Unifier)]
 resolution _ g@(Goal _ [] _) u = return [(g, u)]
 resolution rs g@(Goal _ (p:_) _) u = do
-  gs <- catMaybes <$> mapM (uncurry simplify) (resolutionStep rs g)
+  gs <- concat <$> mapM (uncurry simplify) (resolutionStep rs g)
   when (null gs && isResolves p) (failed g)
   return gs
   where
-    simplify :: Monad m => BoundedGoal a -> Unifier -> RSolver a m (Maybe (BoundedGoal a, Unifier))
+    simplify :: Monad m => BoundedGoal a -> Unifier -> RSolver a m [(BoundedGoal a, Unifier)]
     simplify (Goal ts limits st) u' = do
-      st' <- getSolved <$> Store.simplifyCached st
+      st' <- Store.simplifyCached st
       return $ (, u ~> u') . Goal ts limits <$> st'
 
 resolutionStep :: forall k. Ord k => [Rule k] -> BoundedGoal k -> [(BoundedGoal k, Unifier)]

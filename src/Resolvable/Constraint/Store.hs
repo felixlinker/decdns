@@ -26,7 +26,7 @@ import Resolvable.Prolog.TermView
 import Resolvable.Prolog.Reverse
 import qualified Resolvable.Unification as U
 import qualified Resolvable.Constraint.Neqs as N
-import Resolvable.Constraint.Solving as Solving
+import Resolvable.Constraint.Solving
 
 simplifyTEx :: Term -> Ex.Except String Bool
 simplifyTEx t = case toView t of
@@ -143,10 +143,11 @@ syntacticNots ((doubleNeg -> h):r) = case toView h of
   _ | nott h `elem` r   -> Unsatisfiable
     | otherwise         -> Satisfiable (h:) <*> syntacticNots r
 
-simplify :: ConstraintStore -> Solved ConstraintStore
+-- Returns a disjunction
+simplify :: ConstraintStore -> [ConstraintStore]
 simplify = runIdentity . simplifyWithCache (Identity . simplifyT)
 
-simplifyCached :: Monad m => ConstraintStore -> SimplifyCache m (Solved ConstraintStore)
+simplifyCached :: Monad m => ConstraintStore -> SimplifyCache m [ConstraintStore]
 simplifyCached = simplifyWithCache simplifyTCached
 
 -- The cache belongs to one computation, so independent runs do not retain
@@ -154,17 +155,20 @@ simplifyCached = simplifyWithCache simplifyTCached
 -- neither affect hit rates nor escape into another constraint's result.
 type SimplifyCache m a = St.StateT (M.Map Term Bool) m a
 
-simplifyWithCache :: Monad m => (Term -> m (Solved (Maybe Term))) -> ConstraintStore -> m (Solved ConstraintStore)
+simplifyWithCache :: Monad m => (Term -> m (Solved (Maybe Term))) -> ConstraintStore -> m [ConstraintStore]
 simplifyWithCache cache (CStore ns ts) = do
   let ns' = N.simplify ns
   case syntacticNots ts of
-    Unsatisfiable -> return Unsatisfiable
+    Unsatisfiable -> return []
     Satisfiable ts' -> do
       ts'' <- fmap catMaybes . sequenceA <$> mapM cache ts'
-      return $ CStore <$> ns' <*> ts''
+      return $ CStore <$> concatMap getSolved ns' <*> getSolved ts''
 
 evalCached :: Monad m => SimplifyCache m a -> m a
 evalCached = (`St.evalStateT` M.empty)
 
-solve :: Solved ConstraintStore -> Maybe Bool
-solve = Solving.solve . fmap toBody
+solve :: [ConstraintStore] -> Maybe Bool
+solve [] = Just False
+solve stores
+  | any Resolvable.Constraint.Store.null stores = Just True
+  | otherwise = Nothing

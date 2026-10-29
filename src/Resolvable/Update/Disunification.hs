@@ -3,13 +3,11 @@ module Resolvable.Update.Disunification
   ( withouts
   , computeRegressions ) where
 
-import Control.Monad ((<=<))
-import Data.Maybe (mapMaybe)
+import Control.Monad (guard)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
 import qualified Resolvable.Constraint.Store as Store
-import Resolvable.Constraint.Solving (getSolved)
 import Resolvable.Consequences
 import qualified Resolvable.Unification as U
 import Resolvable.Prolog.Core
@@ -17,7 +15,7 @@ import Resolvable.Prolog.Core
 unifySimplified :: Fact -> Fact -> Maybe U.Unifier
 unifySimplified f1 f2 = do
   u <- U.unify f1 f2
-  _ <- applySimplify u f1
+  guard $ not $ null $ applySimplify u f1
   return u
 
 extendUnif :: U.Unify a => U.Unifier -> a -> a -> Maybe U.Unifier
@@ -33,20 +31,20 @@ disunify base@(Fact t st) neg@(Fact _ (Store.CStore negNeqs negCs)) =
     negCases :: U.Unifier -> [Fact]
     negCases u = notUnified u ++ notConstraints u
 
-    addNeq :: (Term, Term) -> Maybe Store.ConstraintStore
-    addNeq (a, b) = getSolved . Store.simplify =<< Store.add st (a \= b)
+    addNeq :: (Term, Term) -> [Store.ConstraintStore]
+    addNeq (a, b) = maybe [] Store.simplify (Store.add st (a \= b))
 
     -- We describe when the heads don't unify by negating the unifier as it
     -- applies to @t@ (i.e., restricting it).
     notUnified :: U.Unifier -> [Fact]
     notUnified u =
       let U.Unifier (M.toList -> toNegate) = U.filterRenamings $ U.restrict (vars t) u
-      in mapMaybe (fmap (Fact t) . addNeq) toNegate
+      in concatMap (map (Fact t) . addNeq) toNegate
 
     notConstraints :: U.Unifier -> [Fact]
     notConstraints u =
-          mapMaybe ((`applySimplify` base) <=< uncurry (extendUnif u) . U.apply u) negNeqs
-      ++  mapMaybe ((applySimplify u . Fact t <=< Store.add st) . nott) negCs
+          concatMap (maybe [] (`applySimplify` base) . uncurry (extendUnif u) . U.apply u) negNeqs
+      ++  concatMap (maybe [] (applySimplify u . Fact t) . Store.add st . nott) negCs
 
 withouts :: Fact -> [Fact] -> [Fact]
 withouts q = foldr (\nq -> concatMap (`disunify` nq)) [q]

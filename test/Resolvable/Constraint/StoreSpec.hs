@@ -6,7 +6,6 @@ import Test.Tasty.HUnit (testCase, (@?=))
 
 import Resolvable.Prolog.Core
 import Resolvable.Constraint.Store
-import Resolvable.Constraint.Solving (getSolved)
 import Util.Fresh (runFresh)
 
 tests :: TestTree
@@ -23,9 +22,9 @@ tests =
         checkIsName (list (replicate 128 (TAtom "a"))) @?= Just False
     , testCase "simplification retains unresolved constraints beside true constraints" $ do
         let constraints = CStore [] [isName (TVar "X"), isName (list [])]
-        fmap toBody (getSolved (simplify constraints)) @?= Just [isName (TVar "X")]
-        fmap toBody (getSolved (runFresh (evalCached (simplifyCached constraints))))
-          @?= Just [isName (TVar "X")]
+        map toBody (simplify constraints) @?= [[isName (TVar "X")]]
+        map toBody (runFresh (evalCached (simplifyCached constraints)))
+          @?= [[isName (TVar "X")]]
     , testCase "a false constraint rejects a conjunction containing a true constraint" $ do
         let constraints = CStore []
               [isName (list (replicate 128 (TAtom "a"))), isName (list [])]
@@ -39,6 +38,10 @@ tests =
     , testCase "negation supports not solvable constraints" $ do
         let constraints = CStore [] [nott (isName (TVar "X"))]
         solve (simplify constraints) @?= Nothing
+    , testCase "disjunction preservation" $ do
+        let constraints = CStore [(list [TVar "X", TVar "Y"], list [TVar "A", TVar "B"])] [isName (TVar "X")]
+        simplify constraints @?= [ CStore [(TVar "X", TVar "A")] [isName (TVar "X")]
+                                 , CStore [(TVar "Y", TVar "B")] [isName (TVar "X")] ]
     ]
 
 checkIsName :: Term -> Maybe Bool

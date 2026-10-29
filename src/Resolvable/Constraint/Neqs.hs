@@ -1,14 +1,10 @@
+{-# LANGUAGE ViewPatterns #-}
 module Resolvable.Constraint.Neqs
   ( Neqs
   , Resolvable.Constraint.Neqs.empty
   , asPredicates
   , addConstraint
   , simplify ) where
-
-import Control.Monad (guard)
-import Data.Bifunctor (Bifunctor(bimap))
-import Data.Maybe (maybeToList, catMaybes)
-import Data.List (nub)
 
 import Resolvable.Prolog.Core
 import Resolvable.Constraint.Solving
@@ -24,25 +20,26 @@ asPredicates = map (uncurry (\=))
 addConstraint :: Term -> Term -> Neqs -> Neqs
 addConstraint k v = ((k, v):)
 
-simplify :: Neqs -> Solved Neqs
-simplify = fmap (nub . catMaybes) . traverse (uncurry simplifyNeq)
+simplify :: Neqs -> [Solved Neqs]
+simplify = foldr (aux . uncurry simplifyNeq) [Satisfiable []]
+  where
+    aux :: [Solved (Maybe (Term, Term))] -> [Solved Neqs] -> [Solved Neqs]
+    aux (simplifyDisj -> disj) acc
+      | null disj = []
+      | otherwise = concatMap (\d -> map (fmap (d++)) acc) disj
 
-simplifyArgs :: [Term] -> [Term] -> Solved [(Term, Term)]
+simplifyArgs :: [Term] -> [Term] -> [Solved (Maybe (Term, Term))]
 -- Arguments are equal, i.e., contradictory
-simplifyArgs [] [] = Unsatisfiable
+simplifyArgs [] [] = []
 -- Arguments are unequal, i.e., constraint is redundant
-simplifyArgs [] (_:_) = Satisfiable []
-simplifyArgs (_:_) [] = Satisfiable []
-simplifyArgs (a:ta) (b:tb) = cup (maybeToList <$> simplifyNeq a b) (simplifyArgs ta tb)
+simplifyArgs [] (_:_) = [Satisfiable Nothing]
+simplifyArgs (_:_) [] = [Satisfiable Nothing]
+simplifyArgs (a:ta) (b:tb) = simplifyNeq a b ++ simplifyArgs ta tb
 
-listOrSingleton :: [Term] -> Term
-listOrSingleton [a] = a
-listOrSingleton l = list l
-
-simplifyNeq :: Term -> Term -> Solved (Maybe (Term, Term))
+simplifyNeq :: Term -> Term -> [Solved (Maybe (Term, Term))]
 simplifyNeq a@(TVar _) b
-  | a /= b = Satisfiable (Just (a, b))
-  | otherwise = Unsatisfiable
+  | a /= b = [Satisfiable (Just (a, b))]
+  | otherwise = []
 -- NOTE: a below cannot be a variable
 simplifyNeq a b@(TVar _) = simplifyNeq b a
 -- NOTE: b below cannot be a variable
@@ -58,15 +55,10 @@ simplifyNeq a b = case a of
     TFunctor nb argsb
       -- If the functor name is the same, we can reduce inequality of the
       -- functor to the inequality of its list of arguments.
-      | na == nb -> asList <$> simplifyArgs argsa argsb
-    _ -> Satisfiable Nothing
+      | na == nb -> simplifyArgs argsa argsb
+    _ -> [Satisfiable Nothing]
   where
-    asList :: [(Term, Term)] -> Maybe (Term, Term)
-    asList neqs = do
-      guard (not $ null neqs)
-      return $ bimap listOrSingleton listOrSingleton $ unzip neqs
-
-    decideNonVar :: Solved (Maybe a)
+    decideNonVar :: [Solved (Maybe a)]
     decideNonVar
-      | a == b    = Unsatisfiable
-      | otherwise = Satisfiable Nothing
+      | a == b    = []
+      | otherwise = [Satisfiable Nothing]

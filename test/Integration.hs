@@ -16,7 +16,6 @@ import NameConstraint (ConstrainedLabel)
 import Parsing (parseZoneFiles, parseDS)
 import Resolvable.Consequences
 import qualified Resolvable.Constraint.Store as Store
-import Resolvable.Constraint.Solving (getSolved)
 import Resolvable.Prolog.Core
 import Resolvable.Resolvability (compileConfig)
 import Resolvable.Update.Disunification (computeRegressions)
@@ -34,8 +33,8 @@ tests = testGroup "Examples"
   , testCase "signed facts have fully reduced constraints" $ do
       results <- resolvableQueries cnameSigned
       forM_ results $ \(Fact _ constraints) ->
-        fmap Store.toBody (getSolved (Store.simplify constraints))
-          @?= Just (Store.toBody constraints)
+        map Store.toBody (Store.simplify constraints)
+          @?= [Store.toBody constraints]
   , testGroup "regressions"
       [ testCase "unchanged configuration has no regressions" $
           regressionTest cnameBase cnameBase [] [regression wc wc wc]
