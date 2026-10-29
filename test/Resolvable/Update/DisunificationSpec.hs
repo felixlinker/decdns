@@ -85,17 +85,32 @@ minusTests =
       , [ qC ["com", "Y"] [nott (isName (TVar "Y"))] ] )
     , ( qC ["com", "X"] [isName (TVar "X")]
       , [qC ["com", "Y"] [isName (TVar "Y")]]
-      , [] ) ]
+      , [] )
+    -- , ( q [ "X", "X" ]
+    --   , [ qF [ f (fromString "A") (fromString "B"), f (fromString "C") (fromString "D") ] ]
+    --   , [] )
+    -- , ( q [ "X", "Y", "Z" ]
+    --   , [ q [ "A", "A", "A" ] ]
+    --   , [ qC [ "X", "Y", "Z" ] [ "X" != "Y" ]
+    --     , qC [ "X", "Y", "Z" ] [ "X" != "Z" ]
+    --     , qC [ "X", "Y", "Z" ] [ "Y" != "Z" ] ] )
+    ]
   where
     mkTestCase (q', n, expected) =
       testCase (show q' ++ " without " ++ intercalate " and " (map show n)) $
         withouts q' n @?= expected
+
+f :: Term -> Term -> Term
+f a b = TFunctor "f" [ a, b ]
 
 q :: [String] -> Fact
 q = (`qC` [])
 
 labelList :: [String] -> Term
 labelList = list . map fromString
+
+qF :: [Term] -> Fact
+qF ts = Fact (TFunctor "p" [ list ts ]) Store.empty
 
 qC :: [String] -> [Term] -> Fact
 qC (labelList -> ls) neqs =
