@@ -26,7 +26,7 @@ simplifyRejectsEqualGroundTerms =
 simplifyKeepsVariableConstraints :: Assertion
 simplifyKeepsVariableConstraints =
         simplify  [(TVar "X", TVar "Y"), (TAtom "a", TVar "Z")]
-    @?= [Satisfiable [(TVar "X", TVar "Y"), (TVar "Z", TAtom "a")]]
+    @?= [Satisfiable [(TVar "X", TVar "Y"), (TAtom "a", TVar "Z")]]
 
 (!=) :: Term -> Term -> (Term, Term)
 (!=) = (,)

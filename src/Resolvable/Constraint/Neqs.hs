@@ -41,7 +41,7 @@ simplifyNeq a@(TVar _) b
   | a /= b = [Satisfiable (Just (a, b))]
   | otherwise = []
 -- NOTE: a below cannot be a variable
-simplifyNeq a b@(TVar _) = simplifyNeq b a
+simplifyNeq a b@(TVar _) = [Satisfiable (Just (a, b))]
 -- NOTE: b below cannot be a variable
 simplifyNeq a b = case a of
   -- We can simplify all below cases to either dropping the inequality, as the
