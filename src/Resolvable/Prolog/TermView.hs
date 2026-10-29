@@ -37,7 +37,6 @@ data TermView = TVList Term Term
               | TVNeq Term Term
               | TVNot Term
               | TVMin Term Term Term
-              | TVLeq Term Term
               | TVResolves Resolves
               | TVResolvable Term Term Term
               | TVIsName Term
@@ -87,9 +86,6 @@ toView (TFunctor n args)
     _ -> undefined
   | n == minSym = case args of
     [ a, b, c ] -> TVMin a b c
-    _ -> undefined
-  | n == leqSym = case args of
-    [ a, b ] -> TVLeq a b
     _ -> undefined
   | n == resolvesSym = case args of
     [ ns, qtype, zone, qname, d, alias, ver, adb ] -> TVResolves $ Resolves ns qtype zone qname d alias ver adb
@@ -181,7 +177,6 @@ fromView (TVMember a b) = member a b
 fromView (TVNeq a b) = a \= b
 fromView (TVNot constraint) = nott constraint
 fromView (TVMin a b c) = minTerm a b c
-fromView (TVLeq a b) = a =< b
 fromView (TVResolves (Resolves ns qtype zone qname d alias ver adb)) = resolves ns qtype zone qname d alias ver adb
 fromView (TVResolvable qtype qname ver) = resolvable qtype qname ver
 fromView (TVIsName nam) = isName nam

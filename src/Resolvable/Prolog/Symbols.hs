@@ -4,7 +4,6 @@ module Resolvable.Prolog.Symbols
   , memberSym
   , neqSym
   , minSym
-  , leqSym
   , notSym
   , negSym
   , resolvesSym
@@ -29,9 +28,6 @@ memberSym = "member"
 
 neqSym :: String
 neqSym = "dif"
-
-leqSym :: String
-leqSym = "=<"
 
 notSym :: String
 notSym = "not"

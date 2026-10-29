@@ -38,7 +38,6 @@ module Resolvable.Prolog.Core
   , (Resolvable.Prolog.Core.^)
 
   , (\=)
-  , (=<)
   , nott
   , (\+)
   , showKnowledgeBase
@@ -107,7 +106,6 @@ import Data.Maybe (isNothing, fromMaybe)
 infixFunctors :: [String]
 infixFunctors =
   [ caretSym
-  , leqSym
   , negSym ]
 
 data Term = TFunctor String [Term]
@@ -343,9 +341,6 @@ subterm t1 = bool . walk (\t -> Or (t == t1))
 
 (\=) :: Term -> Term -> Term
 (\=) = tBin neqSym
-
-(=<) :: Term -> Term -> Term
-(=<) = tBin leqSym
 
 nott :: Term -> Term
 nott = TFunctor notSym . (:[])
