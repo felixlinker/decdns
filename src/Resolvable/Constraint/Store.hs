@@ -15,6 +15,7 @@ module Resolvable.Constraint.Store
 
 import qualified Control.Monad.Trans.Except as Ex
 import qualified Control.Monad.Trans.State as St
+import Data.List (intercalate)
 import qualified Data.Map.Strict as M
 import Data.Functor.Identity (Identity(..))
 import Data.Maybe (catMaybes)
@@ -84,6 +85,9 @@ simplifyTCached t = do
 
 data ConstraintStore = CStore N.Neqs [Term]
   deriving (Eq, Ord)
+
+instance Show ConstraintStore where
+  show cs = intercalate ", " $ map show (toBody cs)
 
 instance U.Apply ConstraintStore where
   apply u (CStore ns os) = CStore (U.apply u ns) (U.apply u os)
