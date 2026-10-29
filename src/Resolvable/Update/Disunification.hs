@@ -4,7 +4,6 @@ module Resolvable.Update.Disunification
   , computeRegressions ) where
 
 import Control.Monad (guard)
-import qualified Data.Map as M
 import qualified Data.Set as S
 
 import qualified Resolvable.Constraint.Store as Store
@@ -22,7 +21,7 @@ extendUnif :: U.Unify a => U.Unifier -> a -> a -> Maybe U.Unifier
 extendUnif u t1 t2 = U.extendUnifier t1 t2 u
 
 disunify :: Fact -> Fact -> [Fact]
-disunify base@(Fact t st) neg@(Fact _ (Store.CStore negNeqs negCs)) =
+disunify base@(Fact t st) neg@(Fact t' (Store.CStore negNeqs negCs)) =
   -- If the two facts to not unify, there is no thing to subtract.
   maybe [base] negCases (unifySimplified base neg)
   where
@@ -34,12 +33,8 @@ disunify base@(Fact t st) neg@(Fact _ (Store.CStore negNeqs negCs)) =
     addNeq :: (Term, Term) -> [Store.ConstraintStore]
     addNeq (a, b) = maybe [] Store.simplify (Store.add st (a \= b))
 
-    -- We describe when the heads don't unify by negating the unifier as it
-    -- applies to @t@ (i.e., restricting it).
     notUnified :: U.Unifier -> [Fact]
-    notUnified u =
-      let U.Unifier (M.toList -> toNegate) = U.filterRenamings $ U.restrict (vars t) u
-      in concatMap (map (Fact t) . addNeq) toNegate
+    notUnified _ = map (Fact t) (addNeq (t, t'))
 
     notConstraints :: U.Unifier -> [Fact]
     notConstraints u =
