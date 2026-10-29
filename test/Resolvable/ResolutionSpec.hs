@@ -104,9 +104,9 @@ tests =
       ]
     , testGroup "bounds"
       [ testCase "failure order (a)" $ limitsSmallerEq (M.fromList [("a", 1)]) (M.fromList [("a", 2)]) @?= True
-      , testCase "failure order (a)" $ limitsSmallerEq (M.fromList [("a", 2)]) (M.fromList [("a", 2)]) @?= True
       , testCase "failure order (b)" $ limitsSmallerEq (M.fromList [("a", 1)]) (M.fromList [("a", 2), ("b", 3)]) @?= False
       , testCase "failure order (c)" $ limitsSmallerEq (M.fromList [("a", 2)]) (M.fromList [("a", 1)]) @?= False
+      , testCase "failure order (d)" $ limitsSmallerEq (M.fromList [("a", 2)]) (M.fromList [("a", 2)]) @?= True
       , testCase "putting failures maintains larger limits" $
         mkFailures [ stubGoal (M.fromList [("a", 1)]), stubGoal (M.fromList [("a", 2)]) ] @?= mkFailures [ stubGoal (M.fromList [("a", 2)]) ] ]
       , testCase "putting incomparable failures maintains both" $
