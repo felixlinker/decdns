@@ -34,6 +34,7 @@ instance Show (G.Graph Resolves) where
 
 data TermView = TVList Term Term
               | TVMember Term Term
+              | TVNoUnify Term Term
               | TVNeq Term Term
               | TVNot Term
               | TVMin Term Term Term
@@ -77,6 +78,9 @@ toView (TFunctor n args)
     _ -> undefined
   | n == memberSym = case args of
     [ a, b ] -> TVMember a b
+    _ -> undefined
+  | n == noUnifySym = case args of
+    [ a, b ] -> TVNoUnify a b
     _ -> undefined
   | n == neqSym = case args of
     [ a, b ] -> TVNeq a b
@@ -174,6 +178,7 @@ toView (TComplex dat) = TVComplex dat
 fromView :: TermView -> Term
 fromView (TVList a b) = TFunctor listSym [ a, b ]
 fromView (TVMember a b) = member a b
+fromView (TVNoUnify a b) = noUnify a b
 fromView (TVNeq a b) = a \= b
 fromView (TVNot constraint) = nott constraint
 fromView (TVMin a b c) = minTerm a b c

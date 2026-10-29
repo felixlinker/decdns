@@ -38,6 +38,7 @@ module Resolvable.Prolog.Core
   , (Resolvable.Prolog.Core.^)
 
   , (\=)
+  , noUnify
   , nott
   , (\+)
   , showKnowledgeBase
@@ -341,6 +342,9 @@ subterm t1 = bool . walk (\t -> Or (t == t1))
 
 (\=) :: Term -> Term -> Term
 (\=) = tBin neqSym
+
+noUnify :: Term -> Term -> Term
+noUnify = tBin noUnifySym
 
 nott :: Term -> Term
 nott = TFunctor notSym . (:[])

@@ -31,6 +31,7 @@ import Resolvable.Constraint.Solving
 simplifyTEx :: Term -> Ex.Except String Bool
 simplifyTEx t = case toView t of
   TVNot c -> not <$> simplifyTEx c
+  TVNoUnify a b -> return $ not (U.unifies a b)
   TVIsName n
     | minNameLength n > 255 -> return False
     | ground n -> return True
@@ -119,6 +120,7 @@ add (CStore ns os) t = case toView t of
 isConstraint :: Term -> Bool
 isConstraint t = case toView t of
   TVNeq {} -> True
+  TVNoUnify {} -> True
   TVIsName {} -> True
   TVDigestValid {} -> True
   TVRRSIGValid {} -> True
@@ -150,9 +152,6 @@ simplify = runIdentity . simplifyWithCache (Identity . simplifyT)
 simplifyCached :: Monad m => ConstraintStore -> SimplifyCache m [ConstraintStore]
 simplifyCached = simplifyWithCache simplifyTCached
 
--- The cache belongs to one computation, so independent runs do not retain
--- each other's zones. Only ground terms are stored: fresh variable names must
--- neither affect hit rates nor escape into another constraint's result.
 type SimplifyCache m a = St.StateT (M.Map Term Bool) m a
 
 simplifyWithCache :: Monad m => (Term -> m (Solved (Maybe Term))) -> ConstraintStore -> m [ConstraintStore]
