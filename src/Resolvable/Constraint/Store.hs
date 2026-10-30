@@ -13,6 +13,7 @@ module Resolvable.Constraint.Store
   , evalCached
   , Resolvable.Constraint.Store.solve ) where
 
+import Control.Monad (guard)
 import qualified Control.Monad.Trans.Except as Ex
 import qualified Control.Monad.Trans.State as St
 import Data.List (intercalate)
@@ -30,10 +31,10 @@ import Resolvable.Constraint.Solving
 
 simplifyTEx :: Term -> Ex.Except String Bool
 simplifyTEx t = case toView t of
-  TVForAll _ (toView -> TVNot (toView -> TVUnifies a b))
+  TVForAll _ (toView -> TVNeq a b)
     | ground a -> return $ not $ U.unifies a b
+    | otherwise -> maybe (return True) (\u -> guard (U.isRenaming u) >> return False) (U.unify a b)
   TVNot c -> not <$> simplifyTEx c
-  TVUnifies a b -> return $ U.unifies a b
   TVIsName n
     | minNameLength n > 255 -> return False
     | ground n -> return True
@@ -125,7 +126,6 @@ isConstraint :: Term -> Bool
 isConstraint t = case toView t of
   TVNeq {} -> True
   TVForAll {} -> True
-  TVUnifies {} -> True
   TVIsName {} -> True
   TVDigestValid {} -> True
   TVRRSIGValid {} -> True

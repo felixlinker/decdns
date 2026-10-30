@@ -27,7 +27,7 @@ import Data.Functor.Identity (Identity(Identity, runIdentity))
 import Data.List (intercalate)
 import Data.Maybe (fromMaybe, isJust, isNothing)
 
-import Resolvable.Prolog.Core hiding (unifies)
+import Resolvable.Prolog.Core
 import Util.List (zipWithStrict)
 import Util.Fresh
 

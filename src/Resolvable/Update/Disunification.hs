@@ -4,6 +4,7 @@ module Resolvable.Update.Disunification
   , computeRegressions ) where
 
 import Control.Monad (guard)
+import Data.List (nub)
 import qualified Data.Set as S
 
 import qualified Resolvable.Constraint.Store as Store
@@ -38,7 +39,7 @@ disunify base@(Fact tB st) neg@(Fact tN (Store.CStore negNeqs negCs)) =
             f <- awayF base
             (t'', _) <- U.away tN
             return (f, t'')
-          c = TForAll (varNames tN') (nott (unifies tB' tN'))
+          c = TForAll (nub $ varNames tN') (tB' \= tN')
       in  maybe undefined (map (Fact tB') . Store.simplify) (Store.add st' c)
 
     notConstraints :: U.Unifier -> [Fact]

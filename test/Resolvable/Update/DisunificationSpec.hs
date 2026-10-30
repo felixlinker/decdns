@@ -55,13 +55,13 @@ minusTests =
       , [ q ["com", "X"] ] )
     , ( q ["com", "X"]
       , [q ["com", "a"]]
-      , [ qC ["com", "X"] ["X" != "a"] ] )
+      , [ qC ["com", "V0"] ["V0" != "a"] ] )
     , ( qC ["com", "X"] ["X" != "a"]
       , [q ["com", "a"]]
       , [ qC ["com", "X"] ["X" != "a"] ] )
     , ( qC ["com", "X"] ["X" != "a"]
       , [q ["com", "b"]]
-      , [ qC ["com", "X"] ["X" != "b", "X" != "a"] ] )
+      , [ qC ["com", "V0"] ["V0" != "a", "V0" != "b"] ] )
     , ( qC ["com", "X"] ["X" != "a"]
       , [q ["com", "Y"]]
       , [] )
@@ -73,7 +73,7 @@ minusTests =
       , [ q ["com", "b"] ] )
     , ( q ["com", "X", "Y"]
       , [q ["com", "a", "b"]]
-      , [ qC ["com", "X", "Y"] ["X" != "a"], qC ["com", "X", "Y"] ["Y" != "b"] ] )
+      , [ qC ["com", "V0", "V1"] ["V0" != "a"], qC ["com", "V0", "V1"] ["V1" != "b"] ] )
     , ( q ["com", "X", "Y"]
       , [q ["com", "Z", "Z"]]
       , [ qC ["com", "X", "Y"] ["X" != "Y"] ] )

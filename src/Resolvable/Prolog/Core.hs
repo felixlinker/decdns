@@ -39,7 +39,6 @@ module Resolvable.Prolog.Core
   , (Resolvable.Prolog.Core.^)
 
   , (\=)
-  , unifies
   , nott
   , (\+)
   , showKnowledgeBase
@@ -268,7 +267,7 @@ instance Show Term where
       let (l, tl) = collectListWithTail t
       in "[" ++ intercalate ", " (map show l) ++ maybe "" (\x -> " | " ++ show x) tl ++ "]"
     | otherwise = op ++ "(" ++ intercalate ", " (map show args) ++ ")"
-  show (TForAll vs t) = unwords $ "(forall" : map (show . TVar) vs ++ [".", show t, ")"]
+  show (TForAll vs t) = unwords $ "( forall" : map (show . TVar) vs ++ ["::", show t, ")"]
   show TEmptyList = "[]"
   show (TVar "") = undefined
   show v@(TVar (h:t))
@@ -349,9 +348,6 @@ subterm t1 = bool . walk (\t -> Or (t == t1))
 
 (\=) :: Term -> Term -> Term
 (\=) = tBin neqSym
-
-unifies :: Term -> Term -> Term
-unifies = tBin unifiesSym
 
 nott :: Term -> Term
 nott = TFunctor notSym . (:[])

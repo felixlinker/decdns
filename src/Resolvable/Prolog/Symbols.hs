@@ -9,7 +9,6 @@ module Resolvable.Prolog.Symbols
   , resolvesSym
   , resolvableSym
   , adSym
-  , unifiesSym
   , isNameSym
   , rrsigValidSym
   , digestValidSym
@@ -44,9 +43,6 @@ resolvableSym = "resolvable"
 
 adSym :: String
 adSym = "ad"
-
-unifiesSym :: String
-unifiesSym = "unifies"
 
 isNameSym :: String
 isNameSym = "isName"
