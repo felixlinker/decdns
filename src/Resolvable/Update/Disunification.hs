@@ -30,11 +30,8 @@ disunify base@(Fact t st) neg@(Fact t' (Store.CStore negNeqs negCs)) =
     negCases :: U.Unifier -> [Fact]
     negCases u = notUnified u ++ notConstraints u
 
-    addNeq :: (Term, Term) -> [Store.ConstraintStore]
-    addNeq (a, b) = maybe [] Store.simplify (Store.add st (a \= b))
-
     notUnified :: U.Unifier -> [Fact]
-    notUnified _ = map (Fact t) (addNeq (t, t'))
+    notUnified _ = maybe undefined (map (Fact t) . Store.simplify) (Store.add st (noUnify t t'))
 
     notConstraints :: U.Unifier -> [Fact]
     notConstraints u =

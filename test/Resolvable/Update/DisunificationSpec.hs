@@ -61,7 +61,7 @@ minusTests =
       , [ qC ["com", "X"] ["X" != "a"] ] )
     , ( qC ["com", "X"] ["X" != "a"]
       , [q ["com", "b"]]
-      , [ qC ["com", "X"] ["X" != "a", "X" != "b"] ] )
+      , [ qC ["com", "X"] ["X" != "b", "X" != "a"] ] )
     , ( qC ["com", "X"] ["X" != "a"]
       , [q ["com", "Y"]]
       , [] )

@@ -13,8 +13,10 @@ module Resolvable.Constraint.Store
   , evalCached
   , Resolvable.Constraint.Store.solve ) where
 
+import Control.Monad (guard)
 import qualified Control.Monad.Trans.Except as Ex
 import qualified Control.Monad.Trans.State as St
+import Data.Bifunctor (first, second)
 import Data.List (intercalate)
 import qualified Data.Map.Strict as M
 import Data.Functor.Identity (Identity(..))
@@ -28,10 +30,20 @@ import qualified Resolvable.Unification as U
 import qualified Resolvable.Constraint.Neqs as N
 import Resolvable.Constraint.Solving
 
+constraintAsNeq :: Term -> Maybe N.Neqs
+constraintAsNeq t = case toView t of
+  TVNoUnify a b | ground b -> Just [(a, b)]
+  _ -> Nothing
+
+simplifyToNeqs :: [Term] -> ([Term], N.Neqs)
+simplifyToNeqs = foldr (\t -> maybe (first (t:)) (second . (++)) (constraintAsNeq t)) ([], [])
+
 simplifyTEx :: Term -> Ex.Except String Bool
 simplifyTEx t = case toView t of
   TVNot c -> not <$> simplifyTEx c
-  TVNoUnify a b -> return $ not (U.unifies a b)
+  TVNoUnify a b
+    | ground a -> return $ not $ U.unifies a b
+    | otherwise -> maybe (return True) (\u -> guard (U.isRenaming u) >> return False) (U.unify a b)
   TVIsName n
     | minNameLength n > 255 -> return False
     | ground n -> return True
@@ -156,12 +168,12 @@ type SimplifyCache m a = St.StateT (M.Map Term Bool) m a
 
 simplifyWithCache :: Monad m => (Term -> m (Solved (Maybe Term))) -> ConstraintStore -> m [ConstraintStore]
 simplifyWithCache cache (CStore ns ts) = do
-  let ns' = N.simplify ns
   case syntacticNots ts of
     Unsatisfiable -> return []
-    Satisfiable ts' -> do
+    Satisfiable (simplifyToNeqs -> (ts', ns')) -> do
+      let ns'' = N.simplify $ ns ++ ns'
       ts'' <- fmap catMaybes . sequenceA <$> mapM cache ts'
-      return $ CStore <$> concatMap getSolved ns' <*> getSolved ts''
+      return $ CStore <$> concatMap getSolved ns'' <*> getSolved ts''
 
 evalCached :: Monad m => SimplifyCache m a -> m a
 evalCached = (`St.evalStateT` M.empty)
