@@ -27,6 +27,7 @@ module Resolvable.Prolog.Core
   , walk
   , isVar
   , ground
+  , varNames
   , vars
   , renameFunctor
   , subterm
@@ -38,7 +39,7 @@ module Resolvable.Prolog.Core
   , (Resolvable.Prolog.Core.^)
 
   , (\=)
-  , noUnify
+  , unifies
   , nott
   , (\+)
   , showKnowledgeBase
@@ -110,6 +111,7 @@ infixFunctors =
   , negSym ]
 
 data Term = TFunctor String [Term]
+          | TForAll [String] Term
           | TEmptyList
           | TVar String
           | TAtom String
@@ -120,6 +122,7 @@ data Term = TFunctor String [Term]
 
 mapVarsF :: Applicative f => (String -> f String) -> Term -> f Term
 mapVarsF f (TFunctor n args) = TFunctor n <$> traverse (mapVarsF f) args
+mapVarsF f (TForAll vs t) = TForAll <$> traverse f vs <*> mapVarsF f t
 mapVarsF _ TEmptyList = pure TEmptyList
 mapVarsF f (TVar n) = TVar <$> f n
 mapVarsF _ t@(TAtom _) = pure t
@@ -265,6 +268,7 @@ instance Show Term where
       let (l, tl) = collectListWithTail t
       in "[" ++ intercalate ", " (map show l) ++ maybe "" (\x -> " | " ++ show x) tl ++ "]"
     | otherwise = op ++ "(" ++ intercalate ", " (map show args) ++ ")"
+  show (TForAll vs t) = unwords $ "(forall" : map (show . TVar) vs ++ [".", show t, ")"]
   show TEmptyList = "[]"
   show (TVar "") = undefined
   show v@(TVar (h:t))
@@ -283,6 +287,7 @@ instance Show Term where
 
 walk :: Semigroup a => (Term -> a) -> Term -> a
 walk f t@(TFunctor _ args) = sconcat (f t NE.:| map (walk f) args)
+walk f t@(TForAll _ body) = f t <> walk f body
 walk f TEmptyList = f TEmptyList
 walk f t@(TVar _) = f t
 walk f t@(TAtom _) = f t
@@ -318,6 +323,8 @@ replace :: (Term -> Term) -> Term -> Term
 replace f t = rec (f t)
   where
     rec (TFunctor op ts) = TFunctor op (map (replace f) ts)
+    -- TODO: Can yield wrong result if replace changes quantified variables
+    rec (TForAll vs body) = TForAll vs (replace f body)
     rec u@TEmptyList = u
     rec u@(TVar _) = u
     rec u@(TAtom _) = u
@@ -343,8 +350,8 @@ subterm t1 = bool . walk (\t -> Or (t == t1))
 (\=) :: Term -> Term -> Term
 (\=) = tBin neqSym
 
-noUnify :: Term -> Term -> Term
-noUnify = tBin noUnifySym
+unifies :: Term -> Term -> Term
+unifies = tBin unifiesSym
 
 nott :: Term -> Term
 nott = TFunctor notSym . (:[])

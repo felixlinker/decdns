@@ -5,7 +5,7 @@ import Test.Tasty.HUnit (Assertion, assertFailure, testCase, (@?=))
 import Test.Tasty.QuickCheck
 import qualified Data.Map.Strict as M
 
-import Resolvable.Prolog.Core
+import Resolvable.Prolog.Core hiding (unifies)
 import Resolvable.Unification
 import Resolvable.Util (genTerm)
 import Util.Fresh (runFresh)
@@ -45,6 +45,14 @@ tests =
             equivModuloRenaming
               (TFunctor "f" [TVar "X", TVar "X"])
               (TFunctor "f" [TVar "Y", TAtom "a"])
+              @?= False
+        , testCase "universal quantifiers can unify" $
+            unifies (TForAll ["X"] (TFunctor "p" [TVar "X", TVar "A"]))
+                    (TForAll ["X"] (TFunctor "p" [TVar "X", TVar "B"]))
+              @?= True
+        , testCase "cannot unify universally quantified variables" $
+            unifies (TForAll ["X"] (TFunctor "p" [TVar "X", TVar "Y"]))
+                    (TForAll ["X"] (TFunctor "p" [TVar "Z", TVar "X"]))
               @?= False
         ]
     ]

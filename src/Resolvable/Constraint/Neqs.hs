@@ -42,6 +42,8 @@ simplifyNeq a@(TVar _) b
   | otherwise = []
 -- NOTE: a below cannot be a variable
 simplifyNeq a b@(TVar _) = [Satisfiable (Just (a, b))]
+-- Do not simplify universal quantifiers
+simplifyNeq a@(TForAll _ _) b = [Satisfiable (Just (a, b))]
 -- NOTE: b below cannot be a variable
 simplifyNeq a b = case a of
   -- We can simplify all below cases to either dropping the inequality, as the

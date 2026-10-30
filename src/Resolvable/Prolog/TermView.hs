@@ -34,7 +34,8 @@ instance Show (G.Graph Resolves) where
 
 data TermView = TVList Term Term
               | TVMember Term Term
-              | TVNoUnify Term Term
+              | TVUnifies Term Term
+              | TVForAll [String] Term
               | TVNeq Term Term
               | TVNot Term
               | TVMin Term Term Term
@@ -79,8 +80,8 @@ toView (TFunctor n args)
   | n == memberSym = case args of
     [ a, b ] -> TVMember a b
     _ -> undefined
-  | n == noUnifySym = case args of
-    [ a, b ] -> TVNoUnify a b
+  | n == unifiesSym = case args of
+    [ a, b ] -> TVUnifies a b
     _ -> undefined
   | n == neqSym = case args of
     [ a, b ] -> TVNeq a b
@@ -168,6 +169,7 @@ toView (TFunctor n args)
      [serial, scheme, hashAlgorithm, digest] -> TVZONEMDData serial scheme hashAlgorithm digest
      _ -> undefined
   | otherwise = TVFunctor n args
+toView (TForAll vs t) = TVForAll vs t
 toView TEmptyList = TVEmptyList
 toView (TVar v) = TVVar v
 toView (TAtom n) = TVAtom n
@@ -178,7 +180,8 @@ toView (TComplex dat) = TVComplex dat
 fromView :: TermView -> Term
 fromView (TVList a b) = TFunctor listSym [ a, b ]
 fromView (TVMember a b) = member a b
-fromView (TVNoUnify a b) = noUnify a b
+fromView (TVForAll vs t) = TForAll vs t
+fromView (TVUnifies a b) = unifies a b
 fromView (TVNeq a b) = a \= b
 fromView (TVNot constraint) = nott constraint
 fromView (TVMin a b c) = minTerm a b c

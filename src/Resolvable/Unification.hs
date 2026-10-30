@@ -17,6 +17,7 @@ module Resolvable.Unification
   , awayT
   , away ) where
 
+import Control.Monad (guard)
 import Control.Monad.Trans.Class (lift)
 import qualified Control.Monad.Trans.State.Strict as St
 import qualified Data.Map.Strict as M
@@ -26,7 +27,7 @@ import Data.Functor.Identity (Identity(Identity, runIdentity))
 import Data.List (intercalate)
 import Data.Maybe (fromMaybe, isJust, isNothing)
 
-import Resolvable.Prolog.Core
+import Resolvable.Prolog.Core hiding (unifies)
 import Util.List (zipWithStrict)
 import Util.Fresh
 
@@ -102,6 +103,10 @@ filterRenamings (Unifier m) = fst $ foldr foldf (identity, identity) $ M.toList 
 
 instance Apply Term where
   apply u (TFunctor op (map (apply u) -> args)) = TFunctor op args
+  apply (Unifier m) (TForAll vs t) = TForAll vs (apply uNoBound t)
+    where
+      uNoBound :: Unifier
+      uNoBound = Unifier $ M.filterWithKey (\v _ -> v `notElem` map TVar vs) m
   apply _ TEmptyList = TEmptyList
   apply (Unifier m) v@(TVar _) = fromMaybe v (M.lookup v m)
   apply _ t@(TAtom _) = t
@@ -144,6 +149,13 @@ instance Unify Term where
         | op1 == op2 = unifList args1 args2
         | otherwise  = Nothing
       unif (TFunctor _ _) _ = Nothing
+      unif (TForAll vs a) (TForAll ws b)
+        | vs == ws = do
+          u'@(Unifier m') <- extendUnifier a b u
+          guard (all ((`M.notMember` m') . TVar) vs)
+          return u'
+        | otherwise = Nothing
+      unif (TForAll _ _) _ = Nothing
       unif TEmptyList TEmptyList = Just u
       unif TEmptyList _ = Nothing
       unif (TAtom a) (TAtom b)
