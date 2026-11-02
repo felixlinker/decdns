@@ -53,3 +53,8 @@ withouts q = foldr (\nq -> concatMap (`disunify` nq)) [q]
 computeRegressions :: S.Set Fact -> S.Set Fact -> S.Set Fact
 computeRegressions (S.toList -> resOld) (S.toList -> resNew) =
   S.fromList $ concatMap (`withouts` resNew) resOld
+
+constraintClosed :: Fact -> Bool
+constraintClosed (Fact t (Store.toBody -> cs)) =
+  let bodyVars = foldr (S.union . freeVars) S.empty cs
+  in  freeVars t `S.isSubsetOf` bodyVars

@@ -29,6 +29,7 @@ module Resolvable.Prolog.Core
   , ground
   , varNames
   , vars
+  , freeVars
   , renameFunctor
   , subterm
   , Rule(..)
@@ -317,6 +318,12 @@ varNames = walk grabVar
 
 vars :: Term -> S.Set Term
 vars = S.fromList . map TVar . varNames
+
+freeVars :: Term -> S.Set Term
+freeVars v@(TVar _) = S.singleton v
+freeVars (TFunctor _ ts) = S.unions $ map freeVars ts
+freeVars (TForAll quant t) = foldr (S.delete . TVar) (freeVars t) quant
+freeVars _ = S.empty
 
 replace :: (Term -> Term) -> Term -> Term
 replace f t = rec (f t)
