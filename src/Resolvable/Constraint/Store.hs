@@ -2,6 +2,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Constraint.Store
   ( ConstraintStore(..)
+  , awaySt
   , partitionConstraints
   , empty
   , toBody
@@ -14,6 +15,7 @@ module Resolvable.Constraint.Store
   , Resolvable.Constraint.Store.solve ) where
 
 import Control.Monad (guard)
+import Data.Bitraversable (bitraverse)
 import qualified Control.Monad.Trans.Except as Ex
 import qualified Control.Monad.Trans.State as St
 import Data.List (intercalate)
@@ -100,6 +102,12 @@ instance U.Apply ConstraintStore where
 
 instance Semigroup ConstraintStore where
   CStore ns os <> CStore ns' os' = CStore (ns <> ns') (os <> os')
+
+awaySt :: Monad m => ConstraintStore -> U.AwayT m ConstraintStore
+awaySt (CStore neqs ts) = do
+  neqs' <- traverse (bitraverse U.awayT U.awayT) neqs
+  ts' <- traverse U.awayT ts
+  return $ CStore neqs' ts'
 
 partitionConstraints :: [Term] -> (ConstraintStore, [Term])
 partitionConstraints = foldr addConstraint (empty, [])

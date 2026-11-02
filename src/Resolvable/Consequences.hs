@@ -36,8 +36,8 @@ import qualified DNS.RecordType as T
 type CSolver a = Solver Identity a
 
 awayR :: Monad m => Rule a -> FreshT m (Rule a)
-awayR (Rule a h b) = do
-  fr <- fst <$> awayT (h:b)
+awayR (Rule a h b) = fmap fst $ runAwayT $ do
+  fr <- traverse awayT (h:b)
   case fr of
     (h':b') -> return $ Rule a h' b'
     _ -> undefined
@@ -72,9 +72,10 @@ data Fact = Fact Term Store.ConstraintStore
   deriving (Eq, Ord)
 
 awayF :: Monad m => Fact -> FreshT m Fact
-awayF (Fact h st) = do
-  (h', u) <- away h
-  return $ Fact h' (apply u st)
+awayF (Fact h st) = fmap fst $ runAwayT $ do
+  h' <- awayT h
+  st' <- Store.awaySt st
+  return $ Fact h' st'
 
 canonFact :: Fact -> Fact
 canonFact = runFresh . awayF

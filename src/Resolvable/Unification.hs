@@ -13,6 +13,8 @@ module Resolvable.Unification
   , filterRenamings
   , unify
   , unifies
+  , AwayT
+  , runAwayT
   , awayT
   , away ) where
 
@@ -21,8 +23,7 @@ import Control.Monad.Trans.Class (lift)
 import qualified Control.Monad.Trans.State.Strict as St
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
-import Data.Bifunctor (Bifunctor(bimap), first)
-import Data.Functor.Identity (Identity(Identity, runIdentity))
+import Data.Bifunctor (Bifunctor(bimap))
 import Data.List (intercalate)
 import Data.Maybe (fromMaybe, isJust, isNothing)
 
@@ -171,26 +172,28 @@ instance Unify Term where
         | otherwise = Nothing
       unif (TComplex _) _ = Nothing
 
-awayT :: (Traversable t, Monad m) => t Term -> FreshT m (t Term, Unifier)
-awayT t = do
-    (t', m) <- St.runStateT (traverse aux t) M.empty
-    return (t', Unifier $ M.fromList $ map (bimap TVar TVar) $ M.toList m)
-  where
-    aux :: Monad m => Term -> St.StateT (M.Map String String) (FreshT m) Term
-    aux (TVar varName) = do
-      mapped <- St.gets (M.lookup varName)
-      TVar <$> maybe (freshName varName) return mapped
-    aux (TFunctor fn ts) = TFunctor fn <$> traverse aux ts
-    aux (TForAll quantified term) = do
-      quantified' <- traverse freshName quantified
-      TForAll quantified' <$> aux term
-    aux term = return term
+type AwayT m a = St.StateT (M.Map String String) (FreshT m) a
 
-    freshName :: Monad m => String -> St.StateT (M.Map String String) (FreshT m) String
-    freshName varName = do
-      n <- lift $ fresh "V"
-      St.modify (M.insert varName n)
-      return n
+runAwayT :: Monad m => AwayT m a -> FreshT m (a, Unifier)
+runAwayT awayM = do
+  (a, m) <- St.runStateT awayM M.empty
+  return (a, Unifier $ M.fromList $ map (bimap TVar TVar) $ M.toList m)
+
+awayT :: Monad m => Term -> AwayT m Term
+awayT (TVar varName) = do
+  mapped <- St.gets (M.lookup varName)
+  TVar <$> maybe (freshName varName) return mapped
+awayT (TFunctor fn ts) = TFunctor fn <$> traverse awayT ts
+awayT (TForAll quantified term) = do
+  quantified' <- traverse freshName quantified
+  TForAll quantified' <$> awayT term
+awayT term = return term
+
+freshName :: Monad m => String -> AwayT m String
+freshName varName = do
+  n <- lift $ fresh "V"
+  St.modify (M.insert varName n)
+  return n
 
 away :: Monad m => Term -> FreshT m (Term, Unifier)
-away = fmap (first runIdentity) . awayT . Identity
+away = runAwayT . awayT

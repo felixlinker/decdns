@@ -115,9 +115,10 @@ goal :: Limits k -> Term -> (BoundedGoal k, Unifier)
 goal limits g0 = (Goal limits [g0] Store.empty, termIdentity g0)
 
 awayG :: Monad m => BoundedGoal k -> FreshT m (BoundedGoal k, Unifier)
-awayG (Goal limits ts st) = do
-  (ts', u) <- awayT ts
-  return (Goal limits ts' (apply u st), u)
+awayG (Goal limits ts st) = runAwayT $ do
+  ts' <- traverse awayT ts
+  st' <- Store.awaySt st
+  return $ Goal limits ts' st'
 
 canonicalGoal :: BoundedGoal k -> BoundedGoal k
 canonicalGoal g = fst $ runFresh $ awayG g
