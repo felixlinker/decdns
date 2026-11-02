@@ -5,9 +5,12 @@ module Resolvable.Unification
   , Unify(..)
   , Apply(..)
   , identity
+  , isIdentity
   , termIdentity
   , toList
+  , domain
   , restrict
+  , partitionValuation
   , isRenaming
   , nonTrivial
   , filterRenamings
@@ -58,6 +61,9 @@ instance (Apply a, Ord a) => Apply (S.Set a) where
 identity :: Unifier
 identity = Unifier M.empty
 
+isIdentity :: Unifier -> Bool
+isIdentity (Unifier m) = M.foldrWithKey (\a b -> (&&) (a == b)) True m
+
 termIdentity :: Term -> Unifier
 termIdentity t =
   let vs = S.toList $ vars t
@@ -70,8 +76,14 @@ singleton _ _ = undefined
 toList :: Unifier -> [(Term, Term)]
 toList (Unifier u) = M.toList u
 
+domain :: Unifier -> S.Set Term
+domain (Unifier m) = M.keysSet m
+
 restrict :: S.Set Term -> Unifier -> Unifier
 restrict dom (Unifier m) = Unifier $ M.filterWithKey (\k _ -> S.member k dom) m
+
+partitionValuation :: Unifier -> (Unifier, Unifier)
+partitionValuation (Unifier m) = bimap Unifier Unifier $ M.partition ground m
 
 isRenaming :: Unifier -> Bool
 isRenaming (Unifier (M.elems -> ts)) = all isVar ts && not (hasDuplicates ts)

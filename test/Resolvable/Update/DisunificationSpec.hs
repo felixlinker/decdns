@@ -76,7 +76,7 @@ minusTests =
       , [ qC ["com", "V0", "V1"] ["V0" != "a"], qC ["com", "V0", "V1"] ["V1" != "b"] ] )
     , ( q ["com", "X", "Y"]
       , [ qC ["com", "a", "Z"] ["Z" != "b"] ]
-      , [ qC ["com", "X", "Y"] ["X" != "a"], q ["com", "a", "b"] ] )
+      , [ qC ["com", "V0", "V1"] ["V0" != "a"], q ["com", "a", "b"] ] )
     , ( q ["com", "X"]
       , [qC ["com", "Y"] [isName (TVar "Y")]]
       , [ qC ["com", "V1"] [nott (isName (TVar "V1"))] ] )

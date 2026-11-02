@@ -14,12 +14,13 @@ module Resolvable.Constraint.Store
   , evalCached
   , Resolvable.Constraint.Store.solve ) where
 
-import Control.Monad (guard)
+import Control.Monad (guard, foldM)
 import Data.Bitraversable (bitraverse)
 import qualified Control.Monad.Trans.Except as Ex
 import qualified Control.Monad.Trans.State as St
 import Data.List (intercalate)
 import qualified Data.Map.Strict as M
+import qualified Data.Set as S
 import Data.Functor.Identity (Identity(..))
 import Data.Maybe (catMaybes)
 
@@ -121,10 +122,28 @@ empty = CStore N.empty []
 toBody :: ConstraintStore -> [Term]
 toBody (CStore ns os) = N.asPredicates ns ++ os
 
+wellformedQuant :: [String] -> Term -> Bool
+wellformedQuant (S.fromList . map TVar -> vs) left = freeVars left `S.disjoint` vs
+
+canSplitUnifier :: Term -> Term -> Maybe [Term]
+canSplitUnifier a b = do
+  (val, u) <- U.partitionValuation <$> U.unify a b
+  guard (not $ U.isIdentity val)
+  guard (U.domain val `S.isSubsetOf` vars a)
+  guard (U.isRenaming u)
+  return $ map (uncurry (\=)) $ U.toList val
+
 add :: ConstraintStore -> Term -> Maybe ConstraintStore
 add st@(CStore ns os) t = case toView t of
-  -- Drop empty universal quantifiers immediately
-  TVForAll [] c -> add st c
+  TVForAll quant c
+    -- Drop empty universal quantifiers immediately
+    | Prelude.null quant -> add st c
+    -- TODO: Could probably generalize the below; it is similar to the case
+    -- above
+    | otherwise -> case toView c of
+      TVNeq a b | wellformedQuant quant a
+        -> maybe inOthers (foldM add st) (canSplitUnifier a b)
+      _ -> inOthers
   TVNeq a b -> Just $ CStore (N.addConstraint a b ns) os
   _ | isConstraint t -> inOthers
     | otherwise -> Nothing
