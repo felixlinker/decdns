@@ -23,29 +23,28 @@ extendUnif :: U.Unify a => U.Unifier -> a -> a -> Maybe U.Unifier
 extendUnif u t1 t2 = U.extendUnifier t1 t2 u
 
 disunify :: Fact -> Fact -> [Fact]
-disunify base@(Fact tB st) neg@(Fact tN (Store.CStore negNeqs negCs)) =
-  -- If the two facts to not unify, there is no thing to subtract.
-  maybe [base] negCases (unifySimplified base neg)
+-- Rename facts away from one another to avoid capture
+disunify l r = runFresh $ aux <$> awayF l <*> awayF r
   where
-    -- If they unify, there are two cases. Either, the heads don't unify, or
-    -- the heads unify but one of the constraints is false.
-    negCases :: U.Unifier -> [Fact]
-    negCases u = notUnified ++ notConstraints u
+    aux :: Fact -> Fact -> [Fact]
+    aux base@(Fact tB st) neg@(Fact tN (Store.CStore negNeqs negCs)) =
+      -- If the two facts to not unify, there is no thing to subtract.
+      maybe [base] negCases (unifySimplified base neg)
+      where
+        -- If they unify, there are two cases. Either, the heads don't unify, or
+        -- the heads unify but one of the constraints is false.
+        negCases :: U.Unifier -> [Fact]
+        negCases u = notUnified ++ notConstraints u
 
-    notUnified :: [Fact]
-    notUnified =
-      -- Rename fact and right head away from one another to avoid capture
-      let (Fact tB' st', tN') = runFresh $ do
-            f <- awayF base
-            (t'', _) <- U.away tN
-            return (f, t'')
-          c = TForAll (nub $ varNames tN') (tB' \= tN')
-      in  maybe undefined (map (Fact tB') . Store.simplify) (Store.add st' c)
+        notUnified :: [Fact]
+        notUnified =
+          let c = TForAll (nub $ varNames tN) (tB \= tN)
+          in  maybe undefined (map (Fact tB) . Store.simplify) (Store.add st c)
 
-    notConstraints :: U.Unifier -> [Fact]
-    notConstraints u =
-          concatMap (maybe [] (`applySimplify` base) . uncurry (extendUnif u) . U.apply u) negNeqs
-      ++  concatMap (maybe [] (applySimplify u . Fact tB) . Store.add st . nott) negCs
+        notConstraints :: U.Unifier -> [Fact]
+        notConstraints u =
+              concatMap (maybe [] (`applySimplify` base) . uncurry (extendUnif u) . U.apply u) negNeqs
+          ++  concatMap (maybe [] (applySimplify u . Fact tB) . Store.add st . nott) negCs
 
 withouts :: Fact -> [Fact] -> [Fact]
 withouts q = foldr (\nq -> concatMap (`disunify` nq)) [q]

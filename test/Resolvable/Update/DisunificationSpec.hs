@@ -52,13 +52,13 @@ minusTests =
       , [] )
     , ( q ["com", "X"]
       , [q ["net", "a"]]
-      , [ q ["com", "X"] ] )
+      , [ q ["com", "V0"] ] )
     , ( q ["com", "X"]
       , [q ["com", "a"]]
       , [ qC ["com", "V0"] ["V0" != "a"] ] )
     , ( qC ["com", "X"] ["X" != "a"]
       , [q ["com", "a"]]
-      , [ qC ["com", "X"] ["X" != "a"] ] )
+      , [ qC ["com", "V0"] ["V0" != "a"] ] )
     , ( qC ["com", "X"] ["X" != "a"]
       , [q ["com", "b"]]
       , [ qC ["com", "V0"] ["V0" != "a", "V0" != "b"] ] )
@@ -79,7 +79,7 @@ minusTests =
       , [ qC ["com", "X", "Y"] ["X" != "a"], q ["com", "a", "b"] ] )
     , ( q ["com", "X"]
       , [qC ["com", "Y"] [isName (TVar "Y")]]
-      , [ qC ["com", "Y"] [nott (isName (TVar "Y"))] ] )
+      , [ qC ["com", "V1"] [nott (isName (TVar "V1"))] ] )
     , ( qC ["com", "X"] [isName (TVar "X")]
       , [qC ["com", "Y"] [isName (TVar "Y")]]
       , [] )
