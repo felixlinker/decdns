@@ -314,6 +314,7 @@ varNames = walk grabVar
   where
     grabVar :: Term -> [String]
     grabVar (TVar n) = [n]
+    grabVar (TForAll ns _) = ns
     grabVar _ = []
 
 vars :: Term -> S.Set Term
