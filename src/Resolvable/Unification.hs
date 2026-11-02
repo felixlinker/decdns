@@ -13,7 +13,6 @@ module Resolvable.Unification
   , filterRenamings
   , unify
   , unifies
-  , equivModuloRenaming
   , awayT
   , away ) where
 
@@ -120,9 +119,6 @@ unify t1 t2 = extendUnifier t1 t2 identity
 unifies :: Unify a => a -> a -> Bool
 unifies t1 t2 = isJust (unify t1 t2)
 
-equivModuloRenaming :: Unify a => a -> a -> Bool
-equivModuloRenaming t1 t2 = maybe False isRenaming (unify t1 t2)
-
 class Unify a where
   extendUnifier :: a -> a -> Unifier -> Maybe Unifier
 
@@ -177,19 +173,24 @@ instance Unify Term where
 
 awayT :: (Traversable t, Monad m) => t Term -> FreshT m (t Term, Unifier)
 awayT t = do
-    (t', m) <- St.runStateT (traverse (mapVarsF rename) t) M.empty
+    (t', m) <- St.runStateT (traverse aux t) M.empty
     return (t', Unifier $ M.fromList $ map (bimap TVar TVar) $ M.toList m)
   where
-    rename :: Monad m => String -> St.StateT (M.Map String String) (FreshT m) String
-    rename varName = do
+    aux :: Monad m => Term -> St.StateT (M.Map String String) (FreshT m) Term
+    aux (TVar varName) = do
       mapped <- St.gets (M.lookup varName)
-      maybe freshName return mapped
-      where
-        freshName :: Monad m => St.StateT (M.Map String String) (FreshT m) String
-        freshName = do
-          n <- lift $ fresh "V"
-          St.modify (M.insert varName n)
-          return n
+      TVar <$> maybe (freshName varName) return mapped
+    aux (TFunctor fn ts) = TFunctor fn <$> traverse aux ts
+    aux (TForAll quantified term) = do
+      quantified' <- traverse freshName quantified
+      TForAll quantified' <$> aux term
+    aux term = return term
+
+    freshName :: Monad m => String -> St.StateT (M.Map String String) (FreshT m) String
+    freshName varName = do
+      n <- lift $ fresh "V"
+      St.modify (M.insert varName n)
+      return n
 
 away :: Monad m => Term -> FreshT m (Term, Unifier)
 away = fmap (first runIdentity) . awayT . Identity

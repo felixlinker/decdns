@@ -10,13 +10,19 @@ import Resolvable.Unification
 import Resolvable.Util (genTerm)
 import Util.Fresh (runFresh)
 
+termEquiv :: Unify a => a -> a -> Bool
+termEquiv t1 t2 = maybe False isRenaming (unify t1 t2)
+
 tests :: TestTree
 tests =
   testGroup
     "Resolvable.Unification"
     [ testCase "away preserves variable sharing" $
         let t = TFunctor "pair" [TVar "X", TVar "X", TVar "Y"]
-        in  equivModuloRenaming (fst $ runFresh $ away t) t @?= True
+        in  termEquiv (fst $ runFresh $ away t) t @?= True
+    , testCase "away renames universal quantifier" $
+        let t = TForAll ["X"] (TVar "V0" \= TVar "X")
+        in  fst (runFresh $ away t) @?= TForAll ["V0"] (TVar "V1" \= TVar "V0")
     , testProperty "apply unifier implies terms become equal" prop_unify_apply_agrees
     , testProperty "unification is symmetric in success" prop_unify_symmetric
     , testProperty "unification yields normal unifiers" prop_unify_normal
@@ -27,22 +33,22 @@ tests =
         , testCase "list tail unifies against longer list" listTailUnifies
         , testCase "fails on different arity" mismatchedArityFails
         , testCase "equivalence modulo renaming preserves variable sharing" $
-            equivModuloRenaming
+            termEquiv
               (TFunctor "f" [TVar "X", TVar "Y"])
               (TFunctor "f" [TVar "Z", TVar "Z"])
               @?= False
         , testCase "equivalence modulo renaming allows different variable names" $
-            equivModuloRenaming
+            termEquiv
               (TFunctor "f" [TVar "X", TVar "Y"])
               (TFunctor "f" [TVar "A", TVar "B"])
               @?= True
         , testCase "equivalence modulo renaming preserves repeated variables" $
-            equivModuloRenaming
+            termEquiv
               (TFunctor "f" [TVar "X", TVar "X"])
               (TFunctor "f" [TVar "Y", TVar "Y"])
               @?= True
         , testCase "equivalence modulo renaming rejects variables and atoms" $
-            equivModuloRenaming
+            termEquiv
               (TFunctor "f" [TVar "X", TVar "X"])
               (TFunctor "f" [TVar "Y", TAtom "a"])
               @?= False
