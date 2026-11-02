@@ -86,6 +86,10 @@ tests = testGroup "Examples"
           regressionTest shortLongWildcard shortLongDNAME
             [ regression wc (gr longShort) wc ]
             [ regression wc (gr shortShort) wc ]
+      , testCase "moving wildcard regressions." $
+          regressionTest moveDownSingle moveDownDouble
+            [ regression wc (gr aSub) wc ]
+            [ regression wc (gr aSubSub) wc ]
       ]
   ]
 
@@ -559,12 +563,21 @@ shortLongDNAME :: ExampleConfig
 shortLongDNAME =
   ExampleConfig "dname/wildcard-to-dname/new" "/dev/null" dnsRoot ["root"] [] []
 
+moveDownSingle, moveDownDouble :: ExampleConfig
+moveDownSingle =
+  ExampleConfig "wildcards/move-down" "/dev/null" dnsRoot ["single"] [] []
+moveDownDouble =
+  ExampleConfig "wildcards/move-down" "/dev/null" dnsRoot ["double"] [] []
+
 dnsRoot, com, net, de, exampleZone, aExample, bExample, aCom, bCom, aaaaCom, subACom, aSubSubSubCom, xWildcardCom :: Name String
 rootNet, subRootNet, nsCom, nsBCom, nsNet, fnniFnniNet, fnniFnniFnniFnniNet, subExample :: Name String
 labelA, xA, xLabelA :: Name String
 exampleCom, exampleNet, aNet, bNet :: Name String
 aDe, bDe, cDe, nsADe, nsBDe, xDe, yDe, zDe :: Name String
 nsComCom, googleCom, short, long, longShort, shortShort :: Name String
+aSub, aSubSub :: Name String
+aSub = mkName ["a", "sub", ""]
+aSubSub = mkName ["a", "sub", "sub", ""]
 dnsRoot = root
 com = mkName ["com", ""]
 net = mkName ["net", ""]

@@ -126,6 +126,8 @@ extra-source-files:
     examples/misconfigs/rewrite-loop/old/net.
     examples/misconfigs/rewrite-loop/old/root
     examples/wellformedness/ns-wc
+    examples/wildcards/move-down/double
+    examples/wildcards/move-down/single
 
 source-repository head
   type: git
