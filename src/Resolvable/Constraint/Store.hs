@@ -33,6 +33,8 @@ simplifyTEx :: Term -> Ex.Except String Bool
 simplifyTEx t = case toView t of
   TVForAll _ (toView -> TVNeq a b)
     | ground a -> return $ not $ U.unifies a b
+    -- TODO: Could also check that variable assignments are to ground terms *for
+    -- variables occurring on the right-hand side**
     | otherwise -> maybe (return True) (\u -> guard (U.isRenaming u) >> return False) (U.unify a b)
   TVNot c -> not <$> simplifyTEx c
   TVIsName n

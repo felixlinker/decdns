@@ -249,6 +249,7 @@ rootRule :: [Name String] -> Rule (Maybe T.Type)
 rootRule nses =
   let q = TVar "Q"; n = TVar "N"; d = TVar "D"; v = TVar "V"; a = TVar "A"; z = TVar "Z"; alias = TVar "Alias"
   in Rule Nothing (queryT q n d v a)
+        -- TODO: Could enforce that z is root zone and make nses variable
        [resolves (nsesTerm nses) q z n d alias v a, z \= referralZone]
 
 sortFailures :: [Query] -> T.Type -> Name String -> [OnlineGoal] -> [OnlineGoal]
