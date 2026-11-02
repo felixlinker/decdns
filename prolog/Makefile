@@ -5,7 +5,6 @@ PROLOG_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 REPO_ROOT := $(abspath $(PROLOG_DIR)/..)
 STACK ?= stack
 SWIPL ?= swipl
-STACK_CMD = $(STACK) --stack-root "$(REPO_ROOT)/.stack-root"
 SOEXT ?= so
 EXTENSION := build/dnssec_native.$(SOEXT)
 
@@ -19,12 +18,12 @@ all: build
 # Stack owns Haskell dependency tracking. Recursive Make then sees the current
 # generated header and shared library and rebuilds only affected native targets.
 build:
-	@cd "$(REPO_ROOT)" && $(STACK_CMD) build dns-regressor:lib
+	@cd "$(REPO_ROOT)" && $(STACK) build dns-regressor:lib
 	@set -eu; cd "$(REPO_ROOT)"; \
-	  dist_dir=$$($(STACK_CMD) path --dist-dir); \
+	  dist_dir=$$($(STACK) path --dist-dir); \
 	  case "$$dist_dir" in /*) ;; *) dist_dir="$(REPO_ROOT)/$$dist_dir" ;; esac; \
-	  lib_dir=$$($(STACK_CMD) exec -- ghc-pkg field dns-regressor dynamic-library-dirs --simple-output); \
-	  lib_name=$$($(STACK_CMD) exec -- ghc-pkg field dns-regressor hs-libraries --simple-output); \
+	  lib_dir=$$($(STACK) exec -- ghc-pkg field dns-regressor dynamic-library-dirs --simple-output); \
+	  lib_name=$$($(STACK) exec -- ghc-pkg field dns-regressor hs-libraries --simple-output); \
 	  extension=$$($(SWIPL) -q -g 'current_prolog_flag(shared_object_extension, E), write(E), halt'); \
 	  $(MAKE) --no-print-directory -C "$(PROLOG_DIR)" native \
 	    BRIDGE_HEADER="$$dist_dir/build/Prolog/Bridge_stub.h" \
@@ -36,7 +35,7 @@ native: $(EXTENSION)
 build/dnssec_bridge.o: dnssec_bridge.c $(BRIDGE_HEADER) Makefile | build/
 	@set -eu; eval "$$($(SWIPL) --dump-runtime-variables)"; \
 	  cd "$(REPO_ROOT)"; \
-	  $(STACK_CMD) exec -- ghc -c -dynamic -fPIC \
+	  $(STACK) exec -- ghc -c -dynamic -fPIC \
 	    -I"$$PLBASE/include" -I"$(dir $(BRIDGE_HEADER))" \
 	    "$(PROLOG_DIR)/dnssec_bridge.c" -o "$(PROLOG_DIR)/$@"
 
@@ -44,7 +43,7 @@ $(EXTENSION): build/dnssec_bridge.o $(HASKELL_LIBRARY) Makefile
 	@set -eu; test -n "$(HASKELL_LIBRARY)" || { echo 'Missing Haskell shared library; use make build.' >&2; exit 1; }; \
 	  eval "$$($(SWIPL) --dump-runtime-variables)"; \
 	  cd "$(REPO_ROOT)"; \
-	  $(STACK_CMD) exec -- ghc \
+	  $(STACK) exec -- ghc \
 	    -dynamic -shared -fPIC -flink-rts -no-hs-main -threaded \
 	    -package dns-regressor -L"$$PLLIBDIR" -lswipl \
 	    -optl-Wl,-rpath,"$$PLLIBDIR" \
