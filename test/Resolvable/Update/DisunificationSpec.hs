@@ -10,7 +10,7 @@ import Test.Tasty.HUnit (testCase, (@?=))
 import Resolvable.Consequences
 import qualified Resolvable.Constraint.Store as Store
 import Resolvable.Prolog.Core
-import Resolvable.Update.Disunification (withouts)
+import Resolvable.Update.Disunification (constraintClosed, withouts)
 
 import Control.Monad (foldM)
 import Data.Char (isUpper)
@@ -21,7 +21,21 @@ tests :: TestTree
 tests =
   testGroup
     "Resolvable.Update.Disunification"
-    minusTests
+    [ testGroup "constraint closed" constraintClosedTests
+    , testGroup "disunification" minusTests ]
+
+constraintClosedTests :: [TestTree]
+constraintClosedTests =
+  [ testCase "constraint-closed" $
+      constraintClosed (factWithBody (TFunctor "p" [TVar "X"]) [isName (TVar "X")]) @?= True
+  , testCase "not constraint-closed" $
+      constraintClosed (factWithBody (TFunctor "p" [TVar "X"]) [isName (TVar "Y")]) @?= False
+  , testCase "universal quantifier is constraint-closed" $
+      constraintClosed (factWithBody (TFunctor "p" [TAtom "a"]) [TForAll ["X"] (isName (TVar "X"))]) @?= True
+  ]
+
+factWithBody :: Term -> [Term] -> Fact
+factWithBody headTerm constraints = Fact headTerm (store constraints)
 
 minusTests :: [TestTree]
 minusTests =

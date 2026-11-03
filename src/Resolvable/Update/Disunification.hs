@@ -1,7 +1,8 @@
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Update.Disunification
   ( withouts
-  , computeRegressions ) where
+  , computeRegressions
+  , constraintClosed ) where
 
 import Control.Monad (guard, unless)
 import Control.Monad.Trans.Except (ExceptT, throwE)
