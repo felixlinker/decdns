@@ -28,6 +28,7 @@ import qualified Data.ByteString.Char8 as CBS
 import Data.Bits (setBit, zeroBits)
 import Data.List (groupBy, sort)
 import Data.Word (Word8)
+import Data.Maybe (catMaybes, fromMaybe)
 import Data.IP (IPv4, IPv6)
 
 import DNS.Name
@@ -258,12 +259,12 @@ instance Serialize Cat where
   serialize IN = word16 (1 :: Int)
 
 data RData = RData
-  { rcat  :: Cat
+  { rcat  :: Maybe Cat
   , rttl  :: Int
   , rtype :: Type }
 
--- For equality and ordering, we ignore category  because it is constant, and
--- TTL because we are not concerned with TTL in this implementation.
+-- For equality and ordering, we ignore category and TTL. Category can
+-- effectively only be IN, and we don't consider TTL values anyway.
 instance Eq RData where
   (RData _ _ t) == (RData _ _ t') = t == t'
 
@@ -280,12 +281,12 @@ recordType :: Record a -> T.Type
 recordType = toType . rtype . value
 
 instance Show RData where
-  show (RData c ttl t) = show ttl ++ " " ++ show c ++ " " ++ show t
+  show (RData c ttl t) = unwords $ catMaybes [Just (show ttl), show <$> c, Just (show t)]
 
 instance Serialize RData where
   serialize (RData c ttl t) =
     serialize (toType t)
-      <> serialize c
+      <> serialize (fromMaybe IN c)
       <> word32 ttl
       <> word16 (BS.length dat)
       <> dat

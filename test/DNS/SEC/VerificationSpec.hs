@@ -76,7 +76,7 @@ parseBase32Hex :: String -> BS.ByteString
 parseBase32Hex = either undefined id . runParser base32Hex () "<tests>"
 
 r :: [String] -> Type -> Record String
-r n = record (mkName n) . RData IN 100
+r n = record (mkName n) . RData (Just IN) 100
 
 -- TODO: I see four test cases but the test suite only seems to run one
 dnskeyTestCases :: [KeyTestCase]

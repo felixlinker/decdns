@@ -55,7 +55,7 @@ catTtlType = do
   skipSep
   n <- readState lastName
   skipSep
-  c <- tryOrState category lastCat
+  c <- optionMaybe (try category)
   skipSep
   t <- tryOrState int lastTTL
   skipSep
@@ -70,7 +70,7 @@ ttlCatType = do
   t <- int
   writeState lastTTL t
   skipSep
-  c <- tryOrState category lastCat
+  c <- optionMaybe (try category)
   skipSep
   ty <- recordTypeData
   endOfEntry
@@ -81,7 +81,7 @@ nameCatTtlType = do
   skipSep
   n <- tryOrState name lastName
   skipSep
-  c <- tryOrState category lastCat
+  c <- optionMaybe (try category)
   skipSep
   t <- tryOrState int lastTTL
   skipSep
@@ -96,7 +96,7 @@ nameTtlCatType = do
   skipSep
   t <- tryOrState int lastTTL
   skipSep
-  c <- tryOrState category lastCat
+  c <- optionMaybe (try category)
   skipSep
   ty <- recordTypeData
   endOfEntry

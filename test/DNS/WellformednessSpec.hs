@@ -52,8 +52,8 @@ allowsDNSSECAlongsideCNAME :: Assertion
 allowsDNSSECAlongsideCNAME = do
   zone <- zoneFromList
     [ apex org
-    , named alias (RData IN 300 (CNAME (mkName ["target", "example", "net", ""])))
-    , named alias (RData IN 300 (RRSIG (RRSIGData T.CNAME RSASHA256 (labelCount alias) 300 1 0 1 org (BS.pack [1, 2, 3])))) ]
+    , named alias (RData (Just IN) 300 (CNAME (mkName ["target", "example", "net", ""])))
+    , named alias (RData (Just IN) 300 (RRSIG (RRSIGData T.CNAME RSASHA256 (labelCount alias) 300 1 0 1 org (BS.pack [1, 2, 3])))) ]
   zoneWellformed zone @?= []
   where
     org = mkName ["example", "com", ""]
@@ -63,8 +63,8 @@ allowsGlueBelowNSZoneCut :: Assertion
 allowsGlueBelowNSZoneCut = do
   zone <- zoneFromList
     [ apex org
-    , named cut (RData IN 300 (NS glueName))
-    , named glueName (RData IN 300 (A $ read "192.0.2.1")) ]
+    , named cut (RData (Just IN) 300 (NS glueName))
+    , named glueName (RData (Just IN) 300 (A $ read "192.0.2.1")) ]
   zoneWellformed zone @?= []
   where
     org = mkName ["example", "com", ""]
@@ -75,8 +75,8 @@ rejectsCNAMEBelowNSZoneCut :: Assertion
 rejectsCNAMEBelowNSZoneCut = do
   zone <- zoneFromList
     [ apex org
-    , named cut (RData IN 300 (NS ("ns" <| cut)))
-    , named alias (RData IN 300 (CNAME (mkName ["target", "example", "net", ""]))) ]
+    , named cut (RData (Just IN) 300 (NS ("ns" <| cut)))
+    , named alias (RData (Just IN) 300 (CNAME (mkName ["target", "example", "net", ""]))) ]
   zoneWellformed zone @?= [Error "illegal record at or below zone cut"]
   where
     org = mkName ["example", "com", ""]
@@ -87,8 +87,8 @@ rejectsOtherRecordsAlongsideCNAME :: Assertion
 rejectsOtherRecordsAlongsideCNAME = do
   zone <- zoneFromList
     [ apex org
-    , named alias (RData IN 300 (CNAME target))
-    , named alias (RData IN 300 (A $ read "192.0.2.1")) ]
+    , named alias (RData (Just IN) 300 (CNAME target))
+    , named alias (RData (Just IN) 300 (A $ read "192.0.2.1")) ]
   any isFatal (zoneWellformed zone) @?= True
   where
     org = mkName ["example", "com", ""]
@@ -99,8 +99,8 @@ rejectsOtherRecordsAtNSZoneCut :: Assertion
 rejectsOtherRecordsAtNSZoneCut = do
   zone <- zoneFromList
     [ apex org
-    , named cut (RData IN 300 (NS ("ns" <| cut)))
-    , named cut (RData IN 300 (TXT "...")) ]
+    , named cut (RData (Just IN) 300 (NS ("ns" <| cut)))
+    , named cut (RData (Just IN) 300 (TXT "...")) ]
   zoneWellformed zone @?= [Error "illegal record at or below zone cut"]
   where
     org = mkName ["example", "com", ""]
@@ -110,8 +110,8 @@ rejectsMultipleCNAMEs :: Assertion
 rejectsMultipleCNAMEs = do
   zone <- zoneFromList
     [ apex org
-    , named alias (RData IN 300 (CNAME target1))
-    , named alias (RData IN 300 (CNAME target2)) ]
+    , named alias (RData (Just IN) 300 (CNAME target1))
+    , named alias (RData (Just IN) 300 (CNAME target2)) ]
   any isFatal (zoneWellformed zone) @?= True
   where
     org = mkName ["example", "com", ""]
@@ -123,8 +123,8 @@ rejectsMultipleDNAMEs :: Assertion
 rejectsMultipleDNAMEs = do
   zone <- zoneFromList
     [ apex org
-    , named owner (RData IN 300 (DNAME target1))
-    , named owner (RData IN 300 (DNAME target2)) ]
+    , named owner (RData (Just IN) 300 (DNAME target1))
+    , named owner (RData (Just IN) 300 (DNAME target2)) ]
   any isFatal (zoneWellformed zone) @?= True
   where
     org = mkName ["example", "com", ""]
@@ -134,7 +134,7 @@ rejectsMultipleDNAMEs = do
 
 rejectsWildcardNS :: Assertion
 rejectsWildcardNS = do
-  zone <- zoneFromList [apex org, named wildcard (RData IN 300 (NS ns))]
+  zone <- zoneFromList [apex org, named wildcard (RData (Just IN) 300 (NS ns))]
   any isFatal (zoneWellformed zone) @?= True
   where
     org = mkName ["example", "com", ""]
@@ -143,7 +143,7 @@ rejectsWildcardNS = do
 
 rejectsWildcardDNAME :: Assertion
 rejectsWildcardDNAME = do
-  zone <- zoneFromList [apex org, named wildcard (RData IN 300 (DNAME target))]
+  zone <- zoneFromList [apex org, named wildcard (RData (Just IN) 300 (DNAME target))]
   any isFatal (zoneWellformed zone) @?= True
   where
     org = mkName ["example", "com", ""]
@@ -154,7 +154,7 @@ allowsAncestorSigner :: Assertion
 allowsAncestorSigner = do
   zone <- zoneFromList
     [ apex org
-    , named owner (RData IN 300 (A $ read "192.0.2.1"))
+    , named owner (RData (Just IN) 300 (A $ read "192.0.2.1"))
     , named owner (rrsig T.A (labelCount owner) org) ]
   zoneWellformed zone @?= []
   where
@@ -165,7 +165,7 @@ rejectsSignerBelowOwner :: Assertion
 rejectsSignerBelowOwner = do
   zone <- zoneFromList
     [ apex org
-    , named owner (RData IN 300 (A $ read "192.0.2.1"))
+    , named owner (RData (Just IN) 300 (A $ read "192.0.2.1"))
     , named owner (rrsig T.A (labelCount owner) ("signer" <| owner)) ]
   any isFatal (zoneWellformed zone) @?= True
   where
@@ -197,16 +197,16 @@ requiresDNSKEYSignerAtOwner = do
     owner = "key" <| org
 
 dnskey :: [DNSKeyFlag] -> RData
-dnskey flags = RData IN 300 (DNSKEY (DNSKEYData flags RSASHA256 (BS.pack [1, 2, 3])))
+dnskey flags = RData (Just IN) 300 (DNSKEY (DNSKEYData flags RSASHA256 (BS.pack [1, 2, 3])))
 
 rrsig :: T.Type -> Int -> Name String -> RData
 rrsig covered ls signer =
-  RData IN 300 (RRSIG (RRSIGData covered RSASHA256 ls 300 1 0 1 signer (BS.pack [1, 2, 3])))
+  RData (Just IN) 300 (RRSIG (RRSIGData covered RSASHA256 ls 300 1 0 1 signer (BS.pack [1, 2, 3])))
 
 apex :: Name String -> Named String RRSet.RDataSet
 apex org = Named org
-  $ RRSet.insert (RData IN 300 (NS ns))
-  $ RRSet.singleton (RData IN 300 (SOA ns mailbox 1 2 3 4 5))
+  $ RRSet.insert (RData (Just IN) 300 (NS ns))
+  $ RRSet.singleton (RData (Just IN) 300 (SOA ns mailbox 1 2 3 4 5))
   where
     ns = mkName ["ns", "example", "com", ""]
     mailbox = mkName ["hostmaster", "example", "com", ""]

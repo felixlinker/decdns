@@ -103,7 +103,7 @@ propSetPreservesWildcardConstraints =
       )
 
     recordAt :: Name String -> Named String RRSet.RDataSet
-    recordAt n = named n (RData IN 100 (TXT "wildcard"))
+    recordAt n = named n (RData (Just IN) 100 (TXT "wildcard"))
 
     origin :: Name String
     origin = "example" <| N.root
@@ -133,8 +133,8 @@ mergeZonesKeepsBothZones :: Assertion
 mergeZonesKeepsBothZones = do
   let parent = "b" <| N.root
       child = "a" <| parent
-      parentData = RData IN 100 (TXT "parent")
-      childData = RData IN 200 (TXT "child")
+      parentData = RData (Just IN) 100 (TXT "parent")
+      childData = RData (Just IN) 200 (TXT "child")
       parentRecord = Named parent parentData
       childRecord = Named child childData
   parentZone <- zoneFromList [named parent parentData]
@@ -196,6 +196,9 @@ mkAbsolute (Name ls) = Name (ls <> NE.singleton "")
 genTTL :: Gen Int
 genTTL = elements [100, 200]
 
+genCat :: Gen (Maybe Cat)
+genCat = elements [Nothing, Just IN]
+
 genZone :: Gen (Zone String)
 genZone = do
   org <- genAbsoluteName
@@ -224,6 +227,8 @@ genRecord org = oneof $ map ($ org)
 
 genApex :: Name String -> Gen (Named String RRSet.RDataSet)
 genApex org = do
+  soaCat <- genCat
+  nsCat <- genCat
   ttl <- genTTL
   mname <- genAbsoluteName
   rname <- genAbsoluteName
@@ -232,71 +237,80 @@ genApex org = do
   retry <- chooseInt (0, 86400)
   expire <- chooseInt (0, 2000000000)
   minimumTtl <- chooseInt (0, 86400)
-  let soa = RData IN ttl (SOA mname rname serial refresh retry expire minimumTtl)
-  let ns =  RData IN ttl (NS mname)
+  let soa = RData soaCat ttl (SOA mname rname serial refresh retry expire minimumTtl)
+  let ns = RData nsCat ttl (NS mname)
   return $ Named org $ RRSet.fromList [soa, ns]
 
 genNSRecord :: Name String -> Gen StandardRecord
 genNSRecord org = do
   ownerName <- genSubDomain org
+  cat <- genCat
   ttl <- genTTL
   host <- genAbsoluteName
-  return $ Named ownerName (RData IN ttl (NS host))
+  return $ Named ownerName (RData cat ttl (NS host))
 
 genARecord :: Name String -> Gen StandardRecord
 genARecord org = do
   ownerName <- genSubDomain org
+  cat <- genCat
   ttl <- genTTL
   addr <- genIPv4
-  return $ Named ownerName (RData IN ttl (A addr))
+  return $ Named ownerName (RData cat ttl (A addr))
 
 genAAAARecord :: Name String -> Gen StandardRecord
 genAAAARecord org = do
   ownerName <- genSubDomain org
+  cat <- genCat
   ttl <- genTTL
   addr <- genIPv6Like
-  return $ Named ownerName (RData IN ttl (AAAA addr))
+  return $ Named ownerName (RData cat ttl (AAAA addr))
 
 genTXTRecord :: Name String -> Gen StandardRecord
 genTXTRecord org = do
   ownerName <- genSubDomain org
+  cat <- genCat
   ttl <- genTTL
   txt <- genTxtAtom
-  return $ Named ownerName (RData IN ttl (TXT txt))
+  return $ Named ownerName (RData cat ttl (TXT txt))
 
 genMXRecord :: Name String -> Gen StandardRecord
 genMXRecord org = do
   ownerName <- genSubDomain org
+  cat <- genCat
   ttl <- genTTL
   pref <- chooseInt (0, 65535)
   exch <- genAbsoluteName
-  return $ Named ownerName (RData IN ttl (MX pref exch))
+  return $ Named ownerName (RData cat ttl (MX pref exch))
 
 genCNAMERecord :: Name String -> Gen StandardRecord
 genCNAMERecord org = do
   ownerName <- genSubDomain org
+  cat <- genCat
   ttl <- genTTL
   target <- genAbsoluteName
-  return $ Named ownerName (RData IN ttl (CNAME target))
+  return $ Named ownerName (RData cat ttl (CNAME target))
 
 genDNAMERecord :: Name String -> Gen StandardRecord
 genDNAMERecord org = do
   ownerName <- genSubDomain org
+  cat <- genCat
   ttl <- genTTL
   target <- genAbsoluteName
-  return $ Named ownerName (RData IN ttl (DNAME target))
+  return $ Named ownerName (RData cat ttl (DNAME target))
 
 genDNSKEYRecord :: Name String -> Gen StandardRecord
 genDNSKEYRecord org = do
+  cat <- genCat
   ttl <- genTTL
   flags <- genDNSKeyFlags
   algorithm <- genAlgorithm
   publicKey <- genBytes 1 64
-  return $ Named org (RData IN ttl (DNSKEY (DNSKEYData flags algorithm publicKey)))
+  return $ Named org (RData cat ttl (DNSKEY (DNSKEYData flags algorithm publicKey)))
 
 genRRSIGRecord :: Name String -> Gen StandardRecord
 genRRSIGRecord org = do
   ownerName <- oneof [pure org, genSubDomain org]
+  cat <- genCat
   ttl <- genTTL
   typeCovered <- elements nsecTypeUniverse
   algorithm <- genAlgorithm
@@ -309,35 +323,38 @@ genRRSIGRecord org = do
   signature <- genBytes 1 96
   return $
     Named ownerName
-      (RData IN ttl (RRSIG (RRSIGData typeCovered algorithm labelCount originalTTL signatureExpiration signatureInception keyTag signersName signature)))
+      (RData cat ttl (RRSIG (RRSIGData typeCovered algorithm labelCount originalTTL signatureExpiration signatureInception keyTag signersName signature)))
 
 genNSECRecord :: Name String -> Gen StandardRecord
 genNSECRecord org = do
   ownerName <- oneof [pure org, genSubDomain org]
+  cat <- genCat
   ttl <- genTTL
   nextDomainName <- genAbsoluteName
   typeBitMaps <- genTypeBitMaps
-  return $ Named ownerName (RData IN ttl (NSEC (NSECData nextDomainName typeBitMaps)))
+  return $ Named ownerName (RData cat ttl (NSEC (NSECData nextDomainName typeBitMaps)))
 
 genDSRecord :: Name String -> Gen StandardRecord
 genDSRecord org = do
   ownerName <- oneof [pure org, genSubDomain org]
+  cat <- genCat
   ttl <- genTTL
   keyTag <- chooseInt (0, 65535)
   algorithm <- genAlgorithm
   digestType <- genDigestType
   digest <- genBytes 1 64
-  return $ Named ownerName (RData IN ttl (DS (DSData keyTag algorithm digestType digest)))
+  return $ Named ownerName (RData cat ttl (DS (DSData keyTag algorithm digestType digest)))
 
 genZONEMDRecord :: Name String -> Gen StandardRecord
 genZONEMDRecord org = do
   ownerName <- oneof [pure org, genSubDomain org]
+  cat <- genCat
   ttl <- genTTL
   serial <- chooseInt (0, 2000000000)
   scheme <- chooseInt (0, 255)
   hashAlgorithm <- chooseInt (0, 255)
   digest <- genBytes 1 64
-  return $ Named ownerName (RData IN ttl (ZONEMD serial scheme hashAlgorithm digest))
+  return $ Named ownerName (RData cat ttl (ZONEMD serial scheme hashAlgorithm digest))
 
 genIPv4 :: Gen IPv4
 genIPv4 = toIPv4w <$> chooseAny

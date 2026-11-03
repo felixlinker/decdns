@@ -65,14 +65,14 @@ rfc4592Zone = compileWildcards $ fromList $
 wildcardData :: [RData]
 wildcardData =
   RRSet.flattenData $
-    RRSet.insert (RData IN 3600 (MX 10 (name ["host1", "example", ""]))) $
-      RRSet.singleton (RData IN 3600 (TXT "this is a wildcard"))
+    RRSet.insert (RData (Just IN) 3600 (MX 10 (name ["host1", "example", ""]))) $
+      RRSet.singleton (RData (Just IN) 3600 (TXT "this is a wildcard"))
 
 wildcardAnswer :: [String] -> Maybe [RData]
 wildcardAnswer labels = wildcardResponse (name labels) rfc4592Zone
 
 rr :: [String] -> Type -> Named String RRSet.RDataSet
-rr labels ty = Named (name labels) (RRSet.singleton (RData IN 3600 ty))
+rr labels ty = Named (name labels) (RRSet.singleton (RData (Just IN) 3600 ty))
 
 node :: [String] -> Named String RRSet.RDataSet
 node labels = Named (name labels) RRSet.empty

@@ -83,7 +83,7 @@ verifySignature (canonicalName -> owner) (map canonicalType -> rrset) (canonical
         in  if lc' > lc then Name ("*" NE.:| NE.drop (lc' - lc) ls) else n
 
     mkRecord :: Type -> StandardRecord
-    mkRecord = Named originalOwner . RData IN (_originalTTL sig)
+    mkRecord = Named originalOwner . RData (Just IN) (_originalTTL sig)
 
     serializedRRSet :: [BS.ByteString]
     serializedRRSet = map (serialize . mkRecord) $ sortOn serialize $ snub rrset

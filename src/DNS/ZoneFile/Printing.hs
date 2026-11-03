@@ -15,13 +15,13 @@ import DNS.ZoneFile
 type State = (String, Int)  -- (last name, last TTL)
 
 showRecord :: Bool -> [String] -> RData -> St.State State String
-showRecord abrev labels (RData (show -> c) t (show -> d)) = do
+showRecord abrev labels (RData c t (show -> d)) = do
   (lastName, lastTTL) <- St.get
   let rname = maybe "@" (show . Name) (NE.nonEmpty labels)
   let thisName = fromLast lastName rname
   let thisTTL = fromLast lastTTL t
   St.put (fromMaybe lastName thisName, fromMaybe lastTTL thisTTL)
-  return $ indent $ unwords (catMaybes [thisName, show <$> thisTTL, Just c, Just d])
+  return $ indent $ unwords (catMaybes [thisName, show <$> thisTTL, show <$> c, Just d])
   where
     indent :: String -> String
     indent = ("  " ++)

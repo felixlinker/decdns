@@ -82,13 +82,13 @@ wildcardZone = compileWildcards $ fromList
   )
 
 wildcardData :: RRSet.RDataSet
-wildcardData = RRSet.singleton (RData IN 100 (TXT "wildcard"))
+wildcardData = RRSet.singleton (RData (Just IN) 100 (TXT "wildcard"))
 
 exampleCom :: Name String
 exampleCom = mkName ["example", "com", ""]
 
 mkRData :: String -> RData
-mkRData = RData IN 300 . A . read
+mkRData = RData (Just IN) 300 . A . read
 
 mkData :: String -> RRSet.RDataSet
 mkData = RRSet.singleton . mkRData

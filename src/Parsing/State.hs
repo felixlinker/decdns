@@ -8,7 +8,6 @@ module Parsing.State
   , parsedZone
   , lastName
   , lastTTL
-  , lastCat
   , emptyState
   , readState
   , writeState
@@ -25,7 +24,6 @@ import Control.Monad (when, guard, void, unless)
 import qualified Control.Lens as L
 
 import DNS.Name
-import DNS.Record
 import Parsing.Tokens
 import Control.Applicative (asum)
 
@@ -38,7 +36,6 @@ data ParserState = ParserState
   { _parsedZone :: Maybe (Name String)
   , _lastName :: Maybe (Name String)
   , _lastTTL :: Maybe Int
-  , _lastCat :: Maybe Cat
   , _parens :: Bool }
 
 L.makeLenses ''ParserState
@@ -54,7 +51,7 @@ instance OriginProvider (Maybe (Name String)) where
   getOrigin = id
 
 emptyState :: ParserState
-emptyState = ParserState Nothing Nothing Nothing Nothing False
+emptyState = ParserState Nothing Nothing Nothing False
 
 setLensState :: Monad m => L.Lens' ParserState a -> a -> Parser s m ()
 setLensState l a = modifyState (L.set l a)

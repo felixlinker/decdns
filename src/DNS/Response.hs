@@ -32,7 +32,7 @@ fromResourceRecord r = do
   guard (W.rrclass r == 1)
   n <- wireName (W.rrname r)
   d <- dat (W.rdata r)
-  return $ Named n (RData IN (fromIntegral (W.rrttl r)) d)
+  return $ Named n (RData (Just IN) (fromIntegral (W.rrttl r)) d)
   where
     dat :: W.RData -> Maybe Type
     dat (W.RD_A ip) = Just (A ip)
