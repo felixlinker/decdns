@@ -2,7 +2,7 @@ module Integration (tests) where
 
 import Control.Monad (forM_)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Except (runExceptT)
+import Control.Monad.Trans.Except (runExceptT, runExcept, except)
 import qualified Data.Set as S
 import System.FilePath ((</>))
 
@@ -702,6 +702,6 @@ regressionTest oldConfig newConfig expected unexpected = do
     newRules <- compileConfig newRoots newKeys newZones
     oldFacts <- lift $ allResolvable oldRoots <$> immediateConsequences oldRules
     newFacts <- lift $ allResolvable newRoots <$> immediateConsequences newRules
-    return $ computeRegressions oldFacts newFacts
+    except $ runExcept $ computeRegressions oldFacts newFacts
   forM_ expected $ \term -> assertMatch True term regressions
   forM_ unexpected $ \term -> assertMatch False term regressions

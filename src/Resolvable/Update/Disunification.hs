@@ -56,4 +56,4 @@ computeRegressions (S.toList -> resOld) (S.toList -> resNew) =
 constraintClosed :: Fact -> Bool
 constraintClosed (Fact t (Store.toBody -> cs)) =
   let bodyVars = foldr (S.union . freeVars) S.empty cs
-  in  freeVars t `S.isSubsetOf` bodyVars
+  in  bodyVars `S.isSubsetOf` freeVars t
