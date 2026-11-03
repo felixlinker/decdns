@@ -79,7 +79,7 @@ main = do
           newFacts <- lift $ allResolvable rootZoneName <$> immediateConsequences newRecsC
           let regressions = computeRegressions oldFacts newFacts
           let gains = computeRegressions newFacts oldFacts
-          return $ if cmd == "regressions" then regressions else gains
+          if cmd == "regressions" then regressions else gains
         mapM_ print $ S.map toRule changes
       | otherwise -> fail "unknown command"
   where

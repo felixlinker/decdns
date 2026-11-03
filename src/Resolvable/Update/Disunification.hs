@@ -3,7 +3,8 @@ module Resolvable.Update.Disunification
   ( withouts
   , computeRegressions ) where
 
-import Control.Monad (guard)
+import Control.Monad (guard, unless)
+import Control.Monad.Trans.Except (ExceptT, throwE)
 import Data.List (nub)
 import qualified Data.Set as S
 
@@ -49,9 +50,13 @@ disunify l r = runFresh $ aux <$> awayF l <*> awayF r
 withouts :: Fact -> [Fact] -> [Fact]
 withouts q = foldr (\nq -> concatMap (`disunify` nq)) [q]
 
-computeRegressions :: S.Set Fact -> S.Set Fact -> S.Set Fact
-computeRegressions (S.toList -> resOld) (S.toList -> resNew) =
-  S.fromList $ concatMap (`withouts` resNew) resOld
+computeRegressions :: Monad m => S.Set Fact -> S.Set Fact -> ExceptT String m (S.Set Fact)
+computeRegressions (S.toList -> resOld) (S.toList -> resNew) = do
+  unless (all constraintClosed resOld) $
+    throwE "old facts are not constraint-closed"
+  unless (all constraintClosed resNew) $
+    throwE "new facts are not constraint-closed"
+  return $ S.fromList $ concatMap (`withouts` resNew) resOld
 
 constraintClosed :: Fact -> Bool
 constraintClosed (Fact t (Store.toBody -> cs)) =
