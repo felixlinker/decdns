@@ -1,0 +1,7 @@
+$ORIGIN com.
+$TTL 1200
+@ SOA ns.com. hostmaster.com. 0 0 0 0 0
+@ NS ns.com.
+ns A 192.0.2.3
+
+example TXT "retained"

@@ -1,0 +1,7 @@
+$TTL 1200
+. SOA root-ns. hostmaster. 0 0 0 0 0
+. NS root-ns.
+
+root-ns. A 192.0.2.1
+com. NS ns.com.
+ns.com. A 192.0.2.3

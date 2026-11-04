@@ -1,0 +1,6 @@
+$ORIGIN com.
+$TTL 1200
+@ IN SOA a.gtld-servers.net. hostmaster.com. 0 0 0 0 0
+com. IN NS a.gtld-servers.net.
+
+example IN TXT "hello"

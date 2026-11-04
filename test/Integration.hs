@@ -82,6 +82,16 @@ tests = testGroup "Examples"
             [ regression (gr RT.TXT) (gr exampleCom) wc
             , regression (gr RT.TXT) (gr aNet) wc ]
             []
+      , testCase "wildcard-shadowing" $
+          regressionTest wildcardShadowingOld wildcardShadowingNew
+            [ regression (gr RT.A) (gr aGtldServers) noValidate
+            , regression (gr RT.TXT) (gr exampleCom) noValidate ]
+            [ regression Nothing (gr nsNet) noValidate ]
+      , testCase "incomplete-zone-cut" $
+          regressionTest incompleteZoneCutOld incompleteZoneCutNew
+            [ regression (gr RT.A) (gr aCom) noValidate
+            , regression (gr RT.TXT) (gr bCom) noValidate ]
+            [ regression Nothing (gr exampleCom) noValidate ]
       , testCase "wildcard to DNAME can have regressions" $
           regressionTest shortLongWildcard shortLongDNAME
             [ regression wc (gr longShort) wc ]
@@ -133,6 +143,10 @@ exampleConfigs =
   , dnameSequence
   , sibblings
   , google
+  , wildcardShadowingOld
+  , wildcardShadowingNew
+  , incompleteZoneCutOld
+  , incompleteZoneCutNew
   ]
 
 wc :: Maybe a
@@ -555,6 +569,32 @@ rewriteLoopNew :: ExampleConfig
 rewriteLoopNew =
   ExampleConfig "misconfigs/rewrite-loop/new" "/dev/null" dnsRoot ["root", "com.", "net."] [] []
 
+wildcardShadowingOld, wildcardShadowingNew :: ExampleConfig
+wildcardShadowingOld =
+  ExampleConfig "misconfigs/wildcard-shadowing/old" "/dev/null" dnsRoot ["root", "com.", "net."]
+    [ query (gr dnsRoot) (gr RT.TXT) (gr exampleCom) noValidate ad0
+    , query (gr dnsRoot) (gr RT.A) (gr aGtldServers) noValidate ad0 ]
+    []
+wildcardShadowingNew =
+  ExampleConfig "misconfigs/wildcard-shadowing/new" "/dev/null" dnsRoot ["root", "com.", "net."]
+    [ query (gr dnsRoot) (gr RT.A) (gr nsNet) noValidate ad0 ]
+    [ query (gr dnsRoot) (gr RT.A) (gr aGtldServers) Nothing Nothing
+    , query (gr dnsRoot) (gr RT.TXT) (gr exampleCom) Nothing Nothing ]
+
+incompleteZoneCutOld, incompleteZoneCutNew :: ExampleConfig
+incompleteZoneCutOld =
+  ExampleConfig "misconfigs/incomplete-zone-cut/old" "/dev/null" dnsRoot ["root"]
+    [ query (gr dnsRoot) (gr RT.TXT) (gr exampleCom) noValidate ad0
+    , query (gr dnsRoot) (gr RT.A) (gr aCom) noValidate ad0
+    , query (gr dnsRoot) (gr RT.TXT) (gr bCom) noValidate ad0 ]
+    []
+incompleteZoneCutNew =
+  ExampleConfig "misconfigs/incomplete-zone-cut/new" "/dev/null" dnsRoot ["root", "com."]
+    [ query (gr dnsRoot) (gr RT.TXT) (gr exampleCom) noValidate ad0
+    , query (gr dnsRoot) (gr RT.SOA) (gr com) noValidate ad0 ]
+    [ query (gr dnsRoot) (gr RT.A) (gr aCom) Nothing Nothing
+    , query (gr dnsRoot) (gr RT.TXT) (gr bCom) Nothing Nothing ]
+
 shortLongWildcard :: ExampleConfig
 shortLongWildcard =
   ExampleConfig "dname/wildcard-to-dname/old" "/dev/null" dnsRoot ["root"] [] []
@@ -574,7 +614,7 @@ rootNet, subRootNet, nsCom, nsBCom, nsNet, fnniFnniNet, fnniFnniFnniFnniNet, sub
 labelA, xA, xLabelA :: Name String
 exampleCom, exampleNet, aNet, bNet :: Name String
 aDe, bDe, cDe, nsADe, nsBDe, xDe, yDe, zDe :: Name String
-nsComCom, googleCom, short, long, longShort, shortShort :: Name String
+nsComCom, googleCom, aGtldServers, short, long, longShort, shortShort :: Name String
 aSub, aSubSub :: Name String
 aSub = mkName ["a", "sub", ""]
 aSubSub = mkName ["a", "sub", "sub", ""]
@@ -616,6 +656,7 @@ yDe = mkName ["y", "de", ""]
 zDe = mkName ["z", "de", ""]
 nsComCom = mkName ["ns-com", "com", ""]
 googleCom = mkName ["google", "com", ""]
+aGtldServers = mkName ["a", "gtld-servers", "net", ""]
 short = mkName ["short", ""]
 long = mkName ["looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong", ""]
 longShort = mkName $ replicate n "x" ++ ["short", ""]

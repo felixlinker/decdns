@@ -1,0 +1,8 @@
+$TTL 1200
+. SOA root-ns. hostmaster. 0 0 0 0 0
+. NS root-ns.
+root-ns. A 192.0.2.1
+
+example.com. TXT "retained"
+a.com. A 192.0.2.4
+b.com. TXT "omitted"

@@ -1,0 +1,8 @@
+$TTL 1200
+. IN SOA root-ns. hostmaster. 0 0 0 0 0
+. IN NS root-ns.
+root-ns. IN A 192.0.2.1
+
+com. IN NS a.gtld-servers.net.
+net. IN NS ns.net.
+ns.net. IN A 192.0.2.2

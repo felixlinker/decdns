@@ -1,0 +1,8 @@
+$ORIGIN net.
+$TTL 1200
+@ IN SOA ns.net. hostmaster.net. 0 0 0 0 0
+@ IN NS ns.net.
+ns IN A 192.0.2.2
+
+*.gtld-servers IN A 192.0.2.3
+probe.a.gtld-servers IN TXT "shadows the wildcard"

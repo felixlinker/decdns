@@ -105,6 +105,9 @@ extra-source-files:
     examples/misconfigs/denic/old/de
     examples/misconfigs/denic/old/dsset-de.
     examples/misconfigs/denic/README.md
+    examples/misconfigs/incomplete-zone-cut/new/com.
+    examples/misconfigs/incomplete-zone-cut/new/root
+    examples/misconfigs/incomplete-zone-cut/old/root
     examples/misconfigs/lame-deleg/new/com.
     examples/misconfigs/lame-deleg/new/root
     examples/misconfigs/lame-deleg/old/net.
@@ -125,6 +128,12 @@ extra-source-files:
     examples/misconfigs/rewrite-loop/old/com.
     examples/misconfigs/rewrite-loop/old/net.
     examples/misconfigs/rewrite-loop/old/root
+    examples/misconfigs/wildcard-shadowing/new/com.
+    examples/misconfigs/wildcard-shadowing/new/net.
+    examples/misconfigs/wildcard-shadowing/new/root
+    examples/misconfigs/wildcard-shadowing/old/com.
+    examples/misconfigs/wildcard-shadowing/old/net.
+    examples/misconfigs/wildcard-shadowing/old/root
     examples/wellformedness/ns-wc
     examples/wildcards/move-down/double
     examples/wildcards/move-down/single
