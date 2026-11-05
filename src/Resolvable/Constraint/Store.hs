@@ -38,7 +38,8 @@ import Util.List
 
 simplifyTEx :: Term -> Ex.Except String Bool
 simplifyTEx t = case toView t of
-  TVForAll _ (toView -> TVNeq a b)
+  TVForAll vs (toView -> TVNeq a b)
+    | not (wellformedQuant vs a b) -> Ex.throwE "unsupported quantifier"
     | ground a -> return $ not $ U.unifies a b
     -- TODO: Could also check that variable assignments are to ground terms *for
     -- variables occurring on the right-hand side**
@@ -126,14 +127,15 @@ empty = CStore N.empty []
 toBody :: ConstraintStore -> [Term]
 toBody (CStore ns os) = N.asPredicates ns ++ os
 
-wellformedQuant :: [String] -> Term -> Bool
-wellformedQuant (S.fromList . map TVar -> vs) right = freeVars right == vs
+wellformedQuant :: [String] -> Term -> Term -> Bool
+wellformedQuant (S.fromList . map TVar -> vs) left right =
+  freeVars right == vs && S.disjoint (freeVars left) vs
 
 simplifyUniversalNeqs :: Term -> Disjunction [Term]
 simplifyUniversalNeqs t = case t of
   TForAll [] qt
     -> Disjunction [qt]
-  TForAll vs (toView -> TVNeq tl tr) | wellformedQuant vs tr
+  TForAll vs (toView -> TVNeq tl tr) | wellformedQuant vs tl tr
     -> do
       simplified <- simplifyDisj $ N.simplifyNeq tl tr
       let grouped = groupDisj [] $ catMaybes simplified
