@@ -158,9 +158,9 @@ simplifyUniversalNeqs t = case t of
     quantifyDisj :: N.Neqs -> Term
     quantifyDisj [] = undefined
     quantifyDisj [(tl, tr)] = TForAll (snub $ varNames tr) (tl \= tr)
-    quantifyDisj (neq:neqs) =
-      let quant = undefined
-      in TForAll quant (assoc lor $ NE.map (uncurry (\=)) $ neq NE.:| neqs)
+    quantifyDisj neqs@(a:as) =
+      let quant = snub $ concatMap (varNames . snd) neqs
+      in TForAll quant (assoc lor $ NE.map (uncurry (\=)) $ a NE.:| as)
 
 addNeq :: ConstraintStore -> Term -> Maybe ConstraintStore
 addNeq (CStore ns os) t = case toView t of
