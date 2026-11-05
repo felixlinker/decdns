@@ -20,7 +20,7 @@ import Control.Monad (guard)
 import Data.Bitraversable (bitraverse)
 import qualified Control.Monad.Trans.Except as Ex
 import qualified Control.Monad.Trans.State as St
-import Data.List (intercalate)
+import Data.List (intercalate, partition)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -136,9 +136,9 @@ simplifyUniversalNeqs t = case t of
   TForAll vs (toView -> TVNeq tl tr) | wellformedQuant vs tr
     -> do
       simplified <- simplifyDisj $ N.simplifyNeq tl tr
-      let grouped = groupDisj $ catMaybes simplified
+      let grouped = groupDisj [] $ catMaybes simplified
       concat <$> mapM (simplifyFurther . quantifyDisj) grouped
-  _ ->  Disjunction [t]
+  _ -> Disjunction [t]
   where
     simplifyFurther :: Term -> Disjunction [Term]
     simplifyFurther t'
@@ -149,11 +149,11 @@ simplifyUniversalNeqs t = case t of
     varsOverlap _ [] = True
     varsOverlap a bs = not $ all (S.disjoint (vars a) . vars) bs
 
-    groupDisj :: N.Neqs -> [N.Neqs]
-    groupDisj [] = []
-    groupDisj neqs =
-      let (y, n) = foldrPartition (\(map snd -> acc) (snd -> el) -> varsOverlap el acc) neqs
-      in  y : groupDisj n
+    groupDisj :: [N.Neqs] -> N.Neqs -> [N.Neqs]
+    groupDisj acc [] = acc
+    groupDisj acc (n:rec) =
+      let (overlap, acc') = partition (varsOverlap (snd n) . map snd) acc
+      in  groupDisj ((n : concat overlap) : acc') rec
 
     quantifyDisj :: N.Neqs -> Term
     quantifyDisj [] = undefined
