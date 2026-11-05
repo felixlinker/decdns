@@ -1,6 +1,7 @@
 module Resolvable.Constraint.Solving
   ( Solved(..)
   , simplifyDisj
+  , simplifyDisjList
   , getSolved
   , solve ) where
 
@@ -20,14 +21,17 @@ instance Applicative Solved where
   _ <*> Unsatisfiable = Unsatisfiable
   Satisfiable fs <*> Satisfiable as = Satisfiable (fs as)
 
-simplifyDisj :: Foldable f => [Solved (f a)] -> [[a]]
+simplifyDisj :: Foldable f => [Solved (f a)] -> [f a]
 simplifyDisj [] = []
 simplifyDisj (Unsatisfiable:t) = simplifyDisj t
 simplifyDisj (Satisfiable f:t)
-  | null f = [[]]
+  | null f = [f]
   | otherwise = case simplifyDisj t of
-    [[]] -> [[]]
-    t' -> toList f:t'
+    [fRec] | null fRec -> [fRec]
+    t' -> f:t'
+
+simplifyDisjList :: Foldable f => [Solved (f a)] -> [[a]]
+simplifyDisjList = map toList . simplifyDisj
 
 getSolved :: MonadPlus m => Solved a -> m a
 getSolved Unsatisfiable = mzero

@@ -4,7 +4,8 @@ module Resolvable.Constraint.Neqs
   , Resolvable.Constraint.Neqs.empty
   , asPredicates
   , addConstraint
-  , simplify ) where
+  , simplify
+  , simplifyNeq ) where
 
 import Resolvable.Prolog.Core
 import Resolvable.Constraint.Solving
@@ -24,7 +25,7 @@ simplify :: Neqs -> [Solved Neqs]
 simplify = foldr (aux . uncurry simplifyNeq) [Satisfiable []]
   where
     aux :: [Solved (Maybe (Term, Term))] -> [Solved Neqs] -> [Solved Neqs]
-    aux (simplifyDisj -> disj) acc
+    aux (simplifyDisjList -> disj) acc
       | null disj = []
       | otherwise = concatMap (\d -> map (fmap (d++)) acc) disj
 

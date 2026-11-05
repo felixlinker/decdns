@@ -23,6 +23,7 @@ module Resolvable.Prolog.Core
   , listWithTail
   , collectList
   , collectListWithTail
+  , assoc
   , member
   , walk
   , isVar
@@ -40,6 +41,7 @@ module Resolvable.Prolog.Core
   , (Resolvable.Prolog.Core.^)
 
   , (\=)
+  , lor
   , nott
   , (\+)
   , showKnowledgeBase
@@ -108,6 +110,7 @@ import Data.Maybe (isNothing, fromMaybe)
 infixFunctors :: [String]
 infixFunctors =
   [ caretSym
+  , lorSym
   , negSym ]
 
 data Term = TFunctor String [Term]
@@ -254,6 +257,9 @@ collectList t =
 listWithTail :: Foldable t => t Term -> Term -> Term
 listWithTail xs t = foldr (\x acc -> TFunctor listSym [ x, acc ]) t xs
 
+assoc :: (Term -> Term -> Term) -> NE.NonEmpty Term -> Term
+assoc constructor (h NE.:| t) = foldr constructor h t
+
 member :: Term -> Term -> Term
 member a b = TFunctor memberSym [ a, b ]
 
@@ -356,6 +362,9 @@ subterm t1 = bool . walk (\t -> Or (t == t1))
 
 (\=) :: Term -> Term -> Term
 (\=) = tBin neqSym
+
+lor :: Term -> Term -> Term
+lor = tBin lorSym
 
 nott :: Term -> Term
 nott = TFunctor notSym . (:[])

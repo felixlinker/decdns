@@ -36,6 +36,7 @@ data TermView = TVList Term Term
               | TVMember Term Term
               | TVForAll [String] Term
               | TVNeq Term Term
+              | TVOr Term Term
               | TVNot Term
               | TVMin Term Term Term
               | TVResolves Resolves
@@ -81,6 +82,9 @@ toView (TFunctor n args)
     _ -> undefined
   | n == neqSym = case args of
     [ a, b ] -> TVNeq a b
+    _ -> undefined
+  | n == lorSym = case args of
+    [ a, b ] -> TVOr a b
     _ -> undefined
   | n == notSym = case args of
     [ constraint ] -> TVNot constraint
@@ -178,6 +182,7 @@ fromView (TVList a b) = TFunctor listSym [ a, b ]
 fromView (TVMember a b) = member a b
 fromView (TVForAll vs t) = TForAll vs t
 fromView (TVNeq a b) = a \= b
+fromView (TVOr a b) = a `lor` b
 fromView (TVNot constraint) = nott constraint
 fromView (TVMin a b c) = minTerm a b c
 fromView (TVResolves (Resolves ns qtype zone qname d alias ver adb)) = resolves ns qtype zone qname d alias ver adb

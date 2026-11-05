@@ -4,6 +4,7 @@ module Util.List
   , zipWithStrict
   , zipStrict
   , foldrWith
+  , foldrPartition
   , snub ) where
 
 import qualified Data.List.NonEmpty as NE
@@ -27,6 +28,12 @@ foldrWith f acc = foldr aux ([], acc)
     aux a (accL, accB) =
       let (a', accB') = f a accB
       in (a':accL, accB')
+
+foldrPartition :: forall a t. Foldable t => ([a] -> a -> Bool) -> t a -> ([a], [a])
+foldrPartition p = foldr aux ([], [])
+  where
+    aux :: a -> ([a], [a]) -> ([a], [a])
+    aux a (y, n) = if p y a then (a:y, n) else (y, a:n)
 
 snub :: Ord a => [a] -> [a]
 snub = S.toAscList . S.fromList

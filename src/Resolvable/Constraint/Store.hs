@@ -19,6 +19,7 @@ import Data.Bitraversable (bitraverse)
 import qualified Control.Monad.Trans.Except as Ex
 import qualified Control.Monad.Trans.State as St
 import Data.List (intercalate)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Data.Functor.Identity (Identity(..))
@@ -31,6 +32,7 @@ import Resolvable.Prolog.Reverse
 import qualified Resolvable.Unification as U
 import qualified Resolvable.Constraint.Neqs as N
 import Resolvable.Constraint.Solving
+import Util.List
 
 simplifyTEx :: Term -> Ex.Except String Bool
 simplifyTEx t = case toView t of
@@ -123,7 +125,34 @@ toBody :: ConstraintStore -> [Term]
 toBody (CStore ns os) = N.asPredicates ns ++ os
 
 wellformedQuant :: [String] -> Term -> Bool
-wellformedQuant (S.fromList . map TVar -> vs) left = freeVars left `S.disjoint` vs
+wellformedQuant (S.fromList . map TVar -> vs) right = freeVars right == vs
+
+simplifyUniversalNeqs :: Term -> [Maybe Term]
+simplifyUniversalNeqs t = case t of
+  TForAll vs qt@(toView -> TVNeq tl tr) | wellformedQuant vs qt
+    ->  let simplified = simplifyDisj $ N.simplifyNeq tl tr
+            grouped = groupDisj $ catMaybes simplified
+        in  if any Prelude.null simplified
+            then [Nothing]
+            else map (Just . quantify) grouped
+  _ -> [Just t]
+  where
+    varsOverlap :: Term -> [Term] -> Bool
+    varsOverlap _ [] = True
+    varsOverlap a bs = not $ all (S.disjoint (vars a) . vars) bs
+
+    groupDisj :: N.Neqs -> [N.Neqs]
+    groupDisj [] = []
+    groupDisj neqs =
+      let (y, n) = foldrPartition (\(map snd -> acc) (snd -> el) -> varsOverlap el acc) neqs
+      in  y : groupDisj n
+
+    quantify :: N.Neqs -> Term
+    quantify [] = undefined
+    quantify [(tl, tr)] = TForAll (snub $ varNames tr) (tl \= tr)
+    quantify (neq:neqs) =
+      let quant = undefined
+      in TForAll quant (assoc lor $ NE.map (uncurry (\=)) $ neq NE.:| neqs)
 
 canSplitUnifier :: Term -> Term -> Maybe [Term]
 canSplitUnifier a b = do
