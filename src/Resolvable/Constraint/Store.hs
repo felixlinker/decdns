@@ -170,7 +170,7 @@ add st@(CStore ns os) t = case toView t of
     -- TODO: Could probably generalize the below; it is similar to the case
     -- above
     | otherwise -> case toView c of
-      TVNeq a b | wellformedQuant quant a
+      TVNeq a b | wellformedQuant quant b
         -> maybe inOthers (foldM add st) (canSplitUnifier a b)
       _ -> inOthers
   TVNeq a b -> Just $ CStore (N.addConstraint a b ns) os
