@@ -225,9 +225,10 @@ simplifyWithCache simp (CStore ns ts) = disjunction (return [empty]) (fmap conca
 
     -- Use syntactic transformations first; returns a disjunction
     rewrite :: Disjunction [ConstraintStore]
-    rewrite = do
-      ts' <- conjunction (Disjunction []) return $ syntacticNots ts
-      concat <$> mapM toStore (cnfToDnf (map simplifyUniversalNeqs ts'))
+    rewrite = conjunction
+      (Disjunction [])
+      (fmap concat . mapM toStore . cnfToDnf . map simplifyUniversalNeqs)
+      (syntacticNots ts)
       where
         -- Keep ns because above we only simplified ts
         toStore :: Conjunction [Term] -> Disjunction [ConstraintStore]
