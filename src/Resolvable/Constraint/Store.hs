@@ -76,23 +76,23 @@ simplifyTEx t = case toView t of
       return $ verifyClosestEncloserProof n' exN' exDat' nonExN' nonExDat'
   _ -> Ex.throwE "cannot solve"
 
-resultToSolved :: Bool -> Solved (Maybe Term)
-resultToSolved b = if b then Satisfiable Nothing else Unsatisfiable
+resultToSolved :: Bool -> Conjunction (Maybe Term)
+resultToSolved b = if b then Conjunction Nothing else Bot
 
-simplifyT :: Term -> Solved (Maybe Term)
+simplifyT :: Term -> Conjunction (Maybe Term)
 simplifyT t =
-  either  (const $ Satisfiable $ Just t)
+  either  (const $ Conjunction $ Just t)
           resultToSolved
           (Ex.runExcept $ simplifyTEx t)
 
-simplifyTCached :: Monad m => Term -> SimplifyCache m (Solved (Maybe Term))
+simplifyTCached :: Monad m => Term -> SimplifyCache m (Conjunction (Maybe Term))
 simplifyTCached t = do
   mB <- St.gets (M.lookup t)
   maybe setCache (return . resultToSolved) mB
   where
-    setCache :: Monad m => SimplifyCache m (Solved (Maybe Term))
+    setCache :: Monad m => SimplifyCache m (Conjunction (Maybe Term))
     setCache = do
-      either  (const $ return $ Satisfiable $ Just t)
+      either  (const $ return $ Conjunction $ Just t)
               (\b -> St.modify (M.insert t b) >> return (resultToSolved b))
               (Ex.runExcept $ simplifyTEx t)
 
@@ -129,19 +129,20 @@ toBody (CStore ns os) = N.asPredicates ns ++ os
 wellformedQuant :: [String] -> Term -> Bool
 wellformedQuant (S.fromList . map TVar -> vs) right = freeVars right == vs
 
--- Returns a disjunction
-simplifyUniversalNeqs :: Term -> [Term]
+simplifyUniversalNeqs :: Term -> Disjunction [Term]
 simplifyUniversalNeqs t = case t of
-  TForAll [] qt -> [qt]
+  TForAll [] qt
+    -> Disjunction [qt]
   TForAll vs (toView -> TVNeq tl tr) | wellformedQuant vs tr
-    ->  let simplified  = simplifyDisj $ N.simplifyNeq tl tr
-            grouped     = groupDisj $ catMaybes simplified
-        in  concatMap (simplifyFurther . quantifyDisj) grouped
-  _ ->  [t]
+    -> do
+      simplified <- simplifyDisj $ N.simplifyNeq tl tr
+      let grouped = groupDisj $ catMaybes simplified
+      concat <$> mapM (simplifyFurther . quantifyDisj) grouped
+  _ ->  Disjunction [t]
   where
-    simplifyFurther :: Term -> [Term]
+    simplifyFurther :: Term -> Disjunction [Term]
     simplifyFurther t'
-      | t' == t = [t']
+      | t' == t = Disjunction [t']
       | otherwise = simplifyUniversalNeqs t'
 
     varsOverlap :: Term -> [Term] -> Bool
@@ -195,12 +196,12 @@ doubleNeg t = case toView t of
   TVNot (toView -> TVNot c) -> doubleNeg c
   _ -> t
 
-syntacticNots :: [Term] -> Solved [Term]
-syntacticNots [] = Satisfiable []
+syntacticNots :: [Term] -> Conjunction [Term]
+syntacticNots [] = Conjunction []
 syntacticNots ((doubleNeg -> h):r) = case toView h of
-  TVNot c | c `elem` r  -> Unsatisfiable
-  _ | nott h `elem` r   -> Unsatisfiable
-    | otherwise         -> Satisfiable (h:) <*> syntacticNots r
+  TVNot c | c `elem` r  -> Bot
+  _ | nott h `elem` r   -> Bot
+    | otherwise         -> Conjunction (h:) <*> syntacticNots r
 
 -- Returns a disjunction
 simplify :: ConstraintStore -> [ConstraintStore]
@@ -211,24 +212,25 @@ simplifyCached = simplifyWithCache simplifyTCached
 
 type SimplifyCache m a = St.StateT (M.Map Term Bool) m a
 
-simplifyWithCache :: forall m. Monad m => (Term -> m (Solved (Maybe Term))) -> ConstraintStore -> m [ConstraintStore]
-simplifyWithCache simp (CStore ns ts) = concat <$> mapM logical rewrite
+simplifyWithCache :: forall m. Monad m => (Term -> m (Conjunction (Maybe Term))) -> ConstraintStore -> m [ConstraintStore]
+simplifyWithCache simp (CStore ns ts) = disjunction (return [empty]) (fmap concat . mapM logical) rewrite
   where
     logical :: ConstraintStore -> m [ConstraintStore]
     logical (CStore ns' ts') = do
       let nsSimp = N.simplify ns'
       tsSimp <- fmap catMaybes . sequenceA <$> mapM simp ts'
-      return $ solved [] (\ts'' -> map (`CStore` ts'') nsSimp) tsSimp
+      return $ conjunction [] (\ts'' -> map (`CStore` ts'') nsSimp) tsSimp
 
     -- Use syntactic transformations first; returns a disjunction
-    rewrite :: [ConstraintStore]
-    rewrite = solved [] id $ do
-      ts' <- syntacticNots ts
-      return $ map toStore $ cnfToDnf $ map simplifyUniversalNeqs ts'
+    rewrite :: Disjunction [ConstraintStore]
+    rewrite = do
+      ts' <- conjunction (Disjunction []) return $ syntacticNots ts
+      concat <$> mapM toStore (cnfToDnf (map simplifyUniversalNeqs ts'))
       where
         -- Keep ns because above we only simplified ts
-        toStore :: [Term] -> ConstraintStore
-        toStore = foldr (\c st' -> fromMaybe (error "invariant error") (addNeq st' c <|> add st' c)) (CStore ns [])
+        toStore :: Conjunction [Term] -> Disjunction [ConstraintStore]
+        toStore Bot = Disjunction []
+        toStore (Conjunction ts') = Disjunction [foldr (\c st' -> fromMaybe (error "invariant error") (addNeq st' c <|> add st' c)) (CStore ns []) ts']
 
 evalCached :: Monad m => SimplifyCache m a -> m a
 evalCached = (`St.evalStateT` M.empty)

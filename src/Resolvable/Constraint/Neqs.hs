@@ -25,25 +25,26 @@ addConstraint k v = ((k, v):)
 simplify :: Neqs -> [Neqs]
 simplify = foldr (aux . uncurry simplifyNeq) [[]]
   where
-    aux :: [Solved (Maybe (Term, Term))] -> [Neqs] -> [Neqs]
-    aux (simplifyDisj -> disj) acc = concatMap (maybe acc (\d -> map (d:) acc)) disj
+    aux :: [Conjunction (Maybe (Term, Term))] -> [Neqs] -> [Neqs]
+    -- TODO: Check if `disjunction acc` is  correct default handling
+    aux disj acc = disjunction acc (concatMap (maybe acc (\d -> map (d:) acc))) (simplifyDisj disj)
 
-simplifyArgs :: [Term] -> [Term] -> [Solved (Maybe (Term, Term))]
+simplifyArgs :: [Term] -> [Term] -> [Conjunction (Maybe (Term, Term))]
 -- Arguments are equal, i.e., contradictory
 simplifyArgs [] [] = []
 -- Arguments are unequal, i.e., constraint is redundant
-simplifyArgs [] (_:_) = [Satisfiable Nothing]
-simplifyArgs (_:_) [] = [Satisfiable Nothing]
+simplifyArgs [] (_:_) = [Conjunction Nothing]
+simplifyArgs (_:_) [] = [Conjunction Nothing]
 simplifyArgs (a:ta) (b:tb) = simplifyNeq a b ++ simplifyArgs ta tb
 
-simplifyNeq :: Term -> Term -> [Solved (Maybe (Term, Term))]
+simplifyNeq :: Term -> Term -> [Conjunction (Maybe (Term, Term))]
 simplifyNeq a@(TVar _) b
-  | a /= b = [Satisfiable (Just (a, b))]
+  | a /= b = [Conjunction (Just (a, b))]
   | otherwise = []
 -- NOTE: a below cannot be a variable
-simplifyNeq a b@(TVar _) = [Satisfiable (Just (a, b))]
+simplifyNeq a b@(TVar _) = [Conjunction (Just (a, b))]
 -- Do not simplify universal quantifiers
-simplifyNeq a@(TForAll _ _) b = [Satisfiable (Just (a, b))]
+simplifyNeq a@(TForAll _ _) b = [Conjunction (Just (a, b))]
 -- NOTE: b below cannot be a variable
 simplifyNeq a b = case a of
   -- We can simplify all below cases to either dropping the inequality, as the
@@ -58,9 +59,9 @@ simplifyNeq a b = case a of
       -- If the functor name is the same, we can reduce inequality of the
       -- functor to the inequality of its list of arguments.
       | na == nb -> simplifyArgs argsa argsb
-    _ -> [Satisfiable Nothing]
+    _ -> [Conjunction Nothing]
   where
-    decideNonVar :: [Solved (Maybe a)]
+    decideNonVar :: [Conjunction (Maybe a)]
     decideNonVar
       | a == b    = []
-      | otherwise = [Satisfiable Nothing]
+      | otherwise = [Conjunction Nothing]
