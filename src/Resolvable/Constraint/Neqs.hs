@@ -21,11 +21,12 @@ asPredicates = map (uncurry (\=))
 addConstraint :: Term -> Term -> Neqs -> Neqs
 addConstraint k v = ((k, v):)
 
-simplify :: Neqs -> [Solved Neqs]
-simplify = foldr (aux . uncurry simplifyNeq) [Satisfiable []]
+-- Returns a DNF
+simplify :: Neqs -> [Neqs]
+simplify = foldr (aux . uncurry simplifyNeq) [[]]
   where
-    aux :: [Solved (Maybe (Term, Term))] -> [Solved Neqs] -> [Solved Neqs]
-    aux (simplifyDisj -> disj) acc = concatMap (maybe acc (\d -> map (fmap (d:)) acc)) disj
+    aux :: [Solved (Maybe (Term, Term))] -> [Neqs] -> [Neqs]
+    aux (simplifyDisj -> disj) acc = concatMap (maybe acc (\d -> map (d:) acc)) disj
 
 simplifyArgs :: [Term] -> [Term] -> [Solved (Maybe (Term, Term))]
 -- Arguments are equal, i.e., contradictory

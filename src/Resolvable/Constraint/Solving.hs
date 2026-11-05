@@ -1,7 +1,10 @@
 module Resolvable.Constraint.Solving
   ( Solved(..)
+  , solved
   , simplifyDisj
   , simplifyDisjList
+  , simplifyConj
+  , cnfToDnf
   , getSolved
   , solve ) where
 
@@ -10,6 +13,10 @@ import Data.Foldable (toList)
 
 data Solved a = Unsatisfiable | Satisfiable a
   deriving (Eq, Ord, Show)
+
+solved :: b -> (a -> b) -> Solved a -> b
+solved def _ Unsatisfiable = def
+solved _ f (Satisfiable a) = f a
 
 instance Functor Solved where
   fmap _ Unsatisfiable = Unsatisfiable
@@ -20,6 +27,11 @@ instance Applicative Solved where
   Unsatisfiable <*> _ = Unsatisfiable
   _ <*> Unsatisfiable = Unsatisfiable
   Satisfiable fs <*> Satisfiable as = Satisfiable (fs as)
+
+instance Monad Solved where
+  return = pure
+  Unsatisfiable >>= _ = Unsatisfiable
+  Satisfiable as >>= f = f as
 
 simplifyDisj :: Foldable f => [Solved (f a)] -> [f a]
 simplifyDisj [] = []
@@ -32,6 +44,18 @@ simplifyDisj (Satisfiable f:t)
 
 simplifyDisjList :: Foldable f => [Solved (f a)] -> [[a]]
 simplifyDisjList = map toList . simplifyDisj
+
+simplifyConj :: Foldable f => [Solved (f a)] -> Solved [f a]
+simplifyConj [] = Satisfiable []
+simplifyConj (Unsatisfiable:_) = Unsatisfiable
+simplifyConj (Satisfiable f:t)
+  | null f = simplifyConj t
+  | otherwise = do
+    t' <- simplifyConj t
+    return $ f : t'
+
+cnfToDnf :: [[a]] -> [[a]]
+cnfToDnf = foldr (\as acc -> concatMap (\a -> map (a:) acc) as) [[]]
 
 getSolved :: MonadPlus m => Solved a -> m a
 getSolved Unsatisfiable = mzero

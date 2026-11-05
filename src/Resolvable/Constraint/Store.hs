@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 module Resolvable.Constraint.Store
@@ -14,7 +15,8 @@ module Resolvable.Constraint.Store
   , evalCached
   , Resolvable.Constraint.Store.solve ) where
 
-import Control.Monad (guard, foldM)
+import Control.Applicative ((<|>))
+import Control.Monad (guard)
 import Data.Bitraversable (bitraverse)
 import qualified Control.Monad.Trans.Except as Ex
 import qualified Control.Monad.Trans.State as St
@@ -23,7 +25,7 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Data.Functor.Identity (Identity(..))
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromMaybe)
 
 import DNS.SEC.Verification
 import Resolvable.Prolog.Core
@@ -127,16 +129,21 @@ toBody (CStore ns os) = N.asPredicates ns ++ os
 wellformedQuant :: [String] -> Term -> Bool
 wellformedQuant (S.fromList . map TVar -> vs) right = freeVars right == vs
 
-simplifyUniversalNeqs :: Term -> [Maybe Term]
+-- Returns a disjunction
+simplifyUniversalNeqs :: Term -> [Term]
 simplifyUniversalNeqs t = case t of
-  TForAll vs qt@(toView -> TVNeq tl tr) | wellformedQuant vs qt
-    ->  let simplified = simplifyDisj $ N.simplifyNeq tl tr
-            grouped = groupDisj $ catMaybes simplified
-        in  if any Prelude.null simplified
-            then [Nothing]
-            else map (Just . quantify) grouped
-  _ -> [Just t]
+  TForAll [] qt -> [qt]
+  TForAll vs (toView -> TVNeq tl tr) | wellformedQuant vs tr
+    ->  let simplified  = simplifyDisj $ N.simplifyNeq tl tr
+            grouped     = groupDisj $ catMaybes simplified
+        in  concatMap (simplifyFurther . quantifyDisj) grouped
+  _ ->  [t]
   where
+    simplifyFurther :: Term -> [Term]
+    simplifyFurther t'
+      | t' == t = [t']
+      | otherwise = simplifyUniversalNeqs t'
+
     varsOverlap :: Term -> [Term] -> Bool
     varsOverlap _ [] = True
     varsOverlap a bs = not $ all (S.disjoint (vars a) . vars) bs
@@ -147,38 +154,25 @@ simplifyUniversalNeqs t = case t of
       let (y, n) = foldrPartition (\(map snd -> acc) (snd -> el) -> varsOverlap el acc) neqs
       in  y : groupDisj n
 
-    quantify :: N.Neqs -> Term
-    quantify [] = undefined
-    quantify [(tl, tr)] = TForAll (snub $ varNames tr) (tl \= tr)
-    quantify (neq:neqs) =
+    quantifyDisj :: N.Neqs -> Term
+    quantifyDisj [] = undefined
+    quantifyDisj [(tl, tr)] = TForAll (snub $ varNames tr) (tl \= tr)
+    quantifyDisj (neq:neqs) =
       let quant = undefined
       in TForAll quant (assoc lor $ NE.map (uncurry (\=)) $ neq NE.:| neqs)
 
-canSplitUnifier :: Term -> Term -> Maybe [Term]
-canSplitUnifier a b = do
-  (val, u) <- U.partitionValuation <$> U.unify a b
-  guard (not $ U.isIdentity val)
-  guard (U.domain val `S.isSubsetOf` vars a)
-  guard (U.isRenaming u)
-  return $ map (uncurry (\=)) $ U.toList val
+addNeq :: ConstraintStore -> Term -> Maybe ConstraintStore
+addNeq (CStore ns os) t = case toView t of
+  TVNeq a b -> Just $ CStore (N.addConstraint a b ns) os
+  _ -> Nothing
 
 add :: ConstraintStore -> Term -> Maybe ConstraintStore
-add st@(CStore ns os) t = case toView t of
-  TVForAll quant c
-    -- Drop empty universal quantifiers immediately
-    | Prelude.null quant -> add st c
-    -- TODO: Could probably generalize the below; it is similar to the case
-    -- above
-    | otherwise -> case toView c of
-      TVNeq a b | wellformedQuant quant b
-        -> maybe inOthers (foldM add st) (canSplitUnifier a b)
-      _ -> inOthers
-  TVNeq a b -> Just $ CStore (N.addConstraint a b ns) os
-  _ | isConstraint t -> inOthers
-    | otherwise -> Nothing
+add st@(CStore ns os) t = addNeq st t <|> addNonNeq
   where
-    inOthers :: Maybe ConstraintStore
-    inOthers = Just $ CStore ns (t:os)
+    addNonNeq :: Maybe ConstraintStore
+    addNonNeq = if isConstraint t
+      then Just $ CStore ns (t:os)
+      else Nothing
 
 isConstraint :: Term -> Bool
 isConstraint t = case toView t of
@@ -217,14 +211,24 @@ simplifyCached = simplifyWithCache simplifyTCached
 
 type SimplifyCache m a = St.StateT (M.Map Term Bool) m a
 
-simplifyWithCache :: Monad m => (Term -> m (Solved (Maybe Term))) -> ConstraintStore -> m [ConstraintStore]
-simplifyWithCache cache (CStore ns ts) = do
-  case syntacticNots ts of
-    Unsatisfiable -> return []
-    Satisfiable ts' -> do
-      let ns' = N.simplify ns
-      ts'' <- fmap catMaybes . sequenceA <$> mapM cache ts'
-      return $ CStore <$> concatMap getSolved ns' <*> getSolved ts''
+simplifyWithCache :: forall m. Monad m => (Term -> m (Solved (Maybe Term))) -> ConstraintStore -> m [ConstraintStore]
+simplifyWithCache simp (CStore ns ts) = concat <$> mapM logical rewrite
+  where
+    logical :: ConstraintStore -> m [ConstraintStore]
+    logical (CStore ns' ts') = do
+      let nsSimp = N.simplify ns'
+      tsSimp <- fmap catMaybes . sequenceA <$> mapM simp ts'
+      return $ solved [] (\ts'' -> map (`CStore` ts'') nsSimp) tsSimp
+
+    -- Use syntactic transformations first; returns a disjunction
+    rewrite :: [ConstraintStore]
+    rewrite = solved [] id $ do
+      ts' <- syntacticNots ts
+      return $ map toStore $ cnfToDnf $ map simplifyUniversalNeqs ts'
+      where
+        -- Keep ns because above we only simplified ts
+        toStore :: [Term] -> ConstraintStore
+        toStore = foldr (\c st' -> fromMaybe (error "invariant error") (addNeq st' c <|> add st' c)) (CStore ns [])
 
 evalCached :: Monad m => SimplifyCache m a -> m a
 evalCached = (`St.evalStateT` M.empty)
