@@ -41,8 +41,8 @@ simplifyTEx t = case toView t of
   TVForAll vs (toView -> TVNeq a b)
     | not (wellformedQuant vs a b) -> Ex.throwE "unsupported quantifier"
     | ground a -> return $ not $ U.unifies a b
-    -- TODO: Could also check that variable assignments are to ground terms *for
-    -- variables occurring on the right-hand side**
+    -- TODO: Slight deviation from the paper where I only check that right-hand
+    -- side is a variable. Is equivalent, though. Document later.
     | otherwise -> maybe (return True) (\u -> guard (U.isRenaming u) >> return False) (U.unify a b)
   TVNot c -> not <$> simplifyTEx c
   TVIsName n
