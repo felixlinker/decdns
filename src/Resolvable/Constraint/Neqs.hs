@@ -1,4 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
 module Resolvable.Constraint.Neqs
   ( Neqs
   , Resolvable.Constraint.Neqs.empty
@@ -26,7 +25,6 @@ simplify :: Neqs -> [Neqs]
 simplify = foldr (aux . uncurry simplifyNeq) [[]]
   where
     aux :: [Conjunction (Maybe (Term, Term))] -> [Neqs] -> [Neqs]
-    -- TODO: Check if `disjunction acc` is  correct default handling
     aux disj acc = disjunction acc (concatMap (maybe acc (\d -> map (d:) acc))) (simplifyDisj disj)
 
 simplifyArgs :: [Term] -> [Term] -> [Conjunction (Maybe (Term, Term))]
