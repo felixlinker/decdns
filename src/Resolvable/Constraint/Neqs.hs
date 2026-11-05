@@ -25,9 +25,7 @@ simplify :: Neqs -> [Solved Neqs]
 simplify = foldr (aux . uncurry simplifyNeq) [Satisfiable []]
   where
     aux :: [Solved (Maybe (Term, Term))] -> [Solved Neqs] -> [Solved Neqs]
-    aux (simplifyDisjList -> disj) acc
-      | null disj = []
-      | otherwise = concatMap (\d -> map (fmap (d++)) acc) disj
+    aux (simplifyDisj -> disj) acc = concatMap (maybe acc (\d -> map (fmap (d:)) acc)) disj
 
 simplifyArgs :: [Term] -> [Term] -> [Solved (Maybe (Term, Term))]
 -- Arguments are equal, i.e., contradictory
