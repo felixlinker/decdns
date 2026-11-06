@@ -1,12 +1,6 @@
 :- use_module(dnssec).
-all_resolvable(Queries) :- findall(resolvable(Q, N, V), resolvable(Q, N, V), Queries).
 resolvable(Q, N, V) :-
   starting_zone(Z),
   dif(Q, soa), dif(Q, ns), dif(Q, cname), dif(Q, dname),
   dif(Q, ds), dif(Q, dnskey), dif(Q, nsec), dif(Q, nsec3), dif(Q, nsec3param), dif(Q, rrsig),
   resolves(_, Q, Z, N, _, _, V, _).
-
-min(ad(0), ad(0), ad(0)).
-min(ad(0), ad(1), ad(0)).
-min(ad(1), ad(0), ad(0)).
-min(ad(1), ad(1), ad(1)).
