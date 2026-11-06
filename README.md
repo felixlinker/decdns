@@ -1,24 +1,24 @@
-# DNS Regressor
+# DecDNS
 
-This repository contains a Haskell implementation of a tool that can reason about resolvability of DNS zones during updates.
+This repository contains a Haskell implementation of DecDNS, a tool that can reason about resolvability of DNS zones.
 By "resolvability," we mean: Is there an answer to a DNS query?
-We consider resolvability with respect to a list of servers to start the queries at.
 
-The tool provides many commands, but its core utility is to compute two things, given two sets of zone files (one being an old configuration, one being the updated configuration):
+The tool provides many commands, but its core utility is to compute a change-impact analysis of a zone configuration update.
+That is, it can compute (a) whether an update leads to a loss in resolvability, i.e., whether there are queries that cannot be resolved anymore after the update, and (b) whether an update reads to a gain in resolvability, i.e., whether there now resolvable queries that were not resolvable before.
 
-1. Are there any queries that were resolvable in the old configuration but are not resolvable in the new configuration?
-We intend to apply some lightweight reasoning about whether regressions in resolvability are "trivial" (thus, most likely intended).
-For example, if all records that could directly answer a query were deleted, we would like to consider that deletion "trivial" and thus probably intended.
-2. Can the updates be rolled out in a way so that resolvability of queries is not degraded during the rollout, e.g., because resolvers have cached data that conflicts with the update?
-For example, say that a domain `a.com` aliases to `b.com`, but `b.com` is decommissioned and its addresses moved to `a.com`.
-In that case, we should first remove the CNAME record for `a.com` and add its new IP addresses before deleting `b.com`.
-A resolver having cached `a.com`'s CNAME record may otherwise fail looking up `b.com`.
-The rollout computation can also determine that no such rollout is possible, e.g., because the update introduces a cyclic dependency.
-The command-line interface currently does not print a diagnostic in that case.
-
-Our tool compiles DNS zone files into logic programs that can be serialized as Prolog programs.
+DecDNS compiles DNS zone files into constraint logic programs.
 Generally, our output will use SWI-Prolog syntax.
-We do not use SWI-Prolog reasoning, however, as SWI-Prolog's reasoning about negation does not match our needs.
+We do not use SWI-Prolog for our reasoning, however.
+
+## Installation and Pre-requisites
+
+To compile DecDNS, you require `stack`.
+We recommend installing `stack` via [GHCup](https://www.haskell.org/ghcup/).
+
+After having installed `stack`, you can run `stack install` to compile DecDNS.
+
+We also provide a SWI-Prolog integration.
+We refer to the documentation in `prolog/README.md` for configuring this integration.
 
 ## Available commands
 
