@@ -1,4 +1,4 @@
-module PrologCompiler (main) where
+module CLI (main) where
 
 import Arguments
 import DNS.ZoneFile (allRecords, Zone, AZone (zoneName))

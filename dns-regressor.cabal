@@ -221,8 +221,8 @@ library
     , transformers
   default-language: Haskell2010
 
-executable dns-regressor-prolog
-  main-is: PrologCompiler.hs
+executable decdns
+  main-is: CLI.hs
   other-modules:
       Arguments
       Util
@@ -231,7 +231,7 @@ executable dns-regressor-prolog
       Paths_dns_regressor
   hs-source-dirs:
       app
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N -main-is PrologCompiler
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N -main-is CLI
   build-depends:
       base >=4.7 && <5
     , base32

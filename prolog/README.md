@@ -2,7 +2,7 @@
 
 This library runs the existing `DNS.SEC.Verification` Haskell functions from
 CHR constraints. It accepts the names and record terms emitted by
-`dns-regressor-prolog pl-resolvable`.
+`decdns pl-resolvable`.
 
 Build from `dns-regressor/` with `make -C prolog`; this requires Make, Stack,
 SWI-Prolog (including its headers and shared library), and a C compiler.

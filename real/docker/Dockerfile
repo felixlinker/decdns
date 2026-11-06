@@ -15,4 +15,4 @@ WORKDIR /opt/dns-test
 ENTRYPOINT ["/bin/sh", "/opt/dns-test/entrypoint.sh"]
 
 FROM harness AS tool
-COPY --from=builder /out/dns-regressor-prolog /usr/local/bin/dns-regressor-prolog
+COPY --from=builder /out/decdns /usr/local/bin/decdns

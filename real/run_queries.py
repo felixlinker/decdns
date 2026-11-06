@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate a random pending query with dns-regressor and dig through one proxy."""
+"""Evaluate a random pending query with decdns and dig through one proxy."""
 
 import argparse
 import os
@@ -97,7 +97,7 @@ def evaluate(queries: Path, tool_dir: Path, dig_dir: Path, timeout: int,
         print(f"Evaluating line {line_number}: {name} {record_type}", flush=True)
         started = time.monotonic()
         run_and_save(
-            ["/usr/bin/time", "-v", "dns-regressor-prolog", "--timeout", str(timeout),
+            ["/usr/bin/time", "-v", "decdns", "--timeout", str(timeout),
              "query", "root-addresses", "root-keys", record_type, name,
              "+RTS", "-N2", "-RTS"],
             tool_path, timeout + 5,
