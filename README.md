@@ -69,3 +69,14 @@ Available commands are:
 - `parse-only [zone files...]`:
   Parses the list of zone files and prints all records to stdout.
   This command is supposed to aid debugging.
+
+## Repository structure
+
+| Directory | Contents |
+| --- | --- |
+| `app/` | Source code for the `decdns` CLI utility. |
+| `examples/` | Example zone configurations. |
+| `prolog/` | SWI-Prolog integration. |
+| `real/` | Utilities and configuration for experiments against real DNS data. |
+| `src/` | DecDNS library source code. |
+| `test/` | Test suite. |
