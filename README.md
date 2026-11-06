@@ -22,40 +22,50 @@ We refer to the documentation in `prolog/README.md` for configuring this integra
 
 ## Available commands
 
-The tool reasons statically about DNS zone files, as described above, and it requires zone files as arguments.
-Zone files must be provided as paths to files (or globs), and the respective file name indicates the name server's name serving the contents of that file.
-The arguments are as follows:
+DecDNS can reason about zone files both online and offline.
+Zone files must be provided as paths to files.
+The general argument structure is:
 
 ```sh
-stack run -- [command] [args]
+decdns [command] [args]
 ```
 
 Available commands are:
 
 - `query ROOT_ADDRESSES ROOT_KEYS TYPE NAME`:
-  Resolve a fully qualified name against real DNS, starting with the servers in the root addresses file.
-  For example, `stack run -- query root-addresses root-keys NS com.` or `stack run -- query root-addresses root-keys A amazon.com.`.
+  Resolve a fully qualified name against live DNS name servers, starting with the servers in the root addresses file.
+  For example:
+  - `decdns query root-addresses root-keys NS com.`
+  - `decdns query root-addresses root-keys A amazon.com.`
+
   The root addresses file contains root NS records and their A and AAAA records in zone-file format.
   The root keys file contains root (`.`) DS records in zone-file format.
   These records are considered trusted and used to authenticate the root DNSKEY RRSet.
-  Prints the first complete answer and logs network lookups as `%` Prolog comments.
+  The response to the query will be printed as a `query` fact.
+
+- `resolvable ROOT_KEYS ROOT_ZONE_NAME [zone files...]`:
+  Reason statically about all supplied zones.
+  Resolution starts at the apex of the zone `ROOT_ZONE_NAME`, which must be supplied as one of the input zone files.
+  `ROOT_ZONE_NAME` must be fully qualified, for example `com.` or `.`.
+  The root keys file contains trusted DS records in zone-file format; it may be empty for unsigned zones, e.g., `/dev/null`.
+  Output is printed to stdout as facts.
+
 - `pl-resolvable ROOT_KEYS ROOT_ZONE_NAME [zone files...]`:
   Compile a list of zone files to a Prolog program that can reason about resolvability and print it to stdout.
-  Resolution starts at the apex of the zone `ROOT_ZONE_NAME`, as with `resolvable`.
-- `resolvable ROOT_KEYS ROOT_ZONE_NAME [zone files...]`: Reason statically
-and symbolically about all supplied zones. Resolution starts at the apex of the
-  zone `ROOT_ZONE_NAME`, which must be supplied as one of the input zone files.
-  `ROOT_ZONE_NAME` must be fully qualified, for example `com.` or `.`. The root
-  keys file contains trusted DS records in zone-file format; it may be empty.
-  Output is printed to stdout as facts.
+  Arguments are the same as for the `resolvable` command.
+  This command's output can be used with our SWI-Prolog integration (see `prolog/README`).
+
 - `resolves ROOT_KEYS ROOT_ZONE_NAME [zone files...]`:
-  Accepts the same arguments as `resolvable`, and prints the full resolution facts,
-  including nameservers, answer data, alias following, verification, and authentication status.
+  Accepts the same arguments as `resolvable`, and prints the full resolution facts, i.e., omits the projection to the `resolvable` predicate.
+
 - `regressions ROOT_KEYS_OLD ROOT_KEYS_NEW ROOT_ZONE_NAME [old zone files...] :: [new zone files...]`:
-  Compile a list of old and new zone files to a Prolog program and
-  compute regressions in resolvability. Arguments are as with the previous
-  command, but the list of zone files reflect the old and new configuration
-  respectively. Output is printed to stdout as Prolog facts.
+  Reason statically about a list of old and new zone files and compute regressions in resolvability, i.e., compute which queries cannot be resolved in the new configuration but could be resolved in the old configuration.
+  Arguments are as with the previous commands, but the list of zone files reflect the old and new configuration respectively.
+  Output is printed to stdout as Prolog facts.
+
+- `gains ROOT_KEYS_OLD ROOT_KEYS_NEW ROOT_ZONE_NAME [old zone files...] :: [new zone files...]`:
+  Same as `regressions` but computes which queries can be resolved in the new configuration that could not be resolved in the old configuration.
+
 - `parse-only [zone files...]`:
   Parses the list of zone files and prints all records to stdout.
   This command is supposed to aid debugging.
