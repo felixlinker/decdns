@@ -145,6 +145,7 @@ exampleConfigs =
   , google
   , wildcardShadowingOld
   , wildcardShadowingNew
+  , wildcardCname
   , incompleteZoneCutOld
   , incompleteZoneCutNew
   ]
@@ -581,6 +582,12 @@ wildcardShadowingNew =
     [ query (gr dnsRoot) (gr RT.A) (gr aGtldServers) Nothing Nothing
     , query (gr dnsRoot) (gr RT.TXT) (gr exampleCom) Nothing Nothing ]
 
+wildcardCname :: ExampleConfig
+wildcardCname =
+  ExampleConfig "wildcards/cname" "/dev/null" dnsRoot ["root"]
+    [ query (gr dnsRoot) (gr RT.TXT) (gr aSub) noValidate ad0 ]
+    [ query Nothing (gr RT.TXT) (gr tooLongWildcardName) Nothing Nothing ]
+
 incompleteZoneCutOld, incompleteZoneCutNew :: ExampleConfig
 incompleteZoneCutOld =
   ExampleConfig "misconfigs/incomplete-zone-cut/old" "/dev/null" dnsRoot ["root"]
@@ -618,6 +625,8 @@ nsComCom, googleCom, aGtldServers, short, long, longShort, shortShort :: Name St
 aSub, aSubSub :: Name String
 aSub = mkName ["a", "sub", ""]
 aSubSub = mkName ["a", "sub", "sub", ""]
+tooLongWildcardName :: Name String
+tooLongWildcardName = mkName $ replicate 4 (replicate 63 'x') ++ ["sub", ""]
 dnsRoot = root
 com = mkName ["com", ""]
 net = mkName ["net", ""]

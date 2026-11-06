@@ -1,0 +1,8 @@
+$ORIGIN .
+$TTL 1200
+@ SOA ns. example.com. 0 0 0 0 0
+@ NS ns.
+ns A 1.2.3.4
+
+*.sub CNAME example.
+example TXT "hello"

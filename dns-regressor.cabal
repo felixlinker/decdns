@@ -135,6 +135,7 @@ extra-source-files:
     examples/misconfigs/wildcard-shadowing/old/net.
     examples/misconfigs/wildcard-shadowing/old/root
     examples/wellformedness/ns-wc
+    examples/wildcards/cname/root
     examples/wildcards/move-down/double
     examples/wildcards/move-down/single
 
