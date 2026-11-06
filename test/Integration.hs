@@ -667,7 +667,7 @@ nsComCom = mkName ["ns-com", "com", ""]
 googleCom = mkName ["google", "com", ""]
 aGtldServers = mkName ["a", "gtld-servers", "net", ""]
 short = mkName ["short", ""]
-long = mkName ["looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong", ""]
+long = mkName ["loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong", ""]
 longShort = mkName $ replicate n "x" ++ ["short", ""]
   where
     -- Technically subtracting length of root label twice, but is okay becase

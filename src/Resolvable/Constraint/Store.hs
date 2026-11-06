@@ -46,7 +46,7 @@ simplifyTEx t = case toView t of
     | otherwise -> maybe (return True) (\u -> guard (U.isRenaming u) >> return False) (U.unify a b)
   TVNot c -> not <$> simplifyTEx c
   TVIsName n
-    | minNameLength n > 255 -> return False
+    | not (validLength n) -> return False
     | ground n -> return True
   TVDigestValid n dnskeyT dsT | ground t -> do
       n' <- asName n

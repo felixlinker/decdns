@@ -4,5 +4,5 @@ $TTL 1200
 @ IN NS ns.
 ns IN A 1.2.3.4
 
-short IN DNAME looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong.
-*.looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong IN TXT "hello"
+short IN DNAME loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong.
+*.loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong IN TXT "hello"

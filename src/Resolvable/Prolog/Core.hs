@@ -84,7 +84,8 @@ module Resolvable.Prolog.Core
   , nameWithSynthesis
   , nameWithoutSynthesis
   , nameTerm
-  , minNameLength ) where
+  , minNameLength
+  , validLength ) where
 
 import DNS.Name
 import DNS.Record
@@ -576,18 +577,28 @@ nameTerm (Name (NE.toList -> ls)) = list (reverse $ map TAtom $ filter (not . nu
 nameWithoutSynthesis :: ConstrainedName -> Term
 nameWithoutSynthesis = nameTerm . toStringName
 
-minNameLength :: Term -> Int
-minNameLength t =
+minLabelLengths :: Term -> [Int]
+minLabelLengths t =
   -- Drop tail because that could be empty.
   let (els, _) = collectListWithTail t
-  -- (+1) because we do not include the root label in the name representation.
-  in  1 + sum (map labelLength els)
+  -- (1:) because we do not include the root label in the name representation.
+  in  1 : map labelLength els
   where
     labelLength :: Term -> Int
     labelLength (TAtom l) = 1 + length l
     -- 2 because we don't permit empty labels within the name.
     labelLength (TVar _)  = 2
     labelLength _ = 0 -- Technically undefined
+
+minNameLength :: Term -> Int
+minNameLength = sum . minLabelLengths
+
+validLength :: Term -> Bool
+validLength (minLabelLengths -> ls)
+  -- Max label length is 63, but count includes length byte. Thus, compare to 64.
+  | any (> 64) ls = False
+  | sum ls > 255 = False
+  | otherwise = True
 
 minTerm :: Term -> Term -> Term -> Term
 minTerm a b c = TFunctor minSym [a, b, c]

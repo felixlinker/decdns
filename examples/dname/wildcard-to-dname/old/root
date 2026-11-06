@@ -5,4 +5,4 @@ $TTL 1200
 ns IN A 1.2.3.4
 
 *.short IN TXT "hello"
-*.looooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong IN TXT "hello"
+*.loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong IN TXT "hello"
