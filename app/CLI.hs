@@ -63,7 +63,7 @@ main = do
           else Sys.timeout (timeout _options * (10 :: Int) Prelude.^ (6 :: Int))
       (as, _, _) <- maybe (fail "timeout") return =<< time (resolve keys addrs t' qn')
       when (null as) (putStrLn "no response")
-      mapM_ print as
+      mapM_ (print . fact ()) as
     _ | cmd `elem` ["regressions", "gains"] -> do
         keysPathOld:keysPathNew:rootZ:args' <- return args
         keysOld <- parseDS keysPathOld
