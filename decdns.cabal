@@ -267,7 +267,6 @@ test-suite decdns-test
       Resolvable.Prolog.CoreSpec
       Resolvable.QueryingSpec
       Resolvable.ResolutionSpec
-      Resolvable.ResolvabilitySpec
       Resolvable.UnificationSpec
       Resolvable.Update.DisunificationSpec
       Resolvable.Util

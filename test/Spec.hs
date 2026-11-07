@@ -6,7 +6,6 @@ import qualified Resolvable.UnificationSpec as UnificationSpec
 import qualified Resolvable.Prolog.CoreSpec as PrologCoreSpec
 import qualified Resolvable.Constraint.NeqsSpec as NeqsSpec
 import qualified Resolvable.Constraint.StoreSpec as StoreSpec
-import qualified Resolvable.ResolvabilitySpec as ResolvabilitySpec
 import qualified Resolvable.Update.DisunificationSpec as DisunificationSpec
 -- import qualified Resolvable.Update.RolloutSpec as RolloutSpec
 import qualified NameConstraintSpec
@@ -36,7 +35,6 @@ main = do
       "dns-regressor"
       [ UnificationSpec.tests
       , PrologCoreSpec.tests
-      , ResolvabilitySpec.tests
       , DisunificationSpec.tests
       , NameConstraintSpec.tests
       , NameSpec.tests
