@@ -1,10 +1,8 @@
 **/.DS_Store
 .stack-work/
-.stack-root/
-*~
-exm/
-pl/
-viz/
-reports/
 .codex/
 .vscode/
+exm/
+pl/
+reports/
+release/

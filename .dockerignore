@@ -1,7 +1,11 @@
 .git
 .stack-work
-context
+.codex
+.vscode
+exm
+pl
 reports
+release
 real/recordings
 real/tool
 real/dig
