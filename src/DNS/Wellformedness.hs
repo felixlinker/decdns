@@ -129,7 +129,7 @@ noDNSSECKey = all checkData
   where
     checkData :: RRSet.RDataSet -> Bool
     checkData (RRSet.getType T.DNSKEY -> keys) =
-      all ((\case { DNSKEY k -> isDNSSECKey k; _ -> True}) . rtype) keys
+      all ((\case { DNSKEY k -> not (isDNSSECKey k); _ -> True}) . rtype) keys
 
 -- See: https://datatracker.ietf.org/doc/html/rfc6672#section-2.4
 checkDNAME :: Bool -> Tr.Node String RRSet.RDataSet -> Bool

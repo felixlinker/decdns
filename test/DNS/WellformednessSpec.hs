@@ -33,6 +33,7 @@ tests =
     , testCase "rejects a signer below the owner for ordinary RRSIG records" rejectsSignerBelowOwner
     , testCase "requires an SOA RRSIG signer to equal its owner" requiresSOASignerAtOwner
     , testCase "requires a DNSKEY RRSIG signer to equal its owner" requiresDNSKEYSignerAtOwner
+    , testCase "rejects a zone key below the apex" rejectNonApexDNSKEY
     , testGroup "reports issues in zone files" (map reportsWellformednessIssues malformedZoneFiles)
     ]
 
@@ -194,6 +195,14 @@ requiresDNSKEYSignerAtOwner = do
   where
     org = mkName ["example", "com", ""]
     orgLs = labelCount org
+    owner = "key" <| org
+
+rejectNonApexDNSKEY :: Assertion
+rejectNonApexDNSKEY = do
+  zone <- zoneFromList [apex org, named owner $ dnskey [ZoneKey]]
+  any isFatal (zoneWellformed zone) @?= True
+  where
+    org = mkName ["example", "com", ""]
     owner = "key" <| org
 
 dnskey :: [DNSKeyFlag] -> RData
