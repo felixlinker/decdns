@@ -1,0 +1,82 @@
+; File written on Sat Nov  7 17:26:48 2026
+; dnssec-signzone version 9.20.29
+.			1200	IN SOA	ns. example.com. (
+					0          ; serial
+					0          ; refresh (0 seconds)
+					0          ; retry (0 seconds)
+					0          ; expire (0 seconds)
+					0          ; minimum (0 seconds)
+					)
+			1200	RRSIG	SOA 13 0 1200 (
+					20261207152648 20261107152648 29714 .
+					gyo7IJgByyoh5yLvdC5WTxql4yRxbvqfEZv5
+					q3ndwFCt07FUvlP3d6+lC/lzPzsf1RPDcuM9
+					ToqzwHqrPb2xHg== )
+			1200	NS	ns.
+			1200	RRSIG	NS 13 0 1200 (
+					20261207152648 20261107152648 29714 .
+					OZ4KK9Z116WbuBAc5B8z74/LvcmffOfeYnQx
+					UIpyinTRIiKe+BGDaFGr0/JozckGr64rvytr
+					OjqWrKkUUQ76Xg== )
+			0	NSEC	*.loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong. NS SOA RRSIG NSEC DNSKEY
+			0	RRSIG	NSEC 13 0 0 (
+					20261207152648 20261107152648 29714 .
+					1rQ8YeaAUbLuEqUoPL9CJQmpFLoqBtejOOXL
+					1xJXJZKOuQ1f5Wfr9BZYV0h6wMNiRBKRfIP2
+					1DPmJ2UULzb+Iw== )
+			1200	DNSKEY	256 3 13 (
+					Tb763MdvlGdVjv/6hi3S7mwPgJywPvIW+YjU
+					tlmzEMqOSFEsG1p66CJm/Ir0tp2W7kzLBK2b
+					wSAwyVJZRHI+lQ==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 29714
+			1200	DNSKEY	257 3 13 (
+					E8VGVG5gD0uua4APQHONfydvNgWg46k96dgg
+					VJ2aR111FtV2y2YPeYnLAQj1badkwtid323O
+					Vdny31JRgo2Dqg==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 11224
+			1200	RRSIG	DNSKEY 13 0 1200 (
+					20261207152648 20261107152648 11224 .
+					blJTdEQI6karc0pUy/Wa9xGY22bSOiu4x7Ha
+					8MChlcV4Wz0U/GRzPcP28daBDxCp8uqFK7NP
+					oaQqReeF+GqTIA== )
+			1200	RRSIG	DNSKEY 13 0 1200 (
+					20261207152648 20261107152648 29714 .
+					04n/kwhETikJtYUWaeadovgwafBF4jxkO9UD
+					2/bXjJehTJop+niF0/Om0JGhogzG9ySjr/Ku
+					YGmAkucgM3Zc1g== )
+*.loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong. 1200	IN TXT "hello"
+			1200	RRSIG	TXT 13 1 1200 (
+					20261207152648 20261107152648 29714 .
+					6OUVgJTsNNozCbEY0Qz/a6Fq67nEVLNSiwb8
+					9zMuVt3BNJ7Nnjl+M3gYvBxrqvGIViONjmUG
+					ogp3LuGeZU03Zw== )
+			0	NSEC	ns. TXT RRSIG NSEC
+			0	RRSIG	NSEC 13 1 0 (
+					20261207152648 20261107152648 29714 .
+					0IfGwkFalMns6w8LibXN9Fkk9FlI/DEwZ+ng
+					u76o4zOMX7uDhOnBpYmJOOyNzSEFo2DpOmeN
+					nGt5d3UC8TBMGw== )
+ns.			1200	IN A	1.2.3.4
+			1200	RRSIG	A 13 1 1200 (
+					20261207152648 20261107152648 29714 .
+					pLS5McqW6VIVOlrhy5q+DL8HZDJy9A+kLZt8
+					+/iV7C2bwh11wCkUA7/zMX7ON9rquZilfLYU
+					U8rHfDC38BGk1w== )
+			0	NSEC	short. A RRSIG NSEC
+			0	RRSIG	NSEC 13 1 0 (
+					20261207152648 20261107152648 29714 .
+					6UibbmxOVMYjJCLu0aAJHnuC8d7D5vKDF4H2
+					sfu3pJhqZ7jKgfun1VbUbepxBrb8X0oDoCch
+					jCjGIBIE2S1e/w== )
+short.			1200	IN DNAME loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong.
+			1200	RRSIG	DNAME 13 1 1200 (
+					20261207152648 20261107152648 29714 .
+					baTCe2PaiiLz2DxnX4MYUID8JXk6Bx9yW3iC
+					Pj5AMbOzMArpfPH5ogortvbqu45m8XV9X9o9
+					PN1vny0vTD/nqg== )
+			0	NSEC	. DNAME RRSIG NSEC
+			0	RRSIG	NSEC 13 1 0 (
+					20261207152648 20261107152648 29714 .
+					o4R3bKpQGD8Q4RkDhDBXdxX8dMGnfeenDdin
+					QRYYRrJFT/CnfGs0rFVxaziOy4YJp3l8HDK3
+					QM5RaaGEFljFYw== )

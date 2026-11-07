@@ -62,6 +62,11 @@ extra-source-files:
     examples/dnssec/ns/example.
     examples/dnssec/txt/dsset-com.
     examples/dnssec/txt/ns.com.
+    examples/dnssec/wildcard-dname-signed/new/dsset
+    examples/dnssec/wildcard-dname-signed/new/long
+    examples/dnssec/wildcard-dname-signed/new/root
+    examples/dnssec/wildcard-dname-signed/old/dsset
+    examples/dnssec/wildcard-dname-signed/old/root
     examples/dnssec/wildcard/dsset-com.
     examples/dnssec/wildcard/ns.com.
     examples/ns/cyclic-deleg/ns.net.

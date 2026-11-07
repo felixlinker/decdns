@@ -1,0 +1,58 @@
+; File written on Sat Nov  7 17:38:34 2026
+; dnssec-signzone version 9.20.29
+loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong. 1200 IN SOA ns2. example.com. (
+					0          ; serial
+					0          ; refresh (0 seconds)
+					0          ; retry (0 seconds)
+					0          ; expire (0 seconds)
+					0          ; minimum (0 seconds)
+					)
+			1200	RRSIG	SOA 13 1 1200 (
+					20261207152924 20261107152924 35569 loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong.
+					U+iUgf24y8J6+oTE5hUt7tcngL6fntdrfENo
+					CyUILMmnAjk1R1/fECR7ZHzCK/JED+xpkna9
+					eG9r82oSJN7j/w== )
+			1200	NS	ns2.
+			1200	RRSIG	NS 13 1 1200 (
+					20261207152924 20261107152924 35569 loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong.
+					xHdiG/FNqmPAQOlzIOWiAqIkcWromuD2tHLn
+					dPU3YYJPj+oKJNW/hxhlkrRNZbpL0UpgtYGf
+					ctvilAEOnnuZ3A== )
+			0	NSEC	*.loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong. NS SOA RRSIG NSEC DNSKEY
+			0	RRSIG	NSEC 13 1 0 (
+					20261207152924 20261107152924 35569 loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong.
+					X3SBmHBI3XIAD7DvyMR316/ZuTHSeqci8Kst
+					3TlGsp+FLZgZnLoPNVvFOtRw8yyMndoMH4XH
+					a4rK4oPAL20ryg== )
+			1200	DNSKEY	256 3 13 (
+					QQlqINGLGPHPxMARb7gkG+jOPMl0Afr/L2kT
+					he55XRqysktdLId0r1VpsUdUZz0h2VEOh+pw
+					brIL49G9FYg+0g==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 35569
+			1200	DNSKEY	257 3 13 (
+					/GTZQ5+ht/MobZ36fwAUDEMfjoOsAIEewRWm
+					UYH/zElIlJwvBrW8L9rnUTFOR9fY0TxUb39U
+					kJm7FdYSNhEtGw==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 25348
+			1200	RRSIG	DNSKEY 13 1 1200 (
+					20261207152924 20261107152924 25348 loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong.
+					Ddd3VdJFdiusJCXYeN5mHfCkhoPNcxHWIbuq
+					Jz86lvMWnBP3+g58itfJu3fD/qDeuDzLESj0
+					+Is66RCcYsNdUw== )
+			1200	RRSIG	DNSKEY 13 1 1200 (
+					20261207152924 20261107152924 35569 loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong.
+					IKKkHqdEw0w3kZKLoh4Xsp80etn3jQ//B8ez
+					TGaWlTE+qavpoNKm/VqGxEbGjN2ed2x6k+N9
+					w21gFFxS5pNH3A== )
+*.loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong. 1200	IN TXT "hello"
+			1200	RRSIG	TXT 13 1 1200 (
+					20261207152648 20261107152648 29714 .
+					6OUVgJTsNNozCbEY0Qz/a6Fq67nEVLNSiwb8
+					9zMuVt3BNJ7Nnjl+M3gYvBxrqvGIViONjmUG
+					ogp3LuGeZU03Zw== )
+			0	NSEC	loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong. TXT RRSIG NSEC
+			0	RRSIG	NSEC 13 1 0 (
+					20261207152924 20261107152924 35569 loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong.
+					PATqt8+mqRlMIOt7WYR25dlZ/Nju/pXKIzS0
+					2nfzZ/llxR6W4E2mp9mdmlFSaedEx+5atidF
+					KJFBVrjaG4o/vw== )
