@@ -177,7 +177,8 @@ genLabel = elements ["a", "b", "c"]
 
 genName :: Gen (Name String)
 genName = do
-  lbls <- listOf1 genLabel
+  labelNo <- chooseInt (1, 12)
+  lbls <- vectorOf labelNo genLabel
   return (Name (NE.fromList lbls))
 
 genAbsoluteName :: Gen (Name String)

@@ -6,8 +6,9 @@ module Parsing.Name
   , parseName
   , parseNameM ) where
 
+import Data.Char (toLower)
 import Data.Functor (($>))
-import Control.Monad (MonadPlus (mzero), when)
+import Control.Monad (MonadPlus (mzero), when, guard)
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (isJust)
 import Text.Parsec
@@ -16,7 +17,7 @@ import Text.Parsec.Char as Char
 import DNS.Name (Name(..), root)
 import Parsing.Tokens
 import Parsing.State (OriginProvider (getOrigin))
-import Data.Char (toLower)
+import Resolvable.Prolog.Core (nameTerm, validLength)
 
 origin :: (Stream s m Char, OriginProvider u) => ParsecT s u m (Name String)
 origin = do
@@ -37,13 +38,16 @@ label = string "*" <|> do
   p2 <- many letDigUnderscore
   return $ map toLower $ p0 : p1 ++ p2
 
+guardNameLength :: Name String -> ParsecT s u m (Name String)
+guardNameLength n = guard (validLength $ nameTerm n) $> n
+
 absName :: Stream s m Char => ParsecT s u m (Name String)
 absName = rootName <|> nonRootName
   where
     nonRootName :: Stream s m Char => ParsecT s u m (Name String)
     nonRootName = do
       ls <- endBy1 Parsing.Name.label dot
-      return $ Name $ NE.prependList ls $ NE.singleton ""
+      guardNameLength $ Name $ NE.prependList ls $ NE.singleton ""
 
     rootName :: Stream s m Char => ParsecT s u m (Name String)
     rootName = dot $> root
@@ -51,13 +55,13 @@ absName = rootName <|> nonRootName
 relName :: (Stream s m Char) => ParsecT s u m (Name String)
 relName = do
   ls <- sepBy1 Parsing.Name.label dot
-  maybe (fail "no labels parsed") (return . Name) (NE.nonEmpty ls)
+  maybe (fail "no labels parsed") (guardNameLength . Name) (NE.nonEmpty ls)
 
 relToAbsName :: (Stream s m Char, OriginProvider u) => ParsecT s u m (Name String)
 relToAbsName = do
   ls <- sepBy1 Parsing.Name.label dot
   Just (Name org) <- getOrigin <$> getState
-  return $ Name $ NE.prependList ls org
+  guardNameLength $ Name $ NE.prependList ls org
 
 name :: (Stream s m Char, OriginProvider u) => ParsecT s u m (Name String)
 name = choice [origin, try absName, relToAbsName]
