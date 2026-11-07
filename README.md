@@ -48,7 +48,7 @@ Available commands are:
   Resolution starts at the apex of the zone `ROOT_ZONE_NAME`, which must be supplied as one of the input zone files.
   `ROOT_ZONE_NAME` must be fully qualified, for example `com.` or `.`.
   The root keys file contains trusted DS records in zone-file format; it may be empty for unsigned zones, e.g., `/dev/null`.
-  Output is printed to stdout as facts.
+  Output is printed to stdout as Prolog facts.
 
 - `pl-resolvable ROOT_KEYS ROOT_ZONE_NAME [zone files...]`:
   Compile a list of zone files to a Prolog program that can reason about resolvability and print it to stdout.
@@ -61,7 +61,8 @@ Available commands are:
 - `regressions ROOT_KEYS_OLD ROOT_KEYS_NEW ROOT_ZONE_NAME [old zone files...] :: [new zone files...]`:
   Reason statically about a list of old and new zone files and compute regressions in resolvability, i.e., compute which queries cannot be resolved in the new configuration but could be resolved in the old configuration.
   Arguments are as with the previous commands, but the list of zone files reflect the old and new configuration respectively.
-  Output is printed to stdout as Prolog facts.
+  Output is printed to stdout as logical formulas.
+  Note that while these formulas may appear to follow Prolog syntax, they are not valid logic programming rules because they can use negation (`not`) and universal quantification (`forall`).
 
 - `gains ROOT_KEYS_OLD ROOT_KEYS_NEW ROOT_ZONE_NAME [old zone files...] :: [new zone files...]`:
   Same as `regressions` but computes which queries can be resolved in the new configuration that could not be resolved in the old configuration.
