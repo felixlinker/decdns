@@ -6,11 +6,6 @@
    directory_file_path(Directory, 'build/dnssec_native', Library),
    use_foreign_library(Library).
 
-min(ad(0), ad(0), ad(0)).
-min(ad(0), ad(1), ad(0)).
-min(ad(1), ad(0), ad(0)).
-min(ad(1), ad(1), ad(1)).
-
 :- chr_constraint digestValid/3, rrsigValid/4, nsecUnsigned/2,
                   nsec3Unsigned/3, closestEnclosers/5, isName/1.
 
