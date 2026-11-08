@@ -18,12 +18,12 @@ all: build
 # Stack owns Haskell dependency tracking. Recursive Make then sees the current
 # generated header and shared library and rebuilds only affected native targets.
 build:
-	@cd "$(REPO_ROOT)" && $(STACK) build dns-regressor:lib
+	@cd "$(REPO_ROOT)" && $(STACK) build decdns:lib
 	@set -eu; cd "$(REPO_ROOT)"; \
 	  dist_dir=$$($(STACK) path --dist-dir); \
 	  case "$$dist_dir" in /*) ;; *) dist_dir="$(REPO_ROOT)/$$dist_dir" ;; esac; \
-	  lib_dir=$$($(STACK) exec -- ghc-pkg field dns-regressor dynamic-library-dirs --simple-output); \
-	  lib_name=$$($(STACK) exec -- ghc-pkg field dns-regressor hs-libraries --simple-output); \
+	  lib_dir=$$($(STACK) exec -- ghc-pkg field decdns dynamic-library-dirs --simple-output); \
+	  lib_name=$$($(STACK) exec -- ghc-pkg field decdns hs-libraries --simple-output); \
 	  extension=$$($(SWIPL) -q -g 'current_prolog_flag(shared_object_extension, E), write(E), halt'); \
 	  $(MAKE) --no-print-directory -C "$(PROLOG_DIR)" native \
 	    BRIDGE_HEADER="$$dist_dir/build/Prolog/Bridge_stub.h" \
@@ -45,7 +45,7 @@ $(EXTENSION): build/dnssec_bridge.o $(HASKELL_LIBRARY) Makefile
 	  cd "$(REPO_ROOT)"; \
 	  $(STACK) exec -- ghc \
 	    -dynamic -shared -fPIC -flink-rts -no-hs-main -threaded \
-	    -package dns-regressor -L"$$PLLIBDIR" -lswipl \
+	    -package decdns -L"$$PLLIBDIR" -lswipl \
 	    -optl-Wl,-rpath,"$$PLLIBDIR" \
 	    "$(PROLOG_DIR)/build/dnssec_bridge.o" -o "$(PROLOG_DIR)/$@"
 
